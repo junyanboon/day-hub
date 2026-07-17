@@ -23,6 +23,9 @@
     #morning    🧘 Sadhana — bhuta shuddhi (neem & turmeric), guru pooja, shambhavi
     #lists      ✅ Checklists — domestics, trip-prep, dinner-prep
     #today      📅 Today — the day plan (update each morning + at changes)
+    #tov        🎽 TOV — Taste of Vietnam 2026 Fashion Show (Jul 16–18); QR slot
+                pending (Junyan-approved exception if he supplies the image —
+                photo ID is also required at check-in, which limits misuse)
 
   Checklists use per-day localStorage keys (dayhub:<list>:<yyyy-mm-dd>)
   so ticks reset each day but survive reloads.
@@ -144,6 +147,7 @@
   <button data-tab="morning" class="on">🧘 Sadhana</button>
   <button data-tab="lists">✅ Lists</button>
   <button data-tab="today">📅 Today</button>
+  <button data-tab="tov">🎽 TOV</button>
 </nav>
 
 <main>
@@ -252,7 +256,8 @@
 
 <!-- ── 📅 TODAY ───────────────────────────────────────────────── -->
 <section class="tab" id="tab-today">
-  <div class="flag">✅ <span><b>Decided:</b> TOV modelling today — no Kitchener drive tonight. 🏋️ Gym 19:30 stands.</span></div>
+  <div class="flag">✅ <span><b>Decided:</b> TOV modelling today — no Kitchener drive. 🏋️ Gym 19:30 stands (runway ends 19:00 — tight; gym may slide to 20:00).</span></div>
+  <div class="flag">⚠️ <span><b>Check with TOV:</b> model check-in opens 13:00, hair &amp; makeup 14:00–17:00. If you're required in the full H&amp;M window, Pack/groceries/Main Focus all collide — scope-shrink call needed by noon.</span></div>
   <div class="tl">
     <div class="slot"><span class="t">✓ 8–12</span><div class="what"><b>Bell technician — done</b></div></div>
     <div class="slot rock"><span class="t">✓ 8:30</span><div class="what"><b>🧘 Sadhana — complete</b></div></div>
@@ -263,8 +268,53 @@
     <div class="slot rock"><span class="t">14:00</span><div class="what"><b>TOV rehearsal — Nathan Phillips Sq</b><span class="d">groceries fold around it</span></div></div>
     <div class="slot rock"><span class="t">15:30</span><div class="what"><b>🎯 Main Focus — concierge repair</b><span class="d">incl. Ela's two unblocks: night-watch report fix + her Claude setup · if the window dies, shrink scope — work never migrates past 21:00</span></div></div>
     <div class="slot"><span class="t">17:00</span><div class="what"><b>🍳 Dinner prep</b><span class="d">cook-along available — send the recipe link</span></div></div>
-    <div class="slot rock"><span class="t">19:30</span><div class="what"><b>🏋️ Gym — Ian Barseagle</b><span class="d">confirmed — no Kitchener tonight · TOV modelling 18:00 sits before it, keep it tight</span></div></div>
+    <div class="slot rock"><span class="t">18:00</span><div class="what"><b>🎽 TOV runway show</b><span class="d">18:00–19:00 · QR + photo ID + dress code — see the 🎽 tab</span></div></div>
+    <div class="slot rock"><span class="t">19:30</span><div class="what"><b>🏋️ Gym — Ian Barseagle</b><span class="d">confirmed — right after the runway; slide to 20:00 if needed, never dropped</span></div></div>
     <div class="slot rock"><span class="t">Eve</span><div class="what"><b>🌙 Close ritual</b><span class="d">debrief + plan Saturday with the co-pilot</span></div></div>
+  </div>
+</section>
+
+<!-- ── 🎽 TOV ─────────────────────────────────────────────────── -->
+<section class="tab" id="tab-tov">
+  <div class="flag">🎫 <span><b>No QR = no stage access. No exceptions.</b> QR (phone or printed) + valid photo ID at backstage check-in, every day.</span></div>
+
+  <div class="card">
+    <div class="head">
+      <div class="glyph">🎽</div>
+      <div><h3>Taste of Vietnam 2026</h3><div class="sub">Fashion Show · Jul 16–18 · rehearsal @ Nathan Phillips Sq</div></div>
+    </div>
+    <div class="tl" style="margin-top:.6rem">
+      <div class="slot rock"><span class="t">Fri 17</span><div class="what"><b>Check-in from 13:00 · Hair &amp; makeup 14:00–17:00 · Runway 18:00–19:00</b><span class="d">arrive with foundation done (ladies) — stylists do hair on-site</span></div></div>
+      <div class="slot"><span class="t">Sat 18</span><div class="what"><b>Check-in from 9:00 · Hair &amp; makeup 10:00 · Shows &amp; festival 12:30–22:00</b><span class="d">long day — reusable water bottle; vegan meals provided</span></div></div>
+    </div>
+  </div>
+
+  <div class="card" data-card>
+    <div class="head">
+      <div class="glyph">🧳</div>
+      <div><h3>Bring — every day</h3><div class="sub">dress code is mandatory</div></div>
+      <span class="count" data-count></span>
+    </div>
+    <ul class="check" data-list="tov">
+      <li><span class="box">✓</span><span class="txt">QR code ready on phone<span class="note">printed backup even better</span></span></li>
+      <li><span class="box">✓</span><span class="txt">Photo ID</span></li>
+      <li><span class="box">✓</span><span class="txt">Black pants</span></li>
+      <li><span class="box">✓</span><span class="txt">Black formal shoes</span></li>
+      <li><span class="box">✓</span><span class="txt">White or black shirt</span></li>
+      <li><span class="box">✓</span><span class="txt">Reusable water bottle</span></li>
+      <li><span class="box">✓</span><span class="txt">Caney: nude bra + underwear, heels, foundation applied<span class="note">her QR + ID too — group members check in with their own registration</span></span></li>
+      <li><span class="box">✓</span><span class="txt">No valuables<span class="note">zero backstage storage — you carry what you bring</span></span></li>
+    </ul>
+    <div class="bar"><i></i></div>
+    <p class="cheer" data-cheer></p>
+  </div>
+
+  <div class="card">
+    <div class="head">
+      <div class="glyph">🎫</div>
+      <div><h3>Your QR code</h3><div class="sub">stage-access pass</div></div>
+    </div>
+    <p style="color:var(--mute);font-size:.88rem;margin-top:.4rem" id="qr-slot">Slot ready — send the QR image to the co-pilot and it appears here. Until then it's in the Jul 14 email "Check-In Instructions for Stage Access".</p>
   </div>
 </section>
 </main>
