@@ -76,6 +76,35 @@
   .flag{background:var(--act-soft);color:var(--act);border-radius:.6rem;
     padding:.6rem .8rem;font-size:.9rem;margin:.8rem 0}
   footer{margin-top:2.5rem;color:var(--mute);font-size:.75rem}
+  /* ── Isha-inspired Morning tab ── */
+  #tab-morning{--i-ink:#3f3a33;--i-mute:#8a8175;--i-accent:#c96f3b;--i-gold:#b8862d;
+    --i-paper:#faf6ee;--i-hair:#e8e0d1;
+    background:var(--i-paper);color:var(--i-ink);border:1px solid var(--i-hair);
+    border-radius:.9rem;padding:1.6rem 1.3rem;margin-top:.2rem}
+  @media (prefers-color-scheme: dark){
+    #tab-morning{--i-paper:#211d17;--i-ink:#eae3d6;--i-mute:#a1988a;
+      --i-hair:#3a342a;--i-accent:#e08a50;--i-gold:#d4a548}
+  }
+  #tab-morning .invocation{font-family:Georgia,"Iowan Old Style","Times New Roman",serif;
+    font-style:italic;text-align:center;color:var(--i-mute);font-size:.95rem;
+    margin-bottom:1.2rem}
+  #tab-morning h2{font-family:Georgia,"Iowan Old Style","Times New Roman",serif;
+    font-style:normal;text-transform:none;letter-spacing:.01em;font-size:1.5rem;
+    color:var(--i-ink);text-align:center;margin:0 0 .2rem}
+  #tab-morning .sub{text-align:center;color:var(--i-mute)}
+  #tab-morning .orn{text-align:center;color:var(--i-gold);letter-spacing:.6em;
+    font-size:.8rem;margin:1rem 0 .4rem}
+  #tab-morning .practice{font-family:Georgia,"Iowan Old Style",serif;font-size:1.05rem;
+    color:var(--i-accent);text-align:center;margin:1.1rem 0 .2rem}
+  #tab-morning ul.check li{border-bottom:1px solid var(--i-hair)}
+  #tab-morning ul.check li .box{border-color:var(--i-mute);border-radius:999px}
+  #tab-morning ul.check li.done .box{background:var(--i-accent);border-color:var(--i-accent)}
+  #tab-morning ul.check li .note{color:var(--i-mute)}
+  #tab-morning ul.check li.done .txt{color:var(--i-mute)}
+  #tab-morning .progress{background:var(--i-hair)}
+  #tab-morning .progress i{background:var(--i-gold)}
+  #tab-morning .cheer{color:var(--i-gold);text-align:center;
+    font-family:Georgia,serif;font-style:italic}
 </style>
 </head>
 <body>
@@ -92,18 +121,36 @@
 
 <!-- ── 🧘 MORNING ─────────────────────────────────────────────── -->
 <section class="tab on" id="tab-morning">
-  <h2>Morning practice</h2>
-  <p class="sub">Ticks reset daily. Tap a line to check it off.</p>
+  <h2>Morning Sadhana</h2>
+  <p class="sub">Ticks reset daily. Tap a line as you complete it.</p>
+  <div class="orn">✦ ✦ ✦</div>
+
+  <p class="practice">Bhuta Shuddhi</p>
   <ul class="check" data-list="morning">
-    <li><span class="box">✓</span><span class="txt">Glass of water<span class="note">before anything else</span></span></li>
-    <li><span class="box">✓</span><span class="txt">Space ready<span class="note">mat down, phone on silent, window cracked</span></span></li>
-    <li><span class="box">✓</span><span class="txt">Warm-up asanas<span class="note">gentle prep — don't skip on stiff mornings</span></span></li>
-    <li><span class="box">✓</span><span class="txt">🧘 Shambhavi Mahamudra<span class="note">the full kriya, with Caney when shared</span></span></li>
-    <li><span class="box">✓</span><span class="txt">Sit a minute after<span class="note">no phone until you're up off the mat</span></span></li>
-    <li><span class="box">✓</span><span class="txt">Tell the co-pilot you're done<span class="note">one word in the thread — starts the day officially</span></span></li>
+    <li><span class="box">✓</span><span class="txt">Neem &amp; turmeric<span class="note">on an empty stomach, with warm water</span></span></li>
+    <li><span class="box">✓</span><span class="txt">Space ready<span class="note">shower done, mat down, phone on silent</span></span></li>
   </ul>
   <div class="progress"><i></i></div>
   <p class="cheer" data-cheer></p>
+
+  <p class="practice">Guru Pooja</p>
+  <ul class="check" data-list="morning-gp">
+    <li><span class="box">✓</span><span class="txt">Guru Pooja offered<span class="note">unhurried — the invocation sets the tone</span></span></li>
+  </ul>
+  <div class="progress"><i></i></div>
+  <p class="cheer" data-cheer></p>
+
+  <p class="practice">Shambhavi Mahamudra</p>
+  <ul class="check" data-list="morning-sh">
+    <li><span class="box">✓</span><span class="txt">Preparatory asanas</span></li>
+    <li><span class="box">✓</span><span class="txt">Shambhavi Mahamudra kriya<span class="note">the full 21 minutes — with Caney when shared</span></span></li>
+    <li><span class="box">✓</span><span class="txt">Sit in stillness after<span class="note">no phone until you're up off the mat</span></span></li>
+  </ul>
+  <div class="progress"><i></i></div>
+  <p class="cheer" data-cheer></p>
+
+  <div class="orn">✦ ✦ ✦</div>
+  <p class="invocation">"The practice is not the goal — it is the doorway."</p>
 </section>
 
 <!-- ── ✅ CHECKLISTS ──────────────────────────────────────────── -->
