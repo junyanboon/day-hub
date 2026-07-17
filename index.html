@@ -29,6 +29,8 @@
     #meals      🥗 Meals — today's meals + Blueprint targets + Food Notes
                 (textarea persists per-day; "Send to EA" uses navigator.share
                 → Slack, clipboard fallback — EA reads it and logs the Meal Log)
+    #tomorrow   📆 Sat — tomorrow's plan pulled from the calendar (reference;
+                confirm at evening close). Nav is horizontally scrollable now.
     #tov        🎽 TOV — Taste of Vietnam 2026 Fashion Show (Jul 16–18); QR slot
                 pending (Junyan-approved exception if he supplies the image —
                 photo ID is also required at check-in, which limits misuse)
@@ -67,10 +69,12 @@
   .ring .pct{position:absolute;inset:0;display:grid;place-items:center;
     font-size:.72rem;font-weight:600;color:var(--saffron)}
   /* segmented tabs */
-  nav{display:flex;background:var(--card);border:1px solid var(--hair);border-radius:999px;
-    padding:.28rem;box-shadow:var(--shadow);position:sticky;top:.5rem;z-index:5}
-  nav button{flex:1;border:0;background:transparent;color:var(--mute);font-family:var(--sans);
-    font-size:.76rem;font-weight:600;padding:.55rem .1rem;border-radius:999px;cursor:pointer;
+  nav{display:flex;gap:.1rem;background:var(--card);border:1px solid var(--hair);border-radius:999px;
+    padding:.28rem;box-shadow:var(--shadow);position:sticky;top:.5rem;z-index:5;
+    overflow-x:auto;scrollbar-width:none;-ms-overflow-style:none}
+  nav::-webkit-scrollbar{display:none}
+  nav button{flex:0 0 auto;border:0;background:transparent;color:var(--mute);font-family:var(--sans);
+    font-size:.78rem;font-weight:600;padding:.55rem .7rem;border-radius:999px;cursor:pointer;
     letter-spacing:-.01em;white-space:nowrap;-webkit-tap-highlight-color:transparent;transition:all .2s}
   nav button.on{background:var(--saffron);color:#fff;box-shadow:0 2px 8px rgba(205,106,53,.35)}
   main{padding-top:1.2rem}
@@ -173,6 +177,7 @@
   <button data-tab="lists">✅ Lists</button>
   <button data-tab="today">📅 Today</button>
   <button data-tab="meals">🥗 Meals</button>
+  <button data-tab="tomorrow">📆 Sat</button>
   <button data-tab="tov">🎽 TOV</button>
 </nav>
 
@@ -299,6 +304,26 @@
     <div class="slot"><span class="t">→ Sat</span><div class="what"><b>🏋️ Gym — moved to tomorrow</b><span class="d">no gym today — second session takes the evening · slot Saturday's session at evening close</span></div></div>
     <div class="slot rock"><span class="t">Eve</span><div class="what"><b>🌙 Close ritual</b><span class="d">debrief + plan Saturday with the co-pilot</span></div></div>
   </div>
+</section>
+
+<!-- ── 📆 TOMORROW (SAT) ──────────────────────────────────────── -->
+<section class="tab" id="tab-tomorrow">
+  <div class="flag">🧭 <span><b>Heads up — this reads as a Kitchener / BachaZouk day, not TOV.</b> Your calendar shows morning Samba + Sambacita rehearsals, then a PM drive to Kitchener for BachaZouk Infinity (workshop + beach-theme social, Marriott overnight). We'll lock the real shape at tonight's evening close.</span></div>
+  <div class="flag">⚠️ <span><b>Two clashes to sort:</b> the 16:00 drive overlaps the 17:00 workshop, and your 22:00 wind-down bumps the 22:30 social. 🏋️ Gym (moved from today) still needs a slot — mornings are tight.</span></div>
+  <div class="tl">
+    <div class="slot rock"><span class="t">8:30</span><div class="what"><b>🧘 Shambhavi</b><span class="d">shared morning practice — slides later after a late night, never dropped</span></div></div>
+    <div class="slot"><span class="t">10:30</span><div class="what"><b>🥦 Super Veggie</b><span class="d">meal 1</span></div></div>
+    <div class="slot"><span class="t">11:30</span><div class="what"><b>🏠 Domestics</b><span class="d">daily reset — ✅ tab</span></div></div>
+    <div class="slot"><span class="t">12:15</span><div class="what"><b>💃 Samba w/ Laura</b><span class="d">Studio 901 · 12:15–13:15</span></div></div>
+    <div class="slot"><span class="t">13:15</span><div class="what"><b>💃 Sambacita Show Rehearsal</b><span class="d">13:15–15:30</span></div></div>
+    <div class="slot"><span class="t">15:30</span><div class="what"><b>🥣 Nutty Pudding</b><span class="d">meal 2 · always in grams</span></div></div>
+    <div class="slot open"><span class="t">16:00</span><div class="what"><b>🚗 Drive → Kitchener</b><span class="d">16:00–17:30 · overlaps the 17:00 workshop — which gives?</span></div></div>
+    <div class="slot"><span class="t">17:00</span><div class="what"><b>🕺 BachaZouk WS — Rafael &amp; Isabel</b><span class="d">Pre-Adv? · 17:00–18:00</span></div></div>
+    <div class="slot"><span class="t">19:00</span><div class="what"><b>🍛 Dinner</b><span class="d">19:00–20:15</span></div></div>
+    <div class="slot open"><span class="t">22:00</span><div class="what"><b>🌙 Wind-down vs 🎉 Social</b><span class="d">wind-down rock at 22:00 · beach-theme social 22:30–01:30 — festival night wins tonight? call it at close</span></div></div>
+    <div class="slot"><span class="t">overnight</span><div class="what"><b>🏨 Courtyard by Marriott, Kitchener</b><span class="d">2960 King St E</span></div></div>
+  </div>
+  <p class="blessing">Reference — pulled from your calendar · confirm &amp; tidy at evening close.</p>
 </section>
 
 <!-- ── 🥗 MEALS ───────────────────────────────────────────────── -->
