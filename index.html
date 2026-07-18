@@ -31,9 +31,8 @@
                 → Slack, clipboard fallback — EA reads it and logs the Meal Log)
     #tomorrow   📆 Sat — tomorrow's plan pulled from the calendar (reference;
                 confirm at evening close). Nav is horizontally scrollable now.
-    #tov        🎽 TOV — Taste of Vietnam 2026 Fashion Show (Jul 16–18); QR slot
-                pending (Junyan-approved exception if he supplies the image —
-                photo ID is also required at check-in, which limits misuse)
+    (removed 2026-07-17 eve: #tov 🎽 TOV — Fri fashion show is done; tab retired.
+     tov-qr.png asset kept in the tree, no longer referenced.)
 
   Checklists use per-day localStorage keys (dayhub:<list>:<yyyy-mm-dd>)
   so ticks reset each day but survive reloads.
@@ -178,7 +177,6 @@
   <button data-tab="today">📅 Today</button>
   <button data-tab="meals">🥗 Meals</button>
   <button data-tab="tomorrow">📆 Sat</button>
-  <button data-tab="tov">🎽 TOV</button>
 </nav>
 
 <main>
@@ -371,50 +369,6 @@
   </div>
 </section>
 
-<!-- ── 🎽 TOV ─────────────────────────────────────────────────── -->
-<section class="tab" id="tab-tov">
-  <div class="flag">🎫 <span><b>No QR = no stage access. No exceptions.</b> QR (phone or printed) + valid photo ID at backstage check-in, every day.</span></div>
-
-  <div class="card">
-    <div class="head">
-      <div class="glyph">🎽</div>
-      <div><h3>Taste of Vietnam 2026</h3><div class="sub">Fashion Show · Jul 16–18 · rehearsal @ Nathan Phillips Sq</div></div>
-    </div>
-    <div class="tl" style="margin-top:.6rem">
-      <div class="slot rock"><span class="t">Fri 17</span><div class="what"><b>Check-in from 13:00 · Hair &amp; makeup 14:00–17:00 · Runway 18:00–19:00</b><span class="d">arrive with foundation done (ladies) — stylists do hair on-site</span></div></div>
-      <div class="slot"><span class="t">Sat 18</span><div class="what"><b>Check-in from 9:00 · Hair &amp; makeup 10:00 · Shows &amp; festival 12:30–22:00</b><span class="d">long day — reusable water bottle; vegan meals provided</span></div></div>
-    </div>
-  </div>
-
-  <div class="card" data-card>
-    <div class="head">
-      <div class="glyph">🧳</div>
-      <div><h3>Bring — every day</h3><div class="sub">dress code is mandatory</div></div>
-      <span class="count" data-count></span>
-    </div>
-    <ul class="check" data-list="tov">
-      <li><span class="box">✓</span><span class="txt">QR code ready on phone<span class="note">printed backup even better</span></span></li>
-      <li><span class="box">✓</span><span class="txt">Photo ID</span></li>
-      <li><span class="box">✓</span><span class="txt">Black pants</span></li>
-      <li><span class="box">✓</span><span class="txt">Black formal shoes</span></li>
-      <li><span class="box">✓</span><span class="txt">White or black shirt</span></li>
-      <li><span class="box">✓</span><span class="txt">Reusable water bottle</span></li>
-      <li><span class="box">✓</span><span class="txt">Caney: nude bra + underwear, heels, foundation applied<span class="note">her QR + ID too — group members check in with their own registration</span></span></li>
-      <li><span class="box">✓</span><span class="txt">No valuables<span class="note">zero backstage storage — you carry what you bring</span></span></li>
-    </ul>
-    <div class="bar"><i></i></div>
-    <p class="cheer" data-cheer></p>
-  </div>
-
-  <div class="card">
-    <div class="head">
-      <div class="glyph">🎫</div>
-      <div><h3>Your QR code</h3><div class="sub">stage-access pass</div></div>
-    </div>
-    <img src="tov-qr.png" alt="Junyan's TOV stage-access QR code" style="display:block;width:100%;max-width:300px;margin:.6rem auto 0;border-radius:.8rem;background:#fff;padding:.5rem;box-sizing:border-box">
-    <p style="color:var(--mute);font-size:.8rem;text-align:center;margin-top:.5rem">Show at backstage check-in with photo ID · screenshot it too in case of dead zones</p>
-  </div>
-</section>
 </main>
 
 <footer>Updated by the co-pilot · ticks are stored only on this device<br>no codes or contact info ever appear here</footer>
