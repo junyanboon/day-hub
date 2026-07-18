@@ -380,9 +380,9 @@
       <div><h3>Today's meals</h3><div class="sub">Blueprint rhythm</div></div>
     </div>
     <div class="tl" style="margin-top:.6rem">
-      <div class="slot rock"><span class="t">10:30</span><div class="what"><b>🍚 Rice · tofu · broccoli-cauli</b><span class="d">fresh tofu kept soft &amp; plain · peanut-sesame dressing (rice vinegar) · hemp seeds on top</span></div></div>
-      <div class="slot"><span class="t">15:30</span><div class="what"><b>🫐 Nutty Pudding</b><span class="d">no-cook — prep in the morning window so it's grab-able · always in grams</span></div></div>
-      <div class="slot"><span class="t">~17:00 / post-gym</span><div class="what"><b>🍛 Dinner</b><span class="d">early ~17:00 or light ~21:00 after gym · TOV vegan catering is the backup</span></div></div>
+      <div class="slot" data-start="10:30"><span class="t">10:30</span><div class="what"><b>🥑 7-layer Blueprint dip</b><span class="d">refried pinto · cauliflower puree · guac · plantain chips · shiitake-broccoli side · logged ~800 cal / 27g protein</span></div></div>
+      <div class="slot" data-start="15:30"><span class="t">15:30</span><div class="what"><b>🥣 Nutty Pudding</b><span class="d">standard 2-serving + pea protein · logged ~480 cal / 33g protein</span></div></div>
+      <div class="slot" data-start="19:45"><span class="t">19:45</span><div class="what"><b>🍛 Dinner — Bangkok Cuisine</b><span class="d">tofu-forward, protein-heavy · day's running light (~60g so far vs 107g) so load up</span></div></div>
     </div>
   </div>
 
@@ -481,17 +481,23 @@
 // ── live "you are here" timeline: highlight the current slot, dim the past,
 //    flag what's next — re-runs every minute so it advances on its own ──
 (function(){
-  var tl=document.getElementById('today-tl'); if(!tl) return;
-  var slots=[].slice.call(tl.querySelectorAll('.slot[data-start]'));
   function toMin(hhmm){var p=hhmm.split(':');return (+p[0])*60+(+p[1]);}
+  // every timeline that has timed slots gets the live treatment
+  var lists=[].filter.call(document.querySelectorAll('.tl'),function(tl){
+    return tl.querySelector('.slot[data-start]');
+  });
+  if(!lists.length) return;
   function tick(){
-    var n=new Date(), nm=n.getHours()*60+n.getMinutes(), cur=-1;
-    slots.forEach(function(s,i){ if(toMin(s.dataset.start)<=nm) cur=i; });
-    slots.forEach(function(s,i){
-      s.classList.remove('past','now','next');
-      if(i<cur) s.classList.add('past');
-      else if(i===cur) s.classList.add('now');
-      else if(i===cur+1) s.classList.add('next');
+    var n=new Date(), nm=n.getHours()*60+n.getMinutes();
+    lists.forEach(function(tl){
+      var slots=[].slice.call(tl.querySelectorAll('.slot[data-start]')), cur=-1;
+      slots.forEach(function(s,i){ if(toMin(s.dataset.start)<=nm) cur=i; });
+      slots.forEach(function(s,i){
+        s.classList.remove('past','now','next');
+        if(i<cur) s.classList.add('past');
+        else if(i===cur) s.classList.add('now');
+        else if(i===cur+1) s.classList.add('next');
+      });
     });
   }
   tick(); setInterval(tick,60000);
