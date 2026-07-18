@@ -26,9 +26,9 @@
     #morning    🧘 Sadhana — bhuta shuddhi (neem & turmeric), guru pooja, shambhavi
     #lists      ✅ Checklists — domestics, trip-prep, dinner-prep
     #today      📅 Today — the day plan (update each morning + at changes)
-    #meals      🥗 Meals — today's meals + Blueprint targets + Food Notes
-                (textarea persists per-day; "Send to EA" uses navigator.share
-                → Slack, clipboard fallback — EA reads it and logs the Meal Log)
+    #meals      🥗 Meals — today's meals + Blueprint targets
+                (Food Notes textarea removed 2026-07-18 — didn't work reliably;
+                 Junyan jots meals in Slack #executive-assistant, EA logs them)
     (removed 2026-07-17 eve: #tov 🎽 TOV — Fri fashion show is done; tab retired.
      tov-qr.png asset kept in the tree, no longer referenced.)
 
@@ -372,7 +372,7 @@
 
 <!-- ── 🥗 MEALS ───────────────────────────────────────────────── -->
 <section class="tab" id="tab-meals">
-  <div class="flag"><span><b>JOT AS YOU COOK:</b> note meal + portions, tap Send to EA, I log it.</span></div>
+  <div class="flag"><span><b>JOT AS YOU COOK:</b> drop meal + portions in Slack, I log it to the Meal Log.</span></div>
 
   <div class="card">
     <div class="head">
@@ -404,16 +404,7 @@
     <p style="color:var(--mute);font-size:.8rem;margin-top:.6rem">~175 g tofu ≈ the 36 g protein target for the first meal.</p>
   </div>
 
-  <div class="card">
-    <div class="head">
-      <div class="glyph">📝</div>
-      <div><h3>Food notes</h3><div class="sub">saved on this device as you type</div></div>
-    </div>
-    <textarea class="notes" id="food-notes" placeholder="e.g. Meal 1 — 175 g tofu, 1 cup rice, 200 g broccoli+cauli. Peanut-sesame dressing, ate it all, tasty. Log it?"></textarea>
-    <button class="btn" id="send-ea">📤 Send to EA</button>
-    <div class="note-status" id="note-status"></div>
-  </div>
-</section>
+  </section>
 
 </main>
 
@@ -501,47 +492,6 @@
     });
   }
   tick(); setInterval(tick,60000);
-})();
-
-// ── food notes: persist on-device + Send to EA — isolated IIFE so nothing
-//    above can stop it from wiring; share-then-copy with loud feedback ──
-(function(){
-  var ta=document.getElementById('food-notes'),
-      sendBtn=document.getElementById('send-ea'),
-      statusEl=document.getElementById('note-status');
-  if(!ta||!sendBtn) return;
-  var day=new Date().toISOString().slice(0,10);
-  var nkey='dayhub:foodnotes:'+day;
-  try{ ta.value=localStorage.getItem(nkey)||''; }catch(e){}
-  ta.addEventListener('input',function(){ try{localStorage.setItem(nkey,ta.value);}catch(e){} });
-  function flash(msg,ok){
-    if(statusEl) statusEl.textContent=msg;
-    sendBtn.classList.toggle('saved',!!ok);
-    if(ok) setTimeout(function(){sendBtn.classList.remove('saved');},1800);
-  }
-  function copyFallback(payload){
-    if(navigator.clipboard && navigator.clipboard.writeText){
-      navigator.clipboard.writeText(payload).then(function(){
-        flash('copied — paste in Slack #executive-assistant',true);
-      }).catch(function(){ manual(); });
-    } else { manual(); }
-    function manual(){ try{ta.focus();ta.select();}catch(e){} flash('text selected — long-press to copy',false); }
-  }
-  sendBtn.addEventListener('click',function(){
-    var txt=(ta.value||'').trim();
-    if(!txt){ flash('write a note first',false); return; }
-    var payload='Food note '+day+': '+txt;
-    if(navigator.share){
-      navigator.share({text:payload}).then(function(){
-        flash('shared — send it to Slack #executive-assistant',true);
-      }).catch(function(err){
-        if(err && err.name==='AbortError') return; // user closed the share sheet
-        copyFallback(payload);                     // share blocked/unavailable → copy
-      });
-    } else {
-      copyFallback(payload);
-    }
-  });
 })();
 </script>
 </body>
