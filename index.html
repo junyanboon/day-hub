@@ -285,8 +285,8 @@
 
 <!-- ── 📅 TODAY ───────────────────────────────────────────────── -->
 <section class="tab" id="tab-today">
-  <div class="flag">🔄 <span><b>Pivot (17:00):</b> TOV didn't need male models — you're <b>not walking</b>. Caney stays &amp; walks; you head back by <b>17:30 to film her</b> — <b>two sessions</b> (18:00 + 19:30). 🏋️ No gym today — moved to Saturday.</span></div>
-  <div class="flag">✅ <span><b>Scope-shrink done:</b> H&amp;M ate the 15:30 window, so concierge repair → tomorrow. Only Ela's two unblocks (night-watch report + Claude setup) held for a pocket tonight or Sat AM.</span></div>
+  <div class="flag"><span><b>PIVOT:</b> not walking — filming Caney's 2 sessions (18:00 + 19:30). Gym → Saturday.</span></div>
+  <div class="flag"><span><b>SCOPE-SHRINK:</b> concierge repair → tomorrow. Ela's 2 unblocks held.</span></div>
   <div class="tl">
     <div class="slot"><span class="t">✓ 8–12</span><div class="what"><b>Bell technician — done</b></div></div>
     <div class="slot rock"><span class="t">✓ 8:30</span><div class="what"><b>🧘 Sadhana — complete</b></div></div>
@@ -306,7 +306,7 @@
 
 <!-- ── 📆 TOMORROW (SAT) ──────────────────────────────────────── -->
 <section class="tab" id="tab-tomorrow">
-  <div class="flag"><span>kitchener bachazouk day · gym 12:15 during caney samba · festival night so wind-down relaxed</span></div>
+  <div class="flag"><span><b>SAT:</b> Kitchener/BachaZouk day. Gym 12:15 during Caney's Samba. Wind-down relaxed.</span></div>
   <div class="tl">
     <div class="slot rock"><span class="t">8:30</span><div class="what"><b>🧘 Shambhavi</b><span class="d">shared · slides if late</span></div></div>
     <div class="slot"><span class="t">10:30</span><div class="what"><b>🥦 Super Veggie</b><span class="d">meal 1</span></div></div>
@@ -323,7 +323,7 @@
 
 <!-- ── 🥗 MEALS ───────────────────────────────────────────────── -->
 <section class="tab" id="tab-meals">
-  <div class="flag">🥗 <span><b>Jot as you cook.</b> Write meal + portions + how it went below, tap <b>Send to EA</b> → it opens your share sheet to Slack, and I log it to your Meal Log.</span></div>
+  <div class="flag"><span><b>JOT AS YOU COOK:</b> note meal + portions, tap Send to EA, I log it.</span></div>
 
   <div class="card">
     <div class="head">
@@ -427,35 +427,47 @@
     });
     paint();
   });
-  // ── food notes: persist on-device + Send to EA (share sheet → Slack) ──
+})();
+
+// ── food notes: persist on-device + Send to EA — isolated IIFE so nothing
+//    above can stop it from wiring; share-then-copy with loud feedback ──
+(function(){
   var ta=document.getElementById('food-notes'),
       sendBtn=document.getElementById('send-ea'),
-      status=document.getElementById('note-status');
-  if(ta&&sendBtn){
-    var nkey='dayhub:foodnotes:'+day;
-    ta.value=localStorage.getItem(nkey)||'';
-    ta.addEventListener('input',function(){localStorage.setItem(nkey,ta.value);});
-    function flash(msg,ok){
-      status.textContent=msg;
-      if(ok){sendBtn.classList.add('saved');setTimeout(function(){sendBtn.classList.remove('saved');},1600);}
-    }
-    sendBtn.addEventListener('click',function(){
-      var txt=ta.value.trim();
-      if(!txt){flash('Write a note first ☝️',false);return;}
-      var payload='🥗 Food note ('+day+'):\n'+txt;
-      if(navigator.share){
-        navigator.share({text:payload}).then(function(){
-          flash('Shared — pick Slack #executive-assistant',true);
-        }).catch(function(){/* user cancelled the share sheet */});
-      }else if(navigator.clipboard){
-        navigator.clipboard.writeText(payload).then(function(){
-          flash('Copied — paste into Slack #executive-assistant',true);
-        }).catch(function(){flash('Select the text above and copy it manually',false);});
-      }else{
-        ta.select();flash('Select the text above and copy it manually',false);
-      }
-    });
+      statusEl=document.getElementById('note-status');
+  if(!ta||!sendBtn) return;
+  var day=new Date().toISOString().slice(0,10);
+  var nkey='dayhub:foodnotes:'+day;
+  try{ ta.value=localStorage.getItem(nkey)||''; }catch(e){}
+  ta.addEventListener('input',function(){ try{localStorage.setItem(nkey,ta.value);}catch(e){} });
+  function flash(msg,ok){
+    if(statusEl) statusEl.textContent=msg;
+    sendBtn.classList.toggle('saved',!!ok);
+    if(ok) setTimeout(function(){sendBtn.classList.remove('saved');},1800);
   }
+  function copyFallback(payload){
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(payload).then(function(){
+        flash('copied — paste in Slack #executive-assistant',true);
+      }).catch(function(){ manual(); });
+    } else { manual(); }
+    function manual(){ try{ta.focus();ta.select();}catch(e){} flash('text selected — long-press to copy',false); }
+  }
+  sendBtn.addEventListener('click',function(){
+    var txt=(ta.value||'').trim();
+    if(!txt){ flash('write a note first',false); return; }
+    var payload='Food note '+day+': '+txt;
+    if(navigator.share){
+      navigator.share({text:payload}).then(function(){
+        flash('shared — send it to Slack #executive-assistant',true);
+      }).catch(function(err){
+        if(err && err.name==='AbortError') return; // user closed the share sheet
+        copyFallback(payload);                     // share blocked/unavailable → copy
+      });
+    } else {
+      copyFallback(payload);
+    }
+  });
 })();
 </script>
 </body>
