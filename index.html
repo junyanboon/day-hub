@@ -29,8 +29,6 @@
     #meals      🥗 Meals — today's meals + Blueprint targets + Food Notes
                 (textarea persists per-day; "Send to EA" uses navigator.share
                 → Slack, clipboard fallback — EA reads it and logs the Meal Log)
-    #tomorrow   📆 Sat — tomorrow's plan pulled from the calendar (reference;
-                confirm at evening close). Nav is horizontally scrollable now.
     (removed 2026-07-17 eve: #tov 🎽 TOV — Fri fashion show is done; tab retired.
      tov-qr.png asset kept in the tree, no longer referenced.)
 
@@ -188,7 +186,6 @@
   <button data-tab="today">📅 Today</button>
   <button data-tab="kitchener">🧳 Kitchener</button>
   <button data-tab="meals">🥗 Meals</button>
-  <button data-tab="tomorrow">📆 Sat</button>
 </nav>
 
 <main>
@@ -370,23 +367,6 @@
     </ul>
     <div class="bar"><i></i></div>
     <p class="cheer" data-cheer></p>
-  </div>
-</section>
-
-<!-- ── 📆 TOMORROW (SAT) ──────────────────────────────────────── -->
-<section class="tab" id="tab-tomorrow">
-  <div class="flag"><span><b>SAT:</b> Kitchener/BachaZouk day. Gym 12:15 during Caney's Samba. Wind-down relaxed.</span></div>
-  <div class="tl">
-    <div class="slot rock"><span class="t">8:30</span><div class="what"><b>🧘 Shambhavi</b><span class="d">shared · slides if late</span></div></div>
-    <div class="slot"><span class="t">10:30</span><div class="what"><b>🥦 Super Veggie</b><span class="d">meal 1</span></div></div>
-    <div class="slot"><span class="t">11:30</span><div class="what"><b>🏠 Domestics</b><span class="d">wrap by 12:15</span></div></div>
-    <div class="slot rock"><span class="t">12:15</span><div class="what"><b>🏋️ Gym</b><span class="d">during caney samba</span></div></div>
-    <div class="slot"><span class="t">13:15</span><div class="what"><b>💃 Caney — Sambacita rehearsal</b><span class="d">you free · pack for kitchener</span></div></div>
-    <div class="slot"><span class="t">15:30</span><div class="what"><b>🥣 Nutty Pudding</b><span class="d">meal 2</span></div></div>
-    <div class="slot"><span class="t">17:00</span><div class="what"><b>🚗 Drive → Kitchener</b><span class="d">workshop dropped for travel</span></div></div>
-    <div class="slot"><span class="t">19:00</span><div class="what"><b>🍛 Dinner</b><span class="d">kitchener</span></div></div>
-    <div class="slot"><span class="t">22:30</span><div class="what"><b>🎉 Beach social</b><span class="d">mouth-care + nurosym when back</span></div></div>
-    <div class="slot"><span class="t">overnight</span><div class="what"><b>🏨 Marriott, Kitchener</b><span class="d">2960 King St E</span></div></div>
   </div>
 </section>
 
