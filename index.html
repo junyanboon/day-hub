@@ -181,16 +181,16 @@
 </header>
 
 <nav id="tabs">
-  <button data-tab="morning" class="on">🧘 Sadhana</button>
+  <button data-tab="morning">🧘 Sadhana</button>
   <button data-tab="lists">✅ Lists</button>
-  <button data-tab="today">📅 Today</button>
+  <button data-tab="today" class="on">📅 Today</button>
   <button data-tab="kitchener">🧳 Kitchener</button>
   <button data-tab="meals">🥗 Meals</button>
 </nav>
 
 <main>
 <!-- ── 🧘 SADHANA ─────────────────────────────────────────────── -->
-<section class="tab on" id="tab-morning">
+<section class="tab" id="tab-morning">
   <div class="card" data-card>
     <div class="head">
       <div class="glyph">🌿</div>
@@ -293,18 +293,20 @@
 </section>
 
 <!-- ── 📅 TODAY ───────────────────────────────────────────────── -->
-<section class="tab" id="tab-today">
-  <div class="flag"><span><b>NOW:</b> pack, then leave ~6pm for Kitchener — the timeline below tracks where you are</span></div>
-  <div class="flag"><span><b>KITCHENER:</b> BachaZouk day — dinner protein-heavy tonight, meal 1 ran light</span></div>
+<section class="tab on" id="tab-today">
+  <div class="flag"><span><b>NOW:</b> eat 11:00, get ready, leave 11:45 for workshops — the timeline below tracks where you are</span></div>
+  <div class="flag"><span><b>SUNDAY:</b> Shambhavi missed after the late social — workshops all afternoon, pool party, then drive home</span></div>
   <div class="tl" id="today-tl">
-    <div class="slot" data-start="10:30"><span class="t">10:30</span><div class="what"><b>🥑 Meal 1 — 7-layer Blueprint dip</b><span class="d">logged ~800 cal / 27g protein</span></div></div>
-    <div class="slot" data-start="12:15"><span class="t">12:15</span><div class="what"><b>🏋️ Gym</b><span class="d">done 12:15–13:30 · during Caney's Samba</span></div></div>
-    <div class="slot" data-start="15:30"><span class="t">15:30</span><div class="what"><b>🥣 Nutty Pudding — meal 2</b><span class="d">made ~16:20 · logged ~33g protein</span></div></div>
-    <div class="slot" data-start="16:30"><span class="t">16:30</span><div class="what"><b>🎒 Pack for Kitchener</b><span class="d">list on the 🧳 Kitchener tab · beach + pool + 2 dances</span></div></div>
-    <div class="slot" data-start="18:00"><span class="t">18:00</span><div class="what"><b>🚗 Drive → Kitchener</b><span class="d">~1.5h · Courtyard Marriott, 2960 King St E</span></div></div>
-    <div class="slot" data-start="19:45"><span class="t">19:45</span><div class="what"><b>🍛 Dinner — Bangkok Cuisine</b><span class="d">tofu-forward, protein-heavy · closes the day's ~107g</span></div></div>
-    <div class="slot" data-start="22:30"><span class="t">22:30</span><div class="what"><b>🎉 Beach-theme social</b><span class="d">mouth-care + Nurosym after · relaxed wind-down (one-night exception)</span></div></div>
-    <div class="slot" data-start="23:59"><span class="t">late</span><div class="what"><b>🏨 Marriott, Kitchener</b><span class="d">2960 King St E</span></div></div>
+    <div class="slot" data-start="11:00"><span class="t">11:00</span><div class="what"><b>🥦 Eat — Super Veggie</b><span class="d">11:00–11:30 · meal 1, fuel before the floor</span></div></div>
+    <div class="slot" data-start="11:30"><span class="t">11:30</span><div class="what"><b>🎽 Get ready + drive</b><span class="d">leave 11:45 · dance kit, wristband, water</span></div></div>
+    <div class="slot" data-start="12:00"><span class="t">12:00</span><div class="what"><b>💃 WS — Rafael & Isabel (Adv)</b><span class="d">12:00–13:00</span></div></div>
+    <div class="slot" data-start="13:00"><span class="t">13:00</span><div class="what"><b>💃 WS — Arthur (Adv)</b><span class="d">13:00–14:00</span></div></div>
+    <div class="slot" data-start="14:00"><span class="t">14:00</span><div class="what"><b>💃 WS — Rachel & Laura (Adv)</b><span class="d">14:00–15:00</span></div></div>
+    <div class="slot" data-start="15:15"><span class="t">15:15</span><div class="what"><b>🏊 Pool Party</b><span class="d">15:15–18:00 · 1005 Kiwanis Park Dr, Waterloo · bring wristband</span></div></div>
+    <div class="slot" data-start="15:30"><span class="t">15:30</span><div class="what"><b>🥣 Nutty Pudding — meal 2</b><span class="d">grab around the pool window</span></div></div>
+    <div class="slot" data-start="18:15"><span class="t">18:15</span><div class="what"><b>🍛 Dinner</b><span class="d">18:15–19:15 · protein-forward</span></div></div>
+    <div class="slot" data-start="19:30"><span class="t">19:30</span><div class="what"><b>💃 WS — Rachel & Laura (Pre-Adv)</b><span class="d">19:30–20:30 · optional before the drive</span></div></div>
+    <div class="slot" data-start="20:45"><span class="t">20:45</span><div class="what"><b>🚗 Drive home</b><span class="d">~1.5h back to Toronto · 20:30 Robinson & Larissa WS gets cut by this</span></div></div>
   </div>
 </section>
 
