@@ -31,6 +31,13 @@
                  Junyan jots meals in Slack #executive-assistant, EA logs them)
     (removed 2026-07-17 eve: #tov 🎽 TOV — Fri fashion show is done; tab retired.
      tov-qr.png asset kept in the tree, no longer referenced.)
+    (removed 2026-07-20: #kitchener 🧳 Kitchener — one-night trip closed Sun night.
+     Trip tabs are ephemeral: add on departure, retire on return.)
+
+  ★ STALE-DATA RULE (Junyan 2026-07-20): every tab shows TODAY only. On a new
+    day, rewrite #today + #meals and retire any event/trip tab whose event has
+    passed. The durable record of each day lives as a Day Plan page in the
+    Notion "Travel Activities Planner" data source, not here.
 
   Checklists use per-day localStorage keys (dayhub:<list>:<yyyy-mm-dd>)
   so ticks reset each day but survive reloads.
@@ -184,7 +191,6 @@
   <button data-tab="morning">🧘 Sadhana</button>
   <button data-tab="lists">✅ Lists</button>
   <button data-tab="today" class="on">📅 Today</button>
-  <button data-tab="kitchener">🧳 Kitchener</button>
   <button data-tab="meals">🥗 Meals</button>
 </nav>
 
@@ -294,80 +300,19 @@
 
 <!-- ── 📅 TODAY ───────────────────────────────────────────────── -->
 <section class="tab on" id="tab-today">
-  <div class="flag"><span><b>PLAN CHANGE:</b> pool party CANCELLED — back 3pm to pack, checkout 4pm, Caney rehearsal + shoot at Crowne Plaza until ~5:30</span></div>
-  <div class="flag"><span><b>DINNER:</b> unknown right now — decide after the shoot</span></div>
+  <div class="flag"><span><b>TONIGHT:</b> gym &amp; sauna 19:30, then wind-down at 22:00 — screens off at 10</span></div>
+  <div class="flag"><span><b>BRAZIL:</b> 7 days out (Mon Jul 27) — nothing prepped yet, needs a block this week</span></div>
   <div class="tl" id="today-tl">
-    <div class="slot" data-start="12:00"><span class="t">12:00</span><div class="what"><b>💃 WS — Rafael & Isabel (Adv)</b><span class="d">12:00–13:00</span></div></div>
-    <div class="slot" data-start="13:00"><span class="t">13:00</span><div class="what"><b>💃 WS — Arthur (Adv)</b><span class="d">13:00–14:00</span></div></div>
-    <div class="slot" data-start="14:00"><span class="t">14:00</span><div class="what"><b>💃 WS — Rachel & Laura (Adv)</b><span class="d">14:00–15:00</span></div></div>
-    <div class="slot" data-start="15:00"><span class="t">15:00</span><div class="what"><b>🎒 Back to hotel — pack</b><span class="d">sweep the room · list on the 🧳 Kitchener tab</span></div></div>
-    <div class="slot" data-start="16:00"><span class="t">16:00</span><div class="what"><b>🏨 Check out</b><span class="d">Courtyard Marriott · load the car</span></div></div>
-    <div class="slot" data-start="16:15"><span class="t">16:15</span><div class="what"><b>📸 Crowne Plaza — Caney rehearsal + shoot</b><span class="d">until ~17:30 · 105 King St E</span></div></div>
-    <div class="slot" data-start="17:30"><span class="t">17:30</span><div class="what"><b>🍽️ Dinner — TBD</b><span class="d">decide after the shoot · protein-forward</span></div></div>
-    <div class="slot" data-start="19:30"><span class="t">19:30</span><div class="what"><b>💃 WS — Rachel & Laura (Pre-Adv)</b><span class="d">19:30–20:30 · optional, only if energy allows</span></div></div>
-    <div class="slot" data-start="20:45"><span class="t">20:45</span><div class="what"><b>🚗 Drive home</b><span class="d">~1.5h back to Toronto</span></div></div>
-  </div>
-</section>
-
-<!-- ── 🧳 KITCHENER (one-night trip) ──────────────────────────── -->
-<section class="tab" id="tab-kitchener">
-  <div class="flag"><span><b>TRIP:</b> one night · Courtyard Marriott, 2960 King St E · beach party tonight, pool party tomorrow, 2 dances</span></div>
-
-  <div class="card" data-card>
-    <div class="head">
-      <div class="glyph">👕</div>
-      <div><h3>Outfits</h3><div class="sub">3 events + spare</div></div>
-      <span class="count" data-count></span>
-    </div>
-    <ul class="check" data-list="kit-outfits">
-      <li><span class="box">✓</span><span class="txt">Beach-theme party fit<span class="note">tonight 22:30 — beachy/tropical</span></span></li>
-      <li><span class="box">✓</span><span class="txt">Pool party fit + swimwear<span class="note">tomorrow — trunks, cover-up</span></span></li>
-      <li><span class="box">✓</span><span class="txt">Dance outfit #1<span class="note">breathable, moves well</span></span></li>
-      <li><span class="box">✓</span><span class="txt">Dance outfit #2 / spare top</span></li>
-      <li><span class="box">✓</span><span class="txt">Dance shoes</span></li>
-      <li><span class="box">✓</span><span class="txt">Underwear + socks ×2</span></li>
-      <li><span class="box">✓</span><span class="txt">Sleepwear</span></li>
-    </ul>
-    <div class="bar"><i></i></div>
-    <p class="cheer" data-cheer></p>
-  </div>
-
-  <div class="card" data-card>
-    <div class="head">
-      <div class="glyph">🏖️</div>
-      <div><h3>Beach, pool & body</h3><div class="sub">gear + toiletries + health</div></div>
-      <span class="count" data-count></span>
-    </div>
-    <ul class="check" data-list="kit-body">
-      <li><span class="box">✓</span><span class="txt">Quick-dry towel</span></li>
-      <li><span class="box">✓</span><span class="txt">Flip-flops / sandals</span></li>
-      <li><span class="box">✓</span><span class="txt">Sunscreen + sunglasses</span></li>
-      <li><span class="box">✓</span><span class="txt">Deodorant + small sweat towel<span class="note">for the dances</span></span></li>
-      <li><span class="box">✓</span><span class="txt">Toothbrush + Dr. Ellie mouth-care</span></li>
-      <li><span class="box">✓</span><span class="txt">Nurosym + any meds/supplements</span></li>
-      <li><span class="box">✓</span><span class="txt">Contacts / glasses + skincare</span></li>
-    </ul>
-    <div class="bar"><i></i></div>
-    <p class="cheer" data-cheer></p>
-  </div>
-
-  <div class="card" data-card>
-    <div class="head">
-      <div class="glyph">🔑</div>
-      <div><h3>Grab-and-go</h3><div class="sub">last sweep before the door</div></div>
-      <span class="count" data-count></span>
-    </div>
-    <ul class="check" data-list="kit-go">
-      <li><span class="box">✓</span><span class="txt">Wallet + ID</span></li>
-      <li><span class="box">✓</span><span class="txt">Phone + charger + power bank</span></li>
-      <li><span class="box">✓</span><span class="txt">Car keys</span></li>
-      <li><span class="box">✓</span><span class="txt">Hotel confirmation reachable offline</span></li>
-      <li><span class="box">✓</span><span class="txt">Festival tickets / wristband</span></li>
-      <li><span class="box">✓</span><span class="txt">Water bottle + drive snacks</span></li>
-      <li><span class="box">✓</span><span class="txt">Home set: thermostat, windows, lights</span></li>
-    </ul>
-    <div class="bar"><i></i></div>
-    <p class="cheer" data-cheer></p>
+    <div class="slot" data-start="08:30"><span class="t">08:30</span><div class="what"><b>🧘 Shambhavi</b><span class="d">back on after Sunday's miss</span></div></div>
+    <div class="slot" data-start="10:30"><span class="t">10:30</span><div class="what"><b>🥦 Super Veggie — meal 1</b><span class="d">10:30–11:30</span></div></div>
+    <div class="slot" data-start="11:30"><span class="t">11:30</span><div class="what"><b>🧹 Domestics</b><span class="d">post-trip unpack + laundry</span></div></div>
+    <div class="slot" data-start="13:15"><span class="t">13:15</span><div class="what"><b>💃 Zouk Training</b><span class="d">13:15–14:45</span></div></div>
+    <div class="slot" data-start="14:45"><span class="t">14:45</span><div class="what"><b>🛒 Groceries</b><span class="d">14:45–15:15</span></div></div>
+    <div class="slot" data-start="15:30"><span class="t">15:30</span><div class="what"><b>🥣 Nutty Pudding — meal 2</b><span class="d">back on rhythm</span></div></div>
+    <div class="slot" data-start="16:00"><span class="t">16:00</span><div class="what"><b>🎂 Cake for Mr B</b><span class="d">he turns 1 today</span></div></div>
+    <div class="slot" data-start="18:00"><span class="t">18:00</span><div class="what"><b>🍽️ Dinner</b><span class="d">18:00–19:00</span></div></div>
+    <div class="slot" data-start="19:30"><span class="t">19:30</span><div class="what"><b>🏋️ Gym &amp; Sauna</b><span class="d">19:30–21:00 · Monday slot</span></div></div>
+    <div class="slot" data-start="22:00"><span class="t">22:00</span><div class="what"><b>🌙 Wind-down</b><span class="d">rock · screens off at 10, lights out by 11</span></div></div>
   </div>
 </section>
 
@@ -381,8 +326,10 @@
       <div><h3>Today's meals</h3><div class="sub">Blueprint rhythm</div></div>
     </div>
     <div class="tl" style="margin-top:.6rem">
-      <div class="slot" data-start="11:00"><span class="t">11:00</span><div class="what"><b>🥣 Granola yogurt + avocado toast</b><span class="d">with arugula · hotel breakfast · est ~600 cal / ~20g protein</span></div></div>
-      <div class="slot" data-start="17:30"><span class="t">17:30</span><div class="what"><b>🍽️ Dinner — TBD</b><span class="d">no Nutty Pudding today · day running light on protein, make dinner count</span></div></div>
+      <div class="slot" data-start="10:30"><span class="t">10:30</span><div class="what"><b>🥦 Super Veggie</b><span class="d">meal 1 · back on rhythm after the weekend</span></div></div>
+      <div class="slot" data-start="15:30"><span class="t">15:30</span><div class="what"><b>🥣 Nutty Pudding</b><span class="d">meal 2 · standard 2-serving + pea protein</span></div></div>
+      <div class="slot" data-start="16:00"><span class="t">16:00</span><div class="what"><b>🎂 Cake — Mr B's 1st</b><span class="d">off-plan, worth it</span></div></div>
+      <div class="slot" data-start="18:00"><span class="t">18:00</span><div class="what"><b>🍽️ Dinner</b><span class="d">protein-forward · fuel before the 19:30 gym</span></div></div>
     </div>
   </div>
 
