@@ -149,6 +149,14 @@
   .slot.rock .what{border-left:3px solid var(--saffron)}
   .slot.open .what{border-left:3px solid var(--gold)}
   .slot .what .d{display:block;font-size:.8rem;color:var(--mute);margin-top:.15rem}
+  /* live countdown badges (JS-injected on the current + next block) */
+  .slot .cd{display:inline-block;margin-left:.45rem;font-size:.66rem;font-weight:800;
+    letter-spacing:.02em;text-transform:none;color:var(--gold);background:var(--gold-soft);
+    border-radius:999px;padding:.06rem .42rem;vertical-align:1px}
+  .slot.now .cd{color:#fff;background:var(--saffron)}
+  .slot .cd.urgent{color:#fff;background:#c0392b;animation:cdpulse 1s ease-in-out infinite}
+  @keyframes cdpulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(1.06)}}
+  .slot.imminent .what{border-color:#c0392b;box-shadow:0 0 0 1px #c0392b33,var(--shadow)}
   /* meals — food notes */
   .notes{width:100%;min-height:8.5rem;resize:vertical;background:var(--paper);
     border:1px solid var(--hair);border-radius:1rem;padding:.8rem .9rem;margin-top:.5rem;
@@ -421,28 +429,58 @@
 })();
 
 // ── live "you are here" timeline: highlight the current slot, dim the past,
-//    flag what's next — re-runs every minute so it advances on its own ──
+//    flag what's next, and COUNT DOWN to the next transition every second so
+//    there's real urgency to stay on schedule. Re-runs on its own. ──
 (function(){
-  function toMin(hhmm){var p=hhmm.split(':');return (+p[0])*60+(+p[1]);}
-  // every timeline that has timed slots gets the live treatment
+  function startSecs(s){var p=s.dataset.start.split(':');return (+p[0])*3600+(+p[1])*60;}
   var lists=[].filter.call(document.querySelectorAll('.tl'),function(tl){
     return tl.querySelector('.slot[data-start]');
   });
   if(!lists.length) return;
+  var todayTl=document.getElementById('today-tl');
+
+  function fmt(secs){
+    if(secs<0)secs=0;
+    if(secs>=3600){var h=Math.floor(secs/3600),m=Math.round((secs%3600)/60);return h+'h '+(m<10?'0':'')+m+'m';}
+    if(secs>=600)return Math.round(secs/60)+'m';
+    var m=Math.floor(secs/60),s=secs%60;return m+':'+(s<10?'0':'')+s;
+  }
+
   function tick(){
-    var n=new Date(), nm=n.getHours()*60+n.getMinutes();
+    var n=new Date(), nowSecs=n.getHours()*3600+n.getMinutes()*60+n.getSeconds();
+
+    // 1) paint past/now/next on every timeline
     lists.forEach(function(tl){
       var slots=[].slice.call(tl.querySelectorAll('.slot[data-start]')), cur=-1;
-      slots.forEach(function(s,i){ if(toMin(s.dataset.start)<=nm) cur=i; });
+      slots.forEach(function(s,i){ if(startSecs(s)<=nowSecs) cur=i; });
       slots.forEach(function(s,i){
-        s.classList.remove('past','now','next');
+        s.classList.remove('past','now','next','imminent');
+        var cd=s.querySelector('.cd'); if(cd)cd.remove();
         if(i<cur) s.classList.add('past');
         else if(i===cur) s.classList.add('now');
         else if(i===cur+1) s.classList.add('next');
       });
     });
+
+    // 2) countdown to the next transition — Today schedule only
+    if(!todayTl) return;
+    var slots=[].slice.call(todayTl.querySelectorAll('.slot[data-start]')), cur=-1;
+    slots.forEach(function(s,i){ if(startSecs(s)<=nowSecs) cur=i; });
+    var nowSlot=cur>=0?slots[cur]:null, nextSlot=(cur+1<slots.length)?slots[cur+1]:null;
+    if(!nextSlot) return;                       // day's last block — nothing to count to
+    var secs=startSecs(nextSlot)-nowSecs, urgent=secs<=300;
+    function badge(slot,text){
+      if(!slot)return;
+      var t=slot.querySelector('.t'); if(!t)return;
+      var b=document.createElement('span');
+      b.className='cd'+(urgent?' urgent':''); b.textContent=text;
+      t.appendChild(b);
+      if(urgent)slot.classList.add('imminent');
+    }
+    badge(nowSlot, fmt(secs)+' left');          // time remaining in the current block
+    badge(nextSlot, 'in '+fmt(secs));           // countdown to the next block
   }
-  tick(); setInterval(tick,60000);
+  tick(); setInterval(tick,1000);
 })();
 </script>
 </body>
