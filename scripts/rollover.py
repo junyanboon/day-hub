@@ -48,7 +48,9 @@ CALS = [
 NOTION_TOKEN = os.environ.get("NOTION_TOKEN", "").strip()
 # This integration is new (2026) → current data-source API. Pages are created
 # under a DATA SOURCE, and queried at /v1/data_sources/{id}/query.
-NOTION_DS = os.environ.get("NOTION_DAYPLAN_DS", "b9b967bb-211e-42ee-b3c1-8ca3665d6414").strip()
+# NB: os.environ.get(key, default) returns "" when the workflow passes an empty
+# secret (key present but blank) — so fall back with `or`, not the get() default.
+NOTION_DS = os.environ.get("NOTION_DAYPLAN_DS", "").strip() or "b9b967bb-211e-42ee-b3c1-8ca3665d6414"
 NOTION_VER = "2025-09-03"
 DATE_PROP = "Scheduled Date"
 
