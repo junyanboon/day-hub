@@ -1,0 +1,74 @@
+name: Day Hub morning rollover
+
+# Brazil-proof daily rollover. Deterministic scripts/rollover.py reads the four
+# Google Calendars (secret ICS URLs), rewrites index.html's Today + Meals tabs,
+# and creates today's Notion Day Plan. Commits index.html only when it changed.
+#
+# GitHub throttles scheduled crons to ~1/hour, which is fine for a once-a-day job.
+# Two fire times cover 7am Toronto across DST (11:10 UTC = 7:10 EDT summer,
+# 12:10 UTC = 7:10 EST winter). The run is idempotent, so a double-fire is a no-op.
+
+on:
+  schedule:
+    - cron: "10 11 * * *"   # 07:10 America/Toronto (EDT)
+    - cron: "10 12 * * *"   # 07:10 America/Toronto (EST)
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+concurrency:
+  group: day-hub-rollover
+  cancel-in-progress: false
+
+jobs:
+  rollover:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Skip-green until secrets exist
+        id: gate
+        run: |
+          if [ -z "${{ secrets.ICS_URL_JOINT }}" ] || [ -z "${{ secrets.NOTION_TOKEN }}" ]; then
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "Secrets not configured yet — skipping (green). See scripts/RUNBOOK.md."
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Checkout
+        if: steps.gate.outputs.ready == 'true'
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        if: steps.gate.outputs.ready == 'true'
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install deps
+        if: steps.gate.outputs.ready == 'true'
+        run: pip install -r scripts/requirements.txt
+
+      - name: Run rollover
+        if: steps.gate.outputs.ready == 'true'
+        env:
+          ICS_URL_JOINT:  ${{ secrets.ICS_URL_JOINT }}
+          ICS_URL_MYPLAN: ${{ secrets.ICS_URL_MYPLAN }}
+          ICS_URL_CANEY:  ${{ secrets.ICS_URL_CANEY }}
+          ICS_URL_STAFF:  ${{ secrets.ICS_URL_STAFF }}
+          NOTION_TOKEN:   ${{ secrets.NOTION_TOKEN }}
+          NOTION_DAYPLAN_DB: ${{ secrets.NOTION_DAYPLAN_DB }}
+        run: python scripts/rollover.py
+
+      - name: Commit if changed
+        if: steps.gate.outputs.ready == 'true'
+        run: |
+          if git diff --quiet -- index.html; then
+            echo "No change to index.html."
+          else
+            git config user.name  "day-hub-rollover[bot]"
+            git config user.email "actions@github.com"
+            git add index.html
+            git commit -m "Rollover: $(TZ=America/Toronto date '+%A %b %-d') day plan"
+            git push
+          fi
