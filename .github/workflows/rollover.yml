@@ -53,7 +53,7 @@ jobs:
         if: steps.gate.outputs.ready == 'true'
         env:
           ICS_URL_JOINT:  ${{ secrets.ICS_URL_JOINT }}
-          ICS_URL_MYPLAN: ${{ secrets.ICS_URL_MYPLAN }}
+          ICS_URL_JUNYAN: ${{ secrets.ICS_URL_JUNYAN }}
           ICS_URL_CANEY:  ${{ secrets.ICS_URL_CANEY }}
           ICS_URL_STAFF:  ${{ secrets.ICS_URL_STAFF }}
           NOTION_TOKEN:   ${{ secrets.NOTION_TOKEN }}

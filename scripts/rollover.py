@@ -39,7 +39,7 @@ INDEX = os.path.join(HERE, "..", "index.html")
 # (Google Calendar → Settings → "Secret address in iCal format").
 CALS = [
     {"key": "joint",  "env": "ICS_URL_JOINT",  "label": "Joint"},
-    {"key": "myplan", "env": "ICS_URL_MYPLAN", "label": "My Plan"},
+    {"key": "myplan", "env": "ICS_URL_JUNYAN", "label": "My Plan"},
     {"key": "caney",  "env": "ICS_URL_CANEY",  "label": "Caney"},
     {"key": "staff",  "env": "ICS_URL_STAFF",  "label": "Staff"},
 ]

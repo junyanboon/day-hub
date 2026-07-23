@@ -23,7 +23,7 @@ In **github.com/junyanboon/day-hub → Settings → Secrets and variables → Ac
 | Secret | Value |
 |---|---|
 | `ICS_URL_JOINT`  | Joint Plans calendar → Settings → **Secret address in iCal format** |
-| `ICS_URL_MYPLAN` | "Junyan" / My Plan calendar → same secret iCal URL |
+| `ICS_URL_JUNYAN` | "Junyan" / My Plan calendar → same secret iCal URL |
 | `ICS_URL_CANEY`  | Caney calendar (`junyan.boon@gmail.com`) → same secret iCal URL |
 | `ICS_URL_STAFF`  | Staff Scheduling calendar → same secret iCal URL (same value as fbs-monitor's `ICS_URL_STAFF`) |
 | `NOTION_TOKEN`   | A Notion internal-integration token. **Share the *Travel Activities Planner* database with that integration** (••• → Connections). Reuse the fbs-monitor integration if it's easier — just add this DB to its connections. |
