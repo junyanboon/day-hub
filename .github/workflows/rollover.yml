@@ -57,7 +57,7 @@ jobs:
           ICS_URL_CANEY:  ${{ secrets.ICS_URL_CANEY }}
           ICS_URL_STAFF:  ${{ secrets.ICS_URL_STAFF }}
           NOTION_TOKEN:   ${{ secrets.NOTION_TOKEN }}
-          NOTION_DAYPLAN_DB: ${{ secrets.NOTION_DAYPLAN_DB }}
+          NOTION_DAYPLAN_DS: ${{ secrets.NOTION_DAYPLAN_DS }}
         run: python scripts/rollover.py
 
       - name: Commit if changed

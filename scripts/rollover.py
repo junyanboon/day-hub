@@ -46,8 +46,10 @@ CALS = [
 
 # ── Notion ───────────────────────────────────────────────────────────────────
 NOTION_TOKEN = os.environ.get("NOTION_TOKEN", "").strip()
-NOTION_DB = os.environ.get("NOTION_DAYPLAN_DB", "e3212b3245264da48a12dc6d8900490b").strip()
-NOTION_VER = "2022-06-28"
+# This integration is new (2026) → current data-source API. Pages are created
+# under a DATA SOURCE, and queried at /v1/data_sources/{id}/query.
+NOTION_DS = os.environ.get("NOTION_DAYPLAN_DS", "b9b967bb-211e-42ee-b3c1-8ca3665d6414").strip()
+NOTION_VER = "2025-09-03"
 DATE_PROP = "Scheduled Date"
 
 BRAZIL_DEPART = date(2026, 7, 27)
@@ -300,7 +302,7 @@ def notion_headers():
 
 def notion_day_exists(iso_day):
     r = requests.post(
-        f"https://api.notion.com/v1/databases/{NOTION_DB}/query",
+        f"https://api.notion.com/v1/data_sources/{NOTION_DS}/query",
         headers=notion_headers(),
         json={"filter": {"property": DATE_PROP, "date": {"equals": iso_day}},
               "page_size": 1},
@@ -358,12 +360,12 @@ def notion_create_day(iso_day, weekday_title, plan_rows, headline):
                              {"type": "text", "text": {"content": q}}]}})
 
     payload = {
-        "parent": {"type": "database_id", "database_id": NOTION_DB},
+        "parent": {"type": "data_source_id", "data_source_id": NOTION_DS},
         "icon": {"type": "emoji", "emoji": icon},
         "properties": {
             "Name": {"title": [{"text": {"content": weekday_title}}]},
             "Activity Type": {"select": {"name": "Main Focus"}},
-            "Status": {"select": {"name": "In progress"}},
+            "Status": {"status": {"name": "In progress"}},   # status-type, not select
             "Trip": {"select": {"name": "Toronto"}},
             DATE_PROP: {"date": {"start": iso_day}},
         },
