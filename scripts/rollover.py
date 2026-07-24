@@ -267,13 +267,36 @@ def splice(html, start_marker, end_marker, inner, indent_close=""):
     return pat.sub(lambda _: block, html, count=1)
 
 
-def update_hub(today_html, meal_html, flags_html):
+def hub_day(html):
+    """The date the hub's generated regions were last built for, or None."""
+    m = re.search(r'data-rollover-day="(\d{4}-\d{2}-\d{2})"', html)
+    return m.group(1) if m else None
+
+
+def update_hub(today_html, meal_html, flags_html, iso_day):
+    """Rewrite the generated regions — but ONLY when rolling to a NEW day.
+
+    The live co-pilot annotates these same regions during the day: ticked meals,
+    computed macros, retimed blocks. Those edits are the day's real record and the
+    rollover has no way to reproduce them. So once a region is stamped with today's
+    date, a later run leaves it alone — a rollover rolls to a new day, it does not
+    rewrite the current one. (This also makes the double cron fire a true no-op.)
+    Set FORCE_ROLLOVER=1 to rebuild today from the calendar anyway, discarding
+    whatever was logged.
+    """
     with open(INDEX, encoding="utf-8") as fh:
         html = fh.read()
 
+    stamped = hub_day(html)
+    if stamped == iso_day and not os.environ.get("FORCE_ROLLOVER", "").strip():
+        print(f"Hub already built for {iso_day} — leaving live edits intact "
+              f"(set FORCE_ROLLOVER=1 to override).")
+        return False
+
     today_inner = (
         f"{flags_html}\n"
-        f'  <div class="tl" id="today-tl">\n{today_html}\n  </div>')
+        f'  <div class="tl" id="today-tl" data-rollover-day="{iso_day}">\n'
+        f"{today_html}\n  </div>")
     html = splice(
         html,
         "<!-- ROLLOVER:TODAY:START — everything between these markers is regenerated daily by scripts/rollover.py. Hand-edits here are overwritten at the next rollover. -->",
@@ -281,7 +304,7 @@ def update_hub(today_html, meal_html, flags_html):
         today_inner, indent_close="  ")
 
     meals_inner = (
-        '    <div class="tl" style="margin-top:.6rem">\n'
+        f'    <div class="tl" style="margin-top:.6rem" data-rollover-day="{iso_day}">\n'
         f'{meal_html}\n    </div>')
     html = splice(
         html,
@@ -291,6 +314,7 @@ def update_hub(today_html, meal_html, flags_html):
 
     with open(INDEX, "w", encoding="utf-8") as fh:
         fh.write(html)
+    return True
 
 
 # ── Notion ───────────────────────────────────────────────────────────────────
@@ -404,8 +428,8 @@ def main():
     if m:
         headline = f"Tonight: {m.group(1)}."
 
-    update_hub(today_html, meal_html, flags_html)
-    print(f"Hub rewritten for {iso_day} ({len(plan_rows)} blocks).")
+    if update_hub(today_html, meal_html, flags_html, iso_day):
+        print(f"Hub rewritten for {iso_day} ({len(plan_rows)} blocks).")
 
     if not NOTION_TOKEN:
         print("NOTION_TOKEN absent — skipped Notion Day Plan (hub still updated).")
