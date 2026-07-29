@@ -1,4 +1,4 @@
-// Password gate for every production and preview route.
+// Password gate for every production and preview route. Passwords live only in Cloudflare.
 export async function onRequest(context) {
   const password = context.env.DAY_HUB_PASSWORD;
   if (!password) {
