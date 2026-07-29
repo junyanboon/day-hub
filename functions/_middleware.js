@@ -1,3 +1,4 @@
+// Password gate for every production and preview route.
 export async function onRequest(context) {
   const password = context.env.DAY_HUB_PASSWORD;
   if (!password) {
