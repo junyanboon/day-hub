@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Still — a calm day</title>
+<style>
+  :root {
+    --ink: rgba(255,255,255,.95);
+    --ink-soft: rgba(255,255,255,.65);
+    --ink-faint: rgba(255,255,255,.4);
+    --glass: rgba(255,255,255,.12);
+    --glass-border: rgba(255,255,255,.18);
+  }
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html, body { height:100%; overflow:hidden; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
+    color: var(--ink);
+    background: linear-gradient(180deg, #8a7fc4 0%, #6a5fa8 50%, #4a4580 100%);
+    transition: background 3s ease;
+    user-select:none; -webkit-user-select:none;
+  }
+  body.mode-focus { background: linear-gradient(180deg, #5b8fd4 0%, #4a6fa5 45%, #5d5ba8 100%); }
+  body.mode-break { background: linear-gradient(180deg, #6fb98f 0%, #4a8f7b 50%, #3d6b70 100%); }
+  body.mode-fixed { background: linear-gradient(180deg, #d4a45b 0%, #a5764a 45%, #8a5d7a 100%); }
+  body.mode-done  { background: linear-gradient(180deg, #e8a87c 0%, #c97b63 50%, #85506b 100%); }
+
+  #app { height:100%; display:flex; flex-direction:column;
+    padding: calc(env(safe-area-inset-top) + 16px) 20px calc(env(safe-area-inset-bottom) + 16px); }
+
+  header { display:flex; justify-content:space-between; align-items:center; }
+  #clock { font-size:15px; font-weight:500; color:var(--ink-soft); letter-spacing:.5px; }
+  #day-btn, #add-btn { background:var(--glass); border:1px solid var(--glass-border); color:var(--ink);
+    border-radius:20px; padding:7px 14px; font-size:13px; font-weight:500;
+    backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px); }
+  #add-btn { border-radius:50%; width:33px; height:33px; padding:0; font-size:17px; }
+
+  /* quick-add modal */
+  #add-modal { position:fixed; inset:0; display:none; align-items:center; justify-content:center; z-index:20; }
+  #add-modal.open { display:flex; }
+  #add-card { width:min(86vw, 340px); background:rgba(30,35,60,.85);
+    backdrop-filter:blur(24px); -webkit-backdrop-filter:blur(24px);
+    border:1px solid var(--glass-border); border-radius:20px; padding:20px; }
+  #add-card h3 { font-size:16px; font-weight:600; margin-bottom:12px; }
+  #add-card input { width:100%; background:var(--glass); border:1px solid var(--glass-border);
+    border-radius:12px; padding:11px 13px; color:var(--ink); font-size:15px; font-family:inherit; outline:none; }
+  #add-card input::placeholder { color:var(--ink-faint); }
+  #dur-chips { display:flex; gap:8px; margin:12px 0 16px; }
+  #dur-chips button { flex:1; background:var(--glass); border:1px solid var(--glass-border);
+    color:var(--ink); border-radius:11px; padding:9px 0; font-size:13.5px; }
+  #dur-chips button.sel { background:rgba(255,255,255,.9); color:#3a4a6b; }
+  #add-actions { display:flex; gap:8px; }
+  #add-actions button { flex:1; border-radius:12px; padding:12px; font-size:14.5px; font-weight:500;
+    background:var(--glass); border:1px solid var(--glass-border); color:var(--ink); }
+  #add-actions #add-go { background:rgba(255,255,255,.9); color:#3a4a6b; border:none; }
+  .tl.t-task .tag { color:#8fe0da; }
+  .tl .rm-x { background:none; border:none; color:var(--ink-faint); font-size:15px; padding:2px 4px; flex-shrink:0; }
+  button { cursor:pointer; font-family:inherit; }
+
+  #stage { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; min-height:0; }
+  #mantra { font-size:16px; color:var(--ink-soft); letter-spacing:.3px; text-align:center;
+    min-height:22px; transition:opacity 1.2s ease; padding:0 10px; }
+  #block-label { font-size:14px; color:var(--ink-faint); letter-spacing:1.5px; text-transform:uppercase;
+    text-align:center; max-width:90%; }
+  #next-up { font-size:13px; color:var(--ink-faint); text-align:center; min-height:18px; }
+
+  #orb-wrap { position:relative; width:min(68vw, 280px); aspect-ratio:1; margin:10px 0; }
+  #ring { position:absolute; inset:0; transform:rotate(-90deg); }
+  #ring circle { fill:none; stroke-width:3; }
+  #ring .track { stroke:rgba(255,255,255,.15); }
+  #ring .progress { stroke:rgba(255,255,255,.85); stroke-linecap:round; transition:stroke-dashoffset 1s linear; }
+  #orb { position:absolute; inset:14%; border-radius:50%;
+    background: radial-gradient(circle at 35% 35%, rgba(255,255,255,.35), rgba(255,255,255,.08) 60%, rgba(255,255,255,.02));
+    border:1px solid rgba(255,255,255,.25);
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; }
+  body.running #orb { animation:breathe 8s ease-in-out infinite; }
+  @keyframes breathe { 0%,100%{transform:scale(.94);} 50%{transform:scale(1.04);} }
+  #time { font-size:48px; font-weight:200; letter-spacing:1px; font-variant-numeric:tabular-nums; }
+  #time-sub { font-size:12px; color:var(--ink-faint); letter-spacing:1px; }
+
+  #controls { display:flex; align-items:center; gap:18px; margin-top:4px; }
+  .ctl { background:var(--glass); border:1px solid var(--glass-border); color:var(--ink);
+    border-radius:50%; width:52px; height:52px; font-size:20px;
+    backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
+    display:flex; align-items:center; justify-content:center; }
+  .ctl.big { width:68px; height:68px; font-size:26px; background:rgba(255,255,255,.9); color:#3a4a6b; border:none; }
+
+  /* timeline sheet */
+  #sheet { position:fixed; left:0; right:0; bottom:0; max-height:82%;
+    background:rgba(30,35,60,.78); backdrop-filter:blur(24px); -webkit-backdrop-filter:blur(24px);
+    border-radius:24px 24px 0 0; border-top:1px solid var(--glass-border);
+    transform:translateY(100%); transition:transform .35s cubic-bezier(.3,.9,.3,1);
+    display:flex; flex-direction:column;
+    padding:14px 20px calc(env(safe-area-inset-bottom) + 16px); z-index:10; }
+  #sheet.open { transform:translateY(0); }
+  #sheet .handle { width:36px; height:4px; border-radius:2px; background:var(--ink-faint); margin:0 auto 14px; }
+  #sheet h2 { font-size:17px; font-weight:600; margin-bottom:2px; }
+  #sheet .sub { font-size:12.5px; color:var(--ink-soft); margin-bottom:12px; }
+  #timeline { overflow-y:auto; flex:1; display:flex; flex-direction:column; gap:6px; }
+  .tl { display:flex; align-items:center; gap:12px; border-radius:13px; padding:10px 13px;
+    background:var(--glass); border:1px solid var(--glass-border); }
+  .tl.past { opacity:.4; }
+  .tl.now { background:rgba(255,255,255,.24); }
+  .tl .when { font-size:12.5px; color:var(--ink-soft); font-variant-numeric:tabular-nums; width:88px; flex-shrink:0; }
+  .tl .what { flex:1; font-size:14.5px; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .tl .tag { font-size:10.5px; letter-spacing:.8px; text-transform:uppercase; color:var(--ink-faint); flex-shrink:0; }
+  .tl.t-focus .tag { color:#9fc7ff; }
+  .tl.t-fixed .tag { color:#ffce9f; }
+  .tl.t-break .tag { color:#9fe3b0; }
+  #scrim { position:fixed; inset:0; background:rgba(0,0,0,.3); opacity:0; pointer-events:none; transition:opacity .3s; z-index:5; }
+  #scrim.show { opacity:1; pointer-events:auto; }
+
+  footer { display:flex; justify-content:center; gap:6px; padding-top:10px; }
+  .pip { width:7px; height:7px; border-radius:50%; background:var(--ink-faint); }
+  .pip.filled { background:var(--ink); }
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <div id="clock">--:--</div>
+    <div style="display:flex; gap:8px;">
+      <button id="add-btn">＋</button>
+      <button id="day-btn">my day ☼</button>
+    </div>
+  </header>
+  <div id="stage">
+    <div id="block-label"></div>
+    <div id="orb-wrap">
+      <svg id="ring" viewBox="0 0 100 100">
+        <circle class="track" cx="50" cy="50" r="47"/>
+        <circle class="progress" cx="50" cy="50" r="47" stroke-dasharray="295.3" stroke-dashoffset="295.3"/>
+      </svg>
+      <div id="orb"><div id="time">--:--</div><div id="time-sub"></div></div>
+    </div>
+    <div id="mantra">take a deep breath</div>
+    <div id="next-up"></div>
+    <div id="controls">
+      <button class="ctl" id="prev-btn" title="previous">⏮</button>
+      <button class="ctl big" id="play-btn">▶</button>
+      <button class="ctl" id="next-btn" title="next">⏭</button>
+    </div>
+  </div>
+  <footer id="pips"></footer>
+</div>
+
+<div id="add-modal">
+  <div id="add-card">
+    <h3>Slot something in, right now</h3>
+    <input id="add-name" placeholder="brush teeth, stretch, call mom…" autocomplete="off">
+    <div id="dur-chips">
+      <button data-m="5" class="sel">5m</button>
+      <button data-m="10">10m</button>
+      <button data-m="15">15m</button>
+      <button data-m="25">25m</button>
+    </div>
+    <div id="add-actions">
+      <button id="add-cancel">not now</button>
+      <button id="add-go">begin</button>
+    </div>
+  </div>
+</div>
+
+<div id="scrim"></div>
+<div id="sheet">
+  <div class="handle"></div>
+  <h2>Your day, gently planned</h2>
+  <div class="sub" id="plan-meta"></div>
+  <div id="timeline"></div>
+</div>
+
+<script>
+/* ============================================================
+   DAY PLAN — regenerated by Claude from the three calendars:
+   Junyan · Joint Plans · Staff Scheduling
+   Times are ISO with offsets; rendered in the device timezone.
+   ============================================================ */
+const PLAN = {
+  generated: "2026-07-30T11:40:00-04:00",
+  label: "Wed Jul 30 · São Paulo · synced from Junyan + Joint Plans",
+  blocks: [
+    { s:"2026-07-30T07:30:00-04:00", e:"2026-07-30T08:00:00-04:00", t:"🧘 Shambhavi", type:"fixed", cal:"Joint Plans" },
+    { s:"2026-07-30T08:30:00-04:00", e:"2026-07-30T09:30:00-04:00", t:"Hotel breakfast", type:"fixed", cal:"Joint Plans" },
+    { s:"2026-07-30T09:30:00-04:00", e:"2026-07-30T11:00:00-04:00", t:"Morning work", type:"focus", cal:"Joint Plans" },
+    { s:"2026-07-30T11:00:00-04:00", e:"2026-07-30T11:10:00-04:00", t:"Rest", type:"break" },
+    { s:"2026-07-30T11:05:00-04:00", e:"2026-07-30T11:10:00-04:00", t:"🪥 Brush teeth", type:"task", cal:"you" },
+    { s:"2026-07-30T11:10:00-04:00", e:"2026-07-30T12:00:00-04:00", t:"Deep work I", type:"focus", cal:"Junyan" },
+    { s:"2026-07-30T12:00:00-04:00", e:"2026-07-30T12:10:00-04:00", t:"Rest", type:"break" },
+    { s:"2026-07-30T12:10:00-04:00", e:"2026-07-30T13:00:00-04:00", t:"Deep work II", type:"focus", cal:"Junyan" },
+    { s:"2026-07-30T13:00:00-04:00", e:"2026-07-30T13:10:00-04:00", t:"Rest", type:"break" },
+    { s:"2026-07-30T13:10:00-04:00", e:"2026-07-30T13:55:00-04:00", t:"Deep work III", type:"focus", cal:"Junyan" },
+    { s:"2026-07-30T14:00:00-04:00", e:"2026-07-30T14:30:00-04:00", t:"Lunch @ Mariana's Grill 2", type:"fixed", cal:"Joint Plans" },
+    { s:"2026-07-30T14:40:00-04:00", e:"2026-07-30T15:30:00-04:00", t:"Deep work IV", type:"focus", cal:"Junyan" },
+    { s:"2026-07-30T15:30:00-04:00", e:"2026-07-30T15:40:00-04:00", t:"Rest", type:"break" },
+    { s:"2026-07-30T15:40:00-04:00", e:"2026-07-30T16:25:00-04:00", t:"Deep work V", type:"focus", cal:"Junyan" },
+    { s:"2026-07-30T16:30:00-04:00", e:"2026-07-30T17:30:00-04:00", t:"Dinner @ Executive Lounge", type:"fixed", cal:"Joint Plans" },
+    { s:"2026-07-30T17:35:00-04:00", e:"2026-07-30T18:25:00-04:00", t:"Light admin + inbox", type:"focus", cal:"Junyan" },
+    { s:"2026-07-30T18:30:00-04:00", e:"2026-07-30T21:30:00-04:00", t:"🎓 Formação Profissional – Geração 3D", type:"fixed", cal:"Joint Plans" }
+  ]
+};
+
+(() => {
+  const FOCUS_MANTRAS = ["settle into this moment","one thing, softly held","let the rest wait","breathe in, begin","stay with it, gently","this block is enough"];
+  const BREAK_MANTRAS = ["release your shoulders","look far away","take a slow breath","stand, stretch, soften","let your mind wander"];
+  const FIXED_MANTRAS = ["be where your feet are","this, fully","present and unhurried"];
+  const CIRC = 295.3;
+  const $ = id => document.getElementById(id);
+
+  const planBlocks = PLAN.blocks.map(b => ({...b, s:new Date(b.s), e:new Date(b.e)}));
+
+  /* quick-added tasks live in localStorage, merged over the published plan */
+  const XKEY = "still-extras";
+  function loadExtras(){
+    try {
+      const d = JSON.parse(localStorage.getItem(XKEY));
+      if (d && d.date === new Date().toDateString())
+        return d.items.map(b => ({...b, s:new Date(b.s), e:new Date(b.e)}));
+    } catch {}
+    return [];
+  }
+  let extras = loadExtras();
+  function saveExtras(){
+    localStorage.setItem(XKEY, JSON.stringify({date:new Date().toDateString(),
+      items: extras.map(b => ({...b, s:b.s.toISOString(), e:b.e.toISOString()}))}));
+  }
+  function allBlocks(){ return [...planBlocks, ...extras].sort((a,b) => a.s - b.s); }
+
+  let manualIdx = null;     // user override via prev/next
+  let paused = false;
+  let lastPhaseKey = "";
+  let ac;
+
+  function chime(freqs){
+    try {
+      ac = ac || new (window.AudioContext||window.webkitAudioContext)();
+      freqs.forEach((f,i) => {
+        const o = ac.createOscillator(), g = ac.createGain();
+        o.type="sine"; o.frequency.value=f;
+        g.gain.setValueAtTime(0, ac.currentTime + i*.4);
+        g.gain.linearRampToValueAtTime(.18, ac.currentTime + i*.4 + .05);
+        g.gain.exponentialRampToValueAtTime(.0001, ac.currentTime + i*.4 + 2.2);
+        o.connect(g).connect(ac.destination);
+        o.start(ac.currentTime + i*.4); o.stop(ac.currentTime + i*.4 + 2.4);
+      });
+    } catch {}
+  }
+
+  const fmtT = d => d.toLocaleTimeString([], {hour:"numeric", minute:"2-digit"});
+  const fmtC = s => `${String(Math.floor(s/60)).padStart(2,"0")}:${String(Math.floor(s%60)).padStart(2,"0")}`;
+
+  /* latest-starting block containing "now" wins — so a task slotted in
+     mid-block takes the stage over the block it interrupts */
+  function currentIdx(blocks, now){
+    let hit = -1;
+    for (let i=0;i<blocks.length;i++) if (now >= blocks[i].s && now < blocks[i].e) hit = i;
+    return hit;
+  }
+  function nextIdx(blocks, now){
+    for (let i=0;i<blocks.length;i++) if (now < blocks[i].s) return i;
+    return -1;
+  }
+
+  function render(){
+    const now = new Date();
+    const blocks = allBlocks();
+    let idx = manualIdx !== null ? Math.min(manualIdx, blocks.length-1) : currentIdx(blocks, now);
+    let phase, label, remaining=0, total=0, sub="", next="";
+
+    if (idx === -1) {
+      const ni = nextIdx(blocks, now);
+      if (ni === -1) { phase="done"; label="your day is complete"; sub=""; }
+      else {
+        phase="break"; label="open space";
+        remaining = (blocks[ni].s - now)/1000; total = remaining; sub="until " + fmtT(blocks[ni].s);
+        next = `next · ${blocks[ni].t} at ${fmtT(blocks[ni].s)}`;
+      }
+    } else {
+      const b = blocks[idx];
+      phase = b.type === "task" ? "focus" : b.type;
+      label = b.t;
+      total = (b.e - b.s)/1000;
+      remaining = Math.max(0, (b.e - now)/1000);
+      sub = b.type === "focus" || b.type === "task" ? "focus" : b.type === "break" ? "rest" : "in session";
+      const ni = blocks.findIndex((x,i) => i>idx && x.s >= b.e - 60000);
+      if (blocks[idx+1]) next = `next · ${blocks[idx+1].t} at ${fmtT(blocks[idx+1].s)}`;
+    }
+
+    // chime on phase change (only when auto-tracking, timer visible)
+    const key = phase + ":" + label;
+    if (lastPhaseKey && key !== lastPhaseKey && manualIdx === null) {
+      chime(phase === "focus" ? [523.25,659.25,783.99] : [783.99,659.25]);
+    }
+    lastPhaseKey = key;
+
+    $("time").textContent = phase==="done" ? "☺" : fmtC(remaining);
+    $("time-sub").textContent = sub;
+    $("block-label").textContent = label;
+    $("next-up").textContent = next;
+    document.body.className = "mode-" + (phase==="fixed"?"fixed":phase) + (paused ? "" : " running");
+    document.querySelector("#ring .progress").style.strokeDashoffset = total ? CIRC*(remaining/total) : CIRC;
+    $("play-btn").textContent = manualIdx===null ? "◉" : "▶";
+
+    // mantra pool by phase (rotated separately)
+    // pips = focus blocks completed
+    const focusBlocks = blocks.filter(b => b.type==="focus");
+    $("pips").innerHTML = focusBlocks.map(b => `<div class="pip ${now >= b.e ? "filled":""}"></div>`).join("");
+  }
+
+  let mantraPhase = "";
+  setInterval(() => {
+    const now = new Date();
+    const blocks = allBlocks();
+    const idx = currentIdx(blocks, now);
+    const phase = idx===-1 ? "break" : blocks[idx].type;
+    const pool = phase==="focus" ? FOCUS_MANTRAS : phase==="fixed" ? FIXED_MANTRAS : BREAK_MANTRAS;
+    const el = $("mantra");
+    el.style.opacity = 0;
+    setTimeout(() => { el.textContent = pool[Math.floor(Math.random()*pool.length)]; el.style.opacity = 1; }, 1200);
+  }, 45000);
+
+  /* controls: prev/next preview blocks, ◉ returns to "now" */
+  $("prev-btn").onclick = () => {
+    const blocks = allBlocks();
+    const base = manualIdx !== null ? manualIdx : Math.max(0, currentIdx(blocks, new Date()));
+    manualIdx = Math.max(0, base - 1); render();
+  };
+  $("next-btn").onclick = () => {
+    const blocks = allBlocks();
+    const base = manualIdx !== null ? manualIdx : currentIdx(blocks, new Date());
+    manualIdx = Math.min(blocks.length-1, base + 1); render();
+  };
+  $("play-btn").onclick = () => { manualIdx = null; render(); };
+
+  /* timeline sheet */
+  function renderTimeline(){
+    const now = new Date();
+    const blocks = allBlocks();
+    $("plan-meta").textContent = PLAN.label;
+    $("timeline").innerHTML = blocks.map((b,i) => {
+      const cls = now >= b.e ? "past" : (now >= b.s ? "now" : "");
+      const rm = b.extra ? `<button class="rm-x" data-x="${b.xid}">✕</button>` : "";
+      return `<div class="tl t-${b.type} ${cls}">
+        <div class="when">${fmtT(b.s)}–${fmtT(b.e)}</div>
+        <div class="what">${b.t}</div>
+        <div class="tag">${b.type==="fixed" ? (b.cal||"") : b.type==="task" ? (b.cal||"you") : b.type}</div>
+        ${rm}
+      </div>`;
+    }).join("");
+    document.querySelectorAll("#timeline .rm-x").forEach(btn => {
+      btn.onclick = () => {
+        extras = extras.filter(x => x.xid !== btn.dataset.x);
+        saveExtras(); renderTimeline(); render();
+      };
+    });
+    const cur = document.querySelector("#timeline .now");
+    if (cur) cur.scrollIntoView({block:"center"});
+  }
+  const openSheet = v => { $("sheet").classList.toggle("open", v); $("scrim").classList.toggle("show", v); if (v) renderTimeline(); };
+  $("day-btn").onclick = () => openSheet(true);
+  $("scrim").onclick = () => openSheet(false);
+
+  /* quick-add: slot a task in starting now */
+  let durMin = 5;
+  document.querySelectorAll("#dur-chips button").forEach(btn => {
+    btn.onclick = () => {
+      document.querySelectorAll("#dur-chips button").forEach(b => b.classList.remove("sel"));
+      btn.classList.add("sel"); durMin = +btn.dataset.m;
+    };
+  });
+  $("add-btn").onclick = () => { $("add-modal").classList.add("open"); $("add-name").focus(); };
+  $("add-cancel").onclick = () => $("add-modal").classList.remove("open");
+  $("add-modal").onclick = e => { if (e.target === $("add-modal")) $("add-modal").classList.remove("open"); };
+  $("add-go").onclick = () => {
+    const name = $("add-name").value.trim();
+    if (!name) { $("add-name").focus(); return; }
+    const now = new Date();
+    extras.push({ xid:String(now.getTime()), s:now, e:new Date(now.getTime() + durMin*60000),
+      t:name, type:"task", cal:"you", extra:true });
+    saveExtras();
+    $("add-name").value = "";
+    $("add-modal").classList.remove("open");
+    manualIdx = null;
+    chime([659.25, 783.99]);
+    render();
+  };
+  $("add-name").addEventListener("keydown", e => { if (e.key === "Enter") $("add-go").onclick(); });
+
+  setInterval(() => { $("clock").textContent = fmtT(new Date()); render(); }, 1000);
+
+  let wakeLock;
+  async function keepAwake(){ try { wakeLock = await navigator.wakeLock?.request("screen"); } catch {} }
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) keepAwake(); });
+  document.addEventListener("click", keepAwake, { once:true });
+
+  render();
+})();
+</script>
+</body>
+</html>
