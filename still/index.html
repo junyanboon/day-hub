@@ -33,31 +33,11 @@
 
   header { display:flex; justify-content:space-between; align-items:center; }
   #clock { font-size:15px; font-weight:500; color:var(--ink-soft); letter-spacing:.5px; }
+  .hdr-btns { display:flex; gap:8px; }
   #day-btn, #add-btn { background:var(--glass); border:1px solid var(--glass-border); color:var(--ink);
     border-radius:20px; padding:7px 14px; font-size:13px; font-weight:500;
     backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px); }
   #add-btn { border-radius:50%; width:33px; height:33px; padding:0; font-size:17px; }
-
-  /* quick-add modal */
-  #add-modal { position:fixed; inset:0; display:none; align-items:center; justify-content:center; z-index:20; }
-  #add-modal.open { display:flex; }
-  #add-card { width:min(86vw, 340px); background:rgba(30,35,60,.85);
-    backdrop-filter:blur(24px); -webkit-backdrop-filter:blur(24px);
-    border:1px solid var(--glass-border); border-radius:20px; padding:20px; }
-  #add-card h3 { font-size:16px; font-weight:600; margin-bottom:12px; }
-  #add-card input { width:100%; background:var(--glass); border:1px solid var(--glass-border);
-    border-radius:12px; padding:11px 13px; color:var(--ink); font-size:15px; font-family:inherit; outline:none; }
-  #add-card input::placeholder { color:var(--ink-faint); }
-  #dur-chips { display:flex; gap:8px; margin:12px 0 16px; }
-  #dur-chips button { flex:1; background:var(--glass); border:1px solid var(--glass-border);
-    color:var(--ink); border-radius:11px; padding:9px 0; font-size:13.5px; }
-  #dur-chips button.sel { background:rgba(255,255,255,.9); color:#3a4a6b; }
-  #add-actions { display:flex; gap:8px; }
-  #add-actions button { flex:1; border-radius:12px; padding:12px; font-size:14.5px; font-weight:500;
-    background:var(--glass); border:1px solid var(--glass-border); color:var(--ink); }
-  #add-actions #add-go { background:rgba(255,255,255,.9); color:#3a4a6b; border:none; }
-  .tl.t-task .tag { color:#8fe0da; }
-  .tl .rm-x { background:none; border:none; color:var(--ink-faint); font-size:15px; padding:2px 4px; flex-shrink:0; }
   button { cursor:pointer; font-family:inherit; }
 
   #stage { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; min-height:0; }
@@ -78,19 +58,21 @@
     display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; }
   body.running #orb { animation:breathe 8s ease-in-out infinite; }
   @keyframes breathe { 0%,100%{transform:scale(.94);} 50%{transform:scale(1.04);} }
+  @media (prefers-reduced-motion: reduce) { body.running #orb { animation:none; } }
   #time { font-size:48px; font-weight:200; letter-spacing:1px; font-variant-numeric:tabular-nums; }
   #time-sub { font-size:12px; color:var(--ink-faint); letter-spacing:1px; }
 
-  #controls { display:flex; align-items:center; gap:18px; margin-top:4px; }
+  #controls { display:flex; align-items:center; gap:14px; margin-top:4px; }
   .ctl { background:var(--glass); border:1px solid var(--glass-border); color:var(--ink);
-    border-radius:50%; width:52px; height:52px; font-size:20px;
+    border-radius:26px; min-width:52px; height:52px; padding:0 14px; font-size:14px;
     backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
     display:flex; align-items:center; justify-content:center; }
-  .ctl.big { width:68px; height:68px; font-size:26px; background:rgba(255,255,255,.9); color:#3a4a6b; border:none; }
+  .ctl.big { width:68px; height:68px; border-radius:50%; padding:0; font-size:22px;
+    background:rgba(255,255,255,.9); color:#3a4a6b; border:none; }
 
-  /* timeline sheet */
-  #sheet { position:fixed; left:0; right:0; bottom:0; max-height:82%;
-    background:rgba(30,35,60,.78); backdrop-filter:blur(24px); -webkit-backdrop-filter:blur(24px);
+  /* sheets + modals */
+  #sheet { position:fixed; left:0; right:0; bottom:0; max-height:84%;
+    background:rgba(30,35,60,.8); backdrop-filter:blur(24px); -webkit-backdrop-filter:blur(24px);
     border-radius:24px 24px 0 0; border-top:1px solid var(--glass-border);
     transform:translateY(100%); transition:transform .35s cubic-bezier(.3,.9,.3,1);
     display:flex; flex-direction:column;
@@ -98,19 +80,55 @@
   #sheet.open { transform:translateY(0); }
   #sheet .handle { width:36px; height:4px; border-radius:2px; background:var(--ink-faint); margin:0 auto 14px; }
   #sheet h2 { font-size:17px; font-weight:600; margin-bottom:2px; }
-  #sheet .sub { font-size:12.5px; color:var(--ink-soft); margin-bottom:12px; }
+  #sheet .sub { font-size:12.5px; color:var(--ink-soft); margin-bottom:6px; }
+  #sheet .hint { font-size:11.5px; color:var(--ink-faint); margin-bottom:12px; }
   #timeline { overflow-y:auto; flex:1; display:flex; flex-direction:column; gap:6px; }
-  .tl { display:flex; align-items:center; gap:12px; border-radius:13px; padding:10px 13px;
-    background:var(--glass); border:1px solid var(--glass-border); }
+  .tl { display:flex; align-items:center; gap:11px; border-radius:13px; padding:10px 13px;
+    background:var(--glass); border:1px solid var(--glass-border); text-align:left; width:100%;
+    color:var(--ink); font-family:inherit; }
+  .tl:focus-visible { outline:2px solid rgba(255,255,255,.7); outline-offset:2px; }
   .tl.past { opacity:.4; }
   .tl.now { background:rgba(255,255,255,.24); }
-  .tl .when { font-size:12.5px; color:var(--ink-soft); font-variant-numeric:tabular-nums; width:88px; flex-shrink:0; }
+  .tl .when { font-size:12.5px; color:var(--ink-soft); font-variant-numeric:tabular-nums; width:96px; flex-shrink:0; }
   .tl .what { flex:1; font-size:14.5px; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .tl .tag { font-size:10.5px; letter-spacing:.8px; text-transform:uppercase; color:var(--ink-faint); flex-shrink:0; }
   .tl.t-focus .tag { color:#9fc7ff; }
   .tl.t-fixed .tag { color:#ffce9f; }
   .tl.t-break .tag { color:#9fe3b0; }
-  #scrim { position:fixed; inset:0; background:rgba(0,0,0,.3); opacity:0; pointer-events:none; transition:opacity .3s; z-index:5; }
+  .tl.t-task  .tag { color:#8fe0da; }
+  #new-block { margin-top:10px; background:var(--glass); border:1px solid var(--glass-border);
+    color:var(--ink); border-radius:12px; padding:11px; font-size:14px; width:100%; }
+
+  .modal { position:fixed; inset:0; display:none; align-items:center; justify-content:center; z-index:20; padding:20px; }
+  .modal.open { display:flex; }
+  .card { width:min(88vw, 350px); background:rgba(30,35,60,.9);
+    backdrop-filter:blur(24px); -webkit-backdrop-filter:blur(24px);
+    border:1px solid var(--glass-border); border-radius:20px; padding:20px;
+    max-height:86vh; overflow-y:auto; }
+  .card h3 { font-size:16px; font-weight:600; margin-bottom:14px; }
+  .card label { display:block; font-size:11.5px; letter-spacing:.8px; text-transform:uppercase;
+    color:var(--ink-faint); margin-bottom:5px; }
+  .card input { width:100%; background:var(--glass); border:1px solid var(--glass-border);
+    border-radius:12px; padding:11px 13px; color:var(--ink); font-size:15px; font-family:inherit; outline:none; }
+  .card input:focus-visible { outline:2px solid rgba(255,255,255,.6); outline-offset:1px; }
+  .card input::placeholder { color:var(--ink-faint); }
+  .field { margin-bottom:13px; }
+  .two { display:flex; gap:10px; }
+  .two .field { flex:1; }
+  .chips { display:flex; gap:8px; margin-bottom:15px; }
+  .chips button { flex:1; background:var(--glass); border:1px solid var(--glass-border);
+    color:var(--ink); border-radius:11px; padding:9px 0; font-size:13.5px; }
+  .chips button.sel { background:rgba(255,255,255,.9); color:#3a4a6b; }
+  .quick { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:15px; }
+  .quick button { flex:1 1 46%; background:var(--glass); border:1px solid var(--glass-border);
+    color:var(--ink); border-radius:11px; padding:10px 4px; font-size:12.5px; }
+  .acts { display:flex; gap:8px; }
+  .acts button { flex:1; border-radius:12px; padding:12px; font-size:14.5px; font-weight:500;
+    background:var(--glass); border:1px solid var(--glass-border); color:var(--ink); }
+  .acts .primary { background:rgba(255,255,255,.9); color:#3a4a6b; border:none; }
+  .danger { color:#ffb3ba; }
+  #scrim { position:fixed; inset:0; background:rgba(0,0,0,.35); opacity:0; pointer-events:none;
+    transition:opacity .3s; z-index:5; }
   #scrim.show { opacity:1; pointer-events:auto; }
 
   footer { display:flex; justify-content:center; gap:6px; padding-top:10px; }
@@ -122,8 +140,8 @@
 <div id="app">
   <header>
     <div id="clock">--:--</div>
-    <div style="display:flex; gap:8px;">
-      <button id="add-btn">＋</button>
+    <div class="hdr-btns">
+      <button id="add-btn" title="slot something in now">＋</button>
       <button id="day-btn">my day ☼</button>
     </div>
   </header>
@@ -131,35 +149,70 @@
     <div id="block-label"></div>
     <div id="orb-wrap">
       <svg id="ring" viewBox="0 0 100 100">
-        <circle class="track" cx="50" cy="50" r="47"/>
-        <circle class="progress" cx="50" cy="50" r="47" stroke-dasharray="295.3" stroke-dashoffset="295.3"/>
+        <circle class="track" cx="50" cy="50" r="47"></circle>
+        <circle class="progress" cx="50" cy="50" r="47" stroke-dasharray="295.3" stroke-dashoffset="295.3"></circle>
       </svg>
       <div id="orb"><div id="time">--:--</div><div id="time-sub"></div></div>
     </div>
     <div id="mantra">take a deep breath</div>
     <div id="next-up"></div>
     <div id="controls">
-      <button class="ctl" id="prev-btn" title="previous">⏮</button>
-      <button class="ctl big" id="play-btn">▶</button>
-      <button class="ctl" id="next-btn" title="next">⏭</button>
+      <button class="ctl" id="ext-btn" title="give this block 15 more minutes">+15</button>
+      <button class="ctl big" id="now-btn" title="back to now">◉</button>
+      <button class="ctl" id="done-btn" title="finished early">done</button>
     </div>
   </div>
   <footer id="pips"></footer>
 </div>
 
-<div id="add-modal">
-  <div id="add-card">
+<!-- quick add: start something right now -->
+<div class="modal" id="add-modal">
+  <div class="card">
     <h3>Slot something in, right now</h3>
-    <input id="add-name" placeholder="brush teeth, stretch, call mom…" autocomplete="off">
-    <div id="dur-chips">
+    <div class="field">
+      <input id="add-name" placeholder="grooming, stretch, call mom…" autocomplete="off">
+    </div>
+    <div class="chips" id="add-chips">
       <button data-m="5" class="sel">5m</button>
       <button data-m="15">15m</button>
       <button data-m="30">30m</button>
       <button data-m="45">45m</button>
     </div>
-    <div id="add-actions">
+    <div class="acts">
       <button id="add-cancel">not now</button>
-      <button id="add-go">begin</button>
+      <button id="add-go" class="primary">begin</button>
+    </div>
+  </div>
+</div>
+
+<!-- edit any block -->
+<div class="modal" id="edit-modal">
+  <div class="card">
+    <h3 id="edit-title">Adjust this block</h3>
+    <div class="field">
+      <label for="ed-name">What</label>
+      <input id="ed-name" autocomplete="off">
+    </div>
+    <div class="two">
+      <div class="field">
+        <label for="ed-start">Starts</label>
+        <input id="ed-start" type="time">
+      </div>
+      <div class="field">
+        <label for="ed-end">Ends</label>
+        <input id="ed-end" type="time">
+      </div>
+    </div>
+    <div class="quick">
+      <button data-act="now">▶ start it now</button>
+      <button data-act="plus15">+15 min longer</button>
+      <button data-act="push15">↓ push rest of day +15</button>
+      <button data-act="push30">↓ push rest of day +30</button>
+    </div>
+    <div class="acts">
+      <button id="ed-del" class="danger">remove</button>
+      <button id="ed-cancel">cancel</button>
+      <button id="ed-save" class="primary">save</button>
     </div>
   </div>
 </div>
@@ -169,32 +222,30 @@
   <div class="handle"></div>
   <h2>Your day, gently planned</h2>
   <div class="sub" id="plan-meta"></div>
+  <div class="hint">Tap any block to rename it, move it, or start it now.</div>
   <div id="timeline"></div>
+  <button id="new-block">＋ add a block at a set time</button>
 </div>
 
 <script>
 /* ============================================================
-   DAY PLAN — regenerated by Claude from the three calendars:
-   Junyan · Joint Plans · Staff Scheduling
-   Times are ISO with offsets; rendered in the device timezone.
+   DAY PLAN — regenerated by Claude from Junyan + Joint Plans.
+   Your in-app edits are layered on top and always survive a resync.
    ============================================================ */
 const PLAN = {
-  generated: "2026-07-30T13:20:00-04:00",
-  label: "Wed Jul 30 · São Paulo · synced from Junyan + Joint Plans",
+  generated: "2026-07-30T13:30:00-04:00",
+  label: "Thu Jul 30 · São Paulo · synced from Junyan + Joint Plans",
   blocks: [
     { s:"2026-07-30T07:30:00-04:00", e:"2026-07-30T08:00:00-04:00", t:"🧘 Shambhavi", type:"fixed", cal:"Joint Plans" },
     { s:"2026-07-30T08:30:00-04:00", e:"2026-07-30T09:30:00-04:00", t:"Hotel breakfast", type:"fixed", cal:"Joint Plans" },
-    { s:"2026-07-30T09:30:00-04:00", e:"2026-07-30T11:00:00-04:00", t:"Morning work", type:"focus", cal:"Joint Plans" },
-    { s:"2026-07-30T11:00:00-04:00", e:"2026-07-30T11:10:00-04:00", t:"Rest", type:"break" },
-    { s:"2026-07-30T11:10:00-04:00", e:"2026-07-30T12:00:00-04:00", t:"Deep work I", type:"focus", cal:"Junyan" },
-    { s:"2026-07-30T12:00:00-04:00", e:"2026-07-30T12:10:00-04:00", t:"Rest", type:"break" },
-    { s:"2026-07-30T12:10:00-04:00", e:"2026-07-30T13:00:00-04:00", t:"Deep work II", type:"focus", cal:"Junyan" },
-    { s:"2026-07-30T13:00:00-04:00", e:"2026-07-30T13:20:00-04:00", t:"Deep work III", type:"focus", cal:"Junyan" },
-    { s:"2026-07-30T13:20:00-04:00", e:"2026-07-30T14:00:00-04:00", t:"🚿 Grooming — mouth care, shower, tidy up", type:"task", cal:"you" },
-    { s:"2026-07-30T14:00:00-04:00", e:"2026-07-30T14:30:00-04:00", t:"Lunch @ Mariana's Grill 2", type:"fixed", cal:"Joint Plans" },
-    { s:"2026-07-30T14:40:00-04:00", e:"2026-07-30T15:30:00-04:00", t:"Deep work IV", type:"focus", cal:"Junyan" },
-    { s:"2026-07-30T15:30:00-04:00", e:"2026-07-30T15:40:00-04:00", t:"Rest", type:"break" },
-    { s:"2026-07-30T15:40:00-04:00", e:"2026-07-30T16:25:00-04:00", t:"Deep work V", type:"focus", cal:"Junyan" },
+    { s:"2026-07-30T09:30:00-04:00", e:"2026-07-30T10:00:00-04:00", t:"Morning work", type:"focus", cal:"Junyan" },
+    { s:"2026-07-30T10:00:00-04:00", e:"2026-07-30T10:30:00-04:00", t:"Grooming", type:"task", cal:"you" },
+    { s:"2026-07-30T10:30:00-04:00", e:"2026-07-30T11:20:00-04:00", t:"Deep work I", type:"focus", cal:"Junyan" },
+    { s:"2026-07-30T11:20:00-04:00", e:"2026-07-30T11:30:00-04:00", t:"Rest", type:"break" },
+    { s:"2026-07-30T11:30:00-04:00", e:"2026-07-30T12:20:00-04:00", t:"Deep work II", type:"focus", cal:"Junyan" },
+    { s:"2026-07-30T13:25:00-04:00", e:"2026-07-30T14:00:00-04:00", t:"Deep work III", type:"focus", cal:"Junyan" },
+    { s:"2026-07-30T14:00:00-04:00", e:"2026-07-30T15:00:00-04:00", t:"Lunch @ Mariana's Grill 2", type:"fixed", cal:"Joint Plans" },
+    { s:"2026-07-30T15:00:00-04:00", e:"2026-07-30T15:50:00-04:00", t:"Deep work IV", type:"focus", cal:"Junyan" },
     { s:"2026-07-30T16:30:00-04:00", e:"2026-07-30T17:30:00-04:00", t:"Dinner @ Executive Lounge", type:"fixed", cal:"Joint Plans" },
     { s:"2026-07-30T17:35:00-04:00", e:"2026-07-30T18:25:00-04:00", t:"Light admin + inbox", type:"focus", cal:"Junyan" },
     { s:"2026-07-30T18:30:00-04:00", e:"2026-07-30T21:30:00-04:00", t:"🎓 Formação Profissional – Geração 3D", type:"fixed", cal:"Joint Plans" }
@@ -207,31 +258,35 @@ const PLAN = {
   const FIXED_MANTRAS = ["be where your feet are","this, fully","present and unhurried"];
   const CIRC = 295.3;
   const $ = id => document.getElementById(id);
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 
-  const planBlocks = PLAN.blocks.map(b => ({...b, s:new Date(b.s), e:new Date(b.e)}));
+  /* ---------- state: published plan + a local edit layer ---------- */
+  const KEY = "still-ops-v2";
+  const today = () => new Date().toDateString();
+  let ops = { edits:{}, drops:[], adds:[] };
+  try {
+    const d = JSON.parse(localStorage.getItem(KEY));
+    if (d && d.date === today()) ops = { edits:d.edits||{}, drops:d.drops||[], adds:d.adds||[] };
+  } catch {}
+  const saveOps = () => localStorage.setItem(KEY, JSON.stringify({date:today(), ...ops}));
 
-  /* quick-added tasks live in localStorage, merged over the published plan */
-  const XKEY = "still-extras";
-  function loadExtras(){
-    try {
-      const d = JSON.parse(localStorage.getItem(XKEY));
-      if (d && d.date === new Date().toDateString())
-        return d.items.map(b => ({...b, s:new Date(b.s), e:new Date(b.e)}));
-    } catch {}
-    return [];
+  const keyOf = b => b.s + "|" + b.t;
+
+  function allBlocks(){
+    const out = [];
+    PLAN.blocks.forEach(b => {
+      const k = keyOf(b);
+      if (ops.drops.includes(k)) return;
+      const ed = ops.edits[k];
+      out.push({ ...b, key:k,
+        s: new Date(ed?.s ?? b.s), e: new Date(ed?.e ?? b.e), t: ed?.t ?? b.t });
+    });
+    ops.adds.forEach(a => out.push({ ...a, key:a.key, s:new Date(a.s), e:new Date(a.e), extra:true }));
+    return out.sort((x,y) => x.s - y.s);
   }
-  let extras = loadExtras();
-  function saveExtras(){
-    localStorage.setItem(XKEY, JSON.stringify({date:new Date().toDateString(),
-      items: extras.map(b => ({...b, s:b.s.toISOString(), e:b.e.toISOString()}))}));
-  }
-  function allBlocks(){ return [...planBlocks, ...extras].sort((a,b) => a.s - b.s); }
 
-  let manualIdx = null;     // user override via prev/next
-  let paused = false;
-  let lastPhaseKey = "";
+  /* ---------- soft chimes ---------- */
   let ac;
-
   function chime(freqs){
     try {
       ac = ac || new (window.AudioContext||window.webkitAudioContext)();
@@ -249,9 +304,14 @@ const PLAN = {
 
   const fmtT = d => d.toLocaleTimeString([], {hour:"numeric", minute:"2-digit"});
   const fmtC = s => `${String(Math.floor(s/60)).padStart(2,"0")}:${String(Math.floor(s%60)).padStart(2,"0")}`;
+  const toField = d => `${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`;
+  function fromField(v, ref){
+    const [h,m] = v.split(":").map(Number);
+    const d = new Date(ref); d.setHours(h, m, 0, 0); return d;
+  }
 
-  /* latest-starting block containing "now" wins — so a task slotted in
-     mid-block takes the stage over the block it interrupts */
+  /* the latest-starting block containing "now" wins, so anything you
+     slot in mid-block takes the stage over what it interrupts */
   function currentIdx(blocks, now){
     let hit = -1;
     for (let i=0;i<blocks.length;i++) if (now >= blocks[i].s && now < blocks[i].e) hit = i;
@@ -262,6 +322,32 @@ const PLAN = {
     return -1;
   }
 
+  /* ---------- edit operations ---------- */
+  function writeEdit(b, s, e, t){
+    if (b.extra) {
+      const a = ops.adds.find(x => x.key === b.key);
+      if (a) { a.s = s.toISOString(); a.e = e.toISOString(); a.t = t; }
+    } else {
+      ops.edits[b.key] = { s:s.toISOString(), e:e.toISOString(), t };
+    }
+    saveOps();
+  }
+  function removeBlock(b){
+    if (b.extra) ops.adds = ops.adds.filter(x => x.key !== b.key);
+    else { if (!ops.drops.includes(b.key)) ops.drops.push(b.key); delete ops.edits[b.key]; }
+    saveOps();
+  }
+  function pushRest(fromBlock, minutes){
+    const ms = minutes*60000;
+    allBlocks().forEach(b => {
+      if (b.s < fromBlock.s) return;
+      writeEdit(b, new Date(b.s.getTime()+ms), new Date(b.e.getTime()+ms), b.t);
+    });
+  }
+
+  /* ---------- render ---------- */
+  let manualIdx = null, lastKey = "";
+
   function render(){
     const now = new Date();
     const blocks = allBlocks();
@@ -270,10 +356,11 @@ const PLAN = {
 
     if (idx === -1) {
       const ni = nextIdx(blocks, now);
-      if (ni === -1) { phase="done"; label="your day is complete"; sub=""; }
+      if (ni === -1) { phase="done"; label="your day is complete"; }
       else {
         phase="break"; label="open space";
-        remaining = (blocks[ni].s - now)/1000; total = remaining; sub="until " + fmtT(blocks[ni].s);
+        remaining = total = (blocks[ni].s - now)/1000;
+        sub = "until " + fmtT(blocks[ni].s);
         next = `next · ${blocks[ni].t} at ${fmtT(blocks[ni].s)}`;
       }
     } else {
@@ -282,118 +369,171 @@ const PLAN = {
       label = b.t;
       total = (b.e - b.s)/1000;
       remaining = Math.max(0, (b.e - now)/1000);
-      sub = b.type === "focus" || b.type === "task" ? "focus" : b.type === "break" ? "rest" : "in session";
-      const ni = blocks.findIndex((x,i) => i>idx && x.s >= b.e - 60000);
+      sub = (b.type === "focus" || b.type === "task") ? "focus" : b.type === "break" ? "rest" : "in session";
       if (blocks[idx+1]) next = `next · ${blocks[idx+1].t} at ${fmtT(blocks[idx+1].s)}`;
     }
 
-    // chime on phase change (only when auto-tracking, timer visible)
-    const key = phase + ":" + label;
-    if (lastPhaseKey && key !== lastPhaseKey && manualIdx === null) {
+    const k = phase + ":" + label;
+    if (lastKey && k !== lastKey && manualIdx === null) {
       chime(phase === "focus" ? [523.25,659.25,783.99] : [783.99,659.25]);
     }
-    lastPhaseKey = key;
+    lastKey = k;
 
-    $("time").textContent = phase==="done" ? "☺" : fmtC(remaining);
+    $("time").textContent = phase === "done" ? "☺" : fmtC(remaining);
     $("time-sub").textContent = sub;
     $("block-label").textContent = label;
     $("next-up").textContent = next;
-    document.body.className = "mode-" + (phase==="fixed"?"fixed":phase) + (paused ? "" : " running");
+    document.body.className = "mode-" + (phase === "fixed" ? "fixed" : phase) + " running";
     document.querySelector("#ring .progress").style.strokeDashoffset = total ? CIRC*(remaining/total) : CIRC;
-    $("play-btn").textContent = manualIdx===null ? "◉" : "▶";
 
-    // mantra pool by phase (rotated separately)
-    // pips = focus blocks completed
-    const focusBlocks = blocks.filter(b => b.type==="focus");
-    $("pips").innerHTML = focusBlocks.map(b => `<div class="pip ${now >= b.e ? "filled":""}"></div>`).join("");
+    const focusish = blocks.filter(b => b.type === "focus" || b.type === "task");
+    $("pips").innerHTML = focusish.map(b => `<div class="pip ${now >= b.e ? "filled" : ""}"></div>`).join("");
   }
 
-  let mantraPhase = "";
   setInterval(() => {
-    const now = new Date();
     const blocks = allBlocks();
-    const idx = currentIdx(blocks, now);
-    const phase = idx===-1 ? "break" : blocks[idx].type;
-    const pool = phase==="focus" ? FOCUS_MANTRAS : phase==="fixed" ? FIXED_MANTRAS : BREAK_MANTRAS;
+    const i = currentIdx(blocks, new Date());
+    const phase = i === -1 ? "break" : blocks[i].type;
+    const pool = (phase === "focus" || phase === "task") ? FOCUS_MANTRAS
+               : phase === "fixed" ? FIXED_MANTRAS : BREAK_MANTRAS;
     const el = $("mantra");
     el.style.opacity = 0;
     setTimeout(() => { el.textContent = pool[Math.floor(Math.random()*pool.length)]; el.style.opacity = 1; }, 1200);
   }, 45000);
 
-  /* controls: prev/next preview blocks, ◉ returns to "now" */
-  $("prev-btn").onclick = () => {
+  /* ---------- main-screen controls ---------- */
+  $("now-btn").onclick = () => { manualIdx = null; render(); };
+  $("ext-btn").onclick = () => {
     const blocks = allBlocks();
-    const base = manualIdx !== null ? manualIdx : Math.max(0, currentIdx(blocks, new Date()));
-    manualIdx = Math.max(0, base - 1); render();
+    const i = currentIdx(blocks, new Date());
+    if (i === -1) return;
+    const b = blocks[i];
+    writeEdit(b, b.s, new Date(b.e.getTime() + 15*60000), b.t);
+    render();
   };
-  $("next-btn").onclick = () => {
+  $("done-btn").onclick = () => {
     const blocks = allBlocks();
-    const base = manualIdx !== null ? manualIdx : currentIdx(blocks, new Date());
-    manualIdx = Math.min(blocks.length-1, base + 1); render();
+    const i = currentIdx(blocks, new Date());
+    if (i === -1) return;
+    const b = blocks[i], now = new Date();
+    if (now > b.s) writeEdit(b, b.s, now, b.t);
+    chime([523.25, 659.25, 783.99]);
+    manualIdx = null; render(); renderTimeline();
   };
-  $("play-btn").onclick = () => { manualIdx = null; render(); };
 
-  /* timeline sheet */
+  /* ---------- timeline sheet ---------- */
   function renderTimeline(){
     const now = new Date();
     const blocks = allBlocks();
     $("plan-meta").textContent = PLAN.label;
     $("timeline").innerHTML = blocks.map((b,i) => {
       const cls = now >= b.e ? "past" : (now >= b.s ? "now" : "");
-      const rm = b.extra ? `<button class="rm-x" data-x="${b.xid}">✕</button>` : "";
-      return `<div class="tl t-${b.type} ${cls}">
-        <div class="when">${fmtT(b.s)}–${fmtT(b.e)}</div>
-        <div class="what">${b.t}</div>
-        <div class="tag">${b.type==="fixed" ? (b.cal||"") : b.type==="task" ? (b.cal||"you") : b.type}</div>
-        ${rm}
-      </div>`;
+      const tag = b.type === "fixed" ? (b.cal||"") : b.type === "task" ? (b.cal||"you") : b.type;
+      return `<button class="tl t-${b.type} ${cls}" data-i="${i}">
+        <span class="when">${fmtT(b.s)}–${fmtT(b.e)}</span>
+        <span class="what">${esc(b.t)}</span>
+        <span class="tag">${esc(tag)}</span>
+      </button>`;
     }).join("");
-    document.querySelectorAll("#timeline .rm-x").forEach(btn => {
-      btn.onclick = () => {
-        extras = extras.filter(x => x.xid !== btn.dataset.x);
-        saveExtras(); renderTimeline(); render();
-      };
+    document.querySelectorAll("#timeline .tl").forEach(el => {
+      el.onclick = () => openEdit(blocks[+el.dataset.i]);
     });
     const cur = document.querySelector("#timeline .now");
     if (cur) cur.scrollIntoView({block:"center"});
   }
-  const openSheet = v => { $("sheet").classList.toggle("open", v); $("scrim").classList.toggle("show", v); if (v) renderTimeline(); };
+  const openSheet = v => {
+    $("sheet").classList.toggle("open", v);
+    $("scrim").classList.toggle("show", v);
+    if (v) renderTimeline();
+  };
   $("day-btn").onclick = () => openSheet(true);
   $("scrim").onclick = () => openSheet(false);
 
-  /* quick-add: slot a task in starting now */
-  let durMin = 5;
-  document.querySelectorAll("#dur-chips button").forEach(btn => {
+  /* ---------- edit modal ---------- */
+  let editing = null;
+  function openEdit(b){
+    editing = b;
+    $("edit-title").textContent = b.type === "fixed" ? "Adjust — from " + (b.cal||"calendar") : "Adjust this block";
+    $("ed-name").value = b.t;
+    $("ed-start").value = toField(b.s);
+    $("ed-end").value = toField(b.e);
+    $("edit-modal").classList.add("open");
+  }
+  const closeEdit = () => { $("edit-modal").classList.remove("open"); editing = null; };
+  $("ed-cancel").onclick = closeEdit;
+  $("edit-modal").onclick = e => { if (e.target === $("edit-modal")) closeEdit(); };
+  $("ed-save").onclick = () => {
+    if (!editing) return;
+    const s = fromField($("ed-start").value, editing.s);
+    let e = fromField($("ed-end").value, editing.e);
+    if (e <= s) e = new Date(s.getTime() + 15*60000);
+    writeEdit(editing, s, e, $("ed-name").value.trim() || editing.t);
+    closeEdit(); manualIdx = null; render(); renderTimeline();
+  };
+  $("ed-del").onclick = () => {
+    if (!editing) return;
+    removeBlock(editing);
+    closeEdit(); manualIdx = null; render(); renderTimeline();
+  };
+  document.querySelectorAll("#edit-modal .quick button").forEach(btn => {
     btn.onclick = () => {
-      document.querySelectorAll("#dur-chips button").forEach(b => b.classList.remove("sel"));
+      if (!editing) return;
+      const act = btn.dataset.act, now = new Date();
+      if (act === "now") {
+        const dur = editing.e - editing.s;
+        writeEdit(editing, now, new Date(now.getTime() + dur), $("ed-name").value.trim() || editing.t);
+      } else if (act === "plus15") {
+        writeEdit(editing, editing.s, new Date(editing.e.getTime() + 15*60000), editing.t);
+      } else if (act === "push15") { pushRest(editing, 15); }
+      else if (act === "push30") { pushRest(editing, 30); }
+      closeEdit(); manualIdx = null; render(); renderTimeline();
+    };
+  });
+
+  /* ---------- quick add (starts now) ---------- */
+  let durMin = 5;
+  document.querySelectorAll("#add-chips button").forEach(btn => {
+    btn.onclick = () => {
+      document.querySelectorAll("#add-chips button").forEach(b => b.classList.remove("sel"));
       btn.classList.add("sel"); durMin = +btn.dataset.m;
     };
   });
   $("add-btn").onclick = () => { $("add-modal").classList.add("open"); $("add-name").focus(); };
   $("add-cancel").onclick = () => $("add-modal").classList.remove("open");
   $("add-modal").onclick = e => { if (e.target === $("add-modal")) $("add-modal").classList.remove("open"); };
+  function addBlock(name, start, end){
+    ops.adds.push({ key:"x"+start.getTime(), s:start.toISOString(), e:end.toISOString(),
+      t:name, type:"task", cal:"you" });
+    saveOps();
+  }
   $("add-go").onclick = () => {
     const name = $("add-name").value.trim();
     if (!name) { $("add-name").focus(); return; }
     const now = new Date();
-    extras.push({ xid:String(now.getTime()), s:now, e:new Date(now.getTime() + durMin*60000),
-      t:name, type:"task", cal:"you", extra:true });
-    saveExtras();
+    addBlock(name, now, new Date(now.getTime() + durMin*60000));
     $("add-name").value = "";
     $("add-modal").classList.remove("open");
-    manualIdx = null;
-    chime([659.25, 783.99]);
-    render();
+    manualIdx = null; chime([659.25, 783.99]); render(); renderTimeline();
   };
   $("add-name").addEventListener("keydown", e => { if (e.key === "Enter") $("add-go").onclick(); });
 
-  setInterval(() => { $("clock").textContent = fmtT(new Date()); render(); }, 1000);
+  /* add a block at a chosen time, straight from the timeline */
+  $("new-block").onclick = () => {
+    const now = new Date();
+    const s = new Date(now.getTime() + 30*60000); s.setSeconds(0,0);
+    addBlock("New block", s, new Date(s.getTime() + 30*60000));
+    renderTimeline();
+    openEdit(allBlocks().find(b => b.key === "x"+s.getTime()));
+  };
 
+  /* ---------- clock, wake lock ---------- */
+  setInterval(() => { $("clock").textContent = fmtT(new Date()); render(); }, 1000);
   let wakeLock;
   async function keepAwake(){ try { wakeLock = await navigator.wakeLock?.request("screen"); } catch {} }
   document.addEventListener("visibilitychange", () => { if (!document.hidden) keepAwake(); });
   document.addEventListener("click", keepAwake, { once:true });
 
+  $("clock").textContent = fmtT(new Date());
   render();
 })();
 </script>
