@@ -153,9 +153,9 @@
     <input id="add-name" placeholder="brush teeth, stretch, call mom…" autocomplete="off">
     <div id="dur-chips">
       <button data-m="5" class="sel">5m</button>
-      <button data-m="10">10m</button>
       <button data-m="15">15m</button>
-      <button data-m="25">25m</button>
+      <button data-m="30">30m</button>
+      <button data-m="45">45m</button>
     </div>
     <div id="add-actions">
       <button id="add-cancel">not now</button>
@@ -179,19 +179,18 @@
    Times are ISO with offsets; rendered in the device timezone.
    ============================================================ */
 const PLAN = {
-  generated: "2026-07-30T11:40:00-04:00",
+  generated: "2026-07-30T13:20:00-04:00",
   label: "Wed Jul 30 · São Paulo · synced from Junyan + Joint Plans",
   blocks: [
     { s:"2026-07-30T07:30:00-04:00", e:"2026-07-30T08:00:00-04:00", t:"🧘 Shambhavi", type:"fixed", cal:"Joint Plans" },
     { s:"2026-07-30T08:30:00-04:00", e:"2026-07-30T09:30:00-04:00", t:"Hotel breakfast", type:"fixed", cal:"Joint Plans" },
     { s:"2026-07-30T09:30:00-04:00", e:"2026-07-30T11:00:00-04:00", t:"Morning work", type:"focus", cal:"Joint Plans" },
     { s:"2026-07-30T11:00:00-04:00", e:"2026-07-30T11:10:00-04:00", t:"Rest", type:"break" },
-    { s:"2026-07-30T11:05:00-04:00", e:"2026-07-30T11:10:00-04:00", t:"🪥 Brush teeth", type:"task", cal:"you" },
     { s:"2026-07-30T11:10:00-04:00", e:"2026-07-30T12:00:00-04:00", t:"Deep work I", type:"focus", cal:"Junyan" },
     { s:"2026-07-30T12:00:00-04:00", e:"2026-07-30T12:10:00-04:00", t:"Rest", type:"break" },
     { s:"2026-07-30T12:10:00-04:00", e:"2026-07-30T13:00:00-04:00", t:"Deep work II", type:"focus", cal:"Junyan" },
-    { s:"2026-07-30T13:00:00-04:00", e:"2026-07-30T13:10:00-04:00", t:"Rest", type:"break" },
-    { s:"2026-07-30T13:10:00-04:00", e:"2026-07-30T13:55:00-04:00", t:"Deep work III", type:"focus", cal:"Junyan" },
+    { s:"2026-07-30T13:00:00-04:00", e:"2026-07-30T13:20:00-04:00", t:"Deep work III", type:"focus", cal:"Junyan" },
+    { s:"2026-07-30T13:20:00-04:00", e:"2026-07-30T14:00:00-04:00", t:"🚿 Grooming — mouth care, shower, tidy up", type:"task", cal:"you" },
     { s:"2026-07-30T14:00:00-04:00", e:"2026-07-30T14:30:00-04:00", t:"Lunch @ Mariana's Grill 2", type:"fixed", cal:"Joint Plans" },
     { s:"2026-07-30T14:40:00-04:00", e:"2026-07-30T15:30:00-04:00", t:"Deep work IV", type:"focus", cal:"Junyan" },
     { s:"2026-07-30T15:30:00-04:00", e:"2026-07-30T15:40:00-04:00", t:"Rest", type:"break" },
