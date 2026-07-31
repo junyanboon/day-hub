@@ -136,7 +136,7 @@ def fill_gaps(fixed, now, day_start, start_n=0):
             end = t + timedelta(minutes=span)
             n += 1
             blocks.append({"s": iso(t), "e": iso(end),
-                           "t": f"Deep work {roman(n)}", "type": "focus", "cal": "Junyan"})
+                           "t": "Deep work", "type": "focus", "cal": "Junyan"})
             t = end + timedelta(minutes=REST_MIN)
             if (we - t).total_seconds() / 60 >= MIN_GAP:
                 blocks.append({"s": iso(end), "e": iso(t),
@@ -223,6 +223,17 @@ def build_plan(now):
         seen.add(k)
         merged.append(b)
     merged.sort(key=lambda b: b["s"])
+
+    # Number the generated blocks only after the future-filter has run, so a
+    # dropped candidate never burns a numeral and leaves a gap in the sequence.
+    n = used
+    for b in merged:
+        if b["type"] == "focus" and re.match(r"Deep work [IVX]*$", b.get("t", "")):
+            if datetime.fromisoformat(b["s"]) > now:
+                n += 1
+                b["t"] = f"Deep work {roman(n)}"
+            else:
+                n = max(n, unroman(b["t"].split()[-1]) if b["t"].split()[-1] else 0)
     return merged
 
 
