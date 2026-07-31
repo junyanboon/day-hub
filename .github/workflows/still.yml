@@ -1,0 +1,74 @@
+name: Still day plan
+
+# Brazil-proof rebuild of the Still pomodoro planner (still/index.html).
+# Deterministic scripts/still_plan.py reads Joint Plans + Junyan (secret ICS URLs),
+# treats calendar events as fixed blocks, fills the remaining gaps with focus/rest
+# blocks, and splices the PLAN between the STILL:PLAN markers.
+#
+# Replaces the local `still-day-resync` scheduled task, which the local scheduler
+# skips when the Mac is unattended (same failure that moved day-sheet, fbs-monitor,
+# day-hub rollover, the Concierge and the Custodian to cloud).
+#
+# GitHub throttles scheduled crons to roughly 1/hour and fires late under load, so
+# the job asks for :00 and :30 and tolerates drift. Runs are idempotent.
+
+on:
+  schedule:
+    - cron: "*/30 10-23,0-2 * * *"   # ~06:00–22:30 America/Toronto across DST
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+concurrency:
+  group: still-day-plan
+  cancel-in-progress: false
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Skip-green until secrets exist
+        id: gate
+        run: |
+          if [ -z "${{ secrets.ICS_URL_JOINT }}" ] || [ -z "${{ secrets.ICS_URL_JUNYAN }}" ]; then
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "Secrets not configured yet — skipping (green). See scripts/RUNBOOK.md."
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Checkout
+        if: steps.gate.outputs.ready == 'true'
+        uses: actions/checkout@v5
+
+      - name: Set up Python
+        if: steps.gate.outputs.ready == 'true'
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install deps
+        if: steps.gate.outputs.ready == 'true'
+        run: pip install -r scripts/requirements.txt
+
+      - name: Rebuild Still plan
+        if: steps.gate.outputs.ready == 'true'
+        env:
+          ICS_URL_JOINT:  ${{ secrets.ICS_URL_JOINT }}
+          ICS_URL_JUNYAN: ${{ secrets.ICS_URL_JUNYAN }}
+        run: python scripts/still_plan.py
+
+      - name: Commit if changed
+        if: steps.gate.outputs.ready == 'true'
+        run: |
+          if git diff --quiet -- still/index.html; then
+            echo "No change to still/index.html."
+          else
+            git config user.name  "still-planner[bot]"
+            git config user.email "actions@github.com"
+            git add still/index.html
+            git commit -m "Still: $(TZ=America/Toronto date '+%a %b %-d %H:%M') plan"
+            git pull --rebase
+            git push
+          fi
