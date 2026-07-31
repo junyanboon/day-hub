@@ -51,3 +51,44 @@ Treat these like passwords — anyone with the URL can read the calendar.
 - If the Notion query can't be verified, it does **not** create a page (avoids duplicates).
 - Local dry-run: `pip install -r scripts/requirements.txt` then set the five env vars and
   `python scripts/rollover.py`.
+
+---
+
+# Still — pomodoro day plan (cloud, every 30 min)
+
+`.github/workflows/still.yml` runs `scripts/still_plan.py` (deterministic, no AI)
+roughly every 30 minutes, ~06:00–22:30 Toronto, and:
+
+1. Reads **Joint Plans** + **Junyan** for TODAY via the existing secret iCal URLs
+   (`ICS_URL_JOINT`, `ICS_URL_JUNYAN` — no new secrets needed). Staff Scheduling is
+   deliberately excluded; Junyan removed it from Still on 2026-07-30.
+2. Treats every calendar event as a **fixed** block, skips Still's own
+   `🌊 Focus — …` events, and fills the remaining daytime gaps with 50-minute
+   focus blocks separated by 10-minute rests.
+3. Splices the result into `still/index.html` between the `STILL:PLAN:*` markers
+   and stamps `<meta name="still-version">` so phones can detect a fresh plan.
+
+Served at **https://junyanboon.github.io/day-hub/still/**
+
+## Design rules (don't break these)
+
+- **Never shift the offsets.** Times are emitted with the calendars' own
+  `-04:00` (Toronto) offsets. The phone renders them in device-local time
+  (São Paulo), which is what makes a class stored `18:30-04:00` display as
+  19:30. Shifting them "to fix the timezone" breaks every block by an hour.
+- **Only future gaps are replanned.** Blocks that already started are carried
+  over from the previous file verbatim, so the block you're in is never
+  rewritten under you and the past stays an honest record.
+- **The calendar is the source of truth.** If something isn't on Joint Plans or
+  Junyan, the planner will fill that time with work. A missing class shows up
+  as deep-work blocks over the class — add the event, don't patch the script.
+- **In-app edits are safe.** Junyan's edits live in his phone's localStorage
+  (`still-ops-v2`) and are layered over `PLAN` at render time. A rebuild never
+  destroys them; the script cannot see them.
+
+This replaces the local `still-day-resync` scheduled task, disabled 2026-07-31
+after it skipped every fire while the Mac was unattended in Brazil (the app sat
+on the previous day's plan). Do not re-enable it while this workflow runs.
+
+Local dry-run: `pip install -r scripts/requirements.txt`, set `ICS_URL_JOINT`
+and `ICS_URL_JUNYAN`, then `python scripts/still_plan.py`.
