@@ -106,8 +106,11 @@ def merge_fixed(events):
     return kept
 
 
-def fill_gaps(fixed, now, day_start):
-    """Generate focus/rest blocks in the gaps between fixed events."""
+def fill_gaps(fixed, now, day_start, start_n=0):
+    """Generate focus/rest blocks in the gaps between fixed events.
+
+    start_n continues the numbering past any blocks already used earlier today,
+    so a rebuild never produces a second "Deep work II"."""
     lo = max(now, day_start.replace(hour=DAY_START, minute=0))
     hi = day_start.replace(hour=DAY_END, minute=0)
     edges = [(f["start"], f["end"]) for f in fixed]
@@ -122,7 +125,7 @@ def fill_gaps(fixed, now, day_start):
     if cursor < hi:
         windows.append((cursor, hi))
 
-    blocks, n = [], 0
+    blocks, n = [], start_n
     for ws, we in windows:
         ws = max(ws, lo)
         if (we - ws).total_seconds() / 60 < MIN_GAP:
@@ -139,6 +142,16 @@ def fill_gaps(fixed, now, day_start):
                 blocks.append({"s": iso(end), "e": iso(t),
                                "t": "Rest", "type": "break", "cal": ""})
     return blocks
+
+
+def unroman(s):
+    vals = {"I": 1, "V": 5, "X": 10}
+    total = 0
+    for i, c in enumerate(s):
+        v = vals.get(c, 0)
+        nxt = vals.get(s[i + 1], 0) if i + 1 < len(s) else 0
+        total += -v if v < nxt else v
+    return total
 
 
 def roman(n):
@@ -178,11 +191,6 @@ def build_plan(now):
             die(f"missing secret {c['env']}")
         events += fetch_events(c["env"], url, day_start, day_end, c["label"])
 
-    fixed = merge_fixed(events)
-    blocks = [{"s": iso(f["start"]), "e": iso(f["end"]), "t": f["summary"],
-               "type": "fixed", "cal": f["label"]} for f in fixed]
-    blocks += fill_gaps(fixed, now, day_start)
-
     # Keep anything from the previous plan that has already started — the past is
     # a record, and the block you're in must not be rewritten under you.
     try:
@@ -193,6 +201,18 @@ def build_plan(now):
     started = [b for b in prev
                if datetime.fromisoformat(b["s"]) <= now
                and datetime.fromisoformat(b["s"]).date() == now.date()]
+
+    # Continue "Deep work N" numbering past whatever today already used.
+    used = 0
+    for b in started:
+        mt = re.match(r"Deep work ([IVX]+)$", b.get("t", ""))
+        if mt:
+            used = max(used, unroman(mt.group(1)))
+
+    fixed = merge_fixed(events)
+    blocks = [{"s": iso(f["start"]), "e": iso(f["end"]), "t": f["summary"],
+               "type": "fixed", "cal": f["label"]} for f in fixed]
+    blocks += fill_gaps(fixed, now, day_start, start_n=used)
     future = [b for b in blocks if datetime.fromisoformat(b["s"]) > now]
 
     seen, merged = set(), []
