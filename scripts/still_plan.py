@@ -228,12 +228,14 @@ def build_plan(now):
     # dropped candidate never burns a numeral and leaves a gap in the sequence.
     n = used
     for b in merged:
-        if b["type"] == "focus" and re.match(r"Deep work [IVX]*$", b.get("t", "")):
-            if datetime.fromisoformat(b["s"]) > now:
-                n += 1
-                b["t"] = f"Deep work {roman(n)}"
-            else:
-                n = max(n, unroman(b["t"].split()[-1]) if b["t"].split()[-1] else 0)
+        mt = re.match(r"Deep work(?: ([IVX]+))?$", b.get("t", "")) if b["type"] == "focus" else None
+        if not mt:
+            continue
+        if datetime.fromisoformat(b["s"]) > now:
+            n += 1
+            b["t"] = f"Deep work {roman(n)}"
+        elif mt.group(1):
+            n = max(n, unroman(mt.group(1)))
     return merged
 
 
