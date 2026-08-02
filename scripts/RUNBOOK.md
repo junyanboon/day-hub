@@ -92,3 +92,40 @@ on the previous day's plan). Do not re-enable it while this workflow runs.
 
 Local dry-run: `pip install -r scripts/requirements.txt`, set `ICS_URL_JOINT`
 and `ICS_URL_JUNYAN`, then `python scripts/still_plan.py`.
+
+## Live refresh — `still-api` Worker
+
+The 15-minute job above is the safety net. For "I just changed my calendar, show
+me now", the app calls a Cloudflare Worker that reads the calendars on demand:
+
+- Source: `still-api/` (deployed with `wrangler deploy` from that directory)
+- Endpoint: `https://still-api.still-api.workers.dev/plan`
+- Health:   `https://still-api.still-api.workers.dev/health` → `{ok, configured}`
+
+**Why a Worker at all.** This repo is public and GitHub Pages is static, so the
+page can never hold the calendars' secret iCal URLs — anyone with one can read
+the calendar. The Worker holds them as Cloudflare secrets and returns only the
+finished plan.
+
+**Secrets** (set once, interactively — the values never touch chat or the repo):
+
+```
+cd still-api
+npx wrangler secret put ICS_URL_JOINT
+npx wrangler secret put ICS_URL_JUNYAN
+```
+
+Same two values as the matching GitHub secrets. `/health` reports
+`configured:false` until both are set, and `/plan` returns 502 with a clear
+message — the app falls back to its baked plan, so nothing breaks meanwhile.
+
+**When the app calls it:** on first open, whenever the tab regains focus, every
+5 minutes while open, when the day sheet opens, and from the "⟳ refresh from my
+calendar" button in that sheet. Any failure is silent and falls back to the
+baked plan; the button then reads "(offline)".
+
+**Two planners, on purpose.** `scripts/still_plan.py` and `still-api/src/index.js`
+implement the same rules (fixed blocks from the calendar, 50-minute focus blocks
+with 10-minute rests in the gaps, Toronto offsets never shifted). They are kept
+as independent paths so a Worker outage cannot also break the baked fallback.
+Change one, change the other.
