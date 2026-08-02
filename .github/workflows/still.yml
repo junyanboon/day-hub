@@ -14,7 +14,7 @@ name: Still day plan
 
 on:
   schedule:
-    - cron: "*/30 10-23,0-2 * * *"   # ~06:00–22:30 America/Toronto across DST
+    - cron: "*/15 10-23,0-2 * * *"   # ~06:00–22:45 America/Toronto across DST
   workflow_dispatch: {}
 
 permissions:
