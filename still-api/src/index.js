@@ -95,10 +95,66 @@ function atLocalHour(ref, hour, minute = 0) {
 
 /* ── calendar ───────────────────────────────────────────────────────────── */
 
+/**
+ * Keep only the VEVENTs that could land on this day before handing the text to
+ * the parser: recurring series (which must be expanded) and anything dated
+ * within a day of the target. A year of calendar is mostly irrelevant to today,
+ * and parsing all of it is what blows the Worker's CPU budget.
+ */
+function prefilterICS(text, dayStart) {
+  const stamp = (d) => {
+    const p = new Intl.DateTimeFormat("en-CA", {
+      timeZone: TZ, year: "numeric", month: "2-digit", day: "2-digit",
+    }).formatToParts(d);
+    const g = (t) => p.find((x) => x.type === t).value;
+    return `${g("year")}${g("month")}${g("day")}`;
+  };
+  const near = new Set([
+    stamp(new Date(dayStart.getTime() - 86400000)),
+    stamp(dayStart),
+    stamp(new Date(dayStart.getTime() + 86400000)),
+  ]);
+
+  const first = text.indexOf("BEGIN:VEVENT");
+  if (first === -1) return text;
+  const header = text.slice(0, first);
+  const chunks = text.match(/BEGIN:VEVENT[\s\S]*?END:VEVENT/g) || [];
+
+  const kept = chunks.filter((c) => {
+    if (c.includes("RRULE") || c.includes("RECURRENCE-ID")) return true;
+    const m = c.match(/DTSTART[^:\n]*:(\d{8})/);
+    return m ? near.has(m[1]) : false;
+  });
+  return header + kept.join("\r\n") + "\r\nEND:VCALENDAR\r\n";
+}
+
+/**
+ * Advance a series' anchor forward in WHOLE periods so expansion starts just
+ * before the day we care about. Whole periods keep the recurrence aligned
+ * (a WEEKLY rule stays on its weekday), so this is a speed-up, not a shift.
+ * Only DAILY/WEEKLY are worth it; MONTHLY/YEARLY have few enough occurrences.
+ */
+function fastForward(dtstart, recur, target) {
+  const freq = recur && recur.freq;
+  const unitDays = freq === "DAILY" ? 1 : freq === "WEEKLY" ? 7 : 0;
+  if (!unitDays) return dtstart;
+  // A COUNT rule is numbered from its real start; moving the anchor would let
+  // occurrences past the count through. Rare and cheap — just don't skip.
+  if (recur.count) return dtstart;
+  const interval = (recur.interval || 1) * unitDays;
+  const diffDays = Math.floor((target - dtstart.toJSDate()) / 86400000);
+  const periods = Math.floor(diffDays / interval) - 1;
+  if (periods <= 0) return dtstart;
+  const t = dtstart.clone();
+  t.adjust(periods * interval, 0, 0, 0);
+  return t;
+}
+
 async function fetchEvents(url, label, dayStart, dayEnd) {
   const res = await fetch(url, { cf: { cacheTtl: 0 } });
   if (!res.ok) throw new Error(`${label}: HTTP ${res.status}`);
-  const text = await res.text();
+  const raw = await res.text();
+  const text = prefilterICS(raw, dayStart);
 
   const comp = new ICAL.Component(ICAL.parse(text));
   const out = [];
@@ -121,10 +177,12 @@ async function fetchEvents(url, label, dayStart, dayEnd) {
     };
 
     if (ev.isRecurring()) {
-      const it = ev.iterator();
+      const recur = ve.getFirstPropertyValue("rrule");
+      const anchor = fastForward(ev.startDate, recur, dayStart);
+      const it = ev.iterator(anchor);
       const durMs = ev.duration.toSeconds() * 1000;
       let next, guard = 0;
-      while ((next = it.next()) && guard++ < 400) {
+      while ((next = it.next()) && guard++ < 200) {
         const sd = next.toJSDate();
         if (sd >= dayEnd) break;
         if (sd.getTime() + durMs <= dayStart.getTime()) continue;
@@ -214,7 +272,7 @@ async function buildPlan(env, ref) {
 }
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const url = new URL(request.url);
     const origin = request.headers.get("Origin") || "";
     const headers = { ...cors(origin), "Content-Type": "application/json" };
@@ -235,8 +293,24 @@ export default {
     try {
       const q = url.searchParams.get("date");
       const ref = q ? new Date(`${q}T12:00:00Z`) : new Date();
+
+      // Building the plan means fetching and parsing two calendars, so serve a
+      // recent copy when we have one. 60s is well inside "live" for a day plan
+      // and keeps the app snappy when it polls.
+      const cache = caches.default;
+      const key = new Request(new URL(`/plan?d=${q || "today"}`, url.origin), { method: "GET" });
+      const hit = await cache.match(key);
+      if (hit) {
+        const body = await hit.text();
+        return new Response(body, { headers: { ...headers, "X-Still-Cache": "hit" } });
+      }
+
       const plan = await buildPlan(env, ref);
-      return new Response(JSON.stringify(plan), { headers });
+      const body = JSON.stringify(plan);
+      ctx.waitUntil(cache.put(key, new Response(body, {
+        headers: { "Content-Type": "application/json", "Cache-Control": "max-age=60" },
+      })));
+      return new Response(body, { headers: { ...headers, "X-Still-Cache": "miss" } });
     } catch (err) {
       // Fail loud but harmless — the page falls back to its baked-in plan.
       return new Response(JSON.stringify({ error: String(err && err.message || err) }),

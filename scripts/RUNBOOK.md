@@ -125,7 +125,38 @@ calendar" button in that sheet. Any failure is silent and falls back to the
 baked plan; the button then reads "(offline)".
 
 **Two planners, on purpose.** `scripts/still_plan.py` and `still-api/src/index.js`
-implement the same rules (fixed blocks from the calendar, 50-minute focus blocks
-with 10-minute rests in the gaps, Toronto offsets never shifted). They are kept
-as independent paths so a Worker outage cannot also break the baked fallback.
-Change one, change the other.
+share the shape of the plan (fixed blocks from the calendar, 50-minute focus
+blocks with 10-minute rests in the gaps, Toronto offsets never shifted). They are
+kept as independent paths so a Worker outage cannot also break the baked
+fallback. Change one, change the other.
+
+They differ deliberately in one place — **the past**:
+
+- The Python job *preserves* blocks that already started, carrying them over
+  verbatim from the previous file. The baked page is therefore a record of the
+  day as it was lived, and the block you are in is never rewritten under you.
+- The Worker *recomputes* the whole day from the calendar each call. So if an
+  already-finished event is edited, the live view shows the corrected time while
+  the baked copy keeps the original.
+
+Both are right for their job. Expect morning blocks to differ between the two
+after a same-day edit to an early event; that is not a bug.
+
+## Worker performance
+
+The first cut of the Worker died with CPU error 1102. Two causes, both fixed —
+keep them in mind before changing `fetchEvents`:
+
+1. **Parse less.** `prefilterICS` strips the calendar down to recurring series
+   plus events dated within a day of the target before `ICAL.parse` runs. A full
+   year of calendar is mostly irrelevant to today and parsing it blows the CPU
+   budget on its own.
+2. **Don't walk recurrence from the beginning of time.** `fastForward` advances
+   a series' anchor in WHOLE periods (so a weekly rule keeps its weekday) to just
+   before the target day. Iterating a daily series from its real start burns
+   thousands of steps per request — and the old 400-step guard meant long-running
+   series were silently *missed* as well as slow. Rules with `COUNT` are skipped,
+   since moving their anchor would change which occurrences count.
+
+Responses are cached for 60s (`caches.default`, `X-Still-Cache` header shows
+hit/miss), so the app's polling is nearly free.
