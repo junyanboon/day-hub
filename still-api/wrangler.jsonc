@@ -1,0 +1,12 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "still-api",
+  "main": "src/index.js",
+  "compatibility_date": "2026-07-25",
+  "observability": { "enabled": true }
+
+  // Secrets (set with `wrangler secret put`, never in this file):
+  //   ICS_URL_JOINT  — Joint Plans calendar → Settings → Secret address in iCal format
+  //   ICS_URL_JUNYAN — "Junyan" calendar → same
+  // These are the same two values already stored as GitHub secrets on day-hub.
+}
