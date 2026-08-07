@@ -139,14 +139,14 @@
     <div class="label">06 · aura</div><div class="num">6/7</div>
     <canvas id="c6" class="fill"></canvas>
     <div class="center">25 min</div>
-    <div class="hint">hold — the aura gathers and glows brighter</div>
+    <div class="hint">it breathes on its own — nothing to do</div>
   </section>
 
   <section id="s7">
     <div class="label">07 · moon aura</div><div class="num">7/7</div>
     <canvas id="c7" class="fill"></canvas>
-    <div class="center" style="margin-top:150px">25 min</div>
-    <div class="hint">hold — the crescent wakes, the halo breathes wider</div>
+    <div class="center" style="margin-top:0">25 min</div>
+    <div class="hint">the moon breathes on its own — nothing to do</div>
   </section>
 
 </main>
@@ -287,22 +287,21 @@
   })();
   /* 6 — aura: layered wobbling rings, blue out to warm coral core (Calm Sleep) */
   function auraSetup(sectionId, canvasId, layers, drawCore) {
-    const sec = document.getElementById(sectionId), cv = document.getElementById(canvasId);
+    const cv = document.getElementById(canvasId);
     const cx2d = cv.getContext("2d");
-    let hold = false, energy = 0;
     function size(){ cv.width = cv.clientWidth * devicePixelRatio; cv.height = cv.clientHeight * devicePixelRatio; }
     size(); addEventListener("resize", size);
-    sec.addEventListener("pointerdown", () => hold = true);
-    window.addEventListener("pointerup", () => hold = false);
     (function loop(t){
-      energy += ((hold ? 1 : 0) - energy) * .03;
+      // autonomous breath: slow ~9s cycle, no interaction needed
+      const energy = .5 + .5 * Math.sin(t/4500 * Math.PI - Math.PI/2);
       const w = cv.clientWidth, h = cv.clientHeight;
       const cx = w/2, cy = h/2 - 30;
+      const scale = Math.min(w, h) / 390;   // aura fills the phone like the reference
       cx2d.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);
       cx2d.clearRect(0,0,w,h);
       for (const L of layers) {
         // organic wobble: radius modulated by two slow sinusoids per angle
-        const base = L.r * (1 + energy * .16);
+        const base = L.r * scale * (1 + energy * .07);
         cx2d.beginPath();
         for (let a = 0; a <= Math.PI*2 + .01; a += Math.PI/48) {
           const wob = 1
@@ -327,11 +326,11 @@
   }
 
   auraSetup("s6", "c6", [
-    { r:190, c:"rgba(95,121,201,",  a0:.55, w1:.05, w2:.03, t1:2600, t2:3400, ph:0,   blur:18 },
-    { r:150, c:"rgba(150,168,228,", a0:.5,  w1:.06, w2:.04, t1:3000, t2:2500, ph:1.7, blur:14 },
-    { r:112, c:"rgba(246,229,216,", a0:.65, w1:.06, w2:.04, t1:2400, t2:3100, ph:3.1, blur:12 },
-    { r:82,  c:"rgba(240,184,160,", a0:.75, w1:.07, w2:.05, t1:2800, t2:2200, ph:4.4, blur:10 },
-    { r:56,  c:"rgba(224,142,122,", a0:.85, w1:.08, w2:.05, t1:2100, t2:2900, ph:5.6, blur:8  },
+    { r:320, c:"rgba(95,121,201,",  a0:.6,  w1:.04, w2:.03, t1:2600, t2:3400, ph:0,   blur:22 },
+    { r:255, c:"rgba(150,168,228,", a0:.55, w1:.05, w2:.04, t1:3000, t2:2500, ph:1.7, blur:18 },
+    { r:195, c:"rgba(246,229,216,", a0:.7,  w1:.05, w2:.04, t1:2400, t2:3100, ph:3.1, blur:14 },
+    { r:142, c:"rgba(240,184,160,", a0:.8,  w1:.06, w2:.05, t1:2800, t2:2200, ph:4.4, blur:12 },
+    { r:96,  c:"rgba(224,142,122,", a0:.9,  w1:.07, w2:.05, t1:2100, t2:2900, ph:5.6, blur:10 },
   ], (x, cx, cy, t, en) => {
     // starburst core: bright disc + cross flare
     const R = 34 * (1 + en*.25);
@@ -350,38 +349,52 @@
     x.restore(); x.filter = "none";
   });
 
-  /* 7 — moon aura: same living halo, silver-indigo, crescent moon core (Isha / Sadhguru) */
+  /* 7 — moon: one huge textured full moon, silver on dark indigo (Sadhguru / Isha) */
   auraSetup("s7", "c7", [
-    { r:195, c:"rgba(88,104,180,",  a0:.5,  w1:.05, w2:.03, t1:3000, t2:3800, ph:.6,  blur:18 },
-    { r:152, c:"rgba(132,144,210,", a0:.5,  w1:.06, w2:.04, t1:3400, t2:2700, ph:2.2, blur:14 },
-    { r:114, c:"rgba(196,200,240,", a0:.55, w1:.06, w2:.04, t1:2600, t2:3300, ph:3.6, blur:12 },
-    { r:84,  c:"rgba(236,232,255,", a0:.6,  w1:.07, w2:.05, t1:3000, t2:2400, ph:4.9, blur:10 },
-    { r:58,  c:"rgba(255,250,240,", a0:.55, w1:.08, w2:.05, t1:2300, t2:3100, ph:6,   blur:8  },
+    { r:330, c:"rgba(84,96,168,",   a0:.4,  w1:.04, w2:.03, t1:3400, t2:4200, ph:.6,  blur:24 },
+    { r:250, c:"rgba(130,140,204,", a0:.4,  w1:.05, w2:.03, t1:3800, t2:3000, ph:2.2, blur:20 },
+    { r:185, c:"rgba(198,204,240,", a0:.45, w1:.05, w2:.04, t1:3000, t2:3600, ph:3.6, blur:16 },
   ], (x, cx, cy, t, en) => {
-    // crescent: bright disc with an offset disc carved out, tips up like Shiva's moon.
-    // Carved on an offscreen canvas so destination-out can't erase the aura below.
-    const R = 40 * (1 + en*.18);
-    const glow = x.createRadialGradient(cx, cy, R*.3, cx, cy, R*2.4);
-    glow.addColorStop(0, "rgba(255,252,244," + (.5 + en*.35) + ")");
-    glow.addColorStop(1, "rgba(255,252,244,0)");
+    const R = 128 * (Math.min(x.canvas.clientWidth||375, 800) / 390) * (1 + en*.05);
+    // halo breathes with the aura
+    const glow = x.createRadialGradient(cx, cy, R*.6, cx, cy, R*2.1);
+    glow.addColorStop(0, "rgba(235,238,255," + (.35 + en*.3) + ")");
+    glow.addColorStop(1, "rgba(235,238,255,0)");
     x.fillStyle = glow;
-    x.beginPath(); x.arc(cx, cy, R*2.4, 0, Math.PI*2); x.fill();
-    const S = Math.ceil(R*2 + 8);
-    const off = auraSetup._moon || (auraSetup._moon = document.createElement("canvas"));
-    off.width = off.height = S * devicePixelRatio;
-    const o = off.getContext("2d");
-    o.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);
-    o.clearRect(0,0,S,S);
-    o.translate(S/2, S/2); o.rotate(-.5);   // tilt: horns up-right
-    o.beginPath(); o.arc(0, 0, R, 0, Math.PI*2);
-    const mg = o.createRadialGradient(-R*.3, -R*.3, 0, 0, 0, R);
-    mg.addColorStop(0, "#ffffff");
-    mg.addColorStop(1, "#e8e2d2");
-    o.fillStyle = mg; o.fill();
-    o.globalCompositeOperation = "destination-out";
-    o.beginPath(); o.arc(R*.42, -R*.30, R*.92, 0, Math.PI*2); o.fill();
-    o.globalCompositeOperation = "source-over";
-    x.drawImage(off, cx - S/2, cy - S/2, S, S);
+    x.beginPath(); x.arc(cx, cy, R*2.1, 0, Math.PI*2); x.fill();
+    // textured disc, painted once and reused (texture must not flicker per-frame)
+    if (!auraSetup._moonTex) {
+      const S = 560, o = document.createElement("canvas");
+      o.width = o.height = S;
+      const g = o.getContext("2d"), r0 = S/2 - 6;
+      const mg = g.createRadialGradient(S*.38, S*.36, r0*.1, S/2, S/2, r0);
+      mg.addColorStop(0, "#f4f4fa");
+      mg.addColorStop(.75, "#cfd3e8");
+      mg.addColorStop(1, "#9aa0c4");
+      g.beginPath(); g.arc(S/2, S/2, r0, 0, Math.PI*2);
+      g.fillStyle = mg; g.fill();
+      g.save(); g.beginPath(); g.arc(S/2, S/2, r0, 0, Math.PI*2); g.clip();
+      // maria: soft dark blotches
+      for (let i=0; i<340; i++) {
+        const a = Math.random()*Math.PI*2, d = Math.sqrt(Math.random())*r0;
+        const bx = S/2 + Math.cos(a)*d, by = S/2 + Math.sin(a)*d;
+        const br = 3 + Math.random()*26;
+        const bg = g.createRadialGradient(bx, by, 0, bx, by, br);
+        const dark = Math.random() < .6;
+        bg.addColorStop(0, dark ? "rgba(96,104,146,.16)" : "rgba(255,255,255,.14)");
+        bg.addColorStop(1, "rgba(0,0,0,0)");
+        g.fillStyle = bg;
+        g.beginPath(); g.arc(bx, by, br, 0, Math.PI*2); g.fill();
+      }
+      // limb darkening
+      const lg = g.createRadialGradient(S/2, S/2, r0*.55, S/2, S/2, r0);
+      lg.addColorStop(0, "rgba(0,0,0,0)");
+      lg.addColorStop(1, "rgba(28,32,64,.5)");
+      g.fillStyle = lg; g.beginPath(); g.arc(S/2, S/2, r0, 0, Math.PI*2); g.fill();
+      g.restore();
+      auraSetup._moonTex = o;
+    }
+    x.drawImage(auraSetup._moonTex, cx - R, cy - R, R*2, R*2);
   });
 })();
 </script>
