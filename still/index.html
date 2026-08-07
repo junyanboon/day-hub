@@ -779,7 +779,12 @@ const PLAN = {
 
     (function loop(t){
       const w = innerWidth, h = innerHeight;
-      const cx = w/2, cy = h/2 - 40;
+      // anchor to the countdown so the sunburst sits exactly behind the time,
+      // and cap the outer band above the controls so the UI stays on dark navy
+      const wrap = document.getElementById("orb-wrap").getBoundingClientRect();
+      const ctrl = document.getElementById("controls").getBoundingClientRect();
+      const cx = wrap.left + wrap.width/2, cy = wrap.top + wrap.height/2;
+      const maxOuter = Math.max(120, Math.min(w*.78, (ctrl.top - cy)));
       const en = .5 + .5 * Math.sin(t/4500 * Math.PI - Math.PI/2);
       x.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);
       const hour = new Date().getHours();
@@ -789,7 +794,7 @@ const PLAN = {
       x.fillRect(0,0,w,h);
 
       if (night) {
-        const R = 118 * (Math.min(w, 800)/390) * (1 + en*.05);
+        const R = maxOuter * .42 * (1 + en*.05);
         const glow = x.createRadialGradient(cx, cy, R*.6, cx, cy, R*2.1);
         glow.addColorStop(0, "rgba(235,238,255," + (.3 + en*.3) + ")");
         glow.addColorStop(1, "rgba(235,238,255,0)");
@@ -801,11 +806,11 @@ const PLAN = {
       }
 
       const warm = WARM[level-1];
-      const scale = Math.min(w, h) / 390;
+      const scale = maxOuter / 330;
       for (const L of BANDS) {
         const base = L.r * scale * (L.warm ? warm : (.9 + warm*.1)) * (1 + en*.07);
-        const ox = cx + Math.cos(t/L.t1 + L.ph) * base * .025;
-        const oy = cy + Math.sin(t/L.t2 + L.ph) * base * .025;
+        const ox = cx + Math.cos(t/L.t1 + L.ph) * base * .015;
+        const oy = cy + Math.sin(t/L.t2 + L.ph) * base * .015;
         x.beginPath();
         for (let a = 0; a <= Math.PI*2 + .01; a += Math.PI/48) {
           const wob = 1 + L.w1*Math.sin(a*3 + t/L.t1 + L.ph) + L.w2*Math.sin(a*5 - t/L.t2 + L.ph*2);
