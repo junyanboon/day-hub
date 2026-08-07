@@ -328,6 +328,17 @@ async function setTaskDone(env, id, done) {
   return true;
 }
 
+/** The live "Junyan CAD" / "Junyan USD" budget (archived copies excluded). */
+async function findBudget(api, currency) {
+  const br = await api("/budgets");
+  if (!br.ok) throw new Error(`YNAB budgets: HTTP ${br.status}`);
+  const want = `junyan ${currency}`.toLowerCase();
+  return (await br.json()).data.budgets.find((b) => {
+    const n = b.name.toLowerCase();
+    return n.includes(want) && !n.includes("archived");
+  }) || null;
+}
+
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
@@ -346,6 +357,37 @@ export default {
       }), { headers });
     }
 
+    if (url.pathname === "/spent/accounts") {
+      // Read-only: open account names in the last-used budget, for wiring/debugging.
+      try {
+        const token = (env.YNAB_TOKEN || "").trim();
+        if (!token) throw new Error("YNAB_TOKEN not configured");
+        const cache = caches.default;
+        const key = new Request(new URL("/spent/accounts?v=3", url.origin));
+        const hit = await cache.match(key);
+        if (hit) return new Response(await hit.text(), { headers: { ...headers, "X-Still-Cache": "hit" } });
+        const api = (path) => fetch("https://api.ynab.com/v1" + path, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const out = {};
+        for (const cur of ["CAD", "USD"]) {
+          const b = await findBudget(api, cur);
+          if (!b) continue;
+          const ar = await api(`/budgets/${b.id}/accounts`);
+          if (!ar.ok) continue;
+          out[cur] = (await ar.json()).data.accounts
+            .filter((a) => !a.closed && !a.deleted).map((a) => a.name);
+        }
+        const body = JSON.stringify(out);
+        ctx.waitUntil(cache.put(key, new Response(body, {
+          headers: { "Content-Type": "application/json", "Cache-Control": "max-age=3600" },
+        })));
+        return new Response(body, { headers: { ...headers, "X-Still-Cache": "miss" } });
+      } catch (err) {
+        return new Response(JSON.stringify({ error: String(err.message || err) }), { status: 502, headers });
+      }
+    }
+
     if (url.pathname === "/spent" && request.method === "POST") {
       // Log a Spent-today entry straight into YNAB as an uncleared outflow.
       // Budget: last-used. Account: YNAB_ACCOUNT_ID env var if set, otherwise
@@ -353,25 +395,30 @@ export default {
       try {
         const token = (env.YNAB_TOKEN || "").trim();
         if (!token) throw new Error("YNAB_TOKEN not configured");
-        const { name, amt, cur } = await request.json();
+        const { name, amt, cur, account } = await request.json();
         if (!name || !(amt > 0) || amt > 100000) throw new Error("bad name/amt");
         const currency = cur === "USD" ? "USD" : "CAD";
         const api = (path, init) => fetch("https://api.ynab.com/v1" + path, {
           ...init,
           headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
         });
-        // Junyan's two spending accounts, found by name so no ids need configuring.
-        const ar = await api("/budgets/last-used/accounts");
+        // Budgets are "🇨🇦Junyan CAD" / "🇺🇸Junyan USD"; the entry names which
+        // account inside that budget it belongs to (picker in the app).
+        const budget = await findBudget(api, currency);
+        if (!budget) throw new Error(`YNAB: no live "Junyan ${currency}" budget`);
+        const budgetId = budget.id;
+        const ar = await api(`/budgets/${budgetId}/accounts`);
         if (!ar.ok) throw new Error(`YNAB accounts: HTTP ${ar.status}`);
-        const want = `junyan ${currency}`.toLowerCase();
-        const acct = (await ar.json()).data.accounts.find(
-          (a) => !a.closed && !a.deleted && a.name.toLowerCase().includes(want),
-        );
-        if (!acct) throw new Error(`YNAB: no open account named like "Junyan ${currency}"`);
+        const accounts = (await ar.json()).data.accounts.filter((a) => !a.closed && !a.deleted);
+        const wantAcct = String(account || "").trim();
+        const acct = (wantAcct && accounts.find((a) => a.name === wantAcct))
+          || (wantAcct && accounts.find((a) => a.name.toLowerCase().includes(wantAcct.toLowerCase())))
+          || accounts[0];
+        if (!acct) throw new Error(`YNAB: no open accounts in "Junyan ${currency}"`);
         const accountId = acct.id, accountName = acct.name;
         const p = parts(new Date());
         const z = (n) => String(n).padStart(2, "0");
-        const tr = await api("/budgets/last-used/transactions", {
+        const tr = await api(`/budgets/${budgetId}/transactions`, {
           method: "POST",
           body: JSON.stringify({ transaction: {
             account_id: accountId,

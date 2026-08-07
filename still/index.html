@@ -128,6 +128,9 @@
   #sp-row #sp-cur.usd { color:var(--ink); background:rgba(255,255,255,.22); }
   #sp-row #sp-add { background:rgba(255,255,255,.9); color:#3a4a6b; border:none; border-radius:13px;
     padding:0 18px; font-size:14.5px; font-weight:600; }
+  #sp-acct { margin-top:8px; width:100%; background:var(--glass); border:1px solid var(--glass-border);
+    border-radius:13px; padding:12px 13px; color:var(--ink-soft); font-size:13.5px; font-family:inherit;
+    outline:none; -webkit-appearance:none; appearance:none; }
   #tsheet h2 { font-size:17px; font-weight:600; margin-bottom:2px; }
   #tsheet .sub { font-size:12.5px; color:var(--ink-soft); margin-bottom:12px; }
   #tlist { overflow-y:auto; flex:1; display:flex; flex-direction:column; gap:6px; }
@@ -312,6 +315,7 @@
     <button id="sp-cur" title="currency">CAD</button>
     <button id="sp-add">Add</button>
   </div>
+  <select id="sp-acct" title="which account this goes to in YNAB"></select>
 </div>
 
 <div id="sheet">
@@ -606,22 +610,44 @@ const PLAN = {
     try {
       const r = await fetch(STILL_API.replace("/plan", "/spent"), {
         method:"POST", headers:{ "Content-Type":"application/json" },
-        body: JSON.stringify({ name: item.name, amt: item.amt, cur: item.cur }),
+        body: JSON.stringify({ name: item.name, amt: item.amt, cur: item.cur, account: item.account }),
       });
       if (!r.ok) throw new Error();
       const d = await r.json();
       return d.ok === true;
     } catch { return false; }
   }
+  /* account picker: full list per currency from YNAB (via still-api), and the
+     last-used account per currency is remembered — travel card sticks while
+     travelling, home card sticks at home */
+  let spAccts = null;
+  async function pullAccts(){
+    try {
+      const r = await fetch(STILL_API.replace("/plan", "/spent/accounts"), { cache:"no-store" });
+      if (r.ok) { spAccts = await r.json(); fillAccts(); }
+    } catch {}
+  }
+  const spCur = () => $("sp-cur").classList.contains("usd") ? "USD" : "CAD";
+  function fillAccts(){
+    const cur = spCur(), list = (spAccts && spAccts[cur]) || [];
+    const last = localStorage.getItem("still-spent-acct-" + cur);
+    $("sp-acct").innerHTML = list.map(n =>
+      `<option${n === last ? " selected" : ""}>${esc(n)}</option>`).join("")
+      || `<option>first open account</option>`;
+  }
+  $("sp-acct").onchange = () =>
+    localStorage.setItem("still-spent-acct-" + spCur(), $("sp-acct").value);
   $("sp-cur").onclick = () => {
     const usd = $("sp-cur").classList.toggle("usd");
     $("sp-cur").textContent = usd ? "USD" : "CAD";
+    fillAccts();
   };
   $("sp-add").onclick = async () => {
     const name = $("sp-name").value.trim();
     const amt = parseFloat($("sp-amt").value.replace(/[^0-9.]/g, ""));
     if (!name || !(amt > 0)) return;
-    const item = { name, amt, cur: $("sp-cur").classList.contains("usd") ? "USD" : "CAD", at: fmtT(new Date()) };
+    const item = { name, amt, cur: spCur(), account: $("sp-acct").value || "", at: fmtT(new Date()) };
+    localStorage.setItem("still-spent-acct-" + item.cur, item.account);
     const a = spLoad();
     a.push(item); spSave(a);
     $("sp-name").value = ""; $("sp-amt").value = "";
@@ -640,6 +666,7 @@ const PLAN = {
       $("sheet").classList.remove("open"); $("day-btn").classList.remove("on");
       $("tsheet").classList.remove("open"); $("tasks-btn").classList.remove("on");
       renderSpent();
+      if (spAccts) fillAccts(); else pullAccts();
     }
     syncScrim();
   };
