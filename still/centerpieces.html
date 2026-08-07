@@ -68,6 +68,13 @@
   #s4 .center { position:relative; z-index:2; font-size:44px; font-weight:200; pointer-events:none;
     text-shadow:0 2px 30px rgba(0,0,0,.4); }
 
+  /* 6 & 7 — aura (Calm Sleep) and moon aura */
+  #s6 { background:#232847; }
+  #s7 { background:#1d2140; }
+  #c6, #c7 { z-index:1; }
+  #s6 .center, #s7 .center { position:relative; z-index:2; font-size:44px; font-weight:200;
+    pointer-events:none; text-shadow:0 2px 24px rgba(0,0,0,.45); }
+
   /* 5 — eclipse ring */
   #s5 { background:radial-gradient(circle at 50% 42%, #3c4370 0%, #23284c 55%, #171a33 100%); }
   #ring5 { width:280px; height:280px; z-index:2; }
@@ -83,13 +90,13 @@
 <main id="main">
 
   <section id="s1">
-    <div class="label">01 · breathing orb</div><div class="num">1/5</div>
+    <div class="label">01 · breathing orb</div><div class="num">1/7</div>
     <div id="orb1"><span class="t">25 min</span></div>
     <div class="hint">hold to deepen the breath · release for ripples</div>
   </section>
 
   <section id="s2">
-    <div class="label">02 · moon on water</div><div class="num">2/5</div>
+    <div class="label">02 · moon on water</div><div class="num">2/7</div>
     <canvas id="c2" class="fill" style="position:absolute;inset:0;z-index:2;pointer-events:none"></canvas>
     <div id="moon">25</div>
     <div id="water2"></div>
@@ -97,21 +104,21 @@
   </section>
 
   <section id="s3">
-    <div class="label">03 · starfield</div><div class="num">3/5</div>
+    <div class="label">03 · starfield</div><div class="num">3/7</div>
     <canvas id="c3"></canvas>
     <div class="center">25 min</div>
     <div class="hint">hold — the stars gather around your time</div>
   </section>
 
   <section id="s4">
-    <div class="label">04 · aurora</div><div class="num">4/5</div>
+    <div class="label">04 · aurora</div><div class="num">4/7</div>
     <canvas id="c4"></canvas>
     <div class="center">25 min</div>
     <div class="hint">tap to shift the light · drag to stir it</div>
   </section>
 
   <section id="s5">
-    <div class="label">05 · eclipse ring</div><div class="num">5/5</div>
+    <div class="label">05 · eclipse ring</div><div class="num">5/7</div>
     <svg id="ring5" viewBox="0 0 100 100">
       <defs>
         <radialGradient id="coreGrad" cx=".4" cy=".35" r=".8">
@@ -126,6 +133,20 @@
       <text class="time" x="50" y="55" text-anchor="middle" font-size="13" fill="#fff" font-weight="200">25 min</text>
     </svg>
     <div class="hint">press and hold — light fills the ring, then releases</div>
+  </section>
+
+  <section id="s6">
+    <div class="label">06 · aura</div><div class="num">6/7</div>
+    <canvas id="c6" class="fill"></canvas>
+    <div class="center">25 min</div>
+    <div class="hint">hold — the aura gathers and glows brighter</div>
+  </section>
+
+  <section id="s7">
+    <div class="label">07 · moon aura</div><div class="num">7/7</div>
+    <canvas id="c7" class="fill"></canvas>
+    <div class="center" style="margin-top:150px">25 min</div>
+    <div class="hint">hold — the crescent wakes, the halo breathes wider</div>
   </section>
 
 </main>
@@ -264,6 +285,104 @@
     arc5.style.strokeDashoffset = CIRC5 * (1 - fill5);
     requestAnimationFrame(loop5);
   })();
+  /* 6 — aura: layered wobbling rings, blue out to warm coral core (Calm Sleep) */
+  function auraSetup(sectionId, canvasId, layers, drawCore) {
+    const sec = document.getElementById(sectionId), cv = document.getElementById(canvasId);
+    const cx2d = cv.getContext("2d");
+    let hold = false, energy = 0;
+    function size(){ cv.width = cv.clientWidth * devicePixelRatio; cv.height = cv.clientHeight * devicePixelRatio; }
+    size(); addEventListener("resize", size);
+    sec.addEventListener("pointerdown", () => hold = true);
+    window.addEventListener("pointerup", () => hold = false);
+    (function loop(t){
+      energy += ((hold ? 1 : 0) - energy) * .03;
+      const w = cv.clientWidth, h = cv.clientHeight;
+      const cx = w/2, cy = h/2 - 30;
+      cx2d.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);
+      cx2d.clearRect(0,0,w,h);
+      for (const L of layers) {
+        // organic wobble: radius modulated by two slow sinusoids per angle
+        const base = L.r * (1 + energy * .16);
+        cx2d.beginPath();
+        for (let a = 0; a <= Math.PI*2 + .01; a += Math.PI/48) {
+          const wob = 1
+            + L.w1 * Math.sin(a*3 + t/L.t1 + L.ph)
+            + L.w2 * Math.sin(a*5 - t/L.t2 + L.ph*2);
+          const r = base * wob;
+          const x = cx + Math.cos(a)*r, y = cy + Math.sin(a)*r;
+          a === 0 ? cx2d.moveTo(x,y) : cx2d.lineTo(x,y);
+        }
+        cx2d.closePath();
+        const g = cx2d.createRadialGradient(cx, cy, base*.2, cx, cy, base*1.15);
+        g.addColorStop(0, L.c + (L.a0 + energy*.12) + ")");
+        g.addColorStop(1, L.c + "0)");
+        cx2d.fillStyle = g;
+        cx2d.filter = "blur(" + L.blur + "px)";
+        cx2d.fill();
+        cx2d.filter = "none";
+      }
+      drawCore(cx2d, cx, cy, t, energy);
+      requestAnimationFrame(loop);
+    })(0);
+  }
+
+  auraSetup("s6", "c6", [
+    { r:190, c:"rgba(95,121,201,",  a0:.55, w1:.05, w2:.03, t1:2600, t2:3400, ph:0,   blur:18 },
+    { r:150, c:"rgba(150,168,228,", a0:.5,  w1:.06, w2:.04, t1:3000, t2:2500, ph:1.7, blur:14 },
+    { r:112, c:"rgba(246,229,216,", a0:.65, w1:.06, w2:.04, t1:2400, t2:3100, ph:3.1, blur:12 },
+    { r:82,  c:"rgba(240,184,160,", a0:.75, w1:.07, w2:.05, t1:2800, t2:2200, ph:4.4, blur:10 },
+    { r:56,  c:"rgba(224,142,122,", a0:.85, w1:.08, w2:.05, t1:2100, t2:2900, ph:5.6, blur:8  },
+  ], (x, cx, cy, t, en) => {
+    // starburst core: bright disc + cross flare
+    const R = 34 * (1 + en*.25);
+    const g = x.createRadialGradient(cx, cy, 0, cx, cy, R);
+    g.addColorStop(0, "rgba(255,255,255,1)");
+    g.addColorStop(.5, "rgba(255,240,230," + (.8 + en*.2) + ")");
+    g.addColorStop(1, "rgba(255,240,230,0)");
+    x.fillStyle = g;
+    x.beginPath(); x.arc(cx, cy, R, 0, Math.PI*2); x.fill();
+    x.save();
+    x.translate(cx, cy); x.rotate(t/9000);
+    x.strokeStyle = "rgba(255,255,255," + (.5 + en*.3) + ")";
+    x.lineWidth = 1.6; x.filter = "blur(1px)";
+    const F = R * 1.7;
+    for (let i=0;i<4;i++) { x.rotate(Math.PI/4); x.beginPath(); x.moveTo(-F,0); x.lineTo(F,0); x.stroke(); }
+    x.restore(); x.filter = "none";
+  });
+
+  /* 7 — moon aura: same living halo, silver-indigo, crescent moon core (Isha / Sadhguru) */
+  auraSetup("s7", "c7", [
+    { r:195, c:"rgba(88,104,180,",  a0:.5,  w1:.05, w2:.03, t1:3000, t2:3800, ph:.6,  blur:18 },
+    { r:152, c:"rgba(132,144,210,", a0:.5,  w1:.06, w2:.04, t1:3400, t2:2700, ph:2.2, blur:14 },
+    { r:114, c:"rgba(196,200,240,", a0:.55, w1:.06, w2:.04, t1:2600, t2:3300, ph:3.6, blur:12 },
+    { r:84,  c:"rgba(236,232,255,", a0:.6,  w1:.07, w2:.05, t1:3000, t2:2400, ph:4.9, blur:10 },
+    { r:58,  c:"rgba(255,250,240,", a0:.55, w1:.08, w2:.05, t1:2300, t2:3100, ph:6,   blur:8  },
+  ], (x, cx, cy, t, en) => {
+    // crescent: bright disc with an offset disc carved out, tips up like Shiva's moon.
+    // Carved on an offscreen canvas so destination-out can't erase the aura below.
+    const R = 40 * (1 + en*.18);
+    const glow = x.createRadialGradient(cx, cy, R*.3, cx, cy, R*2.4);
+    glow.addColorStop(0, "rgba(255,252,244," + (.5 + en*.35) + ")");
+    glow.addColorStop(1, "rgba(255,252,244,0)");
+    x.fillStyle = glow;
+    x.beginPath(); x.arc(cx, cy, R*2.4, 0, Math.PI*2); x.fill();
+    const S = Math.ceil(R*2 + 8);
+    const off = auraSetup._moon || (auraSetup._moon = document.createElement("canvas"));
+    off.width = off.height = S * devicePixelRatio;
+    const o = off.getContext("2d");
+    o.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);
+    o.clearRect(0,0,S,S);
+    o.translate(S/2, S/2); o.rotate(-.5);   // tilt: horns up-right
+    o.beginPath(); o.arc(0, 0, R, 0, Math.PI*2);
+    const mg = o.createRadialGradient(-R*.3, -R*.3, 0, 0, 0, R);
+    mg.addColorStop(0, "#ffffff");
+    mg.addColorStop(1, "#e8e2d2");
+    o.fillStyle = mg; o.fill();
+    o.globalCompositeOperation = "destination-out";
+    o.beginPath(); o.arc(R*.42, -R*.30, R*.92, 0, Math.PI*2); o.fill();
+    o.globalCompositeOperation = "source-over";
+    x.drawImage(off, cx - S/2, cy - S/2, S, S);
+  });
 })();
 </script>
 </body>
