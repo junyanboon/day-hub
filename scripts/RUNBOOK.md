@@ -209,3 +209,21 @@ uses intensity 3. Responses cache 30 min.
 
 Design studies that led here: still/centerpieces.html (7 interactive
 centerpiece prototypes, kept for reference).
+
+## Still — Spent tab (YNAB)
+
+The bottom bar is Now / Focus / Spent / Schedule (Calm Countdown design).
+Spent is a money-spent-today list, per-day in localStorage — and every entry
+is pushed to YNAB the moment it's added, via `POST /spent` on still-api:
+uncleared outflow in the **last-used budget**, payee = entry name, memo
+"via Still · Spent today". Account: `YNAB_ACCOUNT_ID` env var if set in
+wrangler.toml, else the first open on-budget account. Removing a row in the
+app does NOT delete the YNAB transaction (do that in YNAB).
+
+Worker secret needed once: `YNAB_TOKEN` — a personal access token from
+app.ynab.com → Account Settings → Developer. Set with:
+
+    cd still-api && npx wrangler secret put YNAB_TOKEN
+
+`/health` shows `ynabConfigured`; until set, entries save locally with a ⚠︎
+and nothing reaches YNAB.
