@@ -84,19 +84,30 @@
     transform:rotate(-90deg); transform-origin:50% 50%;
     transition:stroke-dashoffset .12s linear; }
   #ring5 .core { fill:url(#coreGrad); }
+
+  /* 8–12 — new studies (Mobbin: WHOOP, Ultrahuman, Hatch; Isha: dhyana flame; Calm: dawn lake; Opal: halo) */
+  #s8  { background:#14171d; }
+  #s9  { background:#0b0d12; }
+  #s10 { background:radial-gradient(circle at 50% 60%, #14262b 0%, #0c161a 60%, #080f12 100%); }
+  #s11 { background:#1a2350; }
+  #s12 { background:#0f1016; }
+  #c8, #c9, #c10, #c11, #c12 { z-index:1; }
+  #s8 .center, #s9 .center, #s10 .center, #s11 .center, #s12 .center {
+    position:relative; z-index:2; font-size:44px; font-weight:200;
+    pointer-events:none; text-shadow:0 2px 24px rgba(0,0,0,.55); }
 </style>
 </head>
 <body>
 <main id="main">
 
   <section id="s1">
-    <div class="label">01 · breathing orb</div><div class="num">1/7</div>
+    <div class="label">01 · breathing orb</div><div class="num">1/12</div>
     <div id="orb1"><span class="t">25 min</span></div>
     <div class="hint">hold to deepen the breath · release for ripples</div>
   </section>
 
   <section id="s2">
-    <div class="label">02 · moon on water</div><div class="num">2/7</div>
+    <div class="label">02 · moon on water</div><div class="num">2/12</div>
     <canvas id="c2" class="fill" style="position:absolute;inset:0;z-index:2;pointer-events:none"></canvas>
     <div id="moon">25</div>
     <div id="water2"></div>
@@ -104,21 +115,21 @@
   </section>
 
   <section id="s3">
-    <div class="label">03 · starfield</div><div class="num">3/7</div>
+    <div class="label">03 · starfield</div><div class="num">3/12</div>
     <canvas id="c3"></canvas>
     <div class="center">25 min</div>
     <div class="hint">hold — the stars gather around your time</div>
   </section>
 
   <section id="s4">
-    <div class="label">04 · aurora</div><div class="num">4/7</div>
+    <div class="label">04 · aurora</div><div class="num">4/12</div>
     <canvas id="c4"></canvas>
     <div class="center">25 min</div>
     <div class="hint">tap to shift the light · drag to stir it</div>
   </section>
 
   <section id="s5">
-    <div class="label">05 · eclipse ring</div><div class="num">5/7</div>
+    <div class="label">05 · eclipse ring</div><div class="num">5/12</div>
     <svg id="ring5" viewBox="0 0 100 100">
       <defs>
         <radialGradient id="coreGrad" cx=".4" cy=".35" r=".8">
@@ -136,17 +147,52 @@
   </section>
 
   <section id="s6">
-    <div class="label">06 · aura</div><div class="num">6/7</div>
+    <div class="label">06 · aura</div><div class="num">6/12</div>
     <canvas id="c6" class="fill"></canvas>
     <div class="center">25 min</div>
     <div class="hint">it breathes on its own — nothing to do</div>
   </section>
 
   <section id="s7">
-    <div class="label">07 · moon aura</div><div class="num">7/7</div>
+    <div class="label">07 · moon aura</div><div class="num">7/12</div>
     <canvas id="c7" class="fill"></canvas>
     <div class="center" style="margin-top:0">25 min</div>
     <div class="hint">the moon breathes on its own — nothing to do</div>
+  </section>
+
+  <section id="s8">
+    <div class="label">08 · ember ring</div><div class="num">8/12</div>
+    <canvas id="c8" class="fill"></canvas>
+    <div class="center">25 min</div>
+    <div class="hint">a warm ring of embers, breathing slowly</div>
+  </section>
+
+  <section id="s9">
+    <div class="label">09 · soft glow</div><div class="num">9/12</div>
+    <canvas id="c9" class="fill"></canvas>
+    <div class="center">25 min</div>
+    <div class="hint">a single quiet light in the dark</div>
+  </section>
+
+  <section id="s10">
+    <div class="label">10 · dhyana flame</div><div class="num">10/12</div>
+    <canvas id="c10" class="fill"></canvas>
+    <div class="center" style="margin-top:190px">25 min</div>
+    <div class="hint">a lamp flame, steady but alive</div>
+  </section>
+
+  <section id="s11">
+    <div class="label">11 · dawn lake</div><div class="num">11/12</div>
+    <canvas id="c11" class="fill"></canvas>
+    <div class="center" style="margin-top:-120px">25 min</div>
+    <div class="hint">first light over still water</div>
+  </section>
+
+  <section id="s12">
+    <div class="label">12 · halo</div><div class="num">12/12</div>
+    <canvas id="c12" class="fill"></canvas>
+    <div class="center">25 min</div>
+    <div class="hint">a ring of light, breathing in the dark</div>
   </section>
 
 </main>
@@ -421,6 +467,183 @@
       auraSetup._moonTex = o;
     }
     x.drawImage(auraSetup._moonTex, cx - R, cy - R, R*2, R*2);
+  });
+
+  /* helper for the plain full-screen canvas studies */
+  function canvasLoop(id, draw) {
+    const cv = document.getElementById(id), x = cv.getContext("2d");
+    function size(){ cv.width = cv.clientWidth * devicePixelRatio; cv.height = cv.clientHeight * devicePixelRatio; }
+    size(); addEventListener("resize", size);
+    (function loop(t){
+      x.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);
+      draw(x, cv.clientWidth, cv.clientHeight, t, .5 + .5*Math.sin(t/4500*Math.PI - Math.PI/2));
+      requestAnimationFrame(loop);
+    })(0);
+  }
+
+  /* 8 — ember ring (WHOOP): warm gradient ring on charcoal, dotted guides, slow turn */
+  canvasLoop("c8", (x, w, h, t, en) => {
+    x.clearRect(0,0,w,h);
+    const cx = w/2, cy = h/2 - 30, R = Math.min(w,h)*.36 * (1 + en*.05);
+    // dotted guide circles
+    x.setLineDash([1.5, 7]);
+    x.strokeStyle = "rgba(255,255,255,.22)"; x.lineWidth = 1;
+    x.beginPath(); x.arc(cx, cy, R*1.22, 0, Math.PI*2); x.stroke();
+    x.beginPath(); x.arc(cx, cy, R*.55, 0, Math.PI*2); x.stroke();
+    x.setLineDash([]);
+    // inner haze — embers glowing through smoke
+    const hz = x.createRadialGradient(cx, cy, R*.1, cx, cy, R);
+    hz.addColorStop(0, "rgba(0,0,0,0)");
+    hz.addColorStop(.72, `rgba(224,96,60,${.10 + en*.12})`);
+    hz.addColorStop(1, `rgba(248,140,84,${.16 + en*.14})`);
+    x.fillStyle = hz; x.beginPath(); x.arc(cx, cy, R, 0, Math.PI*2); x.fill();
+    // the ring itself: coral-to-amber gradient stroke, slowly rotating
+    const a0 = t/9000;
+    const g = x.createLinearGradient(cx + Math.cos(a0)*R, cy + Math.sin(a0)*R,
+                                     cx - Math.cos(a0)*R, cy - Math.sin(a0)*R);
+    g.addColorStop(0, "#ff9d6e"); g.addColorStop(.5, "#f2643c"); g.addColorStop(1, "#c93f38");
+    x.strokeStyle = g; x.lineWidth = 5 + en*2;
+    x.shadowColor = "rgba(244,110,64,.9)"; x.shadowBlur = 24 + en*18;
+    x.beginPath(); x.arc(cx, cy, R, 0, Math.PI*2); x.stroke();
+    x.shadowBlur = 0;
+  });
+
+  /* 9 — soft glow (Ultrahuman): one amorphous teal light breathing in the dark */
+  canvasLoop("c9", (x, w, h, t, en) => {
+    x.clearRect(0,0,w,h);
+    const cx = w/2 + Math.sin(t/7000)*14, cy = h/2 - 30 + Math.cos(t/9000)*10;
+    const R = Math.min(w,h)*.42 * (.9 + en*.18);
+    x.beginPath();
+    for (let a = 0; a <= Math.PI*2 + .01; a += Math.PI/40) {
+      const wob = 1 + .10*Math.sin(a*3 + t/3800) + .06*Math.sin(a*5 - t/5200);
+      const r = R * wob;
+      const px = cx + Math.cos(a)*r, py = cy + Math.sin(a)*r;
+      a === 0 ? x.moveTo(px,py) : x.lineTo(px,py);
+    }
+    x.closePath();
+    const g = x.createRadialGradient(cx, cy, 0, cx, cy, R*1.1);
+    g.addColorStop(0, `rgba(58,178,168,${.55 + en*.25})`);
+    g.addColorStop(.55, `rgba(38,120,124,${.30 + en*.15})`);
+    g.addColorStop(1, "rgba(20,60,70,0)");
+    x.fillStyle = g; x.filter = "blur(26px)"; x.fill(); x.filter = "none";
+  });
+
+  /* 10 — dhyana flame (Isha): a single lamp flame, steady but alive */
+  canvasLoop("c10", (x, w, h, t, en) => {
+    x.clearRect(0,0,w,h);
+    const cx = w/2, base = h/2 + 40;
+    // flicker: layered slow + fast sinusoids, never jumpy
+    const fl = .8*Math.sin(t/230) + .5*Math.sin(t/97) + .3*Math.sin(t/53);
+    const sway = 3*Math.sin(t/900) + 1.6*Math.sin(t/370);
+    const H = 120 * (1 + en*.06) + fl*3;      // flame height
+    const W = 34 + fl*1.2;                    // flame width
+    // warm halo filling the room
+    const halo = x.createRadialGradient(cx, base - H*.45, 10, cx, base - H*.45, Math.min(w,h)*.62);
+    halo.addColorStop(0, `rgba(255,176,92,${.34 + en*.10 + fl*.015})`);
+    halo.addColorStop(.5, "rgba(214,120,54,.10)");
+    halo.addColorStop(1, "rgba(0,0,0,0)");
+    x.fillStyle = halo; x.fillRect(0,0,w,h);
+    // outer flame — teardrop drawn with beziers, tip sways
+    function drop(hh, ww, tip, c0, c1, blur) {
+      const g = x.createLinearGradient(cx, base, cx, base - hh);
+      g.addColorStop(0, c0); g.addColorStop(1, c1);
+      x.fillStyle = g; x.filter = `blur(${blur}px)`;
+      x.beginPath();
+      x.moveTo(cx - ww, base - hh*.28);
+      x.bezierCurveTo(cx - ww, base + ww*.9, cx + ww, base + ww*.9, cx + ww, base - hh*.28);
+      x.bezierCurveTo(cx + ww*.66, base - hh*.62, cx + tip, base - hh*.9, cx + tip, base - hh);
+      x.bezierCurveTo(cx + tip, base - hh*.9, cx - ww*.66, base - hh*.62, cx - ww, base - hh*.28);
+      x.closePath(); x.fill(); x.filter = "none";
+    }
+    drop(H, W, sway, "#e8813c", "#f6b23e", 6);
+    drop(H*.62, W*.6, sway*.7, "#f8c96a", "#fdf3c8", 4);
+    // blue heart at the wick
+    const bg = x.createRadialGradient(cx, base - 10, 0, cx, base - 10, 16);
+    bg.addColorStop(0, "rgba(120,170,255,.8)"); bg.addColorStop(1, "rgba(120,170,255,0)");
+    x.fillStyle = bg; x.beginPath(); x.arc(cx, base - 10, 16, 0, Math.PI*2); x.fill();
+    // the lamp: a simple dark bowl
+    x.fillStyle = "#1d2a30";
+    x.beginPath(); x.ellipse(cx, base + 16, 64, 18, 0, 0, Math.PI); x.fill();
+    x.fillStyle = "rgba(255,190,120,.25)";
+    x.beginPath(); x.ellipse(cx, base + 15, 58, 6, 0, Math.PI, Math.PI*2); x.fill();
+  });
+
+  /* 11 — dawn lake (Calm Sleep splash): first light, mountains, shimmering water */
+  canvasLoop("c11", (x, w, h, t, en) => {
+    const horizon = h*.62;
+    // sky: night blue down to a warm dawn band at the horizon
+    const sky = x.createLinearGradient(0, 0, 0, horizon);
+    sky.addColorStop(0, "#1a2350"); sky.addColorStop(.55, "#3a4a8e");
+    sky.addColorStop(.85, "#8d7bb0"); sky.addColorStop(1, "#e3b8a4");
+    x.fillStyle = sky; x.fillRect(0, 0, w, horizon);
+    // stars fade with the breath
+    if (!canvasLoop._stars) canvasLoop._stars = Array.from({length:60}, () =>
+      ({ px: Math.random(), py: Math.random()*.5, s: Math.random()*1.3 + .3, tw: Math.random()*Math.PI*2 }));
+    for (const st of canvasLoop._stars) {
+      const a = (.25 + .35*Math.abs(Math.sin(t/1100 + st.tw))) * (1 - st.py*1.4);
+      if (a <= 0) continue;
+      x.beginPath(); x.arc(st.px*w, st.py*horizon, st.s, 0, Math.PI*2);
+      x.fillStyle = `rgba(255,255,255,${a})`; x.fill();
+    }
+    // sun just below the ridge line — a glow, not a disc
+    const sg = x.createRadialGradient(w*.5, horizon, 6, w*.5, horizon, w*.5);
+    sg.addColorStop(0, `rgba(255,214,170,${.5 + en*.25})`);
+    sg.addColorStop(1, "rgba(255,214,170,0)");
+    x.fillStyle = sg; x.fillRect(0, 0, w, horizon);
+    // mountains, two silhouettes
+    function ridge(yo, amp, seed, col) {
+      x.fillStyle = col; x.beginPath(); x.moveTo(0, horizon);
+      for (let px = 0; px <= w; px += 8)
+        x.lineTo(px, horizon - yo - amp*Math.abs(Math.sin(px*.011 + seed)) - amp*.5*Math.abs(Math.sin(px*.027 + seed*2)));
+      x.lineTo(w, horizon); x.closePath(); x.fill();
+    }
+    ridge(14, 60, 1.7, "#232a55");
+    ridge(2, 34, 4.2, "#161c3d");
+    // water: dark mirror with a shimmering column of light
+    const wt = x.createLinearGradient(0, horizon, 0, h);
+    wt.addColorStop(0, "#31386e"); wt.addColorStop(1, "#131735");
+    x.fillStyle = wt; x.fillRect(0, horizon, w, h - horizon);
+    for (let i = 0; i < 22; i++) {
+      const y = horizon + 8 + i*((h - horizon)/23);
+      const hw = (26 + i*3) * (1 + .2*Math.sin(t/700 + i));
+      const a = (.32 - i*.012) * (.7 + en*.5);
+      if (a <= 0) continue;
+      x.strokeStyle = `rgba(255,220,190,${a})`;
+      x.lineWidth = 2;
+      x.beginPath(); x.moveTo(w*.5 - hw, y); x.lineTo(w*.5 + hw, y); x.stroke();
+    }
+  });
+
+  /* 12 — halo (Opal): a luminous irregular ring of white light, breathing */
+  canvasLoop("c12", (x, w, h, t, en) => {
+    x.clearRect(0,0,w,h);
+    const cx = w/2, cy = h/2 - 30, R = Math.min(w,h)*.30 * (1 + en*.10);
+    function ringPath(spread) {
+      x.beginPath();
+      for (let a = 0; a <= Math.PI*2 + .01; a += Math.PI/60) {
+        const wob = 1 + .05*Math.sin(a*2 + t/2600) + .035*Math.sin(a*5 - t/3400) + spread;
+        const r = R * wob;
+        const px = cx + Math.cos(a)*r, py = cy + Math.sin(a)*r;
+        a === 0 ? x.moveTo(px,py) : x.lineTo(px,py);
+      }
+      x.closePath();
+    }
+    // faint cold ambient behind the ring
+    const amb = x.createRadialGradient(cx, cy, R*.4, cx, cy, R*2.4);
+    amb.addColorStop(0, `rgba(190,205,235,${.10 + en*.06})`);
+    amb.addColorStop(1, "rgba(190,205,235,0)");
+    x.fillStyle = amb; x.fillRect(0,0,w,h);
+    // three strokes, wide blur to crisp core
+    x.strokeStyle = `rgba(220,230,255,${.30 + en*.15})`; x.lineWidth = 26; x.filter = "blur(18px)"; ringPath(0); x.stroke();
+    x.strokeStyle = `rgba(240,245,255,${.55 + en*.25})`; x.lineWidth = 10; x.filter = "blur(6px)";  ringPath(0); x.stroke();
+    x.strokeStyle = `rgba(255,255,255,${.85 + en*.15})`; x.lineWidth = 3;  x.filter = "none";       ringPath(0); x.stroke();
+    // a bright bead travelling the ring, like Calm's tracer
+    const ba = t/5200;
+    const bwob = 1 + .05*Math.sin(ba*2 + t/2600) + .035*Math.sin(ba*5 - t/3400);
+    const bx = cx + Math.cos(ba)*R*bwob, by = cy + Math.sin(ba)*R*bwob;
+    const bg = x.createRadialGradient(bx, by, 0, bx, by, 14);
+    bg.addColorStop(0, "rgba(255,255,255,1)"); bg.addColorStop(1, "rgba(255,255,255,0)");
+    x.fillStyle = bg; x.beginPath(); x.arc(bx, by, 14, 0, Math.PI*2); x.fill();
   });
 })();
 </script>
