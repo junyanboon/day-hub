@@ -5,7 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="still-version" content="2026-08-06T23:30:57-04:00">
+<meta name="still-version" content="2026-07-31T16:55:00-04:00">
+<link rel="icon" type="image/svg+xml" href="icon.svg">
+<link rel="apple-touch-icon" href="icon-180.png">
 <title>Still — a calm day</title>
 <style>
   :root {
@@ -32,14 +34,18 @@
   #app { height:100%; display:flex; flex-direction:column;
     padding: calc(env(safe-area-inset-top) + 16px) 20px calc(env(safe-area-inset-bottom) + 16px); }
 
-  header { display:flex; justify-content:space-between; align-items:center; }
+  header { display:flex; justify-content:center; align-items:center; }
   #clock { font-size:15px; font-weight:500; color:var(--ink-soft); letter-spacing:.5px; }
-  .hdr-btns { display:flex; gap:8px; }
-  #day-btn, #add-btn { background:var(--glass); border:1px solid var(--glass-border); color:var(--ink);
-    border-radius:20px; padding:7px 14px; font-size:13px; font-weight:500;
-    backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px); }
-  #add-btn { border-radius:50%; width:33px; height:33px; padding:0; font-size:17px; }
   button { cursor:pointer; font-family:inherit; }
+
+  /* floating pill nav — thumb zone (Tiimo / Calm pattern) */
+  #bar { display:flex; gap:6px; margin-top:10px; padding:6px;
+    background:var(--glass); border:1px solid var(--glass-border); border-radius:28px;
+    backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px); }
+  #bar button { flex:1; background:none; border:none; color:var(--ink-soft);
+    border-radius:22px; padding:11px 0; font-size:13.5px; font-weight:500; }
+  #bar button:active, #bar button.on { background:rgba(255,255,255,.18); color:var(--ink); }
+  #bar #add-btn { flex:0 0 46px; font-size:18px; color:var(--ink); }
 
   #stage { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; min-height:0; }
   #mantra { font-size:16px; color:var(--ink-soft); letter-spacing:.3px; text-align:center;
@@ -72,6 +78,27 @@
     background:rgba(255,255,255,.9); color:#3a4a6b; border:none; }
 
   /* sheets + modals */
+  #tsheet { position:fixed; left:0; right:0; bottom:0; max-height:84%;
+    background:rgba(30,35,60,.8); backdrop-filter:blur(24px); -webkit-backdrop-filter:blur(24px);
+    border-radius:24px 24px 0 0; border-top:1px solid var(--glass-border);
+    transform:translateY(100%); transition:transform .35s cubic-bezier(.3,.9,.3,1);
+    display:flex; flex-direction:column;
+    padding:14px 20px calc(env(safe-area-inset-bottom) + 16px); z-index:10; }
+  #tsheet.open { transform:translateY(0); }
+  #tsheet .handle { width:36px; height:4px; border-radius:2px; background:var(--ink-faint); margin:0 auto 14px; }
+  #tsheet h2 { font-size:17px; font-weight:600; margin-bottom:2px; }
+  #tsheet .sub { font-size:12.5px; color:var(--ink-soft); margin-bottom:12px; }
+  #tlist { overflow-y:auto; flex:1; display:flex; flex-direction:column; gap:6px; }
+  .task { display:flex; align-items:center; gap:12px; border-radius:13px; padding:12px 13px;
+    background:var(--glass); border:1px solid var(--glass-border); text-align:left; width:100%;
+    color:var(--ink); font-family:inherit; }
+  .task .box { width:20px; height:20px; border-radius:7px; border:1.5px solid var(--ink-faint);
+    flex-shrink:0; display:flex; align-items:center; justify-content:center; font-size:13px; }
+  .task.done-t { opacity:.45; }
+  .task.done-t .box { background:#9fe3b0; border-color:#9fe3b0; color:#204030; }
+  .task.done-t .t-name { text-decoration:line-through; }
+  .task .t-name { flex:1; font-size:14.5px; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .task .t-tag { font-size:10.5px; letter-spacing:.6px; text-transform:uppercase; color:var(--ink-faint); flex-shrink:0; }
   #sheet { position:fixed; left:0; right:0; bottom:0; max-height:84%;
     background:rgba(30,35,60,.8); backdrop-filter:blur(24px); -webkit-backdrop-filter:blur(24px);
     border-radius:24px 24px 0 0; border-top:1px solid var(--glass-border);
@@ -144,10 +171,6 @@
 <div id="app">
   <header>
     <div id="clock">--:--</div>
-    <div class="hdr-btns">
-      <button id="add-btn" title="slot something in now">＋</button>
-      <button id="day-btn">my day ☼</button>
-    </div>
   </header>
   <div id="stage">
     <div id="block-label"></div>
@@ -167,6 +190,11 @@
     </div>
   </div>
   <footer id="pips"></footer>
+  <nav id="bar">
+    <button id="tasks-btn">☑ focus</button>
+    <button id="add-btn" title="slot something in now">＋</button>
+    <button id="day-btn">☼ my day</button>
+  </nav>
 </div>
 
 <!-- quick add: start something right now -->
@@ -222,6 +250,15 @@
 </div>
 
 <div id="scrim"></div>
+
+<!-- focus sheet: what to do during work blocks (Tasks Inbox) -->
+<div id="tsheet">
+  <div class="handle"></div>
+  <h2>Focus on what matters</h2>
+  <div class="sub" id="tmeta">Open tasks from your Tasks Inbox. Tap to clear.</div>
+  <div id="tlist"></div>
+</div>
+
 <div id="sheet">
   <div class="handle"></div>
   <h2>Your day, gently planned</h2>
@@ -240,21 +277,21 @@
    ============================================================ */
 // STILL:PLAN:START — regenerated by scripts/still_plan.py. Hand-edits here are overwritten.
 const PLAN = {
-  generated: "2026-08-06T23:30:57-04:00",
-  label: "Thu Aug 6 · synced from Joint Plans + Junyan",
+  generated: "2026-07-31T17:14:00-04:00",
+  label: "Fri Jul 31 · São Paulo · synced from Junyan + Joint Plans",
   blocks: [
-    { s:"2026-08-06T04:00:00-04:00", e:"2026-08-06T08:00:00-04:00", t:"🚐 Santo Amaro → SLZ", type:"fixed", cal:"Joint Plans" },
-    { s:"2026-08-06T08:00:00-04:00", e:"2026-08-06T08:30:00-04:00", t:"Security", type:"fixed", cal:"Joint Plans" },
-    { s:"2026-08-06T08:30:00-04:00", e:"2026-08-06T10:00:00-04:00", t:"The Lounge São Luís [Priority Pass]", type:"fixed", cal:"Joint Plans" },
-    { s:"2026-08-06T10:00:00-04:00", e:"2026-08-06T10:30:00-04:00", t:"Boarding", type:"fixed", cal:"Joint Plans" },
-    { s:"2026-08-06T10:35:00-04:00", e:"2026-08-06T14:05:00-04:00", t:"✈️ LA3584 SLZ ➡️ GRU (LATAM)", type:"fixed", cal:"Joint Plans" },
-    { s:"2026-08-06T14:15:00-04:00", e:"2026-08-06T15:30:00-04:00", t:"Transport [GRU → NIK Paulista]", type:"fixed", cal:"Joint Plans" },
-    { s:"2026-08-06T15:30:00-04:00", e:"2026-08-06T16:30:00-04:00", t:"Check-in — NIK Paulista [2026.08.06]", type:"fixed", cal:"Joint Plans" },
-    { s:"2026-08-06T16:30:00-04:00", e:"2026-08-06T18:00:00-04:00", t:"Rest", type:"fixed", cal:"Joint Plans" },
-    { s:"2026-08-06T18:00:00-04:00", e:"2026-08-06T19:00:00-04:00", t:"Dinner", type:"fixed", cal:"Joint Plans" },
-    { s:"2026-08-06T19:00:00-04:00", e:"2026-08-06T19:50:00-04:00", t:"Deep work I", type:"focus", cal:"Junyan" },
-    { s:"2026-08-06T19:50:00-04:00", e:"2026-08-06T20:00:00-04:00", t:"Rest", type:"break", cal:"" },
-    { s:"2026-08-06T20:00:00-04:00", e:"2026-08-06T20:50:00-04:00", t:"Deep work II", type:"focus", cal:"Junyan" }
+    { s:"2026-07-31T07:30:00-04:00", e:"2026-07-31T08:00:00-04:00", t:"🧘 Shambhavi", type:"fixed", cal:"Joint Plans" },
+    { s:"2026-07-31T08:30:00-04:00", e:"2026-07-31T09:30:00-04:00", t:"Hotel breakfast", type:"fixed", cal:"Joint Plans" },
+    { s:"2026-07-31T09:30:00-04:00", e:"2026-07-31T10:45:00-04:00", t:"Work", type:"focus", cal:"Joint Plans" },
+    { s:"2026-07-31T11:00:00-04:00", e:"2026-07-31T12:00:00-04:00", t:"Gym +/ Sauna?", type:"fixed", cal:"Joint Plans" },
+    { s:"2026-07-31T12:30:00-04:00", e:"2026-07-31T13:15:00-04:00", t:"Check out + commute to Canopy", type:"fixed", cal:"Joint Plans" },
+    { s:"2026-07-31T13:45:00-04:00", e:"2026-07-31T14:30:00-04:00", t:"Lunch @ Mariana's Grill 2", type:"fixed", cal:"Joint Plans" },
+    { s:"2026-07-31T14:40:00-04:00", e:"2026-07-31T15:30:00-04:00", t:"Deep work I", type:"focus", cal:"Junyan" },
+    { s:"2026-07-31T15:40:00-04:00", e:"2026-07-31T16:30:00-04:00", t:"Deep work II", type:"focus", cal:"Junyan" },
+    { s:"2026-07-31T16:55:00-04:00", e:"2026-07-31T17:40:00-04:00", t:"Deep work III", type:"focus", cal:"Junyan" },
+    { s:"2026-07-31T17:45:00-04:00", e:"2026-07-31T18:30:00-04:00", t:"Commute to class", type:"fixed", cal:"Joint Plans" },
+    { s:"2026-07-31T18:30:00-04:00", e:"2026-07-31T19:15:00-04:00", t:"Deep work IV", type:"focus", cal:"Junyan" },
+    { s:"2026-07-31T20:00:00-04:00", e:"2026-07-31T20:30:00-04:00", t:"Dinner @ Canopy (use credit)", type:"fixed", cal:"Joint Plans" }
   ]
 };
 // STILL:PLAN:END
@@ -372,10 +409,10 @@ const PLAN = {
   }
 
   /* ---------- render ---------- */
-  let manualIdx = null, lastKey = "";
+  let manualIdx = null, lastKey = "", pausedAt = null;
 
   function render(){
-    const now = new Date();
+    const now = pausedAt || new Date();
     const blocks = allBlocks();
     let idx = manualIdx !== null ? Math.min(manualIdx, blocks.length-1) : currentIdx(blocks, now);
     let phase, label, remaining=0, total=0, sub="", next="";
@@ -409,7 +446,8 @@ const PLAN = {
     $("time-sub").textContent = sub;
     $("block-label").textContent = label;
     $("next-up").textContent = next;
-    document.body.className = "mode-" + (phase === "fixed" ? "fixed" : phase) + " running";
+    document.body.className = "mode-" + (phase === "fixed" ? "fixed" : phase) + (pausedAt ? "" : " running");
+    $("now-btn").textContent = pausedAt ? "▶" : "❚❚";
     document.querySelector("#ring .progress").style.strokeDashoffset = total ? CIRC*(remaining/total) : CIRC;
 
     const focusish = blocks.filter(b => b.type === "focus" || b.type === "task");
@@ -428,7 +466,26 @@ const PLAN = {
   }, 45000);
 
   /* ---------- main-screen controls ---------- */
-  $("now-btn").onclick = () => { manualIdx = null; render(); };
+  /* ❚❚/▶ — pause freezes the countdown; resuming gives the block back the
+     paused time by pushing its end out, so no focus minutes are lost */
+  $("now-btn").onclick = () => {
+    if (pausedAt === null) {
+      const blocks = allBlocks();
+      if (currentIdx(blocks, new Date()) === -1) return;   // nothing running
+      pausedAt = new Date();
+    } else {
+      const delta = Date.now() - pausedAt.getTime();
+      const blocks = allBlocks();
+      const i = currentIdx(blocks, pausedAt);
+      if (i !== -1 && delta > 5000) {
+        const b = blocks[i];
+        writeEdit(b, b.s, new Date(b.e.getTime() + delta), b.t);
+      }
+      pausedAt = null;
+    }
+    manualIdx = null;
+    render();
+  };
   $("ext-btn").onclick = () => {
     const blocks = allBlocks();
     const i = currentIdx(blocks, new Date());
@@ -467,11 +524,73 @@ const PLAN = {
     const cur = document.querySelector("#timeline .now");
     if (cur) cur.scrollIntoView({block:"center"});
   }
+  const syncScrim = () => $("scrim").classList.toggle("show",
+    $("sheet").classList.contains("open") || $("tsheet").classList.contains("open"));
   const openSheet = v => {
     $("sheet").classList.toggle("open", v);
-    $("scrim").classList.toggle("show", v);
-    if (v) { renderTimeline(); refreshLive(); }
+    $("day-btn").classList.toggle("on", v);
+    if (v) { $("tsheet").classList.remove("open"); $("tasks-btn").classList.remove("on"); renderTimeline(); refreshLive(); }
+    syncScrim();
   };
+
+  /* ---------- focus sheet: Tasks Inbox ---------- */
+  let tasks = [], tasksLoaded = false;
+  async function pullTasks(){
+    try {
+      const r = await fetch(STILL_API.replace("/plan", "/tasks"), { cache:"no-store" });
+      if (!r.ok) return false;
+      const d = await r.json();
+      if (!Array.isArray(d.tasks)) return false;
+      tasks = d.tasks; tasksLoaded = true;
+      return true;
+    } catch { return false; }
+  }
+  function renderTasks(){
+    if (!tasksLoaded) { $("tmeta").textContent = "Reaching your Tasks Inbox…"; $("tlist").innerHTML = ""; return; }
+    const open = tasks.filter(t => !t.done);
+    $("tmeta").textContent = open.length
+      ? `${open.length} open · tap to clear — cleared tasks are marked Done in your Tasks Inbox`
+      : "Inbox clear. Breathe.";
+    $("tlist").innerHTML = tasks.map((t,i) => `
+      <button class="task ${t.done ? "done-t" : ""}" data-i="${i}">
+        <span class="box">${t.done ? "✓" : ""}</span>
+        <span class="t-name">${esc(t.task)}</span>
+        <span class="t-tag">${esc([t.priority, t.estimate].filter(Boolean).join(" · "))}</span>
+      </button>`).join("");
+    document.querySelectorAll("#tlist .task").forEach(el => {
+      el.onclick = () => toggleTask(+el.dataset.i);
+    });
+  }
+  async function toggleTask(i){
+    const t = tasks[i];
+    t.done = !t.done;                 // optimistic
+    renderTasks();
+    if (t.done) chime([659.25, 783.99, 1046.5]);
+    try {
+      const r = await fetch(STILL_API.replace("/plan", "/tasks/done"), {
+        method:"POST", headers:{ "Content-Type":"application/json" },
+        body: JSON.stringify({ id: t.id, done: t.done }),
+      });
+      if (!r.ok) throw new Error();
+    } catch {
+      t.done = !t.done;               // roll back — Notion was not updated
+      renderTasks();
+      $("tmeta").textContent = "Couldn't reach your Tasks Inbox — change not saved.";
+    }
+  }
+  const openTasks = v => {
+    $("tsheet").classList.toggle("open", v);
+    $("tasks-btn").classList.toggle("on", v);
+    if (v) {
+      $("sheet").classList.remove("open"); $("day-btn").classList.remove("on");
+      renderTasks(); pullTasks().then(ok => {
+        if (ok) renderTasks();
+        else if (!tasksLoaded) $("tmeta").textContent = "Can't reach your Tasks Inbox right now.";
+      });
+    }
+    syncScrim();
+  };
+  $("tasks-btn").onclick = () => openTasks(!$("tsheet").classList.contains("open"));
 
   /* pull the calendar again — on demand, and whenever the sheet opens */
   let pulling = false;
@@ -489,8 +608,8 @@ const PLAN = {
     if (ok) { render(); renderTimeline(); }
   }
   $("refresh-btn").onclick = () => refreshLive(true);
-  $("day-btn").onclick = () => openSheet(true);
-  $("scrim").onclick = () => openSheet(false);
+  $("day-btn").onclick = () => openSheet(!$("sheet").classList.contains("open"));
+  $("scrim").onclick = () => { openSheet(false); openTasks(false); };
 
   /* ---------- edit modal ---------- */
   let editing = null;

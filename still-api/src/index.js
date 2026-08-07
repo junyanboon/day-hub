@@ -42,7 +42,7 @@ function cors(origin) {
   const allow = ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
   return {
     "Access-Control-Allow-Origin": allow,
-    "Access-Control-Allow-Methods": "GET, OPTIONS",
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type",
     "Cache-Control": "no-store",
   };
@@ -271,6 +271,63 @@ async function buildPlan(env, ref) {
   return { generated: iso(new Date()), label, blocks };
 }
 
+/* ── Tasks Inbox (Notion) ────────────────────────────────────────────────────
+   The focus sheet lists open tasks and marks them Done. The Notion token is a
+   Worker secret (NOTION_TOKEN) shared with the 📥 Tasks Inbox database. */
+const TASKS_DS = "a404eb91-e7a4-4aa7-aff5-2a86feae427f";
+const NOTION_VER = "2025-09-03";
+
+function notionHeaders(env) {
+  return {
+    "Authorization": `Bearer ${env.NOTION_TOKEN}`,
+    "Notion-Version": NOTION_VER,
+    "Content-Type": "application/json",
+  };
+}
+
+async function listTasks(env) {
+  if (!(env.NOTION_TOKEN || "").trim()) throw new Error("missing secret NOTION_TOKEN");
+  const r = await fetch(`https://api.notion.com/v1/data_sources/${TASKS_DS}/query`, {
+    method: "POST",
+    headers: notionHeaders(env),
+    body: JSON.stringify({
+      filter: { property: "Status", status: { does_not_equal: "Done" } },
+      page_size: 50,
+    }),
+  });
+  if (!r.ok) throw new Error(`Notion query: HTTP ${r.status}`);
+  const d = await r.json();
+  const text = (p) => (p?.title || p?.rich_text || []).map((t) => t.plain_text).join("");
+  const tasks = (d.results || []).map((pg) => ({
+    id: pg.id,
+    task: text(pg.properties?.Task) || "(untitled)",
+    priority: pg.properties?.Priority?.select?.name || "",
+    estimate: pg.properties?.Estimate?.select?.name || "",
+    type: pg.properties?.Type?.select?.name || "",
+    nextAction: !!pg.properties?.["Next Action"]?.checkbox,
+    done: false,
+  }));
+  // Next Action first, then priority, then oldest first.
+  const prio = { "🔴 High": 0, "🟡 Medium": 1, "🟢 Low": 2 };
+  tasks.sort((a, b) => (b.nextAction - a.nextAction) ||
+    ((prio[a.priority] ?? 3) - (prio[b.priority] ?? 3)));
+  return tasks;
+}
+
+async function setTaskDone(env, id, done) {
+  if (!(env.NOTION_TOKEN || "").trim()) throw new Error("missing secret NOTION_TOKEN");
+  if (!/^[0-9a-f-]{32,36}$/i.test(id || "")) throw new Error("bad task id");
+  const r = await fetch(`https://api.notion.com/v1/pages/${id}`, {
+    method: "PATCH",
+    headers: notionHeaders(env),
+    body: JSON.stringify({
+      properties: { Status: { status: { name: done ? "Done" : "Not Started" } } },
+    }),
+  });
+  if (!r.ok) throw new Error(`Notion update: HTTP ${r.status}`);
+  return true;
+}
+
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
@@ -283,7 +340,26 @@ export default {
       return new Response(JSON.stringify({
         ok: true,
         configured: CALS.every((c) => !!(env[c.secret] || "").trim()),
+        tasksConfigured: !!(env.NOTION_TOKEN || "").trim(),
       }), { headers });
+    }
+
+    if (url.pathname === "/tasks") {
+      try {
+        return new Response(JSON.stringify({ tasks: await listTasks(env) }), { headers });
+      } catch (err) {
+        return new Response(JSON.stringify({ error: String(err.message || err) }), { status: 502, headers });
+      }
+    }
+
+    if (url.pathname === "/tasks/done" && request.method === "POST") {
+      try {
+        const { id, done } = await request.json();
+        await setTaskDone(env, id, !!done);
+        return new Response(JSON.stringify({ ok: true }), { headers });
+      } catch (err) {
+        return new Response(JSON.stringify({ error: String(err.message || err) }), { status: 502, headers });
+      }
     }
 
     if (url.pathname !== "/plan") {
