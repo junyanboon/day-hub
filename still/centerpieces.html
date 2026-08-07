@@ -374,14 +374,23 @@
       g.beginPath(); g.arc(S/2, S/2, r0, 0, Math.PI*2);
       g.fillStyle = mg; g.fill();
       g.save(); g.beginPath(); g.arc(S/2, S/2, r0, 0, Math.PI*2); g.clip();
-      // maria: soft dark blotches
-      for (let i=0; i<340; i++) {
+      // maria: a few large soft shaded regions, then faint speckle
+      for (let i=0; i<9; i++) {
+        const a = Math.random()*Math.PI*2, d = Math.sqrt(Math.random())*r0*.8;
+        const bx = S/2 + Math.cos(a)*d, by = S/2 + Math.sin(a)*d;
+        const br = r0*(.22 + Math.random()*.3);
+        const bg = g.createRadialGradient(bx, by, br*.2, bx, by, br);
+        bg.addColorStop(0, "rgba(104,112,152,.14)");
+        bg.addColorStop(1, "rgba(0,0,0,0)");
+        g.fillStyle = bg;
+        g.beginPath(); g.ellipse(bx, by, br, br*(.6+Math.random()*.4), Math.random()*Math.PI, 0, Math.PI*2); g.fill();
+      }
+      for (let i=0; i<70; i++) {
         const a = Math.random()*Math.PI*2, d = Math.sqrt(Math.random())*r0;
         const bx = S/2 + Math.cos(a)*d, by = S/2 + Math.sin(a)*d;
-        const br = 3 + Math.random()*26;
+        const br = 2 + Math.random()*9;
         const bg = g.createRadialGradient(bx, by, 0, bx, by, br);
-        const dark = Math.random() < .6;
-        bg.addColorStop(0, dark ? "rgba(96,104,146,.16)" : "rgba(255,255,255,.14)");
+        bg.addColorStop(0, Math.random() < .5 ? "rgba(96,104,146,.10)" : "rgba(255,255,255,.10)");
         bg.addColorStop(1, "rgba(0,0,0,0)");
         g.fillStyle = bg;
         g.beginPath(); g.arc(bx, by, br, 0, Math.PI*2); g.fill();
