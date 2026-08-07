@@ -664,7 +664,7 @@ const PLAN = {
     if (spSel) setCur(spSel.cur === "USD");
     $("sp-chips").innerHTML = chips.map((c,i) => `
       <button class="sp-chip${spSel && c.name === spSel.name && c.cur === spSel.cur ? " on" : ""}"
-        data-i="${i}">${c.cur === "USD" ? "🇺🇸 " : ""}${esc(c.name)}</button>`).join("")
+        data-i="${i}">${c.cur === "USD" && !c.name.includes("🇺🇸") ? "🇺🇸 " : ""}${esc(c.name)}</button>`).join("")
       + `<button class="sp-chip" id="sp-more">⋯</button>`;
     document.querySelectorAll("#sp-chips .sp-chip[data-i]").forEach(el => {
       el.onclick = () => { spSel = chips[+el.dataset.i]; setCur(spSel.cur === "USD"); fillAccts(); };
