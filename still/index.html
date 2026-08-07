@@ -35,8 +35,6 @@
   #app { height:100%; display:flex; flex-direction:column;
     padding: calc(env(safe-area-inset-top) + 16px) 20px calc(env(safe-area-inset-bottom) + 16px); }
 
-  header { display:flex; justify-content:center; align-items:center; }
-  #clock { font-size:15px; font-weight:500; color:var(--ink-soft); letter-spacing:.5px; }
   button { cursor:pointer; font-family:inherit; }
 
   /* floating pill nav — thumb zone (Tiimo / Calm pattern) */
@@ -165,16 +163,10 @@
     transition:opacity .3s; z-index:5; }
   #scrim.show { opacity:1; pointer-events:auto; }
 
-  footer { display:flex; justify-content:center; gap:6px; padding-top:10px; }
-  .pip { width:7px; height:7px; border-radius:50%; background:var(--ink-faint); }
-  .pip.filled { background:var(--ink); }
 </style>
 </head>
 <body>
 <div id="app">
-  <header>
-    <div id="clock">--:--</div>
-  </header>
   <div id="stage">
     <div id="block-label"></div>
     <div id="orb-wrap">
@@ -192,9 +184,8 @@
       <button class="ctl" id="done-btn" title="finished early">done</button>
     </div>
   </div>
-  <footer id="pips"></footer>
   <nav id="bar">
-    <button id="tasks-btn">☑ focus</button>
+    <button id="tasks-btn">☑ tasks</button>
     <button id="add-btn" title="slot something in now">＋</button>
     <button id="day-btn">☼ my day</button>
   </nav>
@@ -369,7 +360,11 @@ const PLAN = {
   }
 
   const fmtT = d => d.toLocaleTimeString([], {hour:"numeric", minute:"2-digit"});
-  const fmtC = s => `${String(Math.floor(s/60)).padStart(2,"0")}:${String(Math.floor(s%60)).padStart(2,"0")}`;
+  const fmtC = s => {
+    const m = Math.ceil(s/60);
+    if (m > 60) return `${Math.floor(m/60)}h ${m%60}m`;
+    return `${m} min`;
+  };
   const toField = d => `${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`;
   function fromField(v, ref){
     const [h,m] = v.split(":").map(Number);
@@ -452,9 +447,6 @@ const PLAN = {
     document.body.className = "mode-" + (phase === "fixed" ? "fixed" : phase) + (pausedAt ? "" : " running");
     $("now-btn").textContent = pausedAt ? "▶" : "❚❚";
     document.querySelector("#ring .progress").style.strokeDashoffset = total ? CIRC*(remaining/total) : CIRC;
-
-    const focusish = blocks.filter(b => b.type === "focus" || b.type === "task");
-    $("pips").innerHTML = focusish.map(b => `<div class="pip ${now >= b.e ? "filled" : ""}"></div>`).join("");
   }
 
   setInterval(() => {
@@ -719,9 +711,8 @@ const PLAN = {
     return !first || new Date(first.s).toDateString() !== new Date().toDateString();
   }
 
-  /* ---------- clock, wake lock ---------- */
+  /* ---------- tick, wake lock ---------- */
   setInterval(() => {
-    $("clock").textContent = fmtT(new Date());
     render();
     if (planIsStale()) {
       $("block-label").textContent = "today's plan is on its way";
@@ -735,7 +726,6 @@ const PLAN = {
   document.addEventListener("visibilitychange", () => { if (!document.hidden) keepAwake(); });
   document.addEventListener("click", keepAwake, { once:true });
 
-  $("clock").textContent = fmtT(new Date());
   render();
   refreshLive().then(() => { render(); });   // live calendar on first open
 })();
