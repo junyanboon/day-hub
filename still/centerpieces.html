@@ -69,7 +69,7 @@
     text-shadow:0 2px 30px rgba(0,0,0,.4); }
 
   /* 6 & 7 — aura (Calm Sleep) and moon aura */
-  #s6 { background:#232847; }
+  #s6 { background:#3a4677; }
   #s7 { background:#1d2140; }
   #c6, #c7 { z-index:1; }
   #s6 .center, #s7 .center { position:relative; z-index:2; font-size:44px; font-weight:200;
@@ -300,22 +300,37 @@
       cx2d.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);
       cx2d.clearRect(0,0,w,h);
       for (const L of layers) {
-        // organic wobble: radius modulated by two slow sinusoids per angle
+        // organic wobble: radius modulated by two slow sinusoids per angle,
+        // phases drift with time so the lobes swirl slowly around the center
         const base = L.r * scale * (1 + energy * .07);
+        // each band's center drifts on its own small orbit — the layered-paper swirl
+        const ox = cx + Math.cos(t/L.t1 + L.ph) * base * .05;
+        const oy = cy + Math.sin(t/L.t2 + L.ph) * base * .05;
         cx2d.beginPath();
         for (let a = 0; a <= Math.PI*2 + .01; a += Math.PI/48) {
           const wob = 1
             + L.w1 * Math.sin(a*3 + t/L.t1 + L.ph)
             + L.w2 * Math.sin(a*5 - t/L.t2 + L.ph*2);
           const r = base * wob;
-          const x = cx + Math.cos(a)*r, y = cy + Math.sin(a)*r;
+          const x = ox + Math.cos(a)*r, y = oy + Math.sin(a)*r;
           a === 0 ? cx2d.moveTo(x,y) : cx2d.lineTo(x,y);
         }
         cx2d.closePath();
-        const g = cx2d.createRadialGradient(cx, cy, base*.2, cx, cy, base*1.15);
-        g.addColorStop(0, L.c + (L.a0 + energy*.12) + ")");
-        g.addColorStop(1, L.c + "0)");
-        cx2d.fillStyle = g;
+        if (L.c1) {
+          // vibrant band: near-opaque fill, highlight rim on the slowly rotating light side
+          const la = t/6000 + L.ph;                     // light angle drifts
+          const hx = ox + Math.cos(la)*base*.45, hy = oy + Math.sin(la)*base*.45;
+          const g = cx2d.createRadialGradient(hx, hy, base*.1, ox, oy, base*1.15);
+          g.addColorStop(0, L.c0);
+          g.addColorStop(.55, L.c1);
+          g.addColorStop(1, L.c1);
+          cx2d.fillStyle = g;
+        } else {
+          const g = cx2d.createRadialGradient(ox, oy, base*.2, ox, oy, base*1.15);
+          g.addColorStop(0, L.c + (L.a0 + energy*.12) + ")");
+          g.addColorStop(1, L.c + "0)");
+          cx2d.fillStyle = g;
+        }
         cx2d.filter = "blur(" + L.blur + "px)";
         cx2d.fill();
         cx2d.filter = "none";
@@ -326,27 +341,29 @@
   }
 
   auraSetup("s6", "c6", [
-    { r:320, c:"rgba(95,121,201,",  a0:.6,  w1:.04, w2:.03, t1:2600, t2:3400, ph:0,   blur:22 },
-    { r:255, c:"rgba(150,168,228,", a0:.55, w1:.05, w2:.04, t1:3000, t2:2500, ph:1.7, blur:18 },
-    { r:195, c:"rgba(246,229,216,", a0:.7,  w1:.05, w2:.04, t1:2400, t2:3100, ph:3.1, blur:14 },
-    { r:142, c:"rgba(240,184,160,", a0:.8,  w1:.06, w2:.05, t1:2800, t2:2200, ph:4.4, blur:12 },
-    { r:96,  c:"rgba(224,142,122,", a0:.9,  w1:.07, w2:.05, t1:2100, t2:2900, ph:5.6, blur:10 },
+    // vibrant near-opaque bands sampled from the Calm Sleep video frames
+    { r:330, c0:"#7d9bee", c1:"#5d7ed6", w1:.06, w2:.04, t1:5200, t2:6800, ph:0,   blur:14 },
+    { r:262, c0:"#a9c0f2", c1:"#8fa9e8", w1:.07, w2:.05, t1:6000, t2:5000, ph:1.7, blur:12 },
+    { r:200, c0:"#fdeee0", c1:"#f3d9c8", w1:.07, w2:.05, t1:4800, t2:6200, ph:3.1, blur:10 },
+    { r:148, c0:"#f8cab4", c1:"#f0b39e", w1:.08, w2:.06, t1:5600, t2:4400, ph:4.4, blur:9  },
+    { r:102, c0:"#f6b3a0", c1:"#eb9284", w1:.09, w2:.06, t1:4200, t2:5800, ph:5.6, blur:8  },
   ], (x, cx, cy, t, en) => {
-    // starburst core: bright disc + cross flare
-    const R = 34 * (1 + en*.25);
-    const g = x.createRadialGradient(cx, cy, 0, cx, cy, R);
-    g.addColorStop(0, "rgba(255,255,255,1)");
-    g.addColorStop(.5, "rgba(255,240,230," + (.8 + en*.2) + ")");
-    g.addColorStop(1, "rgba(255,240,230,0)");
-    x.fillStyle = g;
-    x.beginPath(); x.arc(cx, cy, R, 0, Math.PI*2); x.fill();
+    // sunburst core: coral disc, 8 translucent spokes, white heart
+    const R = 62 * (1 + en*.12);
+    x.beginPath(); x.arc(cx, cy, R, 0, Math.PI*2);
+    x.fillStyle = "#f2a08c"; x.filter = "blur(4px)"; x.fill(); x.filter = "none";
     x.save();
-    x.translate(cx, cy); x.rotate(t/9000);
-    x.strokeStyle = "rgba(255,255,255," + (.5 + en*.3) + ")";
-    x.lineWidth = 1.6; x.filter = "blur(1px)";
-    const F = R * 1.7;
-    for (let i=0;i<4;i++) { x.rotate(Math.PI/4); x.beginPath(); x.moveTo(-F,0); x.lineTo(F,0); x.stroke(); }
+    x.translate(cx, cy); x.rotate(t/14000);
+    x.strokeStyle = "rgba(255,255,255," + (.4 + en*.25) + ")";
+    x.lineWidth = 3; x.filter = "blur(2px)";
+    for (let i=0;i<4;i++) { x.rotate(Math.PI/4); x.beginPath(); x.moveTo(-R,0); x.lineTo(R,0); x.stroke(); }
     x.restore(); x.filter = "none";
+    const g = x.createRadialGradient(cx, cy, 0, cx, cy, R*.75);
+    g.addColorStop(0, "rgba(255,255,255,1)");
+    g.addColorStop(.45, "rgba(255,246,240," + (.85 + en*.15) + ")");
+    g.addColorStop(1, "rgba(255,246,240,0)");
+    x.fillStyle = g;
+    x.beginPath(); x.arc(cx, cy, R*.75, 0, Math.PI*2); x.fill();
   });
 
   /* 7 — moon: one huge textured full moon, silver on dark indigo (Sadhguru / Isha) */
