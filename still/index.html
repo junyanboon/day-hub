@@ -60,14 +60,27 @@
   /* aura canvas is the centerpiece — the old ring stays in the DOM but hidden */
   #aura { position:fixed; inset:0; width:100%; height:100%; z-index:0; }
   #app { position:relative; z-index:1; }
-  #ring { display:none; position:absolute; inset:0; transform:rotate(-90deg); }
+  #ring { position:absolute; inset:0; transform:rotate(-90deg); }
   #ring circle { fill:none; stroke-width:3; }
   #ring .track { stroke:rgba(255,255,255,.15); }
   #ring .progress { stroke:rgba(255,255,255,.85); stroke-linecap:round; transition:stroke-dashoffset 1s linear; }
   #orb { position:absolute; inset:14%; border-radius:50%;
+    background: radial-gradient(circle at 35% 35%, rgba(255,255,255,.35), rgba(255,255,255,.08) 60%, rgba(255,255,255,.02));
+    border:1px solid rgba(255,255,255,.25);
     display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; }
-  #time { font-size:48px; font-weight:200; letter-spacing:1px; font-variant-numeric:tabular-nums;
-    text-shadow:0 2px 24px rgba(0,0,0,.35); }
+  /* orb glow follows last night's Oura sleep score (5 states, 1 = <60, 5 = 90+) */
+  body[data-sleep="1"] #orb { box-shadow:0 0 30px 2px  rgba(140,155,220,.18); }
+  body[data-sleep="2"] #orb { box-shadow:0 0 45px 6px  rgba(165,180,235,.26); }
+  body[data-sleep="3"] #orb { box-shadow:0 0 60px 10px rgba(200,205,245,.34); }
+  body[data-sleep="4"] #orb { box-shadow:0 0 80px 16px rgba(240,220,210,.42); }
+  body[data-sleep="5"] #orb { box-shadow:0 0 110px 26px rgba(250,215,190,.55); }
+  body.running #orb { animation:breathe 8s ease-in-out infinite; }
+  @keyframes breathe { 0%,100%{transform:scale(.94);} 50%{transform:scale(1.04);} }
+  @media (prefers-reduced-motion: reduce) { body.running #orb { animation:none; } }
+  /* at night the moon takes the orb's place; keep the time, drop the glass chrome */
+  body.night #ring { visibility:hidden; }
+  body.night #orb { background:none; border:none; animation:none; }
+  #time { font-size:48px; font-weight:200; letter-spacing:1px; font-variant-numeric:tabular-nums; }
   #time-sub { font-size:12px; color:var(--ink-faint); letter-spacing:1px; }
 
   #controls { display:flex; align-items:center; gap:14px; margin-top:4px; }
@@ -722,39 +735,30 @@ const PLAN = {
   render();
   refreshLive().then(() => { render(); });   // live calendar on first open
 
-  /* ---------- aura centerpiece (Calm Sleep), intensity from Oura sleep score ----------
-     Five intensity states, matching the reference app's five slider stops.
-     A sleep score of 50 or below is the bottom state; 90+ is the top.
-     After 22:00 device-local the aura yields to the moon. */
+  /* ---------- Oura sleep score -> orb glow (5 states, 50 and below = bottom) ---------- */
   (() => {
-    const cv = $("aura"), x = cv.getContext("2d");
-    function size(){ cv.width = innerWidth * devicePixelRatio; cv.height = innerHeight * devicePixelRatio; }
-    size(); addEventListener("resize", size);
-
-    let level = 3;   // fallback until the score arrives
     async function pullSleep(){
       try {
         const r = await fetch("https://still-api.still-api.workers.dev/sleep", { cache:"no-store" });
         if (!r.ok) return;
         const { score } = await r.json();
         if (typeof score !== "number") return;
-        level = score < 60 ? 1 : score < 70 ? 2 : score < 80 ? 3 : score < 90 ? 4 : 5;
+        document.body.dataset.sleep =
+          score < 60 ? 1 : score < 70 ? 2 : score < 80 ? 3 : score < 90 ? 4 : 5;
       } catch {}
     }
     pullSleep();
     setInterval(pullSleep, 60*60*1000);
     document.addEventListener("visibilitychange", () => { if (!document.hidden) pullSleep(); });
+  })();
 
-    // per-state scale of the warm heart of the aura (1 = the reference's Excellent)
-    const WARM = [.42, .58, .72, .86, 1];
-
-    const BANDS = [
-      { r:330, c0:"#7d9bee", c1:"#5d7ed6", warm:0, w1:.035, w2:.02,  t1:5200, t2:6800, ph:0,   blur:14 },
-      { r:262, c0:"#a9c0f2", c1:"#8fa9e8", warm:0, w1:.04,  w2:.025, t1:6000, t2:5000, ph:1.7, blur:12 },
-      { r:200, c0:"#fdeee0", c1:"#f3d9c8", warm:1, w1:.04,  w2:.025, t1:4800, t2:6200, ph:3.1, blur:10 },
-      { r:148, c0:"#f8cab4", c1:"#f0b39e", warm:1, w1:.045, w2:.03,  t1:5600, t2:4400, ph:4.4, blur:9  },
-      { r:102, c0:"#f6b3a0", c1:"#eb9284", warm:1, w1:.05,  w2:.03,  t1:4200, t2:5800, ph:5.6, blur:8  },
-    ];
+  /* ---------- night moon ----------
+     After 22:00 (until 05:00) device-local, the breathing orb yields to the
+     textured full moon on a dark indigo field. Daytime keeps the classic orb. */
+  (() => {
+    const cv = $("aura"), x = cv.getContext("2d");
+    function size(){ cv.width = innerWidth * devicePixelRatio; cv.height = innerHeight * devicePixelRatio; }
+    size(); addEventListener("resize", size);
 
     let moonTex = null;
     function drawMoon(cx, cy, R){
@@ -786,71 +790,27 @@ const PLAN = {
 
     (function loop(t){
       const w = innerWidth, h = innerHeight;
-      // anchor to the countdown so the sunburst sits exactly behind the time,
-      // and cap the outer band above the controls so the UI stays on dark navy
-      const wrap = document.getElementById("orb-wrap").getBoundingClientRect();
-      const ctrl = document.getElementById("controls").getBoundingClientRect();
-      const cx = wrap.left + wrap.width/2, cy = wrap.top + wrap.height/2;
-      const maxOuter = Math.max(120, Math.min(w*.78, (ctrl.top - cy)));
-      const en = .5 + .5 * Math.sin(t/4500 * Math.PI - Math.PI/2);
-      x.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);
       const hour = new Date().getHours();
       const night = hour >= 22 || hour < 5;
-      // deep navy field, as in the reference
-      x.fillStyle = night ? "#1d2140" : "#3a4677";
-      x.fillRect(0,0,w,h);
-
-      if (night) {
-        const R = maxOuter * .42 * (1 + en*.05);
-        const glow = x.createRadialGradient(cx, cy, R*.6, cx, cy, R*2.1);
-        glow.addColorStop(0, "rgba(235,238,255," + (.3 + en*.3) + ")");
-        glow.addColorStop(1, "rgba(235,238,255,0)");
-        x.fillStyle = glow;
-        x.beginPath(); x.arc(cx, cy, R*2.1, 0, Math.PI*2); x.fill();
-        drawMoon(cx, cy, R);
+      document.body.classList.toggle("night", night);
+      x.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);
+      if (!night) {
+        x.clearRect(0,0,w,h);        // daytime: the orb owns the stage
         requestAnimationFrame(loop);
         return;
       }
-
-      const warm = WARM[level-1];
-      const scale = maxOuter / 330;
-      for (const L of BANDS) {
-        const base = L.r * scale * (L.warm ? warm : (.9 + warm*.1)) * (1 + en*.07);
-        const ox = cx + Math.cos(t/L.t1 + L.ph) * base * .015;
-        const oy = cy + Math.sin(t/L.t2 + L.ph) * base * .015;
-        x.beginPath();
-        for (let a = 0; a <= Math.PI*2 + .01; a += Math.PI/48) {
-          const wob = 1 + L.w1*Math.sin(a*3 + t/L.t1 + L.ph) + L.w2*Math.sin(a*5 - t/L.t2 + L.ph*2);
-          const r = base * wob;
-          const px = ox + Math.cos(a)*r, py = oy + Math.sin(a)*r;
-          a === 0 ? x.moveTo(px,py) : x.lineTo(px,py);
-        }
-        x.closePath();
-        const la = t/6000 + L.ph;
-        const hx = ox + Math.cos(la)*base*.3, hy = oy + Math.sin(la)*base*.3;
-        const g = x.createRadialGradient(hx, hy, base*.1, ox, oy, base*1.15);
-        g.addColorStop(0, L.c0); g.addColorStop(.55, L.c1); g.addColorStop(1, L.c1);
-        x.fillStyle = g;
-        x.filter = "blur(" + L.blur + "px)";
-        x.fill();
-        x.filter = "none";
-      }
-      // sunburst core
-      const R = 62 * scale * warm * (1 + en*.12);
-      x.beginPath(); x.arc(cx, cy, R, 0, Math.PI*2);
-      x.fillStyle = "#f2a08c"; x.filter = "blur(4px)"; x.fill(); x.filter = "none";
-      x.save();
-      x.translate(cx, cy); x.rotate(t/14000);
-      x.strokeStyle = "rgba(255,255,255," + (.4 + en*.25) + ")";
-      x.lineWidth = 3; x.filter = "blur(2px)";
-      for (let i=0;i<4;i++) { x.rotate(Math.PI/4); x.beginPath(); x.moveTo(-R,0); x.lineTo(R,0); x.stroke(); }
-      x.restore(); x.filter = "none";
-      const cg = x.createRadialGradient(cx, cy, 0, cx, cy, R*.75);
-      cg.addColorStop(0, "rgba(255,255,255,1)");
-      cg.addColorStop(.45, "rgba(255,246,240," + (.85 + en*.15) + ")");
-      cg.addColorStop(1, "rgba(255,246,240,0)");
-      x.fillStyle = cg;
-      x.beginPath(); x.arc(cx, cy, R*.75, 0, Math.PI*2); x.fill();
+      const wrap = document.getElementById("orb-wrap").getBoundingClientRect();
+      const cx = wrap.left + wrap.width/2, cy = wrap.top + wrap.height/2;
+      const en = .5 + .5 * Math.sin(t/4500 * Math.PI - Math.PI/2);
+      x.fillStyle = "#1d2140";
+      x.fillRect(0,0,w,h);
+      const R = Math.min(wrap.width, wrap.height) * .5 * (1 + en*.04);
+      const glow = x.createRadialGradient(cx, cy, R*.6, cx, cy, R*2.1);
+      glow.addColorStop(0, "rgba(235,238,255," + (.3 + en*.3) + ")");
+      glow.addColorStop(1, "rgba(235,238,255,0)");
+      x.fillStyle = glow;
+      x.beginPath(); x.arc(cx, cy, R*2.1, 0, Math.PI*2); x.fill();
+      drawMoon(cx, cy, R);
       requestAnimationFrame(loop);
     })(0);
   })();
