@@ -769,6 +769,16 @@ const PLAN = {
           g.fillStyle = bg;
           g.beginPath(); g.ellipse(bx, by, br, br*(.6+Math.random()*.4), Math.random()*Math.PI, 0, Math.PI*2); g.fill();
         }
+        for (let i=0; i<70; i++) {
+          const a = Math.random()*Math.PI*2, d = Math.sqrt(Math.random())*r0;
+          const bx = S/2 + Math.cos(a)*d, by = S/2 + Math.sin(a)*d;
+          const br = 2 + Math.random()*9;
+          const bg = g.createRadialGradient(bx, by, 0, bx, by, br);
+          bg.addColorStop(0, Math.random() < .5 ? "rgba(96,104,146,.10)" : "rgba(255,255,255,.10)");
+          bg.addColorStop(1, "rgba(0,0,0,0)");
+          g.fillStyle = bg;
+          g.beginPath(); g.arc(bx, by, br, 0, Math.PI*2); g.fill();
+        }
         const lg = g.createRadialGradient(S/2, S/2, r0*.55, S/2, S/2, r0);
         lg.addColorStop(0, "rgba(0,0,0,0)"); lg.addColorStop(1, "rgba(28,32,64,.5)");
         g.fillStyle = lg; g.beginPath(); g.arc(S/2, S/2, r0, 0, Math.PI*2); g.fill();
@@ -819,6 +829,33 @@ const PLAN = {
       x.fillStyle = "#1d2140";
       x.fillRect(0,0,w,h);
       const R = Math.min(wrap.width, wrap.height) * .5 * (1 + en*.04);
+      // soft aura bands swirl behind the moon (study 07)
+      const scale = Math.min(w, h) / 390;
+      const bands = [
+        { r:330, c:"rgba(84,96,168,",   a0:.4,  w1:.04, w2:.03, t1:3400, t2:4200, ph:.6,  blur:24 },
+        { r:250, c:"rgba(130,140,204,", a0:.4,  w1:.05, w2:.03, t1:3800, t2:3000, ph:2.2, blur:20 },
+        { r:185, c:"rgba(198,204,240,", a0:.45, w1:.05, w2:.04, t1:3000, t2:3600, ph:3.6, blur:16 },
+      ];
+      for (const L of bands) {
+        const base = L.r * scale * (1 + en * .07);
+        const ox = cx + Math.cos(t/L.t1 + L.ph) * base * .025;
+        const oy = cy + Math.sin(t/L.t2 + L.ph) * base * .025;
+        x.beginPath();
+        for (let a = 0; a <= Math.PI*2 + .01; a += Math.PI/48) {
+          const wob = 1 + L.w1*Math.sin(a*3 + t/L.t1 + L.ph) + L.w2*Math.sin(a*5 - t/L.t2 + L.ph*2);
+          const r = base * wob;
+          const px = ox + Math.cos(a)*r, py = oy + Math.sin(a)*r;
+          a === 0 ? x.moveTo(px,py) : x.lineTo(px,py);
+        }
+        x.closePath();
+        const g = x.createRadialGradient(ox, oy, base*.2, ox, oy, base*1.15);
+        g.addColorStop(0, L.c + (L.a0 + en*.12) + ")");
+        g.addColorStop(1, L.c + "0)");
+        x.fillStyle = g;
+        x.filter = "blur(" + L.blur + "px)";
+        x.fill();
+        x.filter = "none";
+      }
       const glow = x.createRadialGradient(cx, cy, R*.6, cx, cy, R*2.1);
       glow.addColorStop(0, "rgba(235,238,255," + (.3 + en*.3) + ")");
       glow.addColorStop(1, "rgba(235,238,255,0)");
