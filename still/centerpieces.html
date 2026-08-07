@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Stillness — centerpiece studies</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html, body { height:100%; }
+  body {
+    font-family:-apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+    color:rgba(255,255,255,.95); background:#1a1c3a;
+    user-select:none; -webkit-user-select:none; overflow-x:hidden;
+  }
+  section {
+    height:100vh; height:100dvh; scroll-snap-align:start; position:relative;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    overflow:hidden;
+  }
+  main { height:100vh; height:100dvh; overflow-y:scroll; scroll-snap-type:y mandatory; }
+  .label { position:absolute; top:calc(env(safe-area-inset-top) + 18px); width:100%;
+    text-align:center; font-size:12px; letter-spacing:3px; text-transform:uppercase;
+    color:rgba(255,255,255,.55); z-index:3; }
+  .hint { position:absolute; bottom:calc(env(safe-area-inset-bottom) + 26px); width:100%;
+    text-align:center; font-size:13px; color:rgba(255,255,255,.45); z-index:3; }
+  .num { position:absolute; top:calc(env(safe-area-inset-top) + 16px); right:18px;
+    font-size:12px; color:rgba(255,255,255,.35); z-index:3; }
+  .time { font-size:44px; font-weight:200; letter-spacing:1px; fill:#fff; }
+  canvas, svg.fill { position:absolute; inset:0; width:100%; height:100%; }
+
+  /* 1 — breathing orb */
+  #s1 { background:linear-gradient(180deg,#43537f 0%,#2f3b66 55%,#232a4e 100%); }
+  #orb1 { width:240px; height:240px; border-radius:50%; position:relative; z-index:2;
+    background:radial-gradient(circle at 38% 32%, rgba(255,255,255,.85), rgba(255,255,255,.22) 55%, rgba(255,255,255,.05));
+    border:1px solid rgba(255,255,255,.4);
+    box-shadow:0 0 80px 10px rgba(180,190,255,.25);
+    display:flex; align-items:center; justify-content:center;
+    transition:transform 3.2s cubic-bezier(.4,0,.3,1), box-shadow 3.2s ease;
+    animation:breathe1 8s ease-in-out infinite; }
+  #orb1 .t { font-size:40px; font-weight:200; }
+  @keyframes breathe1 { 0%,100%{transform:scale(1)} 50%{transform:scale(1.08)} }
+  #orb1.held { animation:none; transform:scale(1.28); box-shadow:0 0 140px 30px rgba(200,210,255,.5); }
+  .ripple { position:absolute; border-radius:50%; border:1.5px solid rgba(255,255,255,.5);
+    pointer-events:none; animation:rip 1.8s ease-out forwards; z-index:1; }
+  @keyframes rip { from{opacity:.7; transform:scale(.6)} to{opacity:0; transform:scale(2.2)} }
+
+  /* 2 — moon on water */
+  #s2 { background:linear-gradient(180deg,#5a6bb0 0%,#3d4787 52%,#232a55 100%); }
+  #moon { width:150px; height:150px; border-radius:50%; z-index:2; margin-bottom:120px;
+    background:radial-gradient(circle at 40% 34%, #fff, #ece6ff 60%, #cfc6f0);
+    box-shadow:0 0 90px 20px rgba(240,236,255,.35);
+    display:flex; align-items:center; justify-content:center; color:#4a4580;
+    font-size:34px; font-weight:200; transition:box-shadow .8s ease; }
+  #moon.glow { box-shadow:0 0 150px 45px rgba(255,255,255,.55); }
+  #water2 { position:absolute; left:0; right:0; bottom:0; height:34%; z-index:1;
+    background:linear-gradient(180deg, rgba(255,255,255,.16), rgba(255,255,255,.02));
+    border-top:1px solid rgba(255,255,255,.45); }
+
+  /* 3 — starfield */
+  #s3 { background:linear-gradient(180deg,#232649 0%,#181a38 60%,#101126 100%); }
+  #c3 { z-index:1; }
+  #s3 .center { position:relative; z-index:2; font-size:44px; font-weight:200; pointer-events:none; }
+
+  /* 4 — aurora */
+  #s4 { background:#171a33; }
+  #c4 { z-index:1; }
+  #s4 .center { position:relative; z-index:2; font-size:44px; font-weight:200; pointer-events:none;
+    text-shadow:0 2px 30px rgba(0,0,0,.4); }
+
+  /* 5 — eclipse ring */
+  #s5 { background:radial-gradient(circle at 50% 42%, #3c4370 0%, #23284c 55%, #171a33 100%); }
+  #ring5 { width:280px; height:280px; z-index:2; }
+  #ring5 .track { fill:none; stroke:rgba(255,255,255,.16); stroke-width:3; }
+  #ring5 .arc { fill:none; stroke:#fff; stroke-width:3; stroke-linecap:round;
+    filter:drop-shadow(0 0 8px rgba(255,255,255,.8));
+    transform:rotate(-90deg); transform-origin:50% 50%;
+    transition:stroke-dashoffset .12s linear; }
+  #ring5 .core { fill:url(#coreGrad); }
+</style>
+</head>
+<body>
+<main id="main">
+
+  <section id="s1">
+    <div class="label">01 · breathing orb</div><div class="num">1/5</div>
+    <div id="orb1"><span class="t">25 min</span></div>
+    <div class="hint">hold to deepen the breath · release for ripples</div>
+  </section>
+
+  <section id="s2">
+    <div class="label">02 · moon on water</div><div class="num">2/5</div>
+    <canvas id="c2" class="fill" style="position:absolute;inset:0;z-index:2;pointer-events:none"></canvas>
+    <div id="moon">25</div>
+    <div id="water2"></div>
+    <div class="hint">tap anywhere — ripples cross the water</div>
+  </section>
+
+  <section id="s3">
+    <div class="label">03 · starfield</div><div class="num">3/5</div>
+    <canvas id="c3"></canvas>
+    <div class="center">25 min</div>
+    <div class="hint">hold — the stars gather around your time</div>
+  </section>
+
+  <section id="s4">
+    <div class="label">04 · aurora</div><div class="num">4/5</div>
+    <canvas id="c4"></canvas>
+    <div class="center">25 min</div>
+    <div class="hint">tap to shift the light · drag to stir it</div>
+  </section>
+
+  <section id="s5">
+    <div class="label">05 · eclipse ring</div><div class="num">5/5</div>
+    <svg id="ring5" viewBox="0 0 100 100">
+      <defs>
+        <radialGradient id="coreGrad" cx=".4" cy=".35" r=".8">
+          <stop offset="0" stop-color="#ffffff" stop-opacity=".9"/>
+          <stop offset=".6" stop-color="#ffffff" stop-opacity=".25"/>
+          <stop offset="1" stop-color="#ffffff" stop-opacity=".05"/>
+        </radialGradient>
+      </defs>
+      <circle class="track" cx="50" cy="50" r="44"/>
+      <circle class="arc" cx="50" cy="50" r="44" stroke-dasharray="276.5" stroke-dashoffset="207"/>
+      <circle class="core" cx="50" cy="50" r="30"/>
+      <text class="time" x="50" y="55" text-anchor="middle" font-size="13" fill="#fff" font-weight="200">25 min</text>
+    </svg>
+    <div class="hint">press and hold — light fills the ring, then releases</div>
+  </section>
+
+</main>
+<script>
+(() => {
+  /* 1 — breathing orb: hold to inflate, release spawns ripples */
+  const s1 = document.getElementById("s1"), orb1 = document.getElementById("orb1");
+  const press1 = e => { orb1.classList.add("held"); };
+  const lift1 = e => {
+    if (!orb1.classList.contains("held")) return;
+    orb1.classList.remove("held");
+    const r = orb1.getBoundingClientRect(), sr = s1.getBoundingClientRect();
+    for (let i=0;i<3;i++) setTimeout(() => {
+      const d = document.createElement("div");
+      d.className = "ripple";
+      d.style.width = d.style.height = "240px";
+      d.style.left = (r.left - sr.left) + "px";
+      d.style.top = (r.top - sr.top) + "px";
+      s1.appendChild(d); setTimeout(() => d.remove(), 1900);
+    }, i*220);
+  };
+  orb1.addEventListener("pointerdown", press1);
+  window.addEventListener("pointerup", lift1);
+
+  /* 2 — moon on water: tap sends elliptical ripples across the water */
+  const s2 = document.getElementById("s2"), c2 = document.getElementById("c2"), moon = document.getElementById("moon");
+  const x2 = c2.getContext("2d");
+  let rips = [];
+  function size2(){ c2.width = c2.clientWidth * devicePixelRatio; c2.height = c2.clientHeight * devicePixelRatio; }
+  size2(); addEventListener("resize", size2);
+  s2.addEventListener("pointerdown", e => {
+    const b = s2.getBoundingClientRect();
+    const waterTop = b.height * .66;
+    const y = Math.max(e.clientY - b.top, waterTop + 14);
+    rips.push({ x: e.clientX - b.left, y, r: 6, a: .8 });
+    moon.classList.add("glow"); setTimeout(() => moon.classList.remove("glow"), 900);
+  });
+  (function loop2(){
+    x2.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);
+    x2.clearRect(0,0,c2.clientWidth,c2.clientHeight);
+    rips = rips.filter(r => r.a > .02);
+    for (const r of rips) {
+      x2.beginPath();
+      x2.ellipse(r.x, r.y, r.r, r.r*.28, 0, 0, Math.PI*2);
+      x2.strokeStyle = `rgba(255,255,255,${r.a})`;
+      x2.lineWidth = 1.4;
+      x2.stroke();
+      r.r += 1.6; r.a *= .975;
+    }
+    requestAnimationFrame(loop2);
+  })();
+
+  /* 3 — starfield: drifting stars; hold pulls them into a ring around the time */
+  const s3 = document.getElementById("s3"), c3 = document.getElementById("c3");
+  const x3 = c3.getContext("2d");
+  let stars = [], hold3 = false;
+  function size3(){
+    c3.width = c3.clientWidth * devicePixelRatio; c3.height = c3.clientHeight * devicePixelRatio;
+    stars = Array.from({length:110}, () => ({
+      x: Math.random()*c3.clientWidth, y: Math.random()*c3.clientHeight,
+      s: Math.random()*1.6 + .4, tw: Math.random()*Math.PI*2,
+      vx: (Math.random()-.5)*.08, vy: (Math.random()-.5)*.08
+    }));
+  }
+  size3(); addEventListener("resize", size3);
+  s3.addEventListener("pointerdown", () => hold3 = true);
+  window.addEventListener("pointerup", () => hold3 = false);
+  (function loop3(t){
+    x3.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);
+    x3.clearRect(0,0,c3.clientWidth,c3.clientHeight);
+    const cx = c3.clientWidth/2, cy = c3.clientHeight/2, R = 130;
+    for (const st of stars) {
+      if (hold3) {
+        const ang = Math.atan2(st.y-cy, st.x-cx);
+        const tx = cx + Math.cos(ang)*R, ty = cy + Math.sin(ang)*R;
+        st.x += (tx-st.x)*.06; st.y += (ty-st.y)*.06;
+      } else {
+        st.x += st.vx; st.y += st.vy;
+        if (st.x<0) st.x+=c3.clientWidth; if (st.x>c3.clientWidth) st.x-=c3.clientWidth;
+        if (st.y<0) st.y+=c3.clientHeight; if (st.y>c3.clientHeight) st.y-=c3.clientHeight;
+      }
+      const a = .35 + .45*Math.abs(Math.sin(t/900 + st.tw));
+      x3.beginPath(); x3.arc(st.x, st.y, st.s, 0, Math.PI*2);
+      x3.fillStyle = `rgba(255,255,255,${a})`; x3.fill();
+    }
+    requestAnimationFrame(loop3);
+  })(0);
+
+  /* 4 — aurora: blobs of light; tap re-tints, drag stirs */
+  const s4 = document.getElementById("s4"), c4 = document.getElementById("c4");
+  const x4 = c4.getContext("2d");
+  let hueBase = 230, pointer4 = null;
+  const blobs = Array.from({length:5}, (_,i) => ({
+    px: Math.random(), py: Math.random(), r: .38 + Math.random()*.22,
+    dx: (Math.random()-.5)*.0012, dy: (Math.random()-.5)*.0012, off: i*24
+  }));
+  function size4(){ c4.width = c4.clientWidth * devicePixelRatio; c4.height = c4.clientHeight * devicePixelRatio; }
+  size4(); addEventListener("resize", size4);
+  s4.addEventListener("pointerdown", e => { hueBase = (hueBase + 40 + Math.random()*50) % 360; pointer4 = e; });
+  s4.addEventListener("pointermove", e => { if (e.buttons) pointer4 = e; });
+  window.addEventListener("pointerup", () => pointer4 = null);
+  (function loop4(){
+    const w = c4.clientWidth, h = c4.clientHeight;
+    x4.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);
+    x4.fillStyle = "#171a33"; x4.fillRect(0,0,w,h);
+    x4.globalCompositeOperation = "lighter";
+    const b4 = s4.getBoundingClientRect();
+    for (const b of blobs) {
+      b.px += b.dx; b.py += b.dy;
+      if (b.px<.1||b.px>.9) b.dx*=-1; if (b.py<.1||b.py>.9) b.dy*=-1;
+      if (pointer4) {
+        const mx = (pointer4.clientX-b4.left)/w, my = (pointer4.clientY-b4.top)/h;
+        b.px += (mx-b.px)*.012; b.py += (my-b.py)*.012;
+      }
+      const g = x4.createRadialGradient(b.px*w, b.py*h, 0, b.px*w, b.py*h, b.r*Math.min(w,h));
+      const hue = (hueBase + b.off) % 360;
+      g.addColorStop(0, `hsla(${hue}, 70%, 62%, .30)`);
+      g.addColorStop(1, "hsla(0,0%,0%,0)");
+      x4.fillStyle = g;
+      x4.fillRect(0,0,w,h);
+    }
+    x4.globalCompositeOperation = "source-over";
+    requestAnimationFrame(loop4);
+  })();
+
+  /* 5 — eclipse ring: hold to fill with light, release drains it back */
+  const s5 = document.getElementById("s5"), arc5 = document.querySelector("#ring5 .arc");
+  const CIRC5 = 276.5;
+  let fill5 = .25, hold5 = false;
+  s5.addEventListener("pointerdown", () => hold5 = true);
+  window.addEventListener("pointerup", () => hold5 = false);
+  (function loop5(){
+    fill5 += hold5 ? .006 : -.004;
+    if (fill5 >= 1) { fill5 = 1; }
+    fill5 = Math.max(.25, fill5);
+    arc5.style.strokeDashoffset = CIRC5 * (1 - fill5);
+    requestAnimationFrame(loop5);
+  })();
+})();
+</script>
+</body>
+</html>
