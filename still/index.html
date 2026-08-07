@@ -430,7 +430,7 @@ const PLAN = {
       label = b.t;
       total = (b.e - b.s)/1000;
       remaining = Math.max(0, (b.e - now)/1000);
-      sub = (b.type === "focus" || b.type === "task") ? "focus" : b.type === "break" ? "rest" : "in session";
+      sub = (b.type === "focus" || b.type === "task") ? "" : b.type === "break" ? "rest" : "in session";
       if (blocks[idx+1]) next = `next · ${blocks[idx+1].t} at ${fmtT(blocks[idx+1].s)}`;
     }
 
