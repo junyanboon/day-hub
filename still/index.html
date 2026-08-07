@@ -342,22 +342,8 @@ const PLAN = {
     return out.sort((x,y) => x.s - y.s);
   }
 
-  /* ---------- soft chimes ---------- */
-  let ac;
-  function chime(freqs){
-    try {
-      ac = ac || new (window.AudioContext||window.webkitAudioContext)();
-      freqs.forEach((f,i) => {
-        const o = ac.createOscillator(), g = ac.createGain();
-        o.type="sine"; o.frequency.value=f;
-        g.gain.setValueAtTime(0, ac.currentTime + i*.4);
-        g.gain.linearRampToValueAtTime(.18, ac.currentTime + i*.4 + .05);
-        g.gain.exponentialRampToValueAtTime(.0001, ac.currentTime + i*.4 + 2.2);
-        o.connect(g).connect(ac.destination);
-        o.start(ac.currentTime + i*.4); o.stop(ac.currentTime + i*.4 + 2.4);
-      });
-    } catch {}
-  }
+  /* Sounds removed by request — the app is silent. */
+  function chime(){}
 
   const fmtT = d => d.toLocaleTimeString([], {hour:"numeric", minute:"2-digit"});
   const fmtC = s => {
