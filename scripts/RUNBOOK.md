@@ -160,3 +160,26 @@ keep them in mind before changing `fetchEvents`:
 
 Responses are cached for 60s (`caches.default`, `X-Still-Cache` header shows
 hit/miss), so the app's polling is nearly free.
+
+## Still — focus sheet (Tasks Inbox)
+
+The "☑ focus" tab lists open rows from the Notion 📥 Tasks Inbox
+(data source a404eb91-e7a4-4aa7-aff5-2a86feae427f) via still-api:
+
+- `GET /tasks` — open tasks (Status != Done), Next Action first, then priority
+- `POST /tasks/done {id, done}` — flips Status to Done / Not Started
+
+Needs one more Worker secret: `NOTION_TOKEN` — a Notion internal-integration
+token whose integration has the 📥 Tasks Inbox database shared with it
+(••• → Connections on the DB). Reuse the "Dance Annex Desk CLI" integration if
+easier — just add Tasks Inbox to its connections. Set with:
+
+    cd still-api && npx wrangler secret put NOTION_TOKEN
+
+Until set: `/health` shows `tasksConfigured:false`, the focus sheet says it
+can't reach the inbox, everything else works.
+
+UI notes: bottom pill nav (focus / ＋ / my day) replaces the old header
+buttons — thumb zone, Tiimo/Calm pattern. Center ❚❚ button pauses the current
+block; resume pushes the block's end out by the paused duration so no focus
+time is lost. App icon: still/icon.svg + icon-180.png (apple-touch-icon).
