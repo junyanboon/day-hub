@@ -100,6 +100,31 @@
     padding:14px 20px calc(env(safe-area-inset-bottom) + 16px); z-index:10; }
   #tsheet.open { transform:translateY(0); }
   #tsheet .handle { width:36px; height:4px; border-radius:2px; background:var(--ink-faint); margin:0 auto 14px; }
+  /* spent sheet — same glass shell as the others */
+  #ssheet { position:fixed; left:0; right:0; bottom:0; max-height:84%;
+    background:rgba(30,35,60,.8); backdrop-filter:blur(24px); -webkit-backdrop-filter:blur(24px);
+    border-radius:24px 24px 0 0; border-top:1px solid var(--glass-border);
+    transform:translateY(100%); transition:transform .35s cubic-bezier(.3,.9,.3,1);
+    display:flex; flex-direction:column;
+    padding:14px 20px calc(env(safe-area-inset-bottom) + 16px); z-index:10; }
+  #ssheet.open { transform:translateY(0); }
+  #ssheet .handle { width:36px; height:4px; border-radius:2px; background:var(--ink-faint); margin:0 auto 14px; }
+  #ssheet h2 { font-size:17px; font-weight:600; margin-bottom:2px; text-align:center; }
+  #ssheet .sub { font-size:12.5px; color:var(--ink-soft); margin-bottom:12px; }
+  #sp-total { font-size:44px; font-weight:200; text-align:center; margin:8px 0 2px; font-variant-numeric:tabular-nums; }
+  #sp-list { overflow-y:auto; display:flex; flex-direction:column; gap:6px; margin-top:4px; }
+  .sp-item { display:flex; align-items:center; gap:12px; border-radius:13px; padding:12px 13px;
+    background:var(--glass); border:1px solid var(--glass-border); }
+  .sp-item .sp-n { flex:1; min-width:0; font-size:14.5px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .sp-item .sp-t { font-size:11px; color:var(--ink-faint); flex-shrink:0; }
+  .sp-item .sp-a { font-size:14.5px; font-variant-numeric:tabular-nums; flex-shrink:0; }
+  .sp-item .sp-x { background:none; border:none; color:var(--ink-faint); font-size:15px; padding:2px 4px; }
+  #sp-row { display:flex; gap:8px; margin-top:12px; }
+  #sp-row input { flex:1; min-width:0; background:var(--glass); border:1px solid var(--glass-border);
+    border-radius:13px; padding:12px 13px; color:var(--ink); font-size:14.5px; font-family:inherit; outline:none; }
+  #sp-row #sp-amt { flex:0 0 84px; }
+  #sp-row #sp-add { background:rgba(255,255,255,.9); color:#3a4a6b; border:none; border-radius:13px;
+    padding:0 18px; font-size:14.5px; font-weight:600; }
   #tsheet h2 { font-size:17px; font-weight:600; margin-bottom:2px; }
   #tsheet .sub { font-size:12.5px; color:var(--ink-soft); margin-bottom:12px; }
   #tlist { overflow-y:auto; flex:1; display:flex; flex-direction:column; gap:6px; }
@@ -195,15 +220,17 @@
     <div id="mantra">take a deep breath</div>
     <div id="next-up"></div>
     <div id="controls">
+      <button class="ctl" id="add-btn" title="slot something in now">＋</button>
       <button class="ctl" id="ext-btn" title="give this block 15 more minutes">+15</button>
       <button class="ctl big" id="now-btn" title="back to now">◉</button>
       <button class="ctl" id="done-btn" title="finished early">done</button>
     </div>
   </div>
   <nav id="bar">
-    <button id="tasks-btn"><span class="ic">☑</span><span class="lb">tasks</span></button>
-    <button id="add-btn" title="slot something in now"><span class="ic">＋</span><span class="lb">add</span></button>
-    <button id="day-btn"><span class="ic">☼</span><span class="lb">my day</span></button>
+    <button id="now-tab" class="on"><span class="ic">◔</span><span class="lb">Now</span></button>
+    <button id="tasks-btn"><span class="ic">✳</span><span class="lb">Focus</span></button>
+    <button id="spent-btn"><span class="ic">◈</span><span class="lb">Spent</span></button>
+    <button id="day-btn"><span class="ic">☰</span><span class="lb">Schedule</span></button>
   </nav>
 </div>
 
@@ -267,6 +294,20 @@
   <h2>Focus on what matters</h2>
   <div class="sub" id="tmeta">Open tasks from your Tasks Inbox. Tap to clear.</div>
   <div id="tlist"></div>
+</div>
+
+<!-- spent sheet: money spent today (Calm Countdown), lives in localStorage -->
+<div id="ssheet">
+  <div class="handle"></div>
+  <h2>Spent today</h2>
+  <div id="sp-total">$0.00</div>
+  <div class="sub" id="sp-count" style="text-align:center">nothing yet today</div>
+  <div id="sp-list"></div>
+  <div id="sp-row">
+    <input id="sp-name" placeholder="What was it?" autocomplete="off">
+    <input id="sp-amt" placeholder="$" inputmode="decimal" autocomplete="off">
+    <button id="sp-add">Add</button>
+  </div>
 </div>
 
 <div id="sheet">
@@ -516,14 +557,67 @@ const PLAN = {
     const cur = document.querySelector("#timeline .now");
     if (cur) cur.scrollIntoView({block:"center"});
   }
-  const syncScrim = () => $("scrim").classList.toggle("show",
-    $("sheet").classList.contains("open") || $("tsheet").classList.contains("open"));
+  const syncScrim = () => {
+    const any = ["sheet","tsheet","ssheet"].some(id => $(id).classList.contains("open"));
+    $("scrim").classList.toggle("show", any);
+    $("now-tab").classList.toggle("on", !any);
+  };
   const openSheet = v => {
     $("sheet").classList.toggle("open", v);
     $("day-btn").classList.toggle("on", v);
-    if (v) { $("tsheet").classList.remove("open"); $("tasks-btn").classList.remove("on"); renderTimeline(); refreshLive(); }
+    if (v) {
+      $("tsheet").classList.remove("open"); $("tasks-btn").classList.remove("on");
+      $("ssheet").classList.remove("open"); $("spent-btn").classList.remove("on");
+      renderTimeline(); refreshLive();
+    }
     syncScrim();
   };
+
+  /* ---------- spent sheet: money spent today (device-local) ---------- */
+  const spKey = () => "still-spent-" + new Date().toDateString();
+  const spLoad = () => { try { return JSON.parse(localStorage.getItem(spKey())) || []; } catch { return []; } };
+  const spSave = a => { try { localStorage.setItem(spKey(), JSON.stringify(a)); } catch {} };
+  function renderSpent(){
+    const items = spLoad();
+    const total = items.reduce((s,i) => s + i.amt, 0);
+    $("sp-total").textContent = "$" + total.toFixed(2);
+    $("sp-count").textContent = items.length
+      ? `${items.length} item${items.length > 1 ? "s" : ""} today`
+      : "nothing yet today";
+    $("sp-list").innerHTML = items.map((i,n) => `
+      <div class="sp-item">
+        <span class="sp-n">${esc(i.name)}</span>
+        <span class="sp-t">${esc(i.at)}</span>
+        <span class="sp-a">$${i.amt.toFixed(2)}</span>
+        <button class="sp-x" data-n="${n}" title="remove">✕</button>
+      </div>`).join("");
+    document.querySelectorAll("#sp-list .sp-x").forEach(el => {
+      el.onclick = () => { const a = spLoad(); a.splice(+el.dataset.n, 1); spSave(a); renderSpent(); };
+    });
+  }
+  $("sp-add").onclick = () => {
+    const name = $("sp-name").value.trim();
+    const amt = parseFloat($("sp-amt").value.replace(/[^0-9.]/g, ""));
+    if (!name || !(amt > 0)) return;
+    const a = spLoad();
+    a.push({ name, amt, at: fmtT(new Date()) });
+    spSave(a);
+    $("sp-name").value = ""; $("sp-amt").value = "";
+    renderSpent();
+  };
+  $("sp-amt").addEventListener("keydown", e => { if (e.key === "Enter") $("sp-add").onclick(); });
+  const openSpent = v => {
+    $("ssheet").classList.toggle("open", v);
+    $("spent-btn").classList.toggle("on", v);
+    if (v) {
+      $("sheet").classList.remove("open"); $("day-btn").classList.remove("on");
+      $("tsheet").classList.remove("open"); $("tasks-btn").classList.remove("on");
+      renderSpent();
+    }
+    syncScrim();
+  };
+  $("spent-btn").onclick = () => openSpent(!$("ssheet").classList.contains("open"));
+  $("now-tab").onclick = () => { openSheet(false); openTasks(false); openSpent(false); manualIdx = null; render(); };
 
   /* ---------- focus sheet: Tasks Inbox ---------- */
   let tasks = [], tasksLoaded = false;
@@ -575,6 +669,7 @@ const PLAN = {
     $("tasks-btn").classList.toggle("on", v);
     if (v) {
       $("sheet").classList.remove("open"); $("day-btn").classList.remove("on");
+      $("ssheet").classList.remove("open"); $("spent-btn").classList.remove("on");
       renderTasks(); pullTasks().then(ok => {
         if (ok) renderTasks();
         else if (!tasksLoaded) $("tmeta").textContent = "Can't reach your Tasks Inbox right now.";
@@ -601,7 +696,7 @@ const PLAN = {
   }
   $("refresh-btn").onclick = () => refreshLive(true);
   $("day-btn").onclick = () => openSheet(!$("sheet").classList.contains("open"));
-  $("scrim").onclick = () => { openSheet(false); openTasks(false); };
+  $("scrim").onclick = () => { openSheet(false); openTasks(false); openSpent(false); };
 
   /* ---------- edit modal ---------- */
   let editing = null;
