@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Stillness — orb studies</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html, body { height:100%; }
+  body {
+    font-family:-apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+    color:rgba(255,255,255,.95); background:#1a1c3a;
+    user-select:none; -webkit-user-select:none; overflow-x:hidden;
+  }
+  section {
+    height:100vh; height:100dvh; scroll-snap-align:start; position:relative;
+    display:flex; align-items:center; justify-content:center; overflow:hidden;
+  }
+  main { height:100vh; height:100dvh; overflow-y:scroll; scroll-snap-type:y mandatory; }
+  .label { position:absolute; top:calc(env(safe-area-inset-top) + 18px); width:100%;
+    text-align:center; font-size:12px; letter-spacing:3px; text-transform:uppercase;
+    color:rgba(255,255,255,.55); z-index:3; }
+  .hint { position:absolute; bottom:calc(env(safe-area-inset-bottom) + 26px); width:100%;
+    text-align:center; font-size:13px; color:rgba(255,255,255,.45); z-index:3; }
+  .num { position:absolute; top:calc(env(safe-area-inset-top) + 16px); right:18px;
+    font-size:12px; color:rgba(255,255,255,.35); z-index:3; }
+  canvas.fill { position:absolute; inset:0; width:100%; height:100%; z-index:1; }
+
+  /* the orb — identical in every study, same glass as the app */
+  .orb { width:240px; height:240px; border-radius:50%; position:relative; z-index:2;
+    background:radial-gradient(circle at 35% 35%, rgba(255,255,255,.35), rgba(255,255,255,.08) 60%, rgba(255,255,255,.02));
+    border:1px solid rgba(255,255,255,.25);
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    animation:breathe 8s ease-in-out infinite; }
+  .orb .t { font-size:40px; font-weight:200; }
+  .orb .s { font-size:13px; color:rgba(255,255,255,.55); letter-spacing:2px; text-transform:uppercase; margin-top:4px; }
+  @keyframes breathe { 0%,100%{transform:scale(1)} 50%{transform:scale(1.06)} }
+
+  #o1 { background:#14171d; }
+  #o2 { background:#0f1016; }
+  #o3 { background:linear-gradient(180deg,#232649 0%,#181a38 60%,#101126 100%); }
+  #o4 { background:linear-gradient(180deg,#43537f 0%,#2f3b66 55%,#232a4e 100%); }
+  #o5 { background:#171a33; }
+  #o6 { background:linear-gradient(180deg,#3d477f 0%,#2a3160 55%,#1a1f45 100%); }
+</style>
+</head>
+<body>
+<main>
+
+  <section id="o1">
+    <div class="label">01 · orb + ember ring</div><div class="num">1/6</div>
+    <canvas id="k1" class="fill"></canvas>
+    <div class="orb"><span class="t">25 min</span><span class="s">deep work</span></div>
+    <div class="hint">a warm ring of embers circles the orb</div>
+  </section>
+
+  <section id="o2">
+    <div class="label">02 · orb + halo</div><div class="num">2/6</div>
+    <canvas id="k2" class="fill"></canvas>
+    <div class="orb"><span class="t">25 min</span><span class="s">deep work</span></div>
+    <div class="hint">a ring of white light breathes around it</div>
+  </section>
+
+  <section id="o3">
+    <div class="label">03 · orb + constellation</div><div class="num">3/6</div>
+    <canvas id="k3" class="fill"></canvas>
+    <div class="orb"><span class="t">25 min</span><span class="s">deep work</span></div>
+    <div class="hint">stars drift in slow orbit around your time</div>
+  </section>
+
+  <section id="o4">
+    <div class="label">04 · orb + ripples</div><div class="num">4/6</div>
+    <canvas id="k4" class="fill"></canvas>
+    <div class="orb"><span class="t">25 min</span><span class="s">deep work</span></div>
+    <div class="hint">each breath sends a slow ripple outward</div>
+  </section>
+
+  <section id="o5">
+    <div class="label">05 · orb + aurora</div><div class="num">5/6</div>
+    <canvas id="k5" class="fill"></canvas>
+    <div class="orb"><span class="t">25 min</span><span class="s">deep work</span></div>
+    <div class="hint">soft northern light moves behind the glass</div>
+  </section>
+
+  <section id="o6">
+    <div class="label">06 · orb on water</div><div class="num">6/6</div>
+    <canvas id="k6" class="fill"></canvas>
+    <div class="orb" style="margin-bottom:130px"><span class="t">25 min</span><span class="s">deep work</span></div>
+    <div class="hint">the orb rests above its own reflection</div>
+  </section>
+
+</main>
+<script>
+(() => {
+  // shared: full-screen canvas loop with the app's ~9s autonomous breath
+  function loopOn(id, draw) {
+    const cv = document.getElementById(id), x = cv.getContext("2d");
+    function size(){ cv.width = cv.clientWidth * devicePixelRatio; cv.height = cv.clientHeight * devicePixelRatio; }
+    size(); addEventListener("resize", size);
+    (function loop(t){
+      x.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);
+      const en = .5 + .5*Math.sin(t/4000*Math.PI - Math.PI/2);   // matches the 8s CSS breathe
+      draw(x, cv.clientWidth, cv.clientHeight, t, en);
+      requestAnimationFrame(loop);
+    })(0);
+  }
+  // orb center: sections center the orb, o6 lifts it 65px (margin-bottom 130)
+  const center = (w, h, lift=0) => [w/2, h/2 - lift];
+  const ORB_R = 120;
+
+  /* 1 — ember ring: warm gradient circle just outside the orb, dotted guides */
+  loopOn("k1", (x, w, h, t, en) => {
+    x.clearRect(0,0,w,h);
+    const [cx, cy] = center(w, h), R = ORB_R + 38 + en*6;
+    x.setLineDash([1.5, 7]); x.strokeStyle = "rgba(255,255,255,.20)"; x.lineWidth = 1;
+    x.beginPath(); x.arc(cx, cy, R + 44, 0, Math.PI*2); x.stroke();
+    x.setLineDash([]);
+    const a0 = t/9000;
+    const g = x.createLinearGradient(cx + Math.cos(a0)*R, cy + Math.sin(a0)*R,
+                                     cx - Math.cos(a0)*R, cy - Math.sin(a0)*R);
+    g.addColorStop(0, "#ff9d6e"); g.addColorStop(.5, "#f2643c"); g.addColorStop(1, "#c93f38");
+    x.strokeStyle = g; x.lineWidth = 4 + en*2;
+    x.shadowColor = "rgba(244,110,64,.9)"; x.shadowBlur = 22 + en*16;
+    x.beginPath(); x.arc(cx, cy, R, 0, Math.PI*2); x.stroke();
+    x.shadowBlur = 0;
+  });
+
+  /* 2 — halo: soft white ring of light hugging the orb, plus travelling bead */
+  loopOn("k2", (x, w, h, t, en) => {
+    x.clearRect(0,0,w,h);
+    const [cx, cy] = center(w, h), R = ORB_R + 26 + en*8;
+    const amb = x.createRadialGradient(cx, cy, R*.4, cx, cy, R*2.4);
+    amb.addColorStop(0, `rgba(190,205,235,${.10 + en*.06})`);
+    amb.addColorStop(1, "rgba(190,205,235,0)");
+    x.fillStyle = amb; x.fillRect(0,0,w,h);
+    x.strokeStyle = `rgba(220,230,255,${.25 + en*.15})`; x.lineWidth = 22; x.filter = "blur(16px)";
+    x.beginPath(); x.arc(cx, cy, R, 0, Math.PI*2); x.stroke();
+    x.strokeStyle = `rgba(255,255,255,${.6 + en*.3})`; x.lineWidth = 2.5; x.filter = "none";
+    x.beginPath(); x.arc(cx, cy, R, 0, Math.PI*2); x.stroke();
+    const ba = t/5200, bx = cx + Math.cos(ba)*R, by = cy + Math.sin(ba)*R;
+    const bg = x.createRadialGradient(bx, by, 0, bx, by, 12);
+    bg.addColorStop(0, "rgba(255,255,255,1)"); bg.addColorStop(1, "rgba(255,255,255,0)");
+    x.fillStyle = bg; x.beginPath(); x.arc(bx, by, 12, 0, Math.PI*2); x.fill();
+  });
+
+  /* 3 — constellation: stars in slow orbit, nearest ones linked by faint lines */
+  const orbStars = Array.from({length:26}, (_,i) => ({
+    r: ORB_R + 46 + Math.random()*130, a: Math.random()*Math.PI*2,
+    v: (.00005 + Math.random()*.00012) * (Math.random() < .5 ? -1 : 1),
+    s: .8 + Math.random()*1.6, tw: Math.random()*Math.PI*2
+  }));
+  loopOn("k3", (x, w, h, t, en) => {
+    x.clearRect(0,0,w,h);
+    const [cx, cy] = center(w, h);
+    const pts = orbStars.map(st => {
+      st.a += st.v * 16;
+      return { px: cx + Math.cos(st.a)*st.r, py: cy + Math.sin(st.a)*st.r, st };
+    });
+    x.lineWidth = 1;
+    for (let i = 0; i < pts.length; i++) for (let j = i+1; j < pts.length; j++) {
+      const dx = pts[i].px - pts[j].px, dy = pts[i].py - pts[j].py, d = Math.hypot(dx, dy);
+      if (d < 90) {
+        x.strokeStyle = `rgba(255,255,255,${.14 * (1 - d/90) * (.6 + en*.6)})`;
+        x.beginPath(); x.moveTo(pts[i].px, pts[i].py); x.lineTo(pts[j].px, pts[j].py); x.stroke();
+      }
+    }
+    for (const p of pts) {
+      const a = .35 + .45*Math.abs(Math.sin(t/900 + p.st.tw));
+      x.beginPath(); x.arc(p.px, p.py, p.st.s, 0, Math.PI*2);
+      x.fillStyle = `rgba(255,255,255,${a})`; x.fill();
+    }
+  });
+
+  /* 4 — ripples: a new ring leaves the orb at the top of each breath */
+  let rips = [], lastBirth = -1;
+  loopOn("k4", (x, w, h, t, en) => {
+    x.clearRect(0,0,w,h);
+    const [cx, cy] = center(w, h);
+    const phase = Math.floor(t/8000);          // one ripple per breath cycle
+    if (phase !== lastBirth) { lastBirth = phase; rips.push({ r: ORB_R + 4, a: .5 }); }
+    rips = rips.filter(r => r.a > .02);
+    for (const r of rips) {
+      x.beginPath(); x.arc(cx, cy, r.r, 0, Math.PI*2);
+      x.strokeStyle = `rgba(200,212,255,${r.a})`;
+      x.lineWidth = 1.5;
+      x.stroke();
+      r.r += .55; r.a *= .996;
+    }
+  });
+
+  /* 5 — aurora: drifting colour blobs behind the glass (from study 04) */
+  const blobs = Array.from({length:5}, (_,i) => ({
+    px: Math.random(), py: Math.random(), r: .38 + Math.random()*.22,
+    dx: (Math.random()-.5)*.0012, dy: (Math.random()-.5)*.0012, off: i*24
+  }));
+  loopOn("k5", (x, w, h, t, en) => {
+    x.fillStyle = "#171a33"; x.fillRect(0,0,w,h);
+    x.globalCompositeOperation = "lighter";
+    for (const b of blobs) {
+      b.px += b.dx; b.py += b.dy;
+      if (b.px<.1||b.px>.9) b.dx*=-1; if (b.py<.1||b.py>.9) b.dy*=-1;
+      const g = x.createRadialGradient(b.px*w, b.py*h, 0, b.px*w, b.py*h, b.r*Math.min(w,h));
+      const hue = (230 + b.off) % 360;
+      g.addColorStop(0, `hsla(${hue}, 70%, 62%, ${.24 + en*.10})`);
+      g.addColorStop(1, "hsla(0,0%,0%,0)");
+      x.fillStyle = g; x.fillRect(0,0,w,h);
+    }
+    x.globalCompositeOperation = "source-over";
+  });
+
+  /* 6 — water: horizon below the orb, its light reflected in slow ripple bars */
+  loopOn("k6", (x, w, h, t, en) => {
+    x.clearRect(0,0,w,h);
+    const [cx, cy] = center(w, h, 65);
+    const horizon = cy + ORB_R + 46;
+    const wt = x.createLinearGradient(0, horizon, 0, h);
+    wt.addColorStop(0, "rgba(255,255,255,.14)"); wt.addColorStop(1, "rgba(255,255,255,.02)");
+    x.fillStyle = wt; x.fillRect(0, horizon, w, h - horizon);
+    x.strokeStyle = "rgba(255,255,255,.4)"; x.lineWidth = 1.2;
+    x.beginPath(); x.moveTo(0, horizon); x.lineTo(w, horizon); x.stroke();
+    for (let i = 0; i < 8; i++) {
+      const y = horizon + 14 + i*17;
+      const hw = (54 - i*4) * (1 + .18*Math.sin(t/800 + i)) * (.85 + en*.3);
+      const a = (.5 - i*.055) * (.7 + en*.5);
+      if (a <= 0) continue;
+      x.strokeStyle = `rgba(235,240,255,${a})`;
+      x.lineWidth = 3.4 - i*.3;
+      x.lineCap = "round";
+      x.beginPath(); x.moveTo(cx - hw, y); x.lineTo(cx + hw, y); x.stroke();
+    }
+  });
+})();
+</script>
+</body>
+</html>
