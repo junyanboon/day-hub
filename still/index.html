@@ -47,14 +47,15 @@
   #bar #add-btn { flex:0 0 46px; font-size:18px; color:var(--ink); }
 
   #stage { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; min-height:0; }
+  /* mantra floats above the orb, clear of the halo's reach */
   #mantra { font-size:16px; color:var(--ink-soft); letter-spacing:.3px; text-align:center;
     text-shadow:0 1px 14px rgba(20,25,60,.65);
-    min-height:22px; transition:opacity 1.2s ease; padding:0 10px; }
-  #block-label { font-size:14px; color:var(--ink-faint); letter-spacing:1.5px; text-transform:uppercase;
-    text-shadow:0 1px 12px rgba(20,25,60,.65);
-    text-align:center; max-width:90%; }
-  #next-up { font-size:13px; color:var(--ink-faint); text-align:center; min-height:18px;
-    text-shadow:0 1px 12px rgba(20,25,60,.65); }
+    min-height:22px; transition:opacity 1.2s ease; padding:0 10px; margin-bottom:30px; }
+  /* block label + next-up live inside the orb, around the time */
+  #block-label { font-size:11px; color:var(--ink-faint); letter-spacing:2px; text-transform:uppercase;
+    text-align:center; max-width:85%; }
+  #next-up { font-size:11px; color:var(--ink-faint); text-align:center; min-height:15px;
+    max-width:85%; margin-top:2px; }
 
   #orb-wrap { position:relative; width:min(68vw, 280px); aspect-ratio:1; margin:10px 0; }
   /* aura canvas is the centerpiece — the old ring stays in the DOM but hidden */
@@ -79,7 +80,7 @@
   #time { font-size:48px; font-weight:200; letter-spacing:1px; font-variant-numeric:tabular-nums; }
   #time-sub { font-size:12px; color:var(--ink-faint); letter-spacing:1px; }
 
-  #controls { display:flex; align-items:center; gap:14px; margin-top:4px; }
+  #controls { display:flex; align-items:center; gap:14px; margin-top:34px; }
   .ctl { background:var(--glass); border:1px solid var(--glass-border); color:var(--ink);
     border-radius:26px; min-width:52px; height:52px; padding:0 14px; font-size:14px;
     backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
@@ -180,16 +181,14 @@
 <canvas id="aura"></canvas>
 <div id="app">
   <div id="stage">
-    <div id="block-label"></div>
+    <div id="mantra">take a deep breath</div>
     <div id="orb-wrap">
       <svg id="ring" viewBox="0 0 100 100">
         <circle class="track" cx="50" cy="50" r="47"></circle>
         <circle class="progress" cx="50" cy="50" r="47" stroke-dasharray="295.3" stroke-dashoffset="295.3"></circle>
       </svg>
-      <div id="orb"><div id="time">--:--</div><div id="time-sub"></div></div>
+      <div id="orb"><div id="block-label"></div><div id="time">--:--</div><div id="time-sub"></div><div id="next-up"></div></div>
     </div>
-    <div id="mantra">take a deep breath</div>
-    <div id="next-up"></div>
     <div id="controls">
       <button class="ctl" id="ext-btn" title="give this block 15 more minutes">+15</button>
       <button class="ctl big" id="now-btn" title="back to now">◉</button>
@@ -795,7 +794,7 @@ const PLAN = {
         const s = +(document.body.dataset.sleep || 3);
         const lvl = (s - 1) / 4;                       // 0 (worst) .. 1 (best)
         const enD = .5 + .5 * Math.sin(t/4000 * Math.PI - Math.PI/2);  // 8s, matches CSS breathe
-        const R = wrap.width * .5 + 8 + enD*6;
+        const R = wrap.width * .5 + 22 + enD*8;
         // cool lavender at 1 -> warm ivory at 5
         const cr = Math.round(200 + lvl*55), cg = Math.round(212 + lvl*28), cb = Math.round(255 - lvl*45);
         const amb = x.createRadialGradient(cx, cy, R*.4, cx, cy, R*2.4);
