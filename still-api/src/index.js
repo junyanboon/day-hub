@@ -341,7 +341,40 @@ export default {
         ok: true,
         configured: CALS.every((c) => !!(env[c.secret] || "").trim()),
         tasksConfigured: !!(env.NOTION_TOKEN || "").trim(),
+        ouraConfigured: !!(env.OURA_TOKEN || "").trim(),
       }), { headers });
+    }
+
+    if (url.pathname === "/sleep") {
+      // Last night's Oura sleep score. Drives the aura's intensity in the app.
+      try {
+        const token = (env.OURA_TOKEN || "").trim();
+        if (!token) throw new Error("OURA_TOKEN not configured");
+        const cache = caches.default;
+        const key = new Request(new URL("/sleep?v=1", url.origin), { method: "GET" });
+        const hit = await cache.match(key);
+        if (hit) {
+          return new Response(await hit.text(), { headers: { ...headers, "X-Still-Cache": "hit" } });
+        }
+        // Ask for a few days so we still return the latest score after a lazy sync.
+        const ymd = (d) => { const p = parts(d); const z = (n) => String(n).padStart(2, "0"); return `${p.y}-${z(p.m)}-${z(p.d)}`; };
+        const r = await fetch(
+          `https://api.ouraring.com/v2/usercollection/daily_sleep?start_date=${ymd(new Date(Date.now() - 3 * 86400000))}&end_date=${ymd(new Date())}`,
+          { headers: { Authorization: `Bearer ${token}` } },
+        );
+        if (!r.ok) throw new Error(`Oura: HTTP ${r.status}`);
+        const data = await r.json();
+        const days = (data.data || []).filter((d) => typeof d.score === "number");
+        if (!days.length) throw new Error("Oura: no recent sleep score");
+        const latest = days[days.length - 1];
+        const body = JSON.stringify({ score: latest.score, day: latest.day });
+        ctx.waitUntil(cache.put(key, new Response(body, {
+          headers: { "Content-Type": "application/json", "Cache-Control": "max-age=1800" },
+        })));
+        return new Response(body, { headers: { ...headers, "X-Still-Cache": "miss" } });
+      } catch (err) {
+        return new Response(JSON.stringify({ error: String(err.message || err) }), { status: 502, headers });
+      }
     }
 
     if (url.pathname === "/tasks") {

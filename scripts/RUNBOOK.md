@@ -179,7 +179,33 @@ easier — just add Tasks Inbox to its connections. Set with:
 Until set: `/health` shows `tasksConfigured:false`, the focus sheet says it
 can't reach the inbox, everything else works.
 
-UI notes: bottom pill nav (focus / ＋ / my day) replaces the old header
+UI notes: bottom pill nav (tasks / ＋ / my day) replaces the old header
 buttons — thumb zone, Tiimo/Calm pattern. Center ❚❚ button pauses the current
 block; resume pushes the block's end out by the paused duration so no focus
 time is lost. App icon: still/icon.svg + icon-180.png (apple-touch-icon).
+The app is silent (all chimes removed 2026-08-07) and the countdown shows
+whole minutes only.
+
+## Still — aura centerpiece (Oura sleep score)
+
+The timer centerpiece is a canvas recreation of Calm Sleep's animated aura
+(layered wobbling bands, sunburst core), breathing autonomously. It has
+exactly five intensity states, mirroring the reference app's five slider
+stops, driven by last night's Oura sleep score via `GET /sleep` on still-api:
+
+    score < 60 → 1 (dim, cool)   … a score of 50 or below is the bottom state
+    60–69 → 2 · 70–79 → 3 (default when offline) · 80–89 → 4 · 90+ → 5 (full warmth)
+
+After 22:00 (and before 05:00) device-local, the aura yields to the textured
+full moon (Sadhguru/Isha inspiration).
+
+Worker secret needed once: `OURA_TOKEN` — an Oura personal access token from
+cloud.ouraring.com/personal-access-tokens. Set with:
+
+    cd still-api && npx wrangler secret put OURA_TOKEN
+
+`/health` shows `ouraConfigured`; until set, `/sleep` 502s and the app quietly
+uses intensity 3. Responses cache 30 min.
+
+Design studies that led here: still/centerpieces.html (7 interactive
+centerpiece prototypes, kept for reference).
