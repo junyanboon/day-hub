@@ -131,6 +131,13 @@
   #sp-acct { margin-top:8px; width:100%; background:var(--glass); border:1px solid var(--glass-border);
     border-radius:13px; padding:12px 13px; color:var(--ink-soft); font-size:13.5px; font-family:inherit;
     outline:none; -webkit-appearance:none; appearance:none; }
+  #sp-acct.hide { display:none; }
+  /* favourite-card chips: recently used accounts from BOTH budgets, one tap each */
+  #sp-chips { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
+  .sp-chip { background:var(--glass); border:1px solid var(--glass-border); color:var(--ink-soft);
+    border-radius:12px; padding:8px 11px; font-size:12.5px; max-width:46%;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .sp-chip.on { background:rgba(255,255,255,.9); color:#3a4a6b; border-color:transparent; font-weight:600; }
   #tsheet h2 { font-size:17px; font-weight:600; margin-bottom:2px; }
   #tsheet .sub { font-size:12.5px; color:var(--ink-soft); margin-bottom:12px; }
   #tlist { overflow-y:auto; flex:1; display:flex; flex-direction:column; gap:6px; }
@@ -315,7 +322,8 @@
     <button id="sp-cur" title="currency">CAD</button>
     <button id="sp-add">Add</button>
   </div>
-  <select id="sp-acct" title="which account this goes to in YNAB"></select>
+  <div id="sp-chips"></div>
+  <select id="sp-acct" title="which account this goes to in YNAB" class="hide"></select>
 </div>
 
 <div id="sheet">
@@ -615,9 +623,9 @@ const PLAN = {
       return d.ok === true;
     } catch { return false; }
   }
-  /* account picker: full list per currency from YNAB (via still-api), and the
-     last-used account per currency is remembered — travel card sticks while
-     travelling, home card sticks at home */
+  /* account picker: favourite chips from BOTH budgets (recently used first),
+     a ⋯ chip reveals the full per-currency dropdown. Tapping a US card flips
+     the entry to USD automatically, and vice versa. */
   let spAccts = null;
   async function pullAccts(){
     try {
@@ -626,26 +634,65 @@ const PLAN = {
     } catch {}
   }
   const spCur = () => $("sp-cur").classList.contains("usd") ? "USD" : "CAD";
-  function fillAccts(){
-    const cur = spCur(), list = (spAccts && spAccts[cur]) || [];
-    const last = localStorage.getItem("still-spent-acct-" + cur);
-    $("sp-acct").innerHTML = list.map(n =>
-      `<option${n === last ? " selected" : ""}>${esc(n)}</option>`).join("")
-      || `<option>first open account</option>`;
-  }
-  $("sp-acct").onchange = () =>
-    localStorage.setItem("still-spent-acct-" + spCur(), $("sp-acct").value);
-  $("sp-cur").onclick = () => {
-    const usd = $("sp-cur").classList.toggle("usd");
+  const setCur = usd => {
+    $("sp-cur").classList.toggle("usd", usd);
     $("sp-cur").textContent = usd ? "USD" : "CAD";
+  };
+  const spRecents = () => { try { return JSON.parse(localStorage.getItem("still-spent-recents")) || []; } catch { return []; } };
+  function rememberAcct(name, cur){
+    if (!name) return;
+    const rec = spRecents().filter(r => !(r.name === name && r.cur === cur));
+    rec.unshift({ name, cur });
+    try { localStorage.setItem("still-spent-recents", JSON.stringify(rec.slice(0, 6))); } catch {}
+  }
+  let spSel = null;   // { name, cur } currently chosen
+  function fillAccts(){
+    if (!spAccts) return;
+    // chips: recents from both budgets, topped up with the first accounts of the active currency
+    let chips = spRecents().filter(r => (spAccts[r.cur] || []).includes(r.name));
+    for (const cur of [spCur(), spCur() === "CAD" ? "USD" : "CAD"]) {
+      for (const n of (spAccts[cur] || [])) {
+        if (chips.length >= 6) break;
+        if (!chips.some(c => c.name === n && c.cur === cur)) chips.push({ name: n, cur });
+      }
+    }
+    if (!spSel || !chips.some(c => c.name === spSel.name && c.cur === spSel.cur)) spSel = chips[0] || null;
+    if (spSel) setCur(spSel.cur === "USD");
+    $("sp-chips").innerHTML = chips.map((c,i) => `
+      <button class="sp-chip${spSel && c.name === spSel.name && c.cur === spSel.cur ? " on" : ""}"
+        data-i="${i}">${c.cur === "USD" ? "🇺🇸 " : ""}${esc(c.name)}</button>`).join("")
+      + `<button class="sp-chip" id="sp-more">⋯</button>`;
+    document.querySelectorAll("#sp-chips .sp-chip[data-i]").forEach(el => {
+      el.onclick = () => { spSel = chips[+el.dataset.i]; setCur(spSel.cur === "USD"); fillAccts(); };
+    });
+    $("sp-more").onclick = () => {
+      const sel = $("sp-acct");
+      sel.classList.toggle("hide");
+      const cur = spCur();
+      sel.innerHTML = (spAccts[cur] || []).map(n =>
+        `<option${spSel && n === spSel.name ? " selected" : ""}>${esc(n)}</option>`).join("");
+    };
+  }
+  $("sp-acct").onchange = () => {
+    spSel = { name: $("sp-acct").value, cur: spCur() };
+    rememberAcct(spSel.name, spSel.cur);
+    $("sp-acct").classList.add("hide");
+    fillAccts();
+  };
+  $("sp-cur").onclick = () => {
+    setCur(!$("sp-cur").classList.contains("usd"));
+    const cur = spCur();
+    const first = (spAccts && spAccts[cur] || [])[0];
+    const rec = spRecents().find(r => r.cur === cur);
+    spSel = rec && spAccts[cur].includes(rec.name) ? rec : (first ? { name: first, cur } : null);
     fillAccts();
   };
   $("sp-add").onclick = async () => {
     const name = $("sp-name").value.trim();
     const amt = parseFloat($("sp-amt").value.replace(/[^0-9.]/g, ""));
     if (!name || !(amt > 0)) return;
-    const item = { name, amt, cur: spCur(), account: $("sp-acct").value || "", at: fmtT(new Date()) };
-    localStorage.setItem("still-spent-acct-" + item.cur, item.account);
+    const item = { name, amt, cur: spSel ? spSel.cur : spCur(), account: spSel ? spSel.name : "", at: fmtT(new Date()) };
+    rememberAcct(item.account, item.cur);
     const a = spLoad();
     a.push(item); spSave(a);
     $("sp-name").value = ""; $("sp-amt").value = "";

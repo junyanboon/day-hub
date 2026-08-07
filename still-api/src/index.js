@@ -363,7 +363,7 @@ export default {
         const token = (env.YNAB_TOKEN || "").trim();
         if (!token) throw new Error("YNAB_TOKEN not configured");
         const cache = caches.default;
-        const key = new Request(new URL("/spent/accounts?v=3", url.origin));
+        const key = new Request(new URL("/spent/accounts?v=4", url.origin));
         const hit = await cache.match(key);
         if (hit) return new Response(await hit.text(), { headers: { ...headers, "X-Still-Cache": "hit" } });
         const api = (path) => fetch("https://api.ynab.com/v1" + path, {
@@ -376,7 +376,9 @@ export default {
           const ar = await api(`/budgets/${b.id}/accounts`);
           if (!ar.ok) continue;
           out[cur] = (await ar.json()).data.accounts
-            .filter((a) => !a.closed && !a.deleted).map((a) => a.name);
+            .filter((a) => !a.closed && !a.deleted)
+            .map((a) => a.name)
+            .filter((n) => !/gift card|🎁|\bGC\b/i.test(n));   // gift cards excluded by request
         }
         const body = JSON.stringify(out);
         ctx.waitUntil(cache.put(key, new Response(body, {
