@@ -353,21 +353,22 @@ export default {
       try {
         const token = (env.YNAB_TOKEN || "").trim();
         if (!token) throw new Error("YNAB_TOKEN not configured");
-        const { name, amt } = await request.json();
+        const { name, amt, cur } = await request.json();
         if (!name || !(amt > 0) || amt > 100000) throw new Error("bad name/amt");
+        const currency = cur === "USD" ? "USD" : "CAD";
         const api = (path, init) => fetch("https://api.ynab.com/v1" + path, {
           ...init,
           headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
         });
-        let accountId = (env.YNAB_ACCOUNT_ID || "").trim(), accountName = "";
-        if (!accountId) {
-          const ar = await api("/budgets/last-used/accounts");
-          if (!ar.ok) throw new Error(`YNAB accounts: HTTP ${ar.status}`);
-          const accounts = (await ar.json()).data.accounts
-            .filter((a) => a.on_budget && !a.closed && !a.deleted);
-          if (!accounts.length) throw new Error("YNAB: no open on-budget account");
-          accountId = accounts[0].id; accountName = accounts[0].name;
-        }
+        // Junyan's two spending accounts, found by name so no ids need configuring.
+        const ar = await api("/budgets/last-used/accounts");
+        if (!ar.ok) throw new Error(`YNAB accounts: HTTP ${ar.status}`);
+        const want = `junyan ${currency}`.toLowerCase();
+        const acct = (await ar.json()).data.accounts.find(
+          (a) => !a.closed && !a.deleted && a.name.toLowerCase().includes(want),
+        );
+        if (!acct) throw new Error(`YNAB: no open account named like "Junyan ${currency}"`);
+        const accountId = acct.id, accountName = acct.name;
         const p = parts(new Date());
         const z = (n) => String(n).padStart(2, "0");
         const tr = await api("/budgets/last-used/transactions", {
