@@ -23,51 +23,38 @@
   body {
     font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
     color: var(--ink);
-    /* Calm Countdown design: ink-dark field, each mode a whisper of colour */
-    background: radial-gradient(120% 90% at 50% 0%, #182030 0%, #10151f 55%, #0b0e15 100%);
+    background: linear-gradient(180deg, #8a7fc4 0%, #6a5fa8 50%, #4a4580 100%);
     transition: background 3s ease;
     user-select:none; -webkit-user-select:none;
   }
-  body.mode-focus { background: radial-gradient(120% 90% at 50% 0%, #172336 0%, #101725 55%, #0b0e16 100%); }
-  body.mode-break { background: radial-gradient(120% 90% at 50% 0%, #14262a 0%, #0f1a1d 55%, #0a0f11 100%); }
-  body.mode-fixed { background: radial-gradient(120% 90% at 50% 0%, #262019 0%, #181410 55%, #0f0c0a 100%); }
-  body.mode-done  { background: radial-gradient(120% 90% at 50% 0%, #251a22 0%, #171017 55%, #0e0a0e 100%); }
+  body.mode-focus { background: linear-gradient(180deg, #5b8fd4 0%, #4a6fa5 45%, #5d5ba8 100%); }
+  body.mode-break { background: linear-gradient(180deg, #6fb98f 0%, #4a8f7b 50%, #3d6b70 100%); }
+  body.mode-fixed { background: linear-gradient(180deg, #d4a45b 0%, #a5764a 45%, #8a5d7a 100%); }
+  body.mode-done  { background: linear-gradient(180deg, #e8a87c 0%, #c97b63 50%, #85506b 100%); }
 
   #app { height:100%; display:flex; flex-direction:column;
     padding: calc(env(safe-area-inset-top) + 16px) 20px calc(env(safe-area-inset-bottom) + 16px); }
 
   button { cursor:pointer; font-family:inherit; }
 
-  /* bottom tab bar — quiet icons over labels, hairline separator (Calm Countdown) */
-  #bar { display:flex; margin-top:12px; padding-top:10px;
-    border-top:1px solid rgba(255,255,255,.08); }
-  #bar button { flex:1; background:none; border:none; color:rgba(255,255,255,.45);
-    display:flex; flex-direction:column; align-items:center; gap:3px; padding:4px 0; }
-  #bar button .ic { font-size:16px; line-height:1; }
-  #bar button .lb { font-size:11px; letter-spacing:.5px; }
-  #bar button:active, #bar button.on { color:var(--ink); }
+  /* floating pill nav — thumb zone (Tiimo / Calm pattern) */
+  #bar { display:flex; gap:6px; margin-top:10px; padding:6px;
+    background:var(--glass); border:1px solid var(--glass-border); border-radius:28px;
+    backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px); }
+  #bar button { flex:1; background:none; border:none; color:var(--ink-soft);
+    border-radius:22px; padding:11px 0; font-size:13.5px; font-weight:500; }
+  #bar button:active, #bar button.on { background:rgba(255,255,255,.18); color:var(--ink); }
+  #bar #add-btn { flex:0 0 46px; font-size:18px; color:var(--ink); }
 
-  #stage { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; min-height:0; }
-  /* the quote floats at the top, lowercase and letter-spaced */
-  #mantra { font-size:14px; color:rgba(255,255,255,.5); letter-spacing:3px; text-align:center;
-    text-transform:lowercase; min-height:20px; transition:opacity 1.2s ease; padding:0 10px;
-    margin:14px 0 auto; }
-  /* block label lives inside the orb, small caps under the time */
-  #block-label { font-size:12px; color:rgba(255,255,255,.55); letter-spacing:3px; text-transform:uppercase;
-    text-align:center; max-width:85%; }
-  /* meta line under the orb: "now · until 8:00 pm" */
-  #meta { font-size:14px; color:rgba(255,255,255,.45); text-align:center; min-height:18px; letter-spacing:.4px; }
-  /* later-today card pinned toward the bottom */
-  #later { margin-top:auto; width:min(84vw, 340px); }
-  .sect { font-size:11px; letter-spacing:2.5px; text-transform:uppercase; color:rgba(255,255,255,.35);
-    margin-bottom:8px; }
-  #next-up { display:flex; align-items:center; gap:16px; min-height:20px;
-    background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.08);
-    border-radius:14px; padding:14px 16px; font-size:14.5px; }
-  #next-up:empty, #next-up.none { display:none; }
-  #later.none { visibility:hidden; }
-  #next-time { color:rgba(255,255,255,.45); flex-shrink:0; font-variant-numeric:tabular-nums; }
-  #next-name { color:var(--ink); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  #stage { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; min-height:0; }
+  #mantra { font-size:16px; color:var(--ink-soft); letter-spacing:.3px; text-align:center;
+    text-shadow:0 1px 14px rgba(20,25,60,.65);
+    min-height:22px; transition:opacity 1.2s ease; padding:0 10px; }
+  #block-label { font-size:14px; color:var(--ink-faint); letter-spacing:1.5px; text-transform:uppercase;
+    text-shadow:0 1px 12px rgba(20,25,60,.65);
+    text-align:center; max-width:90%; }
+  #next-up { font-size:13px; color:var(--ink-faint); text-align:center; min-height:18px;
+    text-shadow:0 1px 12px rgba(20,25,60,.65); }
 
   #orb-wrap { position:relative; width:min(68vw, 280px); aspect-ratio:1; margin:10px 0; }
   /* aura canvas is the centerpiece — the old ring stays in the DOM but hidden */
@@ -75,8 +62,8 @@
   #app { position:relative; z-index:1; }
   #ring { position:absolute; inset:0; transform:rotate(-90deg); }
   #ring circle { fill:none; stroke-width:3; }
-  #ring .track { stroke:rgba(255,255,255,.08); }
-  #ring .progress { stroke:rgba(255,255,255,.55); stroke-linecap:round; transition:stroke-dashoffset 1s linear; }
+  #ring .track { stroke:rgba(255,255,255,.15); }
+  #ring .progress { stroke:rgba(255,255,255,.85); stroke-linecap:round; transition:stroke-dashoffset 1s linear; }
   #orb { position:absolute; inset:14%; border-radius:50%;
     background: radial-gradient(circle at 35% 35%, rgba(255,255,255,.35), rgba(255,255,255,.08) 60%, rgba(255,255,255,.02));
     border:1px solid rgba(255,255,255,.25);
@@ -96,12 +83,13 @@
   #time { font-size:48px; font-weight:200; letter-spacing:1px; font-variant-numeric:tabular-nums; }
   #time-sub { font-size:12px; color:var(--ink-faint); letter-spacing:1px; }
 
-  #controls { display:flex; align-items:center; gap:12px; margin-top:8px; }
-  .ctl { background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.10); color:var(--ink);
-    border-radius:16px; min-width:74px; height:48px; padding:0 20px; font-size:15px;
+  #controls { display:flex; align-items:center; gap:14px; margin-top:4px; }
+  .ctl { background:var(--glass); border:1px solid var(--glass-border); color:var(--ink);
+    border-radius:26px; min-width:52px; height:52px; padding:0 14px; font-size:14px;
     backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
     display:flex; align-items:center; justify-content:center; }
-  .ctl:active { background:rgba(255,255,255,.14); }
+  .ctl.big { width:68px; height:68px; border-radius:50%; padding:0; font-size:22px;
+    background:rgba(255,255,255,.9); color:#3a4a6b; border:none; }
 
   /* sheets + modals */
   #tsheet { position:fixed; left:0; right:0; bottom:0; max-height:84%;
@@ -196,29 +184,26 @@
 <canvas id="aura"></canvas>
 <div id="app">
   <div id="stage">
-    <div id="mantra">take a deep breath</div>
+    <div id="block-label"></div>
     <div id="orb-wrap">
       <svg id="ring" viewBox="0 0 100 100">
         <circle class="track" cx="50" cy="50" r="47"></circle>
         <circle class="progress" cx="50" cy="50" r="47" stroke-dasharray="295.3" stroke-dashoffset="295.3"></circle>
       </svg>
-      <div id="orb"><div id="time">--:--</div><div id="block-label"></div><div id="time-sub"></div></div>
+      <div id="orb"><div id="time">--:--</div><div id="time-sub"></div></div>
     </div>
-    <div id="meta"></div>
+    <div id="mantra">take a deep breath</div>
+    <div id="next-up"></div>
     <div id="controls">
       <button class="ctl" id="ext-btn" title="give this block 15 more minutes">+15</button>
-      <button class="ctl" id="now-btn" title="pause / resume">❚❚</button>
+      <button class="ctl big" id="now-btn" title="back to now">◉</button>
       <button class="ctl" id="done-btn" title="finished early">done</button>
-    </div>
-    <div id="later">
-      <div class="sect">later today</div>
-      <div id="next-up"><span id="next-time"></span><span id="next-name"></span></div>
     </div>
   </div>
   <nav id="bar">
-    <button id="tasks-btn"><span class="ic">☑</span><span class="lb">tasks</span></button>
-    <button id="add-btn" title="slot something in now"><span class="ic">＋</span><span class="lb">add</span></button>
-    <button id="day-btn"><span class="ic">☼</span><span class="lb">my day</span></button>
+    <button id="tasks-btn">☑ tasks</button>
+    <button id="add-btn" title="slot something in now">＋</button>
+    <button id="day-btn">☼ my day</button>
   </nav>
 </div>
 
@@ -317,10 +302,9 @@ const PLAN = {
 // STILL:PLAN:END
 
 (() => {
-  /* short Sadhguru-inspired lines, a few words each (Calm Countdown design) */
-  const FOCUS_MANTRAS = ["be, simply be","this moment is inevitable","involve yourself absolutely","one thing, totally","do it willingly","stay with it, gently"];
-  const BREAK_MANTRAS = ["be, simply be","sit quietly, do nothing","let the breath breathe you","look far away","release your shoulders"];
-  const FIXED_MANTRAS = ["be where your feet are","this moment is all there is","present and unhurried"];
+  const FOCUS_MANTRAS = ["settle into this moment","one thing, softly held","let the rest wait","breathe in, begin","stay with it, gently","this block is enough"];
+  const BREAK_MANTRAS = ["release your shoulders","look far away","take a slow breath","stand, stretch, soften","let your mind wander"];
+  const FIXED_MANTRAS = ["be where your feet are","this, fully","present and unhurried"];
   const CIRC = 295.3;
   const $ = id => document.getElementById(id);
   const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
@@ -426,7 +410,7 @@ const PLAN = {
     const now = pausedAt || new Date();
     const blocks = allBlocks();
     let idx = manualIdx !== null ? Math.min(manualIdx, blocks.length-1) : currentIdx(blocks, now);
-    let phase, label, remaining=0, total=0, sub="", meta="", nextB=null;
+    let phase, label, remaining=0, total=0, sub="", next="";
 
     if (idx === -1) {
       const ni = nextIdx(blocks, now);
@@ -434,8 +418,8 @@ const PLAN = {
       else {
         phase="break"; label="open space";
         remaining = total = (blocks[ni].s - now)/1000;
-        meta = "open · until " + fmtT(blocks[ni].s);
-        nextB = blocks[ni];
+        sub = "until " + fmtT(blocks[ni].s);
+        next = `next · ${blocks[ni].t} at ${fmtT(blocks[ni].s)}`;
       }
     } else {
       const b = blocks[idx];
@@ -444,8 +428,7 @@ const PLAN = {
       total = (b.e - b.s)/1000;
       remaining = Math.max(0, (b.e - now)/1000);
       sub = (b.type === "break") ? "rest" : "";
-      meta = "now · until " + fmtT(b.e);
-      if (blocks[idx+1]) nextB = blocks[idx+1];
+      if (blocks[idx+1]) next = `next · ${blocks[idx+1].t} at ${fmtT(blocks[idx+1].s)}`;
     }
 
     const k = phase + ":" + label;
@@ -457,11 +440,8 @@ const PLAN = {
     $("time").textContent = phase === "done" ? "☺" : fmtC(remaining);
     $("time-sub").textContent = sub;
     $("block-label").textContent = label;
-    $("next-time").textContent = nextB ? fmtT(nextB.s) : "";
-    $("next-name").textContent = nextB ? nextB.t : "";
-    $("later").classList.toggle("none", !nextB);
+    $("next-up").textContent = next;
     document.body.className = "mode-" + (phase === "fixed" ? "fixed" : phase) + (pausedAt ? "" : " running");
-    $("meta").textContent = meta;
     $("now-btn").textContent = pausedAt ? "▶" : "❚❚";
     document.querySelector("#ring .progress").style.strokeDashoffset = total ? CIRC*(remaining/total) : CIRC;
   }
@@ -735,8 +715,7 @@ const PLAN = {
       $("block-label").textContent = "today's plan is on its way";
       $("time").textContent = "…";
       $("time-sub").textContent = "";
-      $("meta").textContent = "pull down to refresh";
-      $("later").classList.add("none");
+      $("next-up").textContent = "pull down to refresh";
     }
   }, 1000);
   let wakeLock;
