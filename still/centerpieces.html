@@ -304,8 +304,8 @@
         // phases drift with time so the lobes swirl slowly around the center
         const base = L.r * scale * (1 + energy * .07);
         // each band's center drifts on its own small orbit — the layered-paper swirl
-        const ox = cx + Math.cos(t/L.t1 + L.ph) * base * .05;
-        const oy = cy + Math.sin(t/L.t2 + L.ph) * base * .05;
+        const ox = cx + Math.cos(t/L.t1 + L.ph) * base * .025;
+        const oy = cy + Math.sin(t/L.t2 + L.ph) * base * .025;
         cx2d.beginPath();
         for (let a = 0; a <= Math.PI*2 + .01; a += Math.PI/48) {
           const wob = 1
@@ -319,7 +319,7 @@
         if (L.c1) {
           // vibrant band: near-opaque fill, highlight rim on the slowly rotating light side
           const la = t/6000 + L.ph;                     // light angle drifts
-          const hx = ox + Math.cos(la)*base*.45, hy = oy + Math.sin(la)*base*.45;
+          const hx = ox + Math.cos(la)*base*.3, hy = oy + Math.sin(la)*base*.3;
           const g = cx2d.createRadialGradient(hx, hy, base*.1, ox, oy, base*1.15);
           g.addColorStop(0, L.c0);
           g.addColorStop(.55, L.c1);
@@ -342,11 +342,11 @@
 
   auraSetup("s6", "c6", [
     // vibrant near-opaque bands sampled from the Calm Sleep video frames
-    { r:330, c0:"#7d9bee", c1:"#5d7ed6", w1:.06, w2:.04, t1:5200, t2:6800, ph:0,   blur:14 },
-    { r:262, c0:"#a9c0f2", c1:"#8fa9e8", w1:.07, w2:.05, t1:6000, t2:5000, ph:1.7, blur:12 },
-    { r:200, c0:"#fdeee0", c1:"#f3d9c8", w1:.07, w2:.05, t1:4800, t2:6200, ph:3.1, blur:10 },
-    { r:148, c0:"#f8cab4", c1:"#f0b39e", w1:.08, w2:.06, t1:5600, t2:4400, ph:4.4, blur:9  },
-    { r:102, c0:"#f6b3a0", c1:"#eb9284", w1:.09, w2:.06, t1:4200, t2:5800, ph:5.6, blur:8  },
+    { r:330, c0:"#7d9bee", c1:"#5d7ed6", w1:.035, w2:.02, t1:5200, t2:6800, ph:0,   blur:14 },
+    { r:262, c0:"#a9c0f2", c1:"#8fa9e8", w1:.04, w2:.025, t1:6000, t2:5000, ph:1.7, blur:12 },
+    { r:200, c0:"#fdeee0", c1:"#f3d9c8", w1:.04, w2:.025, t1:4800, t2:6200, ph:3.1, blur:10 },
+    { r:148, c0:"#f8cab4", c1:"#f0b39e", w1:.045, w2:.03, t1:5600, t2:4400, ph:4.4, blur:9  },
+    { r:102, c0:"#f6b3a0", c1:"#eb9284", w1:.05, w2:.03, t1:4200, t2:5800, ph:5.6, blur:8  },
   ], (x, cx, cy, t, en) => {
     // sunburst core: coral disc, 8 translucent spokes, white heart
     const R = 62 * (1 + en*.12);
