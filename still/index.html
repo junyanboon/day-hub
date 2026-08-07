@@ -582,12 +582,12 @@ const PLAN = {
     const total = items.reduce((s,i) => s + i.amt, 0);
     $("sp-total").textContent = "$" + total.toFixed(2);
     $("sp-count").textContent = items.length
-      ? `${items.length} item${items.length > 1 ? "s" : ""} today`
+      ? `${items.length} item${items.length > 1 ? "s" : ""} today · ✓ = in YNAB`
       : "nothing yet today";
     $("sp-list").innerHTML = items.map((i,n) => `
       <div class="sp-item">
         <span class="sp-n">${esc(i.name)}</span>
-        <span class="sp-t">${esc(i.at)}</span>
+        <span class="sp-t">${esc(i.at)}${i.ynab ? " ✓" : i.ynab === false ? " ⚠︎" : ""}</span>
         <span class="sp-a">$${i.amt.toFixed(2)}</span>
         <button class="sp-x" data-n="${n}" title="remove">✕</button>
       </div>`).join("");
@@ -595,14 +595,32 @@ const PLAN = {
       el.onclick = () => { const a = spLoad(); a.splice(+el.dataset.n, 1); spSave(a); renderSpent(); };
     });
   }
-  $("sp-add").onclick = () => {
+  /* every entry is pushed to YNAB the moment it's added (via still-api, which
+     holds the token). ✓ = landed in YNAB, ⚠︎ = couldn't reach it (kept locally). */
+  async function pushSpent(item){
+    try {
+      const r = await fetch(STILL_API.replace("/plan", "/spent"), {
+        method:"POST", headers:{ "Content-Type":"application/json" },
+        body: JSON.stringify({ name: item.name, amt: item.amt }),
+      });
+      if (!r.ok) throw new Error();
+      const d = await r.json();
+      return d.ok === true;
+    } catch { return false; }
+  }
+  $("sp-add").onclick = async () => {
     const name = $("sp-name").value.trim();
     const amt = parseFloat($("sp-amt").value.replace(/[^0-9.]/g, ""));
     if (!name || !(amt > 0)) return;
+    const item = { name, amt, at: fmtT(new Date()) };
     const a = spLoad();
-    a.push({ name, amt, at: fmtT(new Date()) });
-    spSave(a);
+    a.push(item); spSave(a);
     $("sp-name").value = ""; $("sp-amt").value = "";
+    renderSpent();
+    const ok = await pushSpent(item);
+    const b = spLoad();
+    const mine = b.find(x => x.at === item.at && x.name === item.name && x.amt === item.amt && x.ynab === undefined);
+    if (mine) { mine.ynab = ok; spSave(b); }
     renderSpent();
   };
   $("sp-amt").addEventListener("keydown", e => { if (e.key === "Enter") $("sp-add").onclick(); });

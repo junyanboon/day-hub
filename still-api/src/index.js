@@ -342,7 +342,53 @@ export default {
         configured: CALS.every((c) => !!(env[c.secret] || "").trim()),
         tasksConfigured: !!(env.NOTION_TOKEN || "").trim(),
         ouraConfigured: !!(env.OURA_TOKEN || "").trim(),
+        ynabConfigured: !!(env.YNAB_TOKEN || "").trim(),
       }), { headers });
+    }
+
+    if (url.pathname === "/spent" && request.method === "POST") {
+      // Log a Spent-today entry straight into YNAB as an uncleared outflow.
+      // Budget: last-used. Account: YNAB_ACCOUNT_ID env var if set, otherwise
+      // the first open on-budget account (reported back so it can be pinned).
+      try {
+        const token = (env.YNAB_TOKEN || "").trim();
+        if (!token) throw new Error("YNAB_TOKEN not configured");
+        const { name, amt } = await request.json();
+        if (!name || !(amt > 0) || amt > 100000) throw new Error("bad name/amt");
+        const api = (path, init) => fetch("https://api.ynab.com/v1" + path, {
+          ...init,
+          headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        });
+        let accountId = (env.YNAB_ACCOUNT_ID || "").trim(), accountName = "";
+        if (!accountId) {
+          const ar = await api("/budgets/last-used/accounts");
+          if (!ar.ok) throw new Error(`YNAB accounts: HTTP ${ar.status}`);
+          const accounts = (await ar.json()).data.accounts
+            .filter((a) => a.on_budget && !a.closed && !a.deleted);
+          if (!accounts.length) throw new Error("YNAB: no open on-budget account");
+          accountId = accounts[0].id; accountName = accounts[0].name;
+        }
+        const p = parts(new Date());
+        const z = (n) => String(n).padStart(2, "0");
+        const tr = await api("/budgets/last-used/transactions", {
+          method: "POST",
+          body: JSON.stringify({ transaction: {
+            account_id: accountId,
+            date: `${p.y}-${z(p.m)}-${z(p.d)}`,
+            amount: -Math.round(amt * 1000),   // milliunits, outflow
+            payee_name: String(name).slice(0, 100),
+            memo: "via Still · Spent today",
+            cleared: "uncleared",
+          } }),
+        });
+        if (!tr.ok) throw new Error(`YNAB create: HTTP ${tr.status} ${(await tr.text()).slice(0, 200)}`);
+        const created = (await tr.json()).data.transaction;
+        return new Response(JSON.stringify({
+          ok: true, id: created.id, account: accountName || created.account_name || accountId,
+        }), { headers });
+      } catch (err) {
+        return new Response(JSON.stringify({ error: String(err.message || err) }), { status: 502, headers });
+      }
     }
 
     if (url.pathname === "/sleep") {
