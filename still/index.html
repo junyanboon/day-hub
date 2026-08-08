@@ -19,7 +19,10 @@
     --glass-border: rgba(255,255,255,.18);
   }
   * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
-  html, body { height:100%; overflow:hidden; }
+  /* the gradient lives on html too, so the area behind the home-indicator
+     inset stays dark instead of showing a white bar */
+  html { height:100%; overflow:hidden; background:#4a4580; }
+  body { height:100%; overflow:hidden; }
   body {
     font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
     color: var(--ink);
@@ -77,9 +80,8 @@
   body.running #orb { animation:breathe 8s ease-in-out infinite; }
   @keyframes breathe { 0%,100%{transform:scale(.94);} 50%{transform:scale(1.04);} }
   @media (prefers-reduced-motion: reduce) { body.running #orb { animation:none; } }
-  /* at night the moon takes the orb's place; keep the time, drop the glass chrome */
-  body.night #ring { visibility:hidden; }
-  body.night #orb { background:none; border:none; animation:none; }
+  /* night keeps the orb — only the field behind it goes dark and quiet */
+  body.night { background: linear-gradient(180deg, #2b3160 0%, #232850 50%, #191d3c 100%); }
   #time { font-size:48px; font-weight:200; letter-spacing:1px; font-variant-numeric:tabular-nums; }
   #time-sub { font-size:12px; color:var(--ink-faint); letter-spacing:1px; }
 
@@ -113,6 +115,8 @@
   .task.done-t .t-name { text-decoration:line-through; }
   .task .t-name { flex:1; font-size:14.5px; min-width:0; line-height:1.35;
     display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+  .task.t-more { justify-content:center; background:none; border-style:dashed; }
+  .task.t-more .t-name { flex:0; white-space:nowrap; color:var(--ink-soft); font-size:13px; }
   .task .t-tag { font-size:10px; letter-spacing:.6px; text-transform:uppercase; color:var(--ink-faint);
     flex-shrink:0; text-align:right; line-height:1.3; max-width:62px; }
   #sheet { position:fixed; left:0; right:0; bottom:0; max-height:84%;
@@ -265,7 +269,7 @@
 <!-- focus sheet: what to do during work blocks (Tasks Inbox) -->
 <div id="tsheet">
   <div class="handle"></div>
-  <h2>Focus on what matters</h2>
+  <h2>Your three</h2>
   <div class="sub" id="tmeta">Open tasks from your Tasks Inbox. Tap to clear.</div>
   <div id="tlist"></div>
 </div>
@@ -546,21 +550,36 @@ const PLAN = {
       return true;
     } catch { return false; }
   }
+  /* Focus opens on the three that matter — the inbox order already puts Next
+     Action first, then priority. "show everything" reveals the rest. */
+  let showAllTasks = false;
   function renderTasks(){
     if (!tasksLoaded) { $("tmeta").textContent = "Reaching your Tasks Inbox…"; $("tlist").innerHTML = ""; return; }
     const open = tasks.filter(t => !t.done);
+    // the three, plus anything already ticked this session so it doesn't vanish
+    const top3 = new Set(open.slice(0, 3));
+    const shown = showAllTasks ? tasks : tasks.filter(t => top3.has(t) || t.done);
     $("tmeta").textContent = open.length
-      ? `${open.length} open · tap to clear — cleared tasks are marked Done in your Tasks Inbox`
+      ? (showAllTasks
+          ? `${open.length} open · tap to clear`
+          : `your three · ${open.length} open in the inbox`)
       : "Inbox clear. Breathe.";
-    $("tlist").innerHTML = tasks.map((t,i) => `
-      <button class="task ${t.done ? "done-t" : ""}" data-i="${i}">
+    $("tlist").innerHTML = shown.map(t => `
+      <button class="task ${t.done ? "done-t" : ""}" data-i="${tasks.indexOf(t)}">
         <span class="box">${t.done ? "✓" : ""}</span>
         <span class="t-name">${esc(t.task)}</span>
         <span class="t-tag">${esc((t.priority || "").replace(/[^\p{Emoji}]/gu, ""))} ${esc(t.estimate || "")}</span>
-      </button>`).join("");
-    document.querySelectorAll("#tlist .task").forEach(el => {
+      </button>`).join("")
+      + (open.length > 3
+          ? `<button class="task t-more" id="t-more">
+               <span class="t-name">${showAllTasks ? "just my three" : `show everything (${open.length - 3} more)`}</span>
+             </button>`
+          : "");
+    document.querySelectorAll("#tlist .task[data-i]").forEach(el => {
       el.onclick = () => toggleTask(+el.dataset.i);
     });
+    const more = $("t-more");
+    if (more) more.onclick = () => { showAllTasks = !showAllTasks; renderTasks(); };
   }
   async function toggleTask(i){
     const t = tasks[i];
@@ -752,105 +771,21 @@ const PLAN = {
     document.addEventListener("visibilitychange", () => { if (!document.hidden) pullSleep(); });
   })();
 
-  /* ---------- night moon ----------
-     After 22:00 (until 05:00) device-local, the breathing orb yields to the
-     textured full moon on a dark indigo field. Daytime keeps the classic orb. */
+  /* ---------- night ----------
+     After 22:00 (until 05:00) device-local the field goes dark and quiet, but
+     the orb stays — text has to stay readable, which the moon never allowed.
+     The canvas is unused now; it stays in the DOM for future centerpieces. */
   (() => {
     const cv = $("aura"), x = cv.getContext("2d");
     function size(){ cv.width = innerWidth * devicePixelRatio; cv.height = innerHeight * devicePixelRatio; }
     size(); addEventListener("resize", size);
-
-    let moonTex = null;
-    function drawMoon(cx, cy, R){
-      if (!moonTex) {
-        const S = 560, o = document.createElement("canvas");
-        o.width = o.height = S;
-        const g = o.getContext("2d"), r0 = S/2 - 6;
-        const mg = g.createRadialGradient(S*.38, S*.36, r0*.1, S/2, S/2, r0);
-        // dimmed for night eyes — a moon seen through air, not a lamp
-        mg.addColorStop(0, "#b9bdd2"); mg.addColorStop(.75, "#8f94b2"); mg.addColorStop(1, "#5f6488");
-        g.beginPath(); g.arc(S/2, S/2, r0, 0, Math.PI*2); g.fillStyle = mg; g.fill();
-        g.save(); g.beginPath(); g.arc(S/2, S/2, r0, 0, Math.PI*2); g.clip();
-        for (let i=0; i<9; i++) {
-          const a = Math.random()*Math.PI*2, d = Math.sqrt(Math.random())*r0*.8;
-          const bx = S/2 + Math.cos(a)*d, by = S/2 + Math.sin(a)*d;
-          const br = r0*(.22 + Math.random()*.3);
-          const bg = g.createRadialGradient(bx, by, br*.2, bx, by, br);
-          bg.addColorStop(0, "rgba(104,112,152,.14)"); bg.addColorStop(1, "rgba(0,0,0,0)");
-          g.fillStyle = bg;
-          g.beginPath(); g.ellipse(bx, by, br, br*(.6+Math.random()*.4), Math.random()*Math.PI, 0, Math.PI*2); g.fill();
-        }
-        for (let i=0; i<70; i++) {
-          const a = Math.random()*Math.PI*2, d = Math.sqrt(Math.random())*r0;
-          const bx = S/2 + Math.cos(a)*d, by = S/2 + Math.sin(a)*d;
-          const br = 2 + Math.random()*9;
-          const bg = g.createRadialGradient(bx, by, 0, bx, by, br);
-          bg.addColorStop(0, Math.random() < .5 ? "rgba(96,104,146,.10)" : "rgba(255,255,255,.10)");
-          bg.addColorStop(1, "rgba(0,0,0,0)");
-          g.fillStyle = bg;
-          g.beginPath(); g.arc(bx, by, br, 0, Math.PI*2); g.fill();
-        }
-        const lg = g.createRadialGradient(S/2, S/2, r0*.55, S/2, S/2, r0);
-        lg.addColorStop(0, "rgba(0,0,0,0)"); lg.addColorStop(1, "rgba(28,32,64,.5)");
-        g.fillStyle = lg; g.beginPath(); g.arc(S/2, S/2, r0, 0, Math.PI*2); g.fill();
-        g.restore();
-        moonTex = o;
-      }
-      x.drawImage(moonTex, cx - R, cy - R, R*2, R*2);
-    }
-
-    (function loop(t){
-      const w = innerWidth, h = innerHeight;
+    (function loop(){
       const hour = new Date().getHours();
-      const night = hour >= 22 || hour < 5;
-      document.body.classList.toggle("night", night);
+      document.body.classList.toggle("night", hour >= 22 || hour < 5);
       x.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);
-      if (!night) {
-        x.clearRect(0,0,w,h);        // daytime: the orb owns the stage
-        requestAnimationFrame(loop);
-        return;
-      }
-      const wrap = document.getElementById("orb-wrap").getBoundingClientRect();
-      const cx = wrap.left + wrap.width/2, cy = wrap.top + wrap.height/2;
-      const en = .5 + .5 * Math.sin(t/4500 * Math.PI - Math.PI/2);
-      x.fillStyle = "#1d2140";
-      x.fillRect(0,0,w,h);
-      const R = Math.min(wrap.width, wrap.height) * .5 * (1 + en*.04);
-      // soft aura bands swirl behind the moon (study 07)
-      const scale = Math.min(w, h) / 390;
-      const bands = [
-        { r:330, c:"rgba(52,62,116,",   a0:.18, w1:.04, w2:.03, t1:3400, t2:4200, ph:.6,  blur:24 },
-        { r:250, c:"rgba(74,84,142,",   a0:.18, w1:.05, w2:.03, t1:3800, t2:3000, ph:2.2, blur:20 },
-        { r:185, c:"rgba(104,112,166,", a0:.20, w1:.05, w2:.04, t1:3000, t2:3600, ph:3.6, blur:16 },
-      ];
-      for (const L of bands) {
-        const base = L.r * scale * (1 + en * .07);
-        const ox = cx + Math.cos(t/L.t1 + L.ph) * base * .025;
-        const oy = cy + Math.sin(t/L.t2 + L.ph) * base * .025;
-        x.beginPath();
-        for (let a = 0; a <= Math.PI*2 + .01; a += Math.PI/48) {
-          const wob = 1 + L.w1*Math.sin(a*3 + t/L.t1 + L.ph) + L.w2*Math.sin(a*5 - t/L.t2 + L.ph*2);
-          const r = base * wob;
-          const px = ox + Math.cos(a)*r, py = oy + Math.sin(a)*r;
-          a === 0 ? x.moveTo(px,py) : x.lineTo(px,py);
-        }
-        x.closePath();
-        const g = x.createRadialGradient(ox, oy, base*.2, ox, oy, base*1.15);
-        g.addColorStop(0, L.c + (L.a0 + en*.05) + ")");
-        g.addColorStop(1, L.c + "0)");
-        x.fillStyle = g;
-        x.filter = "blur(" + L.blur + "px)";
-        x.fill();
-        x.filter = "none";
-      }
-      const glow = x.createRadialGradient(cx, cy, R*.6, cx, cy, R*2.1);
-      glow.addColorStop(0, "rgba(200,208,240," + (.10 + en*.10) + ")");
-      glow.addColorStop(1, "rgba(200,208,240,0)");
-      x.fillStyle = glow;
-      x.beginPath(); x.arc(cx, cy, R*2.1, 0, Math.PI*2); x.fill();
-      drawMoon(cx, cy, R);
+      x.clearRect(0,0,innerWidth,innerHeight);
       requestAnimationFrame(loop);
-    })(0);
+    })();
   })();
 })();
 </script>
