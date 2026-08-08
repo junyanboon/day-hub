@@ -210,20 +210,19 @@ uses intensity 3. Responses cache 30 min.
 Design studies that led here: still/centerpieces.html (7 interactive
 centerpiece prototypes, kept for reference).
 
-## Still — Spent tab (YNAB)
+## Still — Spent tab (removed 2026-08-07)
 
-The bottom bar is Now / Focus / Spent / Schedule (Calm Countdown design).
-Spent is a money-spent-today list, per-day in localStorage — and every entry
-is pushed to YNAB the moment it's added, via `POST /spent` on still-api:
-uncleared outflow in the **last-used budget**, payee = entry name, memo
-"via Still · Spent today". Account: `YNAB_ACCOUNT_ID` env var if set in
-wrangler.toml, else the first open on-budget account. Removing a row in the
-app does NOT delete the YNAB transaction (do that in YNAB).
+The bottom bar is Now / Focus / Schedule (Calm Countdown design; quick-add is
+the ＋ pill under the orb). A fourth **Spent** tab briefly logged same-day
+spending into YNAB and was removed the same evening — the reason is worth
+keeping, since it kills the idea rather than the implementation:
 
-Worker secret needed once: `YNAB_TOKEN` — a personal access token from
-app.ynab.com → Account Settings → Developer. Set with:
+**YNAB's API only exposes a transaction once it POSTS.** Card charges sitting
+as *pending* in the YNAB app are invisible to `/transactions`, so "what did I
+spend today" was reliably empty on the days it mattered, while manual entries
+duplicated what the bank feed would import a day or two later.
 
-    cd still-api && npx wrangler secret put YNAB_TOKEN
-
-`/health` shows `ynabConfigured`; until set, entries save locally with a ⚠︎
-and nothing reaches YNAB.
+The Worker keeps the routes (`POST /spent`, `GET /spent/today`,
+`GET /spent/accounts`) and the `YNAB_TOKEN` secret is set, so this can be
+revived from the app side alone. `/health` reports `ynabConfigured`. Budgets
+are found by name — 🇨🇦Junyan CAD / 🇺🇸Junyan USD, archived copies excluded.

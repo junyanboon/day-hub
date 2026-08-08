@@ -100,46 +100,6 @@
     padding:14px 20px calc(env(safe-area-inset-bottom) + 16px); z-index:10; }
   #tsheet.open { transform:translateY(0); }
   #tsheet .handle { width:36px; height:4px; border-radius:2px; background:var(--ink-faint); margin:0 auto 14px; }
-  /* spent sheet — same glass shell as the others */
-  #ssheet { position:fixed; left:0; right:0; bottom:0; max-height:84%;
-    background:rgba(30,35,60,.8); backdrop-filter:blur(24px); -webkit-backdrop-filter:blur(24px);
-    border-radius:24px 24px 0 0; border-top:1px solid var(--glass-border);
-    transform:translateY(100%); transition:transform .35s cubic-bezier(.3,.9,.3,1);
-    display:flex; flex-direction:column;
-    padding:14px 20px calc(env(safe-area-inset-bottom) + 16px); z-index:10; }
-  #ssheet.open { transform:translateY(0); }
-  #ssheet .handle { width:36px; height:4px; border-radius:2px; background:var(--ink-faint); margin:0 auto 14px; }
-  #ssheet h2 { font-size:17px; font-weight:600; margin-bottom:2px; text-align:center; }
-  #ssheet .sub { font-size:12.5px; color:var(--ink-soft); margin-bottom:12px; }
-  #sp-total { font-size:44px; font-weight:200; text-align:center; margin:8px 0 2px; font-variant-numeric:tabular-nums; }
-  #sp-list { overflow-y:auto; display:flex; flex-direction:column; gap:6px; margin-top:4px; }
-  .sp-sect { font-size:11px; letter-spacing:2px; text-transform:uppercase; color:var(--ink-faint);
-    margin:10px 0 2px; }
-  .sp-item { display:flex; align-items:center; gap:12px; border-radius:13px; padding:12px 13px;
-    background:var(--glass); border:1px solid var(--glass-border); }
-  .sp-item .sp-n { flex:1; min-width:0; font-size:14.5px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .sp-item .sp-t { font-size:11px; color:var(--ink-faint); flex-shrink:0; }
-  .sp-item .sp-a { font-size:14.5px; font-variant-numeric:tabular-nums; flex-shrink:0; }
-  .sp-item .sp-x { background:none; border:none; color:var(--ink-faint); font-size:15px; padding:2px 4px; }
-  #sp-row { display:flex; gap:8px; margin-top:12px; }
-  #sp-row input { flex:1; min-width:0; background:var(--glass); border:1px solid var(--glass-border);
-    border-radius:13px; padding:12px 13px; color:var(--ink); font-size:14.5px; font-family:inherit; outline:none; }
-  #sp-row #sp-amt { flex:0 0 70px; }
-  #sp-row #sp-cur { flex:0 0 58px; background:var(--glass); border:1px solid var(--glass-border);
-    border-radius:13px; color:var(--ink-soft); font-size:12.5px; font-weight:600; letter-spacing:.5px; }
-  #sp-row #sp-cur.usd { color:var(--ink); background:rgba(255,255,255,.22); }
-  #sp-row #sp-add { background:rgba(255,255,255,.9); color:#3a4a6b; border:none; border-radius:13px;
-    padding:0 18px; font-size:14.5px; font-weight:600; }
-  #sp-acct { margin-top:8px; width:100%; background:var(--glass); border:1px solid var(--glass-border);
-    border-radius:13px; padding:12px 13px; color:var(--ink-soft); font-size:13.5px; font-family:inherit;
-    outline:none; -webkit-appearance:none; appearance:none; }
-  #sp-acct.hide { display:none; }
-  /* favourite-card chips: recently used accounts from BOTH budgets, one tap each */
-  #sp-chips { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
-  .sp-chip { background:var(--glass); border:1px solid var(--glass-border); color:var(--ink-soft);
-    border-radius:12px; padding:8px 11px; font-size:12.5px; max-width:46%;
-    overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .sp-chip.on { background:rgba(255,255,255,.9); color:#3a4a6b; border-color:transparent; font-weight:600; }
   #tsheet h2 { font-size:17px; font-weight:600; margin-bottom:2px; }
   #tsheet .sub { font-size:12.5px; color:var(--ink-soft); margin-bottom:12px; }
   #tlist { overflow-y:auto; flex:1; display:flex; flex-direction:column; gap:6px; }
@@ -244,7 +204,6 @@
   <nav id="bar">
     <button id="now-tab" class="on"><span class="ic">◔</span><span class="lb">Now</span></button>
     <button id="tasks-btn"><span class="ic">✳</span><span class="lb">Focus</span></button>
-    <button id="spent-btn"><span class="ic">◈</span><span class="lb">Spent</span></button>
     <button id="day-btn"><span class="ic">☰</span><span class="lb">Schedule</span></button>
   </nav>
 </div>
@@ -309,23 +268,6 @@
   <h2>Focus on what matters</h2>
   <div class="sub" id="tmeta">Open tasks from your Tasks Inbox. Tap to clear.</div>
   <div id="tlist"></div>
-</div>
-
-<!-- spent sheet: money spent today (Calm Countdown), lives in localStorage -->
-<div id="ssheet">
-  <div class="handle"></div>
-  <h2>Spent today</h2>
-  <div id="sp-total">$0.00</div>
-  <div class="sub" id="sp-count" style="text-align:center">nothing yet today</div>
-  <div id="sp-list"></div>
-  <div id="sp-row">
-    <input id="sp-name" placeholder="What was it?" autocomplete="off">
-    <input id="sp-amt" placeholder="$" inputmode="decimal" autocomplete="off">
-    <button id="sp-cur" title="currency">CAD</button>
-    <button id="sp-add">Add</button>
-  </div>
-  <div id="sp-chips"></div>
-  <select id="sp-acct" title="which account this goes to in YNAB" class="hide"></select>
 </div>
 
 <div id="sheet">
@@ -576,7 +518,7 @@ const PLAN = {
     if (cur) cur.scrollIntoView({block:"center"});
   }
   const syncScrim = () => {
-    const any = ["sheet","tsheet","ssheet"].some(id => $(id).classList.contains("open"));
+    const any = ["sheet","tsheet"].some(id => $(id).classList.contains("open"));
     $("scrim").classList.toggle("show", any);
     $("now-tab").classList.toggle("on", !any);
   };
@@ -585,173 +527,12 @@ const PLAN = {
     $("day-btn").classList.toggle("on", v);
     if (v) {
       $("tsheet").classList.remove("open"); $("tasks-btn").classList.remove("on");
-      $("ssheet").classList.remove("open"); $("spent-btn").classList.remove("on");
       renderTimeline(); refreshLive();
     }
     syncScrim();
   };
 
-  /* ---------- spent sheet: money spent today (device-local) ---------- */
-  const spKey = () => "still-spent-" + new Date().toDateString();
-  const spLoad = () => { try { return JSON.parse(localStorage.getItem(spKey())) || []; } catch { return []; } };
-  const spSave = a => { try { localStorage.setItem(spKey(), JSON.stringify(a)); } catch {} };
-  /* today's outflows straight from YNAB (both budgets) — includes what the
-     bank feeds imported, not just what was typed here */
-  let spToday = [];
-  async function pullSpentToday(){
-    try {
-      const r = await fetch(STILL_API.replace("/plan", "/spent/today"), { cache:"no-store" });
-      if (r.ok) { spToday = (await r.json()).items || []; renderSpent(); }
-    } catch {}
-  }
-  function renderSpent(){
-    const local = spLoad();
-    // YNAB rows that match a synced in-app entry are the same expense — skip them
-    const ynab = spToday.filter(y =>
-      !local.some(l => l.ynab && l.cur === y.cur && Math.abs(l.amt - y.amt) < .005
-        && (l.name || "").toLowerCase() === (y.name || "").toLowerCase()));
-    const all = [
-      ...local.map((l,n) => ({ ...l, src:"local", n })),
-      ...ynab.map(y => ({ ...y, src:"ynab" })),
-    ];
-    // the headline total is today only; earlier posted charges follow underneath
-    const todays = all.filter(i => i.src === "local" || i.today);
-    const earlier = all.filter(i => i.src === "ynab" && !i.today);
-    const cad = todays.filter(i => i.cur !== "USD").reduce((s,i) => s + i.amt, 0);
-    const usd = todays.filter(i => i.cur === "USD").reduce((s,i) => s + i.amt, 0);
-    $("sp-total").textContent = "$" + cad.toFixed(2) + (usd > 0 ? " + US$" + usd.toFixed(2) : "");
-    $("sp-count").textContent = todays.length
-      ? `${todays.length} item${todays.length > 1 ? "s" : ""} today · ✓ in YNAB · ☁︎ from your cards`
-      : "nothing posted today — card charges appear once they clear pending";
-    const row = i => `
-      <div class="sp-item">
-        <span class="sp-n">${esc(i.name)}</span>
-        <span class="sp-t">${i.src === "ynab"
-          ? (i.today ? "☁︎ " : "☁︎ " + esc((i.date || "").slice(5)) + " ") + esc((i.account || "").slice(0, 12))
-          : esc(i.at) + (i.ynab ? " ✓" : i.ynab === false ? " ⚠︎" : "")}</span>
-        <span class="sp-a">${i.cur === "USD" ? "US$" : "$"}${i.amt.toFixed(2)}</span>
-        ${i.src === "local" ? `<button class="sp-x" data-n="${i.n}" title="remove">✕</button>` : ""}
-      </div>`;
-    $("sp-list").innerHTML = todays.map(row).join("")
-      + (earlier.length ? `<div class="sp-sect">last few days</div>` + earlier.map(row).join("") : "");
-    document.querySelectorAll("#sp-list .sp-x").forEach(el => {
-      el.onclick = () => { const a = spLoad(); a.splice(+el.dataset.n, 1); spSave(a); renderSpent(); };
-    });
-  }
-  /* every entry is pushed to YNAB the moment it's added (via still-api, which
-     holds the token). ✓ = landed in YNAB, ⚠︎ = couldn't reach it (kept locally). */
-  async function pushSpent(item){
-    try {
-      const r = await fetch(STILL_API.replace("/plan", "/spent"), {
-        method:"POST", headers:{ "Content-Type":"application/json" },
-        body: JSON.stringify({ name: item.name, amt: item.amt, cur: item.cur, account: item.account }),
-      });
-      if (!r.ok) throw new Error();
-      const d = await r.json();
-      return d.ok === true;
-    } catch { return false; }
-  }
-  /* account picker: favourite chips from BOTH budgets (recently used first),
-     a ⋯ chip reveals the full per-currency dropdown. Tapping a US card flips
-     the entry to USD automatically, and vice versa. */
-  let spAccts = null;
-  async function pullAccts(){
-    try {
-      const r = await fetch(STILL_API.replace("/plan", "/spent/accounts"), { cache:"no-store" });
-      if (r.ok) { spAccts = await r.json(); fillAccts(); }
-    } catch {}
-  }
-  const spCur = () => $("sp-cur").classList.contains("usd") ? "USD" : "CAD";
-  const setCur = usd => {
-    $("sp-cur").classList.toggle("usd", usd);
-    $("sp-cur").textContent = usd ? "USD" : "CAD";
-  };
-  /* the cards Junyan actually uses right now — fixed order, never reshuffled */
-  const SP_PINNED = [
-    { match: "1657 WS Cash",      cur: "CAD" },
-    { match: "EQ Bank Card",      cur: "CAD" },
-    { match: "1034 National Bank", cur: "CAD" },
-    { match: "Bonvoy Boundless",  cur: "USD" },
-    { match: "Business Platinum", cur: "USD" },
-  ];
-  function rememberAcct(name, cur){
-    if (!name) return;
-    try { localStorage.setItem("still-spent-sel", JSON.stringify({ name, cur })); } catch {}
-  }
-  let spSel = null;   // { name, cur } currently chosen
-  try { spSel = JSON.parse(localStorage.getItem("still-spent-sel")); } catch {}
-  function fillAccts(){
-    if (!spAccts) return;
-    const chips = SP_PINNED.map(p => {
-      const name = (spAccts[p.cur] || []).find(n => n.toLowerCase().includes(p.match.toLowerCase()));
-      return name ? { name, cur: p.cur } : null;
-    }).filter(Boolean);
-    // a non-pinned pick from the full list rides along as a fifth chip
-    if (spSel && (spAccts[spSel.cur] || []).includes(spSel.name)
-        && !chips.some(c => c.name === spSel.name && c.cur === spSel.cur)) chips.push(spSel);
-    if (!spSel || !chips.some(c => c.name === spSel.name && c.cur === spSel.cur)) spSel = chips[0] || null;
-    if (spSel) setCur(spSel.cur === "USD");
-    $("sp-chips").innerHTML = chips.map((c,i) => `
-      <button class="sp-chip${spSel && c.name === spSel.name && c.cur === spSel.cur ? " on" : ""}"
-        data-i="${i}">${c.cur === "USD" && !c.name.includes("🇺🇸") ? "🇺🇸 " : ""}${esc(c.name)}</button>`).join("")
-      + `<button class="sp-chip" id="sp-more">⋯</button>`;
-    document.querySelectorAll("#sp-chips .sp-chip[data-i]").forEach(el => {
-      el.onclick = () => { spSel = chips[+el.dataset.i]; setCur(spSel.cur === "USD"); fillAccts(); };
-    });
-    $("sp-more").onclick = () => {
-      const sel = $("sp-acct");
-      sel.classList.toggle("hide");
-      const cur = spCur();
-      sel.innerHTML = (spAccts[cur] || []).map(n =>
-        `<option${spSel && n === spSel.name ? " selected" : ""}>${esc(n)}</option>`).join("");
-    };
-  }
-  $("sp-acct").onchange = () => {
-    spSel = { name: $("sp-acct").value, cur: spCur() };
-    rememberAcct(spSel.name, spSel.cur);
-    $("sp-acct").classList.add("hide");
-    fillAccts();
-  };
-  $("sp-cur").onclick = () => {
-    setCur(!$("sp-cur").classList.contains("usd"));
-    const cur = spCur();
-    // jump to the first pinned card of that currency
-    const pin = SP_PINNED.find(p => p.cur === cur);
-    const name = pin && (spAccts && spAccts[cur] || []).find(n => n.toLowerCase().includes(pin.match.toLowerCase()));
-    if (name) spSel = { name, cur };
-    fillAccts();
-  };
-  $("sp-add").onclick = async () => {
-    const name = $("sp-name").value.trim();
-    const amt = parseFloat($("sp-amt").value.replace(/[^0-9.]/g, ""));
-    if (!name || !(amt > 0)) return;
-    const item = { name, amt, cur: spSel ? spSel.cur : spCur(), account: spSel ? spSel.name : "", at: fmtT(new Date()) };
-    rememberAcct(item.account, item.cur);
-    const a = spLoad();
-    a.push(item); spSave(a);
-    $("sp-name").value = ""; $("sp-amt").value = "";
-    renderSpent();
-    const ok = await pushSpent(item);
-    const b = spLoad();
-    const mine = b.find(x => x.at === item.at && x.name === item.name && x.amt === item.amt && x.ynab === undefined);
-    if (mine) { mine.ynab = ok; spSave(b); }
-    renderSpent();
-  };
-  $("sp-amt").addEventListener("keydown", e => { if (e.key === "Enter") $("sp-add").onclick(); });
-  const openSpent = v => {
-    $("ssheet").classList.toggle("open", v);
-    $("spent-btn").classList.toggle("on", v);
-    if (v) {
-      $("sheet").classList.remove("open"); $("day-btn").classList.remove("on");
-      $("tsheet").classList.remove("open"); $("tasks-btn").classList.remove("on");
-      renderSpent();
-      pullSpentToday();
-      if (spAccts) fillAccts(); else pullAccts();
-    }
-    syncScrim();
-  };
-  $("spent-btn").onclick = () => openSpent(!$("ssheet").classList.contains("open"));
-  $("now-tab").onclick = () => { openSheet(false); openTasks(false); openSpent(false); manualIdx = null; render(); };
+  $("now-tab").onclick = () => { openSheet(false); openTasks(false); manualIdx = null; render(); };
 
   /* ---------- focus sheet: Tasks Inbox ---------- */
   let tasks = [], tasksLoaded = false;
@@ -803,7 +584,6 @@ const PLAN = {
     $("tasks-btn").classList.toggle("on", v);
     if (v) {
       $("sheet").classList.remove("open"); $("day-btn").classList.remove("on");
-      $("ssheet").classList.remove("open"); $("spent-btn").classList.remove("on");
       renderTasks(); pullTasks().then(ok => {
         if (ok) renderTasks();
         else if (!tasksLoaded) $("tmeta").textContent = "Can't reach your Tasks Inbox right now.";
@@ -830,7 +610,7 @@ const PLAN = {
   }
   $("refresh-btn").onclick = () => refreshLive(true);
   $("day-btn").onclick = () => openSheet(!$("sheet").classList.contains("open"));
-  $("scrim").onclick = () => { openSheet(false); openTasks(false); openSpent(false); };
+  $("scrim").onclick = () => { openSheet(false); openTasks(false); };
 
   /* ---------- edit modal ---------- */
   let editing = null;
