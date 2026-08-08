@@ -593,20 +593,39 @@ const PLAN = {
   const spKey = () => "still-spent-" + new Date().toDateString();
   const spLoad = () => { try { return JSON.parse(localStorage.getItem(spKey())) || []; } catch { return []; } };
   const spSave = a => { try { localStorage.setItem(spKey(), JSON.stringify(a)); } catch {} };
+  /* today's outflows straight from YNAB (both budgets) — includes what the
+     bank feeds imported, not just what was typed here */
+  let spToday = [];
+  async function pullSpentToday(){
+    try {
+      const r = await fetch(STILL_API.replace("/plan", "/spent/today"), { cache:"no-store" });
+      if (r.ok) { spToday = (await r.json()).items || []; renderSpent(); }
+    } catch {}
+  }
   function renderSpent(){
-    const items = spLoad();
-    const cad = items.filter(i => i.cur !== "USD").reduce((s,i) => s + i.amt, 0);
-    const usd = items.filter(i => i.cur === "USD").reduce((s,i) => s + i.amt, 0);
+    const local = spLoad();
+    // YNAB rows that match a synced in-app entry are the same expense — skip them
+    const ynab = spToday.filter(y =>
+      !local.some(l => l.ynab && l.cur === y.cur && Math.abs(l.amt - y.amt) < .005
+        && (l.name || "").toLowerCase() === (y.name || "").toLowerCase()));
+    const all = [
+      ...local.map((l,n) => ({ ...l, src:"local", n })),
+      ...ynab.map(y => ({ ...y, src:"ynab" })),
+    ];
+    const cad = all.filter(i => i.cur !== "USD").reduce((s,i) => s + i.amt, 0);
+    const usd = all.filter(i => i.cur === "USD").reduce((s,i) => s + i.amt, 0);
     $("sp-total").textContent = "$" + cad.toFixed(2) + (usd > 0 ? " + US$" + usd.toFixed(2) : "");
-    $("sp-count").textContent = items.length
-      ? `${items.length} item${items.length > 1 ? "s" : ""} today · ✓ = in YNAB`
+    $("sp-count").textContent = all.length
+      ? `${all.length} item${all.length > 1 ? "s" : ""} today · ✓ in YNAB · ☁︎ from your cards`
       : "nothing yet today";
-    $("sp-list").innerHTML = items.map((i,n) => `
+    $("sp-list").innerHTML = all.map(i => `
       <div class="sp-item">
         <span class="sp-n">${esc(i.name)}</span>
-        <span class="sp-t">${esc(i.at)}${i.ynab ? " ✓" : i.ynab === false ? " ⚠︎" : ""}</span>
+        <span class="sp-t">${i.src === "ynab"
+          ? "☁︎ " + esc((i.account || "").slice(0, 14))
+          : esc(i.at) + (i.ynab ? " ✓" : i.ynab === false ? " ⚠︎" : "")}</span>
         <span class="sp-a">${i.cur === "USD" ? "US$" : "$"}${i.amt.toFixed(2)}</span>
-        <button class="sp-x" data-n="${n}" title="remove">✕</button>
+        ${i.src === "local" ? `<button class="sp-x" data-n="${i.n}" title="remove">✕</button>` : ""}
       </div>`).join("");
     document.querySelectorAll("#sp-list .sp-x").forEach(el => {
       el.onclick = () => { const a = spLoad(); a.splice(+el.dataset.n, 1); spSave(a); renderSpent(); };
@@ -644,6 +663,7 @@ const PLAN = {
   const SP_PINNED = [
     { match: "1657 WS Cash",      cur: "CAD" },
     { match: "EQ Bank Card",      cur: "CAD" },
+    { match: "1034 National Bank", cur: "CAD" },
     { match: "Bonvoy Boundless",  cur: "USD" },
     { match: "Business Platinum", cur: "USD" },
   ];
@@ -718,6 +738,7 @@ const PLAN = {
       $("sheet").classList.remove("open"); $("day-btn").classList.remove("on");
       $("tsheet").classList.remove("open"); $("tasks-btn").classList.remove("on");
       renderSpent();
+      pullSpentToday();
       if (spAccts) fillAccts(); else pullAccts();
     }
     syncScrim();

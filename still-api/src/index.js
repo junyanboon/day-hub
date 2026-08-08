@@ -390,6 +390,50 @@ export default {
       }
     }
 
+    if (url.pathname === "/spent/today") {
+      // Today's outflows from both Junyan budgets, so the app shows what the
+      // bank feeds imported (pending card charges) alongside in-app entries.
+      try {
+        const token = (env.YNAB_TOKEN || "").trim();
+        if (!token) throw new Error("YNAB_TOKEN not configured");
+        const cache = caches.default;
+        const key = new Request(new URL("/spent/today?v=1", url.origin));
+        const hit = await cache.match(key);
+        if (hit) return new Response(await hit.text(), { headers: { ...headers, "X-Still-Cache": "hit" } });
+        const api = (path) => fetch("https://api.ynab.com/v1" + path, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const p = parts(new Date());
+        const z = (n) => String(n).padStart(2, "0");
+        const today = `${p.y}-${z(p.m)}-${z(p.d)}`;
+        const items = [];
+        for (const cur of ["CAD", "USD"]) {
+          const b = await findBudget(api, cur);
+          if (!b) continue;
+          const tr = await api(`/budgets/${b.id}/transactions?since_date=${today}`);
+          if (!tr.ok) continue;
+          for (const t of (await tr.json()).data.transactions) {
+            if (t.deleted || t.amount >= 0) continue;         // outflows only
+            if (t.transfer_account_id) continue;              // not transfers
+            items.push({
+              name: t.payee_name || t.memo || "(no payee)",
+              amt: -t.amount / 1000,
+              cur,
+              account: t.account_name,
+              cleared: t.cleared,
+            });
+          }
+        }
+        const body = JSON.stringify({ items });
+        ctx.waitUntil(cache.put(key, new Response(body, {
+          headers: { "Content-Type": "application/json", "Cache-Control": "max-age=300" },
+        })));
+        return new Response(body, { headers: { ...headers, "X-Still-Cache": "miss" } });
+      } catch (err) {
+        return new Response(JSON.stringify({ error: String(err.message || err) }), { status: 502, headers });
+      }
+    }
+
     if (url.pathname === "/spent" && request.method === "POST") {
       // Log a Spent-today entry straight into YNAB as an uncleared outflow.
       // Budget: last-used. Account: YNAB_ACCOUNT_ID env var if set, otherwise
