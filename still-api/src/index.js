@@ -397,7 +397,7 @@ export default {
         const token = (env.YNAB_TOKEN || "").trim();
         if (!token) throw new Error("YNAB_TOKEN not configured");
         const cache = caches.default;
-        const key = new Request(new URL("/spent/today?v=1", url.origin));
+        const key = new Request(new URL("/spent/today?v=3&s=" + (url.searchParams.get("since") || ""), url.origin));
         const hit = await cache.match(key);
         if (hit) return new Response(await hit.text(), { headers: { ...headers, "X-Still-Cache": "hit" } });
         const api = (path) => fetch("https://api.ynab.com/v1" + path, {
@@ -406,11 +406,17 @@ export default {
         const p = parts(new Date());
         const z = (n) => String(n).padStart(2, "0");
         const today = `${p.y}-${z(p.m)}-${z(p.d)}`;
+        // YNAB's API only exposes transactions once they POST — a card charge
+        // sitting as "pending" in the YNAB app is invisible here. So look back a
+        // few days rather than only today, and let the app show each row's date.
+        const back = new Date(Date.now() - 3 * 86400000);
+        const bp = parts(back);
+        const since = url.searchParams.get("since") || `${bp.y}-${z(bp.m)}-${z(bp.d)}`;
         const items = [];
         for (const cur of ["CAD", "USD"]) {
           const b = await findBudget(api, cur);
           if (!b) continue;
-          const tr = await api(`/budgets/${b.id}/transactions?since_date=${today}`);
+          const tr = await api(`/budgets/${b.id}/transactions?since_date=${since}`);
           if (!tr.ok) continue;
           for (const t of (await tr.json()).data.transactions) {
             if (t.deleted || t.amount >= 0) continue;         // outflows only
@@ -420,10 +426,13 @@ export default {
               amt: -t.amount / 1000,
               cur,
               account: t.account_name,
+              date: t.date,
+              today: t.date === today,
               cleared: t.cleared,
             });
           }
         }
+        items.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
         const body = JSON.stringify({ items });
         ctx.waitUntil(cache.put(key, new Response(body, {
           headers: { "Content-Type": "application/json", "Cache-Control": "max-age=300" },
