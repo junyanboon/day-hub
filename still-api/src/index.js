@@ -151,7 +151,13 @@ function fastForward(dtstart, recur, target) {
 }
 
 async function fetchEvents(url, label, dayStart, dayEnd) {
-  const res = await fetch(url, { cf: { cacheTtl: 0 } });
+  // Google answers 429 if the secret iCal URL is polled hard; one short retry
+  // clears the usual burst, and the caller falls back to the last good plan.
+  let res = await fetch(url, { cf: { cacheTtl: 0 } });
+  if (res.status === 429) {
+    await new Promise((r) => setTimeout(r, 1200));
+    res = await fetch(url, { cf: { cacheTtl: 0 } });
+  }
   if (!res.ok) throw new Error(`${label}: HTTP ${res.status}`);
   const raw = await res.text();
   const text = prefilterICS(raw, dayStart);
@@ -557,16 +563,37 @@ export default {
       // and keeps the app snappy when it polls.
       const cache = caches.default;
       const key = new Request(new URL(`/plan?d=${q || "today"}`, url.origin), { method: "GET" });
+      // A second, long-lived copy. Google rate-limits the secret iCal URLs
+      // (HTTP 429) if they're fetched too often, and a 429 used to mean the app
+      // simply got nothing. Now the last good plan answers instead.
+      const lastKey = new Request(new URL(`/plan-last?d=${q || "today"}`, url.origin), { method: "GET" });
+
       const hit = await cache.match(key);
       if (hit) {
         const body = await hit.text();
         return new Response(body, { headers: { ...headers, "X-Still-Cache": "hit" } });
       }
 
-      const plan = await buildPlan(env, ref);
+      let plan;
+      try {
+        plan = await buildPlan(env, ref);
+      } catch (err) {
+        const stale = await cache.match(lastKey);
+        if (stale) {
+          return new Response(await stale.text(), {
+            headers: { ...headers, "X-Still-Cache": "stale", "X-Still-Error": String(err && err.message || err) },
+          });
+        }
+        throw err;
+      }
       const body = JSON.stringify(plan);
+      // 5 minutes of "live" is plenty for a day plan and keeps Google happy;
+      // the stale copy lives for a day as the fallback.
       ctx.waitUntil(cache.put(key, new Response(body, {
-        headers: { "Content-Type": "application/json", "Cache-Control": "max-age=60" },
+        headers: { "Content-Type": "application/json", "Cache-Control": "max-age=300" },
+      })));
+      ctx.waitUntil(cache.put(lastKey, new Response(body, {
+        headers: { "Content-Type": "application/json", "Cache-Control": "max-age=86400" },
       })));
       return new Response(body, { headers: { ...headers, "X-Still-Cache": "miss" } });
     } catch (err) {
