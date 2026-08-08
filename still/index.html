@@ -744,9 +744,13 @@ const PLAN = {
   setInterval(refreshLive, 5*60*1000);
 
   /* if the plan on screen isn't for today, say so instead of "day complete" */
+  /* A plan is stale only if NOTHING in it touches today. Judging by the first
+     block alone was wrong: a plan legitimately opens with last night's late
+     event (a social that runs past midnight), which reads as yesterday. */
   function planIsStale(){
-    const first = activePlan().blocks[0];
-    return !first || new Date(first.s).toDateString() !== new Date().toDateString();
+    const today = new Date().toDateString();
+    return !activePlan().blocks.some(b =>
+      new Date(b.s).toDateString() === today || new Date(b.e).toDateString() === today);
   }
 
   /* ---------- tick, wake lock ---------- */
