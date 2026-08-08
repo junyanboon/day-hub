@@ -35,12 +35,23 @@
   html.mode-fixed { background-image: linear-gradient(180deg, #d4a45b 0%, #a5764a 45%, #8a5d7a 100%); background-color:#8a5d7a; }
   html.mode-done  { background-image: linear-gradient(180deg, #e8a87c 0%, #c97b63 50%, #85506b 100%); background-color:#85506b; }
   html.night      { background-image: linear-gradient(180deg, #2b3160 0%, #232850 50%, #191d3c 100%); background-color:#191d3c; }
+  /* body spans the DYNAMIC viewport (100dvh = the physical screen in the
+     installed app, even when the layout viewport stops short of the home
+     indicator) and carries the same gradient as html — so page, bar and inset
+     are one unbroken surface. */
   body {
-    position:fixed; inset:0; overflow:hidden; background:none;
+    position:fixed; top:0; left:0; right:0; height:100dvh; overflow:hidden;
+    background-image: linear-gradient(180deg, #8a7fc4 0%, #6a5fa8 50%, #4a4580 100%);
+    transition: background-image 3s ease;
     font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
     color: var(--ink);
     user-select:none; -webkit-user-select:none;
   }
+  body.mode-focus { background-image: linear-gradient(180deg, #5b8fd4 0%, #4a6fa5 45%, #5d5ba8 100%); }
+  body.mode-break { background-image: linear-gradient(180deg, #6fb98f 0%, #4a8f7b 50%, #3d6b70 100%); }
+  body.mode-fixed { background-image: linear-gradient(180deg, #d4a45b 0%, #a5764a 45%, #8a5d7a 100%); }
+  body.mode-done  { background-image: linear-gradient(180deg, #e8a87c 0%, #c97b63 50%, #85506b 100%); }
+  body.night      { background-image: linear-gradient(180deg, #2b3160 0%, #232850 50%, #191d3c 100%); }
 
   /* the bar is fixed at the bottom, so the app clears it with padding */
   #app { height:100%; display:flex; flex-direction:column;
@@ -48,11 +59,11 @@
 
   button { cursor:pointer; font-family:inherit; }
 
-  /* bottom tab bar — pinned to the physical bottom edge, transparent so the
-     mode gradient runs straight through it; icons ride low into the
-     home-indicator strip (Calm Countdown) */
-  #bar { position:fixed; left:0; right:0; bottom:0; z-index:5;
-    display:flex; padding:10px 0 max(calc(env(safe-area-inset-bottom) - 12px), 8px);
+  /* bottom tab bar — absolute at body's bottom, i.e. the physical screen edge
+     (body is 100dvh). Transparent so the gradient runs straight through it;
+     icons ride low into the home-indicator strip (Calm Countdown) */
+  #bar { position:absolute; left:0; right:0; bottom:0; z-index:5;
+    display:flex; padding:10px 0 max(calc(env(safe-area-inset-bottom) - 12px), 10px);
     border-top:1px solid rgba(255,255,255,.14); }
   #bar button { flex:1; background:none; border:none; color:var(--ink-soft);
     display:flex; flex-direction:column; align-items:center; gap:4px; padding:4px 0; }
@@ -104,12 +115,12 @@
     background:rgba(255,255,255,.9); color:#3a4a6b; border:none; }
 
   /* sheets + modals */
-  #tsheet { position:fixed; left:0; right:0; bottom:-80px; max-height:84%;
+  #tsheet { position:absolute; left:0; right:0; bottom:0; max-height:84%;
     background:rgba(30,35,60,.8); backdrop-filter:blur(24px); -webkit-backdrop-filter:blur(24px);
     border-radius:24px 24px 0 0; border-top:1px solid var(--glass-border);
     transform:translateY(100%); transition:transform .35s cubic-bezier(.3,.9,.3,1);
     display:flex; flex-direction:column;
-    padding:14px 20px calc(env(safe-area-inset-bottom) + 96px); z-index:10; }
+    padding:14px 20px calc(env(safe-area-inset-bottom) + 20px); z-index:10; }
   #tsheet.open { transform:translateY(0); }
   #tsheet .handle { width:36px; height:4px; border-radius:2px; background:var(--ink-faint); margin:0 auto 14px; }
   #tsheet h2 { font-size:17px; font-weight:600; margin-bottom:2px; }
@@ -129,12 +140,12 @@
   .task.t-more .t-name { flex:0; white-space:nowrap; color:var(--ink-soft); font-size:13px; }
   .task .t-tag { font-size:10px; letter-spacing:.6px; text-transform:uppercase; color:var(--ink-faint);
     flex-shrink:0; text-align:right; line-height:1.3; max-width:62px; }
-  #sheet { position:fixed; left:0; right:0; bottom:-80px; max-height:84%;
+  #sheet { position:absolute; left:0; right:0; bottom:0; max-height:84%;
     background:rgba(30,35,60,.8); backdrop-filter:blur(24px); -webkit-backdrop-filter:blur(24px);
     border-radius:24px 24px 0 0; border-top:1px solid var(--glass-border);
     transform:translateY(100%); transition:transform .35s cubic-bezier(.3,.9,.3,1);
     display:flex; flex-direction:column;
-    padding:14px 20px calc(env(safe-area-inset-bottom) + 96px); z-index:10; }
+    padding:14px 20px calc(env(safe-area-inset-bottom) + 20px); z-index:10; }
   #sheet.open { transform:translateY(0); }
   #sheet .handle { width:36px; height:4px; border-radius:2px; background:var(--ink-faint); margin:0 auto 14px; }
   #sheet h2 { font-size:17px; font-weight:600; margin-bottom:2px; }
@@ -217,7 +228,7 @@
   </div>
   <nav id="bar">
     <button id="now-tab" class="on"><span class="ic">◔</span><span class="lb">Now</span></button>
-    <button id="tasks-btn"><span class="ic">✳</span><span class="lb">Focus</span></button>
+    <button id="tasks-btn"><span class="ic">✳&#xFE0E;</span><span class="lb">Focus</span></button>
     <button id="day-btn"><span class="ic">☰</span><span class="lb">Schedule</span></button>
   </nav>
 </div>
