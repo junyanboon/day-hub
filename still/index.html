@@ -42,14 +42,18 @@
     user-select:none; -webkit-user-select:none;
   }
 
+  /* the bar is fixed at the bottom, so the app clears it with padding */
   #app { height:100%; display:flex; flex-direction:column;
-    padding: calc(env(safe-area-inset-top) + 16px) 20px calc(env(safe-area-inset-bottom) + 16px); }
+    padding: calc(env(safe-area-inset-top) + 16px) 20px calc(env(safe-area-inset-bottom) + 78px); }
 
   button { cursor:pointer; font-family:inherit; }
 
-  /* bottom tab bar — icon over label with a hairline separator (Calm Countdown) */
-  #bar { display:flex; margin-top:12px; padding-top:12px;
-    border-top:1px solid rgba(255,255,255,.18); }
+  /* bottom tab bar — pinned to the physical bottom edge, transparent so the
+     mode gradient runs straight through it; icons ride low into the
+     home-indicator strip (Calm Countdown) */
+  #bar { position:fixed; left:0; right:0; bottom:0; z-index:5;
+    display:flex; padding:10px 0 max(calc(env(safe-area-inset-bottom) - 12px), 8px);
+    border-top:1px solid rgba(255,255,255,.14); }
   #bar button { flex:1; background:none; border:none; color:var(--ink-soft);
     display:flex; flex-direction:column; align-items:center; gap:4px; padding:4px 0; }
   #bar button .ic { font-size:17px; line-height:1; }
