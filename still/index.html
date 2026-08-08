@@ -980,7 +980,8 @@ const PLAN = {
         o.width = o.height = S;
         const g = o.getContext("2d"), r0 = S/2 - 6;
         const mg = g.createRadialGradient(S*.38, S*.36, r0*.1, S/2, S/2, r0);
-        mg.addColorStop(0, "#f4f4fa"); mg.addColorStop(.75, "#cfd3e8"); mg.addColorStop(1, "#9aa0c4");
+        // dimmed for night eyes — a moon seen through air, not a lamp
+        mg.addColorStop(0, "#b9bdd2"); mg.addColorStop(.75, "#8f94b2"); mg.addColorStop(1, "#5f6488");
         g.beginPath(); g.arc(S/2, S/2, r0, 0, Math.PI*2); g.fillStyle = mg; g.fill();
         g.save(); g.beginPath(); g.arc(S/2, S/2, r0, 0, Math.PI*2); g.clip();
         for (let i=0; i<9; i++) {
@@ -1031,9 +1032,9 @@ const PLAN = {
       // soft aura bands swirl behind the moon (study 07)
       const scale = Math.min(w, h) / 390;
       const bands = [
-        { r:330, c:"rgba(84,96,168,",   a0:.4,  w1:.04, w2:.03, t1:3400, t2:4200, ph:.6,  blur:24 },
-        { r:250, c:"rgba(130,140,204,", a0:.4,  w1:.05, w2:.03, t1:3800, t2:3000, ph:2.2, blur:20 },
-        { r:185, c:"rgba(198,204,240,", a0:.45, w1:.05, w2:.04, t1:3000, t2:3600, ph:3.6, blur:16 },
+        { r:330, c:"rgba(52,62,116,",   a0:.18, w1:.04, w2:.03, t1:3400, t2:4200, ph:.6,  blur:24 },
+        { r:250, c:"rgba(74,84,142,",   a0:.18, w1:.05, w2:.03, t1:3800, t2:3000, ph:2.2, blur:20 },
+        { r:185, c:"rgba(104,112,166,", a0:.20, w1:.05, w2:.04, t1:3000, t2:3600, ph:3.6, blur:16 },
       ];
       for (const L of bands) {
         const base = L.r * scale * (1 + en * .07);
@@ -1048,7 +1049,7 @@ const PLAN = {
         }
         x.closePath();
         const g = x.createRadialGradient(ox, oy, base*.2, ox, oy, base*1.15);
-        g.addColorStop(0, L.c + (L.a0 + en*.12) + ")");
+        g.addColorStop(0, L.c + (L.a0 + en*.05) + ")");
         g.addColorStop(1, L.c + "0)");
         x.fillStyle = g;
         x.filter = "blur(" + L.blur + "px)";
@@ -1056,8 +1057,8 @@ const PLAN = {
         x.filter = "none";
       }
       const glow = x.createRadialGradient(cx, cy, R*.6, cx, cy, R*2.1);
-      glow.addColorStop(0, "rgba(235,238,255," + (.3 + en*.3) + ")");
-      glow.addColorStop(1, "rgba(235,238,255,0)");
+      glow.addColorStop(0, "rgba(200,208,240," + (.10 + en*.10) + ")");
+      glow.addColorStop(1, "rgba(200,208,240,0)");
       x.fillStyle = glow;
       x.beginPath(); x.arc(cx, cy, R*2.1, 0, Math.PI*2); x.fill();
       drawMoon(cx, cy, R);
