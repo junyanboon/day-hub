@@ -640,26 +640,28 @@ const PLAN = {
     $("sp-cur").classList.toggle("usd", usd);
     $("sp-cur").textContent = usd ? "USD" : "CAD";
   };
-  const spRecents = () => { try { return JSON.parse(localStorage.getItem("still-spent-recents")) || []; } catch { return []; } };
+  /* the cards Junyan actually uses right now — fixed order, never reshuffled */
+  const SP_PINNED = [
+    { match: "1657 WS Cash",      cur: "CAD" },
+    { match: "EQ Bank Card",      cur: "CAD" },
+    { match: "Bonvoy Boundless",  cur: "USD" },
+    { match: "Business Platinum", cur: "USD" },
+  ];
   function rememberAcct(name, cur){
     if (!name) return;
-    const rec = spRecents().filter(r => !(r.name === name && r.cur === cur));
-    rec.unshift({ name, cur });
-    try { localStorage.setItem("still-spent-recents", JSON.stringify(rec.slice(0, 6))); } catch {}
+    try { localStorage.setItem("still-spent-sel", JSON.stringify({ name, cur })); } catch {}
   }
   let spSel = null;   // { name, cur } currently chosen
+  try { spSel = JSON.parse(localStorage.getItem("still-spent-sel")); } catch {}
   function fillAccts(){
     if (!spAccts) return;
-    // chips: recents from both budgets, topped up with the first accounts of the active currency
-    let chips = spRecents().filter(r => (spAccts[r.cur] || []).includes(r.name));
-    // top up with fresh suggestions from BOTH budgets, max 3 per currency
-    for (const cur of [spCur(), spCur() === "CAD" ? "USD" : "CAD"]) {
-      let added = chips.filter(c => c.cur === cur).length;
-      for (const n of (spAccts[cur] || [])) {
-        if (chips.length >= 6 || added >= 3) break;
-        if (!chips.some(c => c.name === n && c.cur === cur)) { chips.push({ name: n, cur }); added++; }
-      }
-    }
+    const chips = SP_PINNED.map(p => {
+      const name = (spAccts[p.cur] || []).find(n => n.toLowerCase().includes(p.match.toLowerCase()));
+      return name ? { name, cur: p.cur } : null;
+    }).filter(Boolean);
+    // a non-pinned pick from the full list rides along as a fifth chip
+    if (spSel && (spAccts[spSel.cur] || []).includes(spSel.name)
+        && !chips.some(c => c.name === spSel.name && c.cur === spSel.cur)) chips.push(spSel);
     if (!spSel || !chips.some(c => c.name === spSel.name && c.cur === spSel.cur)) spSel = chips[0] || null;
     if (spSel) setCur(spSel.cur === "USD");
     $("sp-chips").innerHTML = chips.map((c,i) => `
@@ -686,9 +688,10 @@ const PLAN = {
   $("sp-cur").onclick = () => {
     setCur(!$("sp-cur").classList.contains("usd"));
     const cur = spCur();
-    const first = (spAccts && spAccts[cur] || [])[0];
-    const rec = spRecents().find(r => r.cur === cur);
-    spSel = rec && spAccts[cur].includes(rec.name) ? rec : (first ? { name: first, cur } : null);
+    // jump to the first pinned card of that currency
+    const pin = SP_PINNED.find(p => p.cur === cur);
+    const name = pin && (spAccts && spAccts[cur] || []).find(n => n.toLowerCase().includes(pin.match.toLowerCase()));
+    if (name) spSel = { name, cur };
     fillAccts();
   };
   $("sp-add").onclick = async () => {
