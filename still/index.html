@@ -19,21 +19,24 @@
     --glass-border: rgba(255,255,255,.18);
   }
   * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
-  /* the gradient lives on html too, so the area behind the home-indicator
-     inset stays dark instead of showing a white bar */
-  html { height:100%; overflow:hidden; background:#4a4580; }
-  body { height:100%; overflow:hidden; }
+  /* The gradient is painted by <html>, and the mode class is mirrored onto it,
+     so it always fills the whole screen — including the home-indicator inset,
+     which showed as a pale strip when only <body> carried the background.
+     body stays pinned to the screen and transparent. */
+  html { height:100%; overflow:hidden;
+    background: linear-gradient(180deg, #8a7fc4 0%, #6a5fa8 50%, #4a4580 100%);
+    transition: background 3s ease; }
+  html.mode-focus { background: linear-gradient(180deg, #5b8fd4 0%, #4a6fa5 45%, #5d5ba8 100%); }
+  html.mode-break { background: linear-gradient(180deg, #6fb98f 0%, #4a8f7b 50%, #3d6b70 100%); }
+  html.mode-fixed { background: linear-gradient(180deg, #d4a45b 0%, #a5764a 45%, #8a5d7a 100%); }
+  html.mode-done  { background: linear-gradient(180deg, #e8a87c 0%, #c97b63 50%, #85506b 100%); }
+  html.night      { background: linear-gradient(180deg, #2b3160 0%, #232850 50%, #191d3c 100%); }
   body {
+    position:fixed; inset:0; overflow:hidden; background:none;
     font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
     color: var(--ink);
-    background: linear-gradient(180deg, #8a7fc4 0%, #6a5fa8 50%, #4a4580 100%);
-    transition: background 3s ease;
     user-select:none; -webkit-user-select:none;
   }
-  body.mode-focus { background: linear-gradient(180deg, #5b8fd4 0%, #4a6fa5 45%, #5d5ba8 100%); }
-  body.mode-break { background: linear-gradient(180deg, #6fb98f 0%, #4a8f7b 50%, #3d6b70 100%); }
-  body.mode-fixed { background: linear-gradient(180deg, #d4a45b 0%, #a5764a 45%, #8a5d7a 100%); }
-  body.mode-done  { background: linear-gradient(180deg, #e8a87c 0%, #c97b63 50%, #85506b 100%); }
 
   #app { height:100%; display:flex; flex-direction:column;
     padding: calc(env(safe-area-inset-top) + 16px) 20px calc(env(safe-area-inset-bottom) + 16px); }
@@ -81,7 +84,6 @@
   @keyframes breathe { 0%,100%{transform:scale(.94);} 50%{transform:scale(1.04);} }
   @media (prefers-reduced-motion: reduce) { body.running #orb { animation:none; } }
   /* night keeps the orb — only the field behind it goes dark and quiet */
-  body.night { background: linear-gradient(180deg, #2b3160 0%, #232850 50%, #191d3c 100%); }
   #time { font-size:48px; font-weight:200; letter-spacing:1px; font-variant-numeric:tabular-nums; }
   #time-sub { font-size:12px; color:var(--ink-faint); letter-spacing:1px; }
 
@@ -460,6 +462,9 @@ const PLAN = {
     $("block-label").textContent = label;
     $("next-up").textContent = next;
     document.body.className = "mode-" + (phase === "fixed" ? "fixed" : phase) + (pausedAt ? "" : " running");
+    // <html> paints the gradient, so it needs the same mode class
+    document.documentElement.classList.remove("mode-focus","mode-break","mode-fixed","mode-done");
+    document.documentElement.classList.add("mode-" + (phase === "fixed" ? "fixed" : phase));
     $("now-btn").textContent = pausedAt ? "▶" : "❚❚";
     document.querySelector("#ring .progress").style.strokeDashoffset = total ? CIRC*(remaining/total) : CIRC;
   }
@@ -794,7 +799,9 @@ const PLAN = {
     size(); addEventListener("resize", size);
     (function loop(){
       const hour = new Date().getHours();
-      document.body.classList.toggle("night", hour >= 22 || hour < 5);
+      const night = hour >= 22 || hour < 5;
+      document.body.classList.toggle("night", night);
+      document.documentElement.classList.toggle("night", night);
       x.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);
       x.clearRect(0,0,innerWidth,innerHeight);
       requestAnimationFrame(loop);
