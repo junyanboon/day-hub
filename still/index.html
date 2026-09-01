@@ -351,7 +351,7 @@ const PLAN = {
      PLAN below is the copy baked into this page by the 15-minute GitHub job.
      The Worker at STILL_API reads the calendars on demand, so a live fetch is
      always at least as fresh. If it's unreachable we simply keep the baked copy. */
-  const STILL_API = "https://still-api.still-api.workers.dev/plan";
+  const STILL_API = "https://still.srv1948070.hstgr.cloud/plan";
   let LIVE = null;
   const activePlan = () => LIVE || PLAN;
 
@@ -821,7 +821,7 @@ const PLAN = {
   (() => {
     async function pullSleep(){
       try {
-        const r = await fetch("https://still-api.still-api.workers.dev/sleep", { cache:"no-store" });
+        const r = await fetch("https://still.srv1948070.hstgr.cloud/sleep", { cache:"no-store" });
         if (!r.ok) return;
         const { score } = await r.json();
         if (typeof score !== "number") return;
