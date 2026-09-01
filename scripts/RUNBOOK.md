@@ -142,6 +142,17 @@ They differ deliberately in one place — **the past**:
 Both are right for their job. Expect morning blocks to differ between the two
 after a same-day edit to an early event; that is not a bug.
 
+## Edit-layer sync — `/ops` (added 2026-09-01)
+
+The phone's in-app edits (pause/+15/done/add/drop, localStorage `still-ops-v2`)
+now also sync through the Worker: `GET /ops?d=<JS toDateString>` and `POST /ops`
+(last-write-wins on a client `ts`), stored in Cloudflare KV (binding
+`STILL_OPS`), 48 h TTL. The phone pushes on every edit and pulls on every plan
+refresh. The native desktop orb (`desk-widgets/Still.app` in the workspace)
+speaks the same protocol, so both devices show one day. Offline is fine — the
+push is fire-and-forget and localStorage stays authoritative until a newer
+`ts` arrives.
+
 ## Worker performance
 
 The first cut of the Worker died with CPU error 1102. Two causes, both fixed —
