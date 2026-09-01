@@ -212,8 +212,8 @@ centerpiece prototypes, kept for reference).
 
 ## Still — Spent tab (removed 2026-08-07)
 
-The bottom bar is Now / Focus / Schedule / Pond (Calm Countdown design;
-quick-add is the ＋ pill under the orb). A fourth **Spent** tab briefly logged same-day
+The bottom bar is Now / Focus / Schedule (Calm Countdown design; quick-add is
+the ＋ pill under the orb). A fourth **Spent** tab briefly logged same-day
 spending into YNAB and was removed the same evening — the reason is worth
 keeping, since it kills the idea rather than the implementation:
 
@@ -226,17 +226,3 @@ The Worker keeps the routes (`POST /spent`, `GET /spent/today`,
 `GET /spent/accounts`) and the `YNAB_TOKEN` secret is set, so this can be
 revived from the app side alone. `/health` reports `ynabConfigured`. Budgets
 are found by name — 🇨🇦Junyan CAD / 🇺🇸Junyan USD, archived copies excluded.
-
-## Still — the pond (added 2026-08-31)
-
-PomoReef-inspired reward layer (Tina Huang's Builder Night koi pomodoro,
-https://pomoreef.pages.dev). Every focus/task block of 10+ minutes that reaches
-its end hatches a koi into a persistent pond — the **Pond** tab (≋). Longer
-blocks raise the odds of rarer fish: common orange → calico → gold, with a
-50-minute block giving full odds. A 5-second scanner catches ends up to 10
-minutes late (covers "done" pressed early, since that moves the block's end to
-now); hatched block keys are remembered so nothing double-counts. All of it
-lives in the phone's localStorage (`still-pond-v1`, koi capped at 120) —
-purely client-side, no Worker involvement. The desktop floating mini-timer
-(⧉, Document Picture-in-Picture, Chrome/Edge only) shows the last few koi
-swimming behind the countdown.

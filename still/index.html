@@ -172,28 +172,6 @@
     border-radius:11px; padding:9px; font-size:13px; width:100%; margin-bottom:10px; }
   #refresh-btn.busy { opacity:.55; }
 
-  /* pond sheet — every finished focus block hatches a koi (PomoReef-inspired) */
-  #psheet { position:fixed; left:0; right:0; bottom:0; height:84%;
-    background:rgba(30,35,60,.8); backdrop-filter:blur(24px); -webkit-backdrop-filter:blur(24px);
-    border-radius:24px 24px 0 0; border-top:1px solid var(--glass-border);
-    transform:translateY(100%); transition:transform .35s cubic-bezier(.3,.9,.3,1);
-    display:flex; flex-direction:column;
-    padding:14px 20px calc(env(safe-area-inset-bottom) + 20px); z-index:10; }
-  #psheet.open { transform:translateY(0); }
-  #psheet .handle { width:36px; height:4px; border-radius:2px; background:var(--ink-faint); margin:0 auto 14px; }
-  #psheet h2 { font-size:17px; font-weight:600; margin-bottom:2px; }
-  #psheet .sub { font-size:12.5px; color:var(--ink-soft); margin-bottom:12px; }
-  #pond { flex:1; min-height:0; width:100%; border-radius:16px;
-    background:linear-gradient(180deg, rgba(105,160,200,.4), rgba(30,50,100,.55));
-    border:1px solid var(--glass-border); }
-  #hatch-toast { position:fixed; left:50%; top:calc(env(safe-area-inset-top) + 20px);
-    transform:translate(-50%,-16px); background:rgba(30,35,60,.85);
-    backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px);
-    border:1px solid var(--glass-border); color:var(--ink); border-radius:20px;
-    padding:10px 18px; font-size:14px; opacity:0; pointer-events:none;
-    transition:opacity .5s, transform .5s; z-index:30; white-space:nowrap; }
-  #hatch-toast.show { opacity:1; transform:translate(-50%,0); }
-
   .modal { position:fixed; inset:0; display:none; align-items:center; justify-content:center; z-index:20; padding:20px; }
   .modal.open { display:flex; }
   .card { width:min(88vw, 350px); background:rgba(30,35,60,.9);
@@ -253,7 +231,6 @@
     <button id="now-tab" class="on"><span class="ic">◔</span><span class="lb">Now</span></button>
     <button id="tasks-btn"><span class="ic">✳&#xFE0E;</span><span class="lb">Focus</span></button>
     <button id="day-btn"><span class="ic">☰</span><span class="lb">Schedule</span></button>
-    <button id="pond-btn"><span class="ic">≋</span><span class="lb">Pond</span></button>
   </nav>
 </div>
 
@@ -328,15 +305,6 @@
   <div id="timeline"></div>
   <button id="new-block">＋ add a block at a set time</button>
 </div>
-
-<!-- pond: finished focus blocks hatch koi (PomoReef-inspired; longer blocks, rarer fish) -->
-<div id="psheet">
-  <div class="handle"></div>
-  <h2>Your pond</h2>
-  <div class="sub" id="pond-meta"></div>
-  <canvas id="pond"></canvas>
-</div>
-<div id="hatch-toast"></div>
 
 <script>
 /* ============================================================
@@ -590,7 +558,7 @@ const PLAN = {
     if (cur) cur.scrollIntoView({block:"center"});
   }
   const syncScrim = () => {
-    const any = ["sheet","tsheet","psheet"].some(id => $(id).classList.contains("open"));
+    const any = ["sheet","tsheet"].some(id => $(id).classList.contains("open"));
     $("scrim").classList.toggle("show", any);
     $("now-tab").classList.toggle("on", !any);
   };
@@ -599,13 +567,12 @@ const PLAN = {
     $("day-btn").classList.toggle("on", v);
     if (v) {
       $("tsheet").classList.remove("open"); $("tasks-btn").classList.remove("on");
-      openPond(false);
       renderTimeline(); refreshLive();
     }
     syncScrim();
   };
 
-  $("now-tab").onclick = () => { openSheet(false); openTasks(false); openPond(false); manualIdx = null; render(); };
+  $("now-tab").onclick = () => { openSheet(false); openTasks(false); manualIdx = null; render(); };
 
   /* ---------- focus sheet: Tasks Inbox ---------- */
   let tasks = [], tasksLoaded = false;
@@ -672,7 +639,6 @@ const PLAN = {
     $("tasks-btn").classList.toggle("on", v);
     if (v) {
       $("sheet").classList.remove("open"); $("day-btn").classList.remove("on");
-      openPond(false);
       renderTasks(); pullTasks().then(ok => {
         if (ok) renderTasks();
         else if (!tasksLoaded) $("tmeta").textContent = "Can't reach your Tasks Inbox right now.";
@@ -699,7 +665,7 @@ const PLAN = {
   }
   $("refresh-btn").onclick = () => refreshLive(true);
   $("day-btn").onclick = () => openSheet(!$("sheet").classList.contains("open"));
-  $("scrim").onclick = () => { openSheet(false); openTasks(false); openPond(false); };
+  $("scrim").onclick = () => { openSheet(false); openTasks(false); };
 
   /* ---------- edit modal ---------- */
   let editing = null;
@@ -864,128 +830,6 @@ const PLAN = {
     })();
   })();
 
-  /* ---------- the pond (PomoReef-inspired) ----------
-     Every focus block that reaches its end hatches a koi into a persistent
-     pond (localStorage). Longer blocks raise the odds of rarer fish:
-     common orange → calico → gold. "done" counts too — the scanner sees the
-     block's end move to now. The pond is the reward view; nothing in the
-     planner depends on it. */
-  const POND_KEY = "still-pond-v1";
-  function pondLoad(){
-    try { const d = JSON.parse(localStorage.getItem(POND_KEY)); if (d && Array.isArray(d.koi)) return d; }
-    catch {}
-    return { koi: [], done: {} };
-  }
-  const pond = pondLoad();
-  function pondSave(){
-    pond.koi = pond.koi.slice(-120);
-    const keys = Object.keys(pond.done);
-    if (keys.length > 200) keys.slice(0, keys.length - 200).forEach(k => delete pond.done[k]);
-    try { localStorage.setItem(POND_KEY, JSON.stringify(pond)); } catch {}
-  }
-  const RARITY = ["common", "calico", "gold"];
-  function hatch(minutes){
-    const m = Math.min(minutes, 90) / 50;          // a full 50-min block = full odds
-    const roll = Math.random();
-    const r = roll < 0.15 * m ? 2 : roll < 0.15 * m + 0.30 * m ? 1 : 0;
-    const k = { ts: Date.now(), r, h: 15 + Math.random() * 25, p: Math.random() * 6.28 };
-    pond.koi.push(k); pondSave();
-    const el = $("hatch-toast");
-    el.textContent = `a ${RARITY[r]} koi hatched · ${pond.koi.length} in your pond`;
-    el.classList.add("show");
-    setTimeout(() => el.classList.remove("show"), 4000);
-    if ($("psheet").classList.contains("open")) pondSpawn();
-  }
-  /* scanner: any focus/task block whose end just passed (≤10 min ago) and
-     wasn't already counted hatches once. Runs every 5s; done{} stops doubles. */
-  setInterval(() => {
-    const now = Date.now();
-    for (const b of allBlocks()) {
-      if (b.type !== "focus" && b.type !== "task") continue;
-      const mins = (b.e - b.s) / 60000;
-      if (mins < 10) continue;
-      if (b.e.getTime() > now || now - b.e.getTime() > 10 * 60000) continue;
-      const key = b.t + "@" + b.s.getTime();
-      if (pond.done[key]) continue;
-      pond.done[key] = 1;
-      hatch(mins);
-    }
-  }, 5000);
-
-  /* one koi, drawn at (k.x,k.y) heading k.a — body ellipse, sine-wagged tail */
-  function drawKoi(x, k, t){
-    const wag = Math.sin(t * 3 + k.p) * 0.5;
-    x.save(); x.translate(k.x, k.y); x.rotate(k.a);
-    const body = k.r === 2 ? "#f0c04a" : k.r === 1 ? "#f2ede4" : `hsl(${k.h},72%,58%)`;
-    x.fillStyle = body;
-    x.beginPath(); x.ellipse(0, 0, 13, 5.5, 0, 0, 6.29); x.fill();
-    x.save(); x.translate(-12, 0); x.rotate(wag);
-    x.beginPath(); x.moveTo(0, 0); x.lineTo(-9, -5); x.lineTo(-7, 0); x.lineTo(-9, 5); x.closePath(); x.fill();
-    x.restore();
-    if (k.r === 1) {                                   // calico patches
-      x.fillStyle = `hsl(${k.h},80%,52%)`;
-      x.beginPath(); x.ellipse(4, -1.5, 4, 2.6, 0.3, 0, 6.29); x.fill();
-      x.fillStyle = "#40424e";
-      x.beginPath(); x.ellipse(-4, 1.5, 2.6, 1.8, -0.3, 0, 6.29); x.fill();
-    }
-    if (k.r === 2) {                                   // gold shimmer belly
-      x.fillStyle = "rgba(255,240,200,.7)";
-      x.beginPath(); x.ellipse(2, 1.5, 7, 2.2, 0, 0, 6.29); x.fill();
-    }
-    x.fillStyle = "rgba(20,25,40,.8)";
-    x.beginPath(); x.arc(9.5, -1.5, 1.1, 0, 6.29); x.fill();
-    x.restore();
-  }
-  /* gentle wander: ease toward a drifting target angle, wrap at the walls */
-  function swim(k, w, h, dt){
-    k.a += (k.ta - k.a) * 0.02;
-    if (Math.random() < 0.006) k.ta = k.a + (Math.random() - 0.5) * 2;
-    k.x += Math.cos(k.a) * k.v * dt; k.y += Math.sin(k.a) * k.v * dt;
-    if (k.x < -20) k.x = w + 20; if (k.x > w + 20) k.x = -20;
-    if (k.y < 14) { k.y = 14; k.ta = 1; } if (k.y > h - 14) { k.y = h - 14; k.ta = -1; }
-  }
-  function spawnSwimmer(k, w, h){
-    return { ...k, x: Math.random() * w, y: 14 + Math.random() * (h - 28),
-      a: Math.random() * 6.28, ta: Math.random() * 6.28, v: 18 + Math.random() * 14 };
-  }
-
-  let pondAnim = null, swimmers = [];
-  function pondSpawn(){
-    const cv = $("pond");
-    cv.width = cv.clientWidth * devicePixelRatio; cv.height = cv.clientHeight * devicePixelRatio;
-    swimmers = pond.koi.slice(-40).map(k => spawnSwimmer(k, cv.clientWidth, cv.clientHeight));
-    const counts = [0, 0, 0]; pond.koi.forEach(k => counts[k.r]++);
-    $("pond-meta").textContent = pond.koi.length
-      ? `${pond.koi.length} koi · ${counts[0]} common · ${counts[1]} calico · ${counts[2]} gold — one hatches each finished focus block`
-      : "Finish a focus block (10 min or more) to hatch your first koi.";
-  }
-  function pondLoop(then){
-    const cv = $("pond"), x = cv.getContext("2d");
-    const now = performance.now(), dt = Math.min((now - then) / 1000, 0.1);
-    x.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
-    x.clearRect(0, 0, cv.clientWidth, cv.clientHeight);
-    x.fillStyle = "rgba(255,255,255,.05)";
-    for (let i = 0; i < 3; i++) {
-      const ry = (now / 40 + i * 130) % (cv.clientHeight + 60) - 30;
-      x.beginPath(); x.ellipse(cv.clientWidth * (0.2 + i * 0.3), ry, 46, 7, 0, 0, 6.29); x.fill();
-    }
-    const t = now / 1000;
-    for (const k of swimmers) { swim(k, cv.clientWidth, cv.clientHeight, dt); drawKoi(x, k, t); }
-    pondAnim = requestAnimationFrame(() => pondLoop(now));
-  }
-  function openPond(v){
-    $("psheet").classList.toggle("open", v);
-    $("pond-btn").classList.toggle("on", v);
-    if (v) {
-      $("sheet").classList.remove("open"); $("day-btn").classList.remove("on");
-      $("tsheet").classList.remove("open"); $("tasks-btn").classList.remove("on");
-      pondSpawn();
-      if (!pondAnim) pondLoop(performance.now());
-    } else if (pondAnim) { cancelAnimationFrame(pondAnim); pondAnim = null; }
-    syncScrim();
-  }
-  $("pond-btn").onclick = () => openPond(!$("psheet").classList.contains("open"));
-
   /* ---------- floating mini-timer (desktop) ----------
      Document Picture-in-Picture gives a genuine always-on-top window — the OS
      keeps it above every app, which a normal browser window can't do. Desktop
@@ -1001,7 +845,7 @@ const PLAN = {
     btn.textContent = "⧉";
     $("controls").appendChild(btn);
 
-    let pw = null, pipSwimmers = [];
+    let pw = null;
     function syncPip(){
       if (!pw) return;
       const d = pw.document;
@@ -1012,24 +856,6 @@ const PLAN = {
       d.body.style.background = getComputedStyle(document.documentElement).backgroundImage;
     }
     setInterval(syncPip, 1000);
-    /* the parent animates the pip's canvas directly (same origin) — the pip
-       document itself stays script-free */
-    function pipLoop(then){
-      if (!pw) return;
-      const cv = pw.document.getElementById("p-pond");
-      if (!cv) return;
-      const w = pw.innerWidth, h = pw.innerHeight;
-      if (cv.width !== w * devicePixelRatio) { cv.width = w * devicePixelRatio; cv.height = h * devicePixelRatio; }
-      const x = cv.getContext("2d");
-      const now = performance.now(), dt = Math.min((now - then) / 1000, 0.1);
-      x.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
-      x.clearRect(0, 0, w, h);
-      x.globalAlpha = 0.5;
-      const t = now / 1000;
-      for (const k of pipSwimmers) { swim(k, w, h, dt); drawKoi(x, k, t); }
-      x.globalAlpha = 1;
-      requestAnimationFrame(() => pipLoop(now));
-    }
 
     btn.onclick = async () => {
       if (pw) { pw.close(); return; }
@@ -1051,16 +877,12 @@ const PLAN = {
           max-width:92%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
         #p-pause{margin-top:5px;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.25);
           color:inherit;border-radius:17px;width:62px;height:30px;font-size:13px;cursor:pointer;}
-        #p-pond{position:absolute;inset:0;z-index:-1;}
-        #p-label,#p-time,#p-sub,#p-pause{position:relative;}
       </style>`;
-      d.body.innerHTML = `<canvas id="p-pond"></canvas><div id="p-label"></div><div id="p-time">--:--</div>
+      d.body.innerHTML = `<div id="p-label"></div><div id="p-time">--:--</div>
         <div id="p-sub"></div><button id="p-pause">❚❚</button>`;
       d.getElementById("p-pause").onclick = () => $("now-btn").onclick();
       pw.addEventListener("pagehide", () => { pw = null; });
-      pipSwimmers = pond.koi.slice(-4).map(k => spawnSwimmer(k, 280, 180));
       syncPip();
-      pipLoop(performance.now());
     };
   })();
 })();
