@@ -363,6 +363,7 @@ const PLAN = {
       const p = await r.json();
       if (!p || !Array.isArray(p.blocks) || !p.blocks.length) return false;
       LIVE = p;
+      pullOps().then(changed => { if (changed) { render(); renderTimeline(); } });
       return true;
     } catch { return false; }
   }
@@ -370,12 +371,34 @@ const PLAN = {
   /* ---------- state: published plan + a local edit layer ---------- */
   const KEY = "still-ops-v2";
   const today = () => new Date().toDateString();
-  let ops = { edits:{}, drops:[], adds:[] };
+  let ops = { edits:{}, drops:[], adds:[], ts:0 };
   try {
     const d = JSON.parse(localStorage.getItem(KEY));
-    if (d && d.date === today()) ops = { edits:d.edits||{}, drops:d.drops||[], adds:d.adds||[] };
+    if (d && d.date === today()) ops = { edits:d.edits||{}, drops:d.drops||[], adds:d.adds||[], ts:d.ts||0 };
   } catch {}
-  const saveOps = () => localStorage.setItem(KEY, JSON.stringify({date:today(), ...ops}));
+  /* edits sync across devices through the Worker (/ops, KV, last-write-wins):
+     every save stamps ts and pushes; every plan refresh pulls and adopts a
+     newer day. The desktop orb speaks the same protocol. */
+  const OPS_API = STILL_API.replace("/plan", "/ops");
+  const saveOps = () => {
+    ops.ts = Date.now();
+    localStorage.setItem(KEY, JSON.stringify({date:today(), ...ops}));
+    fetch(OPS_API, { method:"POST", headers:{ "Content-Type":"application/json" },
+      body: JSON.stringify({ date:today(), ...ops }) }).catch(() => {});
+  };
+  async function pullOps(){
+    try {
+      const r = await fetch(OPS_API + "?d=" + encodeURIComponent(today()), { cache:"no-store" });
+      if (!r.ok) return false;
+      const d = await r.json();
+      if (d && d.date === today() && (d.ts||0) > (ops.ts||0)) {
+        ops = { edits:d.edits||{}, drops:d.drops||[], adds:d.adds||[], ts:d.ts };
+        localStorage.setItem(KEY, JSON.stringify({date:today(), ...ops}));
+        return true;
+      }
+    } catch {}
+    return false;
+  }
 
   const keyOf = b => b.s + "|" + b.t;
 
