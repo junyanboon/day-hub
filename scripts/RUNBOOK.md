@@ -99,8 +99,28 @@ The 15-minute job above is the safety net. For "I just changed my calendar, show
 me now", the app calls a Cloudflare Worker that reads the calendars on demand:
 
 - Source: `still-api/` (deployed with `wrangler deploy` from that directory)
-- Endpoint: `https://still-api.still-api.workers.dev/plan`
-- Health:   `https://still-api.still-api.workers.dev/health` → `{ok, configured}`
+- Endpoint: `https://still.srv1948070.hstgr.cloud/plan`
+- Health:   `https://still.srv1948070.hstgr.cloud/health` → `{ok, configured}`
+
+**Moved off Cloudflare Workers on 2026-09-01.** The free tier caps CPU at 10 ms and
+the two-calendar parse did not fit: `/plan` returned HTTP 503 with Cloudflare
+`error code: 1102` on 6 of 8 forced builds, which is what made the desktop orb say
+"plan may be stale". It now runs as Node on the Hostinger VPS `srv1948070.hstgr.cloud`,
+in `/docker/still-api`, behind the Traefik already on that box. `server.mjs` hosts the
+*same* `src/index.js` — the cache and the `STILL_OPS` KV binding are shimmed, so there
+is no second implementation to keep in step.
+
+- Deploy:  `cd still-api && ./deploy.sh` (needs key-based ssh to `root@2.25.139.60`)
+- Logs:    `ssh root@2.25.139.60 'docker logs -f still-api'`
+- Secrets: `/docker/still-api/.env` on the server only — never committed, never in chat.
+
+**Unset secrets forward to the old Worker.** Cloudflare will not read Worker secrets
+back, and Oura has retired Personal Access Tokens (the existing one is masked and new
+ones cannot be created), so `OURA_TOKEN` could not be moved. When a secret is unset,
+`/sleep`, `/spent` and `/tasks` proxy to `https://still-api.still-api.workers.dev` and
+the response carries `X-Still-Fallback`. Fill the secret in on the VPS and that endpoint
+stops forwarding — no code change. **Keep the old Worker deployed**; it backs these
+routes. **Do not revoke the Oura tokens.**
 
 **Why a Worker at all.** This repo is public and GitHub Pages is static, so the
 page can never hold the calendars' secret iCal URLs — anyone with one can read
