@@ -829,6 +829,62 @@ const PLAN = {
       requestAnimationFrame(loop);
     })();
   })();
+
+  /* ---------- floating mini-timer (desktop) ----------
+     Document Picture-in-Picture gives a genuine always-on-top window — the OS
+     keeps it above every app, which a normal browser window can't do. Desktop
+     Chrome/Edge only; the ⧉ button never appears where the API is missing
+     (Safari, iOS), so phones are untouched. The pip window renders nothing of
+     its own: it mirrors the main screen once a second, and its pause button
+     just forwards to the real one. */
+  (() => {
+    if (!("documentPictureInPicture" in window)) return;
+    const btn = document.createElement("button");
+    btn.className = "ctl"; btn.id = "float-btn";
+    btn.title = "float a mini timer above your other apps";
+    btn.textContent = "⧉";
+    $("controls").appendChild(btn);
+
+    let pw = null;
+    function syncPip(){
+      if (!pw) return;
+      const d = pw.document;
+      d.getElementById("p-label").textContent = $("block-label").textContent;
+      d.getElementById("p-time").textContent  = $("time").textContent;
+      d.getElementById("p-sub").textContent   = $("time-sub").textContent || $("next-up").textContent;
+      d.getElementById("p-pause").textContent = $("now-btn").textContent;
+      d.body.style.background = getComputedStyle(document.documentElement).backgroundImage;
+    }
+    setInterval(syncPip, 1000);
+
+    btn.onclick = async () => {
+      if (pw) { pw.close(); return; }
+      try {
+        pw = await documentPictureInPicture.requestWindow({ width: 280, height: 180 });
+      } catch { pw = null; return; }   // embedded browsers expose the API but can't open the window
+      const d = pw.document;
+      d.head.innerHTML = `<style>
+        *{box-sizing:border-box;margin:0;}
+        body{height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;
+          gap:5px;font-family:-apple-system,"SF Pro Display","Segoe UI",sans-serif;
+          color:rgba(255,255,255,.95);transition:background 2s ease;
+          -webkit-user-select:none;user-select:none;}
+        #p-label{font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:rgba(255,255,255,.55);
+          max-width:92%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+        #p-time{font-size:46px;font-weight:200;letter-spacing:1px;line-height:1.1;
+          font-variant-numeric:tabular-nums;}
+        #p-sub{font-size:11px;letter-spacing:.5px;color:rgba(255,255,255,.45);min-height:14px;
+          max-width:92%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+        #p-pause{margin-top:5px;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.25);
+          color:inherit;border-radius:17px;width:62px;height:30px;font-size:13px;cursor:pointer;}
+      </style>`;
+      d.body.innerHTML = `<div id="p-label"></div><div id="p-time">--:--</div>
+        <div id="p-sub"></div><button id="p-pause">❚❚</button>`;
+      d.getElementById("p-pause").onclick = () => $("now-btn").onclick();
+      pw.addEventListener("pagehide", () => { pw = null; });
+      syncPip();
+    };
+  })();
 })();
 </script>
 </body>
