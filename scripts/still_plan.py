@@ -26,6 +26,7 @@ Fail policy: a calendar-source failure aborts nonzero and writes nothing.
 
 import os
 import re
+import unicodedata
 import sys
 import json
 from datetime import datetime, timedelta
@@ -81,6 +82,9 @@ def fetch_events(env, url, day_start, day_end, label):
         # Still's own output — never treat it as a fixed commitment.
         if summary.startswith("🌊 Focus"):
             continue
+        summary = strip_emoji(summary)
+        if not summary:
+            continue
         dt = e.get("DTSTART").dt
         de = e.get("DTEND").dt if e.get("DTEND") else None
         if not isinstance(dt, datetime) or not isinstance(de, datetime):
@@ -93,6 +97,21 @@ def fetch_events(env, url, day_start, day_end, label):
 def iso(dt):
     """ISO with the calendar's own offset, e.g. 2026-07-31T18:30:00-04:00."""
     return dt.strftime("%Y-%m-%dT%H:%M:%S%z")[:-2] + ":" + dt.strftime("%z")[-2:]
+
+
+def strip_emoji(s):
+    """Calendar titles arrive with emoji prefixes ("🥦 Super Veggie"); Still
+    shows words only (Junyan, 2026-09-02). Drops symbol-other characters,
+    joiners, variation selectors, skin tones and keycaps."""
+    out = []
+    for ch in s:
+        o = ord(ch)
+        if unicodedata.category(ch) == "So":
+            continue
+        if o in (0x200D, 0xFE0F, 0x20E3) or 0x1F3FB <= o <= 0x1F3FF or 0xE0020 <= o <= 0xE007F:
+            continue
+        out.append(ch)
+    return re.sub(r"\s+", " ", "".join(out)).strip()
 
 
 def merge_fixed(events):
