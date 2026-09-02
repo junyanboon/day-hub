@@ -106,11 +106,9 @@ def merge_fixed(events):
     return kept
 
 
-def fill_gaps(fixed, now, day_start, start_n=0):
-    """Generate focus/rest blocks in the gaps between fixed events.
-
-    start_n continues the numbering past any blocks already used earlier today,
-    so a rebuild never produces a second "Quiet time II"."""
+def fill_gaps(fixed, now, day_start):
+    """Generate Open space / Rest blocks in the gaps between fixed events.
+    Generated blocks are not numbered (Junyan, 2026-09-02)."""
     lo = max(now, day_start.replace(hour=DAY_START, minute=0))
     hi = day_start.replace(hour=DAY_END, minute=0)
     edges = [(f["start"], f["end"]) for f in fixed]
@@ -125,7 +123,7 @@ def fill_gaps(fixed, now, day_start, start_n=0):
     if cursor < hi:
         windows.append((cursor, hi))
 
-    blocks, n = [], start_n
+    blocks = []
     for ws, we in windows:
         ws = max(ws, lo)
         if (we - ws).total_seconds() / 60 < MIN_GAP:
@@ -134,9 +132,8 @@ def fill_gaps(fixed, now, day_start, start_n=0):
         while (we - t).total_seconds() / 60 >= MIN_GAP:
             span = min(FOCUS_MIN, int((we - t).total_seconds() // 60))
             end = t + timedelta(minutes=span)
-            n += 1
             blocks.append({"s": iso(t), "e": iso(end),
-                           "t": "Quiet time", "type": "focus", "cal": "Junyan"})
+                           "t": "Open space", "type": "focus", "cal": "Junyan"})
             t = end + timedelta(minutes=REST_MIN)
             if (we - t).total_seconds() / 60 >= MIN_GAP:
                 blocks.append({"s": iso(end), "e": iso(t),
@@ -144,24 +141,10 @@ def fill_gaps(fixed, now, day_start, start_n=0):
     return blocks
 
 
-def unroman(s):
-    vals = {"I": 1, "V": 5, "X": 10}
-    total = 0
-    for i, c in enumerate(s):
-        v = vals.get(c, 0)
-        nxt = vals.get(s[i + 1], 0) if i + 1 < len(s) else 0
-        total += -v if v < nxt else v
-    return total
 
 
-def roman(n):
-    vals = [(10, "X"), (9, "IX"), (5, "V"), (4, "IV"), (1, "I")]
-    out = ""
-    for v, s in vals:
-        while n >= v:
-            out += s
-            n -= v
-    return out
+
+
 
 
 def previous_plan(html):
@@ -202,17 +185,10 @@ def build_plan(now):
                if datetime.fromisoformat(b["s"]) <= now
                and datetime.fromisoformat(b["s"]).date() == now.date()]
 
-    # Continue "Quiet time N" numbering past whatever today already used.
-    used = 0
-    for b in started:
-        mt = re.match(r"Quiet time ([IVX]+)$", b.get("t", ""))
-        if mt:
-            used = max(used, unroman(mt.group(1)))
-
     fixed = merge_fixed(events)
     blocks = [{"s": iso(f["start"]), "e": iso(f["end"]), "t": f["summary"],
                "type": "fixed", "cal": f["label"]} for f in fixed]
-    blocks += fill_gaps(fixed, now, day_start, start_n=used)
+    blocks += fill_gaps(fixed, now, day_start)
     future = [b for b in blocks if datetime.fromisoformat(b["s"]) > now]
 
     seen, merged = set(), []
@@ -224,18 +200,6 @@ def build_plan(now):
         merged.append(b)
     merged.sort(key=lambda b: b["s"])
 
-    # Number the generated blocks only after the future-filter has run, so a
-    # dropped candidate never burns a numeral and leaves a gap in the sequence.
-    n = used
-    for b in merged:
-        mt = re.match(r"Quiet time(?: ([IVX]+))?$", b.get("t", "")) if b["type"] == "focus" else None
-        if not mt:
-            continue
-        if datetime.fromisoformat(b["s"]) > now:
-            n += 1
-            b["t"] = f"Quiet time {roman(n)}"
-        elif mt.group(1):
-            n = max(n, unroman(mt.group(1)))
     return merged
 
 
