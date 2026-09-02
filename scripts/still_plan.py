@@ -110,7 +110,7 @@ def fill_gaps(fixed, now, day_start, start_n=0):
     """Generate focus/rest blocks in the gaps between fixed events.
 
     start_n continues the numbering past any blocks already used earlier today,
-    so a rebuild never produces a second "Deep work II"."""
+    so a rebuild never produces a second "Quiet time II"."""
     lo = max(now, day_start.replace(hour=DAY_START, minute=0))
     hi = day_start.replace(hour=DAY_END, minute=0)
     edges = [(f["start"], f["end"]) for f in fixed]
@@ -136,7 +136,7 @@ def fill_gaps(fixed, now, day_start, start_n=0):
             end = t + timedelta(minutes=span)
             n += 1
             blocks.append({"s": iso(t), "e": iso(end),
-                           "t": "Deep work", "type": "focus", "cal": "Junyan"})
+                           "t": "Quiet time", "type": "focus", "cal": "Junyan"})
             t = end + timedelta(minutes=REST_MIN)
             if (we - t).total_seconds() / 60 >= MIN_GAP:
                 blocks.append({"s": iso(end), "e": iso(t),
@@ -202,10 +202,10 @@ def build_plan(now):
                if datetime.fromisoformat(b["s"]) <= now
                and datetime.fromisoformat(b["s"]).date() == now.date()]
 
-    # Continue "Deep work N" numbering past whatever today already used.
+    # Continue "Quiet time N" numbering past whatever today already used.
     used = 0
     for b in started:
-        mt = re.match(r"Deep work ([IVX]+)$", b.get("t", ""))
+        mt = re.match(r"Quiet time ([IVX]+)$", b.get("t", ""))
         if mt:
             used = max(used, unroman(mt.group(1)))
 
@@ -228,12 +228,12 @@ def build_plan(now):
     # dropped candidate never burns a numeral and leaves a gap in the sequence.
     n = used
     for b in merged:
-        mt = re.match(r"Deep work(?: ([IVX]+))?$", b.get("t", "")) if b["type"] == "focus" else None
+        mt = re.match(r"Quiet time(?: ([IVX]+))?$", b.get("t", "")) if b["type"] == "focus" else None
         if not mt:
             continue
         if datetime.fromisoformat(b["s"]) > now:
             n += 1
-            b["t"] = f"Deep work {roman(n)}"
+            b["t"] = f"Quiet time {roman(n)}"
         elif mt.group(1):
             n = max(n, unroman(mt.group(1)))
     return merged
