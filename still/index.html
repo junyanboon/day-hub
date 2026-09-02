@@ -81,6 +81,14 @@
     text-align:center; max-width:90%; }
   #next-up { font-size:13px; color:var(--ink-faint); text-align:center; min-height:18px;
     text-shadow:0 1px 12px rgba(20,25,60,.65); }
+  /* activity glyph under the next line — same set and rules as the desktop orb (2026-09-02) */
+  #glyph { width:46px; height:46px; margin:4px auto 0; opacity:.85; color:var(--ink); transition:opacity 1.2s ease;
+    filter:drop-shadow(0 1px 10px rgba(20,25,60,.45)); }
+  html.night #glyph { opacity:.3; }
+  #glyph svg { width:100%; height:100%; overflow:visible; display:block; }
+  #glyph .aura { animation:glyphbreathe 6s ease-in-out infinite; }
+  @keyframes glyphbreathe { 0%,100% { opacity:.55; } 50% { opacity:1; } }
+  @media (prefers-reduced-motion: reduce) { #glyph .aura { animation:none; opacity:.8; } }
 
   #orb-wrap { position:relative; width:min(68vw, 280px); aspect-ratio:1; margin:10px 0; }
   /* aura canvas is the centerpiece — the old ring stays in the DOM but hidden */
@@ -220,6 +228,7 @@
     </div>
     <div id="mantra">take a deep breath</div>
     <div id="next-up"></div>
+    <div id="glyph"></div>
     <div id="controls">
       <button class="ctl" id="add-btn" title="slot something in now">＋</button>
       <button class="ctl" id="ext-btn" title="give this block 15 more minutes">+15</button>
@@ -464,6 +473,96 @@ const PLAN = {
     });
   }
 
+
+  /* ---------- activity glyph ----------
+     One small drawing under the "next" line saying what kind of thing this
+     block is. Same geometry and word rules as the desktop orb (desk-widgets/
+     still.swift, glyphFor + drawGlyph), so phone and Mac agree. Drawn in a
+     32x32 box centred on 0,0, in the warm apricot ink, with a breathing aura. */
+  const GLYPH = (() => {
+    const INK = "currentColor";   // the app's own ink (see #glyph in CSS); the Mac orb uses apricot on its dark disc
+    const S = (d, w = 1.3) => `<path d="${d}" fill="none" stroke="${INK}" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round"/>`;
+    const F = (d) => `<path d="${d}" fill="${INK}"/>`;
+    const r2 = (n) => Math.round(n * 100) / 100;
+    function petal(bx, by, deg, len) {
+      const a = deg * Math.PI / 180;
+      const tx = bx + Math.cos(a) * len, ty = by - Math.sin(a) * len;
+      const w = len * 0.42, px = -Math.sin(a) * w, py = -Math.cos(a) * w;
+      const mx = bx + Math.cos(a) * len * 0.55, my = by - Math.sin(a) * len * 0.55;
+      return `M${r2(bx)},${r2(by)} C${r2(mx+px)},${r2(my+py)} ${r2(tx+px*.35)},${r2(ty+py*.35)} ${r2(tx)},${r2(ty)} ` +
+             `C${r2(tx-px*.35)},${r2(ty-py*.35)} ${r2(mx-px)},${r2(my-py)} ${r2(bx)},${r2(by)}`;
+    }
+    const D = {
+      hourglass: S("M-6.5,-11 L6.5,-11 M-6.5,11 L6.5,11", 1.5) +
+                 S("M-5.5,-11 L-5.5,-8 C-5.5,-3.5 -1,-1.5 0,0 C1,-1.5 5.5,-3.5 5.5,-8 L5.5,-11") +
+                 S("M-5.5,11 L-5.5,8 C-5.5,3.5 -1,1.5 0,0 C1,1.5 5.5,3.5 5.5,8 L5.5,11") +
+                 F("M-3.6,-8.6 L3.6,-8.6 L0.9,-4.2 L-0.9,-4.2 Z") + F("M-3.4,9.4 L3.4,9.4 L0,6.4 Z"),
+      moon:      F("M6.5,-7.6 A10,10 0 1 0 6.5,7.6 A8,8 0 1 1 6.5,-7.6 Z"),
+      book:      S("M0,8.5 L0,-6", 1.1) +
+                 S("M0,-6 C4,-8 8,-8.5 11,-7.5 L11,5.5 C8,4.5 4,5 0,7 Z") +
+                 S("M0,-6 C-4,-8 -8,-8.5 -11,-7.5 L-11,5.5 C-8,4.5 -4,5 0,7 Z") +
+                 S("M0,8.5 C4,6.5 8,6 11,7", .9) + S("M0,8.5 C-4,6.5 -8,6 -11,7", .9) +
+                 S("M0,10 C4,8 8,7.5 11,8.5", .9) + S("M0,10 C-4,8 -8,7.5 -11,8.5", .9) +
+                 [-3.5,-1,1.5].map(y => S(`M2.5,${y} C5,${y-.9} 7,${y-1} 8.8,${y-.6}`, .7) + S(`M-2.5,${y} C-5,${y-.9} -7,${y-1} -8.8,${y-.6}`, .7)).join(""),
+      dhyana:    S("M-4.6,7.5 L-4.6,-5 C-4.6,-11.6 4.6,-11.6 4.6,-5 L4.6,7.5", 1.3) +
+                 [-2.6, 0.6, 3.8].map(y => S(`M-4.6,${y} Q0,${y+1.3} 4.6,${y}`, .8)).join("") +
+                 `<ellipse cx="0" cy="8.2" rx="12" ry="3" fill="none" stroke="${INK}" stroke-width="1.1"/>` +
+                 S("M-12,8.2 L-12,13.4 M12,8.2 L12,13.4", 1.1) +
+                 S("M-12,10.8 A12,3 0 0 0 12,10.8", 1.0) + S("M-12,13.4 A12,3 0 0 0 12,13.4", 1.0) +
+                 S("M12,8.6 C14.4,7.6 16.6,8.6 16.2,10.4 C15.8,11.6 13.6,11.2 12.2,10.6", 1.1) + `<circle cx="14.6" cy="9.4" r=".6" fill="${INK}"/>` +
+                 S("M-6.2,-3 C-6.2,-8.8 -2.4,-13.6 0,-13.9 C2.4,-13.6 6.2,-8.8 6.2,-3", .9) +
+                 S("M-6.2,-3 L-6.6,6.8 M6.2,-3 L6.6,6.8", .9) +
+                 [[-5.8,-6],[-3.6,-10.4],[0,-12.9],[3.6,-10.4],[5.8,-6],[-6.3,0],[-6.5,3.6],[6.3,0],[6.5,3.6]].map(([x,y]) => `<circle cx="${x}" cy="${y}" r=".8" fill="${INK}"/>`).join(""),
+      zouk:      `<circle cx="-5" cy="-9.5" r="2.4" fill="${INK}"/>` +
+                 `<path d="M-8.6,-6.6 L-1.4,-6.6 C-1.0,-3.2 -1.2,0.4 -1.8,3.2 L-8.2,3.2 C-8.8,0.4 -9.0,-3.2 -8.6,-6.6 Z M-5.9,-6.6 L-4.1,-6.6 L-5.0,-1.4 Z" fill="${INK}" fill-rule="evenodd"/>` +
+                 F("M-8.0,3.2 L-5.4,3.2 L-6.2,13.6 L-8.6,13.6 Z") + F("M-4.6,3.2 L-2.0,3.2 L-2.2,13.6 L-4.6,13.6 Z") +
+                 S("M-1.8,-5.6 C0.6,-4.6 2.0,-2.4 3.4,-0.4", 1.8) +
+                 F("M5.8,-5.4 C4.6,-4.8 4.0,-3.2 4.2,-2.4 C4.0,-1.4 3.8,-0.8 3.6,-0.3 C2.6,0.6 1.6,1.2 1.4,1.8 C0.6,2.8 -0.2,3.8 -0.8,4.9 L5.4,5.7 C4.9,5.2 4.6,4.7 4.6,4.2 C5.0,3.0 5.2,1.8 5.2,1.1 C6.4,0.0 7.2,-0.6 7.4,-1.3 C7.8,-2.2 8.2,-2.8 8.2,-3.4 Z") +
+                 S("M0.6,4.9 C-0.2,7.8 -0.9,10.8 -1.6,13.8", 1.5) + S("M3.8,5.5 C5.4,7.8 7.4,10.2 9.8,12.4", 1.5) +
+                 `<circle cx="9.2" cy="-7.0" r="2.1" fill="${INK}"/>` + S("M7.1,-4.7 L8.1,-5.7", 1.5) +
+                 S("M8.4,-3.2 C10.6,-1.6 12.4,0.4 13.2,2.6", 1.2) + S("M5.8,-5.2 C3,-6.8 0,-7.4 -2.4,-6.8", 1.2) +
+                 F("M9.05,-8.8 L9.47,-8.78 L9.79,-8.7 L10.09,-8.56 L10.37,-8.37 L10.59,-8.13 L10.72,-7.83 L10.79,-7.51 L10.8,-7.21 L10.76,-6.91 L10.66,-6.64 L10.54,-6.39 L10.17,-5.32 L10.76,-4.08 L11.41,-3.38 L12.18,-2.86 L13.04,-2.51 L13.94,-2.34 L14.86,-2.33 L15.78,-2.48 L16.69,-2.79 L17.55,-3.25 L18.35,-3.87 L18.99,-4.7 L19.49,-5.65 L19.83,-6.7 L19.98,-7.74 L20.08,-8.55 L20.26,-9.17 L20.51,-9.7 L20.84,-10.15 L21.25,-10.54 L21.73,-10.85 L22.28,-11.08 L22.87,-11.22 L23.51,-11.27 L24.18,-11.21 L24.85,-11.05 L25.51,-10.77 L26.15,-10.38 L26.76,-9.86 L27.04,-10.14 L26.51,-10.79 L25.88,-11.35 L25.19,-11.81 L24.44,-12.16 L23.65,-12.38 L22.83,-12.49 L22,-12.47 L21.18,-12.31 L20.37,-12 L19.62,-11.54 L18.94,-10.92 L18.36,-10.14 L17.9,-9.22 L17.62,-8.26 L17.37,-7.44 L17.06,-6.86 L16.69,-6.39 L16.28,-6.03 L15.89,-5.69 L15.47,-5.42 L15.02,-5.23 L14.57,-5.12 L14.13,-5.08 L13.72,-5.12 L13.36,-5.23 L13.05,-5.4 L12.78,-5.64 L12.65,-5.58 L12.77,-5.38 L12.99,-6.07 L13.04,-6.78 L12.95,-7.48 L12.75,-8.15 L12.42,-8.75 L12,-9.28 L11.53,-9.74 L10.99,-10.13 L10.38,-10.4 L9.74,-10.56 L9.16,-10.6 Z") + F("M10.41,-4.53 L10.78,-3.83 L11.29,-3.18 L11.89,-2.66 L12.56,-2.3 L13.26,-2.09 L13.98,-2.02 L14.69,-2.1 L15.36,-2.31 L15.99,-2.64 L16.56,-3.09 L17.06,-3.64 L17.48,-4.3 L17.8,-5.04 L18,-5.83 L18.14,-6.49 L18.33,-7 L18.6,-7.43 L18.93,-7.79 L19.31,-8.08 L19.75,-8.3 L20.23,-8.44 L20.74,-8.5 L21.28,-8.47 L21.82,-8.35 L22.37,-8.14 L22.9,-7.83 L23.41,-7.42 L23.88,-6.9 L24.12,-7.1 L23.68,-7.68 L23.17,-8.18 L22.61,-8.58 L22.02,-8.89 L21.4,-9.1 L20.76,-9.21 L20.12,-9.21 L19.49,-9.1 L18.89,-8.89 L18.32,-8.56 L17.8,-8.11 L17.37,-7.55 L17.02,-6.88 L16.8,-6.17 L16.57,-5.51 L16.28,-4.99 L15.94,-4.57 L15.58,-4.25 L15.19,-4.01 L14.8,-3.87 L14.41,-3.8 L14.05,-3.81 L13.7,-3.89 L13.39,-4.04 L13.1,-4.25 L12.84,-4.54 L12.62,-4.91 L12.39,-5.47 Z") + F("M9.87,-3.48 L10.16,-2.93 L10.51,-2.41 L10.9,-1.95 L11.33,-1.55 L11.78,-1.23 L12.26,-0.99 L12.75,-0.83 L13.24,-0.75 L13.74,-0.76 L14.22,-0.86 L14.69,-1.05 L15.12,-1.32 L15.53,-1.67 L15.9,-2.09 L15.7,-2.31 L15.28,-1.97 L14.87,-1.73 L14.47,-1.58 L14.09,-1.52 L13.73,-1.52 L13.38,-1.59 L13.05,-1.72 L12.74,-1.91 L12.45,-2.15 L12.18,-2.44 L11.93,-2.78 L11.7,-3.17 L11.51,-3.61 L11.33,-4.12 Z"),
+      talk:      `<circle cx="-6" cy="0" r="2.6" fill="none" stroke="${INK}" stroke-width="1.2"/>` +
+                 S("M-11,11 C-11,5.5 -8.5,4 -6,4 C-4.6,4 -3.6,4.5 -2.7,5.5", 1.2) +
+                 `<circle cx="6" cy="0" r="2.6" fill="none" stroke="${INK}" stroke-width="1.2"/>` +
+                 S("M11,11 C11,5.5 8.5,4 6,4 C4.6,4 3.6,4.5 2.7,5.5", 1.2) +
+                 S("M-13,-13 L-5,-13 Q-3.5,-13 -3.5,-11.5 L-3.5,-8.5 Q-3.5,-7 -5,-7 L-7.5,-7 L-8.5,-5 L-9.5,-7 L-13,-7 Q-14.5,-7 -14.5,-8.5 L-14.5,-11.5 Q-14.5,-13 -13,-13 Z", 1.0) +
+                 S("M5,-15 L13,-15 Q14.5,-15 14.5,-13.5 L14.5,-10.5 Q14.5,-9 13,-9 L9.5,-9 L8.5,-7 L7.5,-9 L5,-9 Q3.5,-9 3.5,-10.5 L3.5,-13.5 Q3.5,-15 5,-15 Z", 1.0),
+      mug:       `<rect x="-9" y="-2" width="13" height="12" rx="2" fill="none" stroke="${INK}" stroke-width="1.3"/>` +
+                 S("M5.37,7.76 A4,4 0 0 0 5.37,0.24") +
+                 [-5.5,-2.5].map(dx => S(`M${dx},-4 C${dx-2.5},-6.5 ${dx+2.5},-8.5 ${dx},-11`, 1.1)).join(""),
+      lotus:     [[90,16],[62,14],[118,14],[36,11],[144,11]].map(([d,l]) => S(petal(0, 9, d, l), 1.2)).join(""),
+      ring:      `<circle r="11" fill="none" stroke="${INK}" stroke-width="1.3"/><circle r="6.5" fill="none" stroke="${INK}" stroke-width="1.3"/><circle r="2.2" fill="${INK}"/>`,
+      meal:      `<circle r="6.2" fill="none" stroke="${INK}" stroke-width="1.3"/><circle r="3.4" fill="none" stroke="${INK}" stroke-width="1"/>` +
+                 S("M-11,-1 L-11,10", 1.4) + S("M-13,-10 L-13,-4 C-13,-2 -12.2,-1 -11,-1 C-9.8,-1 -9,-2 -9,-4 L-9,-10 M-11,-10 L-11,-4", 1.1) +
+                 S("M11,-10 L11,10", 1.4) + F("M11,-10 C13.2,-8 13.6,-3 11.2,0.6 L9.8,0.6 L9.8,-9 Z"),
+    };
+    function pick(title, type, night, dayDone, openSpace) {
+      if (openSpace && !night) return "lotus";
+      const t = (title || "").toLowerCase();
+      const has = (ws) => ws.some(w => t.includes(w));
+      if (has(["sleep", "bed", "nap"])) return "moon";
+      if (has(["wind down", "winding", "unwind", "read"]) || dayDone) return "book";
+      if (has(["open space"])) return "lotus";
+      if (has(["shambhavi", "yoga", "isha", "meditat", "sadhana", "kriya", "breath"])) return "dhyana";
+      if (has(["zouk", "samba", "danc", "bachata", "salsa", "kizomba", "ballet", "choreo", "forró", "forro"])) return "zouk";
+      if (has(["party", "celebrat", "birthday", "wedding", "festa", "friends"])) return "talk";
+      if (has(["deep work", "focus"]) || type === "task") return "hourglass";
+      if (type === "focus") return "lotus";
+      if (has(["lunch", "dinner", "breakfast", "brunch", "meal", "veggie", "cook", "eat", "food", "supper", "snack"])) return "meal";
+      if (has(["coffee", "tea"]) || type === "break") return "mug";
+      if (night) return "moon";
+      return "ring";
+    }
+    const svg = (g) => `<svg viewBox="-16 -16 32 32" xmlns="http://www.w3.org/2000/svg"><defs>
+      <filter id="gblur" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="2.8"/></filter>
+      <radialGradient id="ghalo"><stop offset="0" stop-color="${INK}" stop-opacity=".34"/><stop offset=".6" stop-color="${INK}" stop-opacity=".10"/><stop offset="1" stop-color="${INK}" stop-opacity="0"/></radialGradient></defs>
+      <g class="aura"><circle r="20" fill="url(#ghalo)"/><g filter="url(#gblur)">${g}</g></g>${g}</svg>`;
+    let shown = "";
+    return { show(name) { if (name === shown) return; shown = name; $("glyph").innerHTML = name ? svg(D[name] || D.ring) : ""; }, pick };
+  })();
+  window.GLYPH = GLYPH;   // for poking at from the console
+
   /* ---------- render ---------- */
   let manualIdx = null, lastKey = "", pausedAt = null;
 
@@ -472,12 +571,13 @@ const PLAN = {
     const blocks = allBlocks();
     let idx = manualIdx !== null ? Math.min(manualIdx, blocks.length-1) : currentIdx(blocks, now);
     let phase, label, remaining=0, total=0, sub="", next="";
+    let gTitle = null, gType = null, gOpen = false;
 
     if (idx === -1) {
       const ni = nextIdx(blocks, now);
       if (ni === -1) { phase="done"; label="your day is complete"; }
       else {
-        phase="break"; label="open space";
+        phase="break"; label="open space"; gTitle = blocks[ni].t; gType = blocks[ni].type; gOpen = true;
         remaining = total = (blocks[ni].s - now)/1000;
         sub = "until " + fmtT(blocks[ni].s);
         next = `next · ${blocks[ni].t} at ${fmtT(blocks[ni].s)}`;
@@ -485,7 +585,7 @@ const PLAN = {
     } else {
       const b = blocks[idx];
       phase = b.type === "task" ? "focus" : b.type;
-      label = b.t;
+      label = b.t; gTitle = b.t; gType = b.type;
       total = (b.e - b.s)/1000;
       remaining = Math.max(0, (b.e - now)/1000);
       sub = (b.type === "break") ? "rest" : "";
@@ -502,6 +602,7 @@ const PLAN = {
     $("time-sub").textContent = sub;
     $("block-label").textContent = label;
     $("next-up").textContent = next;
+    GLYPH.show(blocks.length ? GLYPH.pick(gTitle, gType, document.documentElement.classList.contains("night"), phase === "done", gOpen) : "");
     document.body.className = "mode-" + (phase === "fixed" ? "fixed" : phase) + (pausedAt ? "" : " running");
     // <html> paints the gradient, so it needs the same mode class
     document.documentElement.classList.remove("mode-focus","mode-break","mode-fixed","mode-done");
@@ -807,6 +908,7 @@ const PLAN = {
       $("time").textContent = "…";
       $("time-sub").textContent = "";
       $("next-up").textContent = "pull down to refresh";
+      GLYPH.show("");
     }
   }, 1000);
   let wakeLock;
