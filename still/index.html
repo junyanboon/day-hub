@@ -81,8 +81,9 @@
     text-align:center; max-width:90%; }
   #next-up { font-size:13px; color:var(--ink-faint); text-align:center; min-height:18px;
     text-shadow:0 1px 12px rgba(20,25,60,.65); }
-  /* activity glyph under the next line — same set and rules as the desktop orb (2026-09-02) */
-  #glyph { width:46px; height:46px; margin:4px auto 0; opacity:.85; color:var(--ink); transition:opacity 1.2s ease;
+  /* activity glyph is the centrepiece, between the label and the time — same
+     layout as the desktop orb (2026-09-02: label · glyph · time · next event) */
+  #glyph { width:78px; height:78px; opacity:.85; color:var(--ink); transition:opacity 1.2s ease;
     filter:drop-shadow(0 1px 10px rgba(20,25,60,.45)); }
   html.night #glyph { opacity:.3; }
   #glyph svg { width:100%; height:100%; overflow:visible; display:block; }
@@ -112,7 +113,8 @@
   @keyframes breathe { 0%,100%{transform:scale(.94);} 50%{transform:scale(1.04);} }
   @media (prefers-reduced-motion: reduce) { body.running #orb { animation:none; } }
   /* night keeps the orb — only the field behind it goes dark and quiet */
-  #time { font-size:48px; font-weight:200; letter-spacing:1px; font-variant-numeric:tabular-nums; }
+  #time { font-family:ui-rounded,-apple-system,"SF Pro Rounded","SF Pro Text",sans-serif;
+    font-size:48px; font-weight:300; letter-spacing:1px; font-variant-numeric:tabular-nums; }
   #time-sub { font-size:12px; color:var(--ink-faint); letter-spacing:1px; }
 
   #controls { display:flex; align-items:center; gap:14px; margin-top:4px; }
@@ -219,6 +221,7 @@
 <div id="app">
   <div id="stage">
     <div id="block-label"></div>
+    <div id="glyph"></div>
     <div id="orb-wrap">
       <svg id="ring" viewBox="0 0 100 100">
         <circle class="track" cx="50" cy="50" r="47"></circle>
@@ -226,9 +229,8 @@
       </svg>
       <div id="orb"><div id="time">--:--</div><div id="time-sub"></div></div>
     </div>
-    <div id="mantra">take a deep breath</div>
     <div id="next-up"></div>
-    <div id="glyph"></div>
+    <div id="mantra">take a deep breath</div>
     <div id="controls">
       <button class="ctl" id="add-btn" title="slot something in now">＋</button>
       <button class="ctl" id="ext-btn" title="give this block 15 more minutes">+15</button>
@@ -584,7 +586,7 @@ const PLAN = {
         phase="break"; label="open space"; gTitle = blocks[ni].t; gType = blocks[ni].type; gOpen = true;
         remaining = total = (blocks[ni].s - now)/1000;
         sub = "until " + fmtT(blocks[ni].s);
-        next = `next · ${blocks[ni].t} at ${fmtT(blocks[ni].s)}`;
+        next = `${blocks[ni].t} at ${fmtT(blocks[ni].s)}`;
       }
     } else {
       const b = blocks[idx];
@@ -593,7 +595,7 @@ const PLAN = {
       total = (b.e - b.s)/1000;
       remaining = Math.max(0, (b.e - now)/1000);
       sub = (b.type === "break") ? "rest" : "";
-      if (blocks[idx+1]) next = `next · ${blocks[idx+1].t} at ${fmtT(blocks[idx+1].s)}`;
+      if (blocks[idx+1]) next = `${blocks[idx+1].t} at ${fmtT(blocks[idx+1].s)}`;
     }
 
     const k = phase + ":" + label;
