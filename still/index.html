@@ -531,6 +531,7 @@ const PLAN = {
                  S("M5.37,7.76 A4,4 0 0 0 5.37,0.24") +
                  [-5.5,-2.5].map(dx => S(`M${dx},-4 C${dx-2.5},-6.5 ${dx+2.5},-8.5 ${dx},-11`, 1.1)).join(""),
       lotus:     [[90,16],[62,14],[118,14],[36,11],[144,11]].map(([d,l]) => S(petal(0, 9, d, l), 1.2)).join(""),
+      weight:    `<path d="M-6,0 L6,0" fill="none" stroke="${INK}" stroke-width="2" stroke-linecap="round"/><path d="M-15,0 L-12.5,0 M12.5,0 L15,0" fill="none" stroke="${INK}" stroke-width="1.3" stroke-linecap="round"/><path d="M-9.5,-6.5 L-6,-6.5 L-6,6.5 L-9.5,6.5 Z M-12.5,-4 L-9.5,-4 L-9.5,4 L-12.5,4 Z M9.5,-6.5 L6,-6.5 L6,6.5 L9.5,6.5 Z M12.5,-4 L9.5,-4 L9.5,4 L12.5,4 Z" fill="none" stroke="${INK}" stroke-width="1.3" stroke-linejoin="round"/>`,
       ring:      `<circle r="11" fill="none" stroke="${INK}" stroke-width="1.3"/><circle r="6.5" fill="none" stroke="${INK}" stroke-width="1.3"/><circle r="2.2" fill="${INK}"/>`,
       meal:      `<circle r="6.2" fill="none" stroke="${INK}" stroke-width="1.3"/><circle r="3.4" fill="none" stroke="${INK}" stroke-width="1"/>` +
                  S("M-11,-1 L-11,10", 1.4) + S("M-13,-10 L-13,-4 C-13,-2 -12.2,-1 -11,-1 C-9.8,-1 -9,-2 -9,-4 L-9,-10 M-11,-10 L-11,-4", 1.1) +
@@ -549,6 +550,7 @@ const PLAN = {
       if (has(["deep work", "focus"]) || type === "task") return "hourglass";
       if (type === "focus") return "lotus";
       if (has(["lunch", "dinner", "breakfast", "brunch", "meal", "veggie", "cook", "eat", "food", "supper", "snack", "pudding", "smoothie", "dessert", "soup", "salad", "porridge", "oats"])) return "meal";
+      if (has(["gym", "sauna", "workout", "lift", "running", "jog", "swim", "cardio", "stretch", "exercis", "walk", "hike", "cycling", "pilates"])) return "weight";   // after meals: "brunch" must not read as a run
       if (has(["coffee", "tea"]) || type === "break") return "mug";
       if (night) return "moon";
       return "ring";
