@@ -537,12 +537,14 @@ const PLAN = {
                  [-5.5,-2.5].map(dx => S(`M${dx},-4 C${dx-2.5},-6.5 ${dx+2.5},-8.5 ${dx},-11`, 1.1)).join(""),
       lotus:     [[90,16],[62,14],[118,14],[36,11],[144,11]].map(([d,l]) => S(petal(0, 9, d, l), 1.2)).join(""),
       weight:    `<path d="M-6,0 L6,0" fill="none" stroke="${INK}" stroke-width="2" stroke-linecap="round"/><path d="M-15,0 L-12.5,0 M12.5,0 L15,0" fill="none" stroke="${INK}" stroke-width="1.3" stroke-linecap="round"/><path d="M-9.5,-6.5 L-6,-6.5 L-6,6.5 L-9.5,6.5 Z M-12.5,-4 L-9.5,-4 L-9.5,4 L-12.5,4 Z M9.5,-6.5 L6,-6.5 L6,6.5 L9.5,6.5 Z M12.5,-4 L9.5,-4 L9.5,4 L12.5,4 Z" fill="none" stroke="${INK}" stroke-width="1.3" stroke-linejoin="round"/>`,
+      sunrise:   `<circle cx="-5" cy="-6" r="4.6" fill="none" stroke="${INK}" stroke-width="1.3"/><path d="M-5,-12.6 L-5,-15.2 M-9.67,-10.67 L-11.51,-12.51 M-11.6,-6 L-14.2,-6 M-0.33,-10.67 L1.51,-12.51 M1.6,-6 L4.2,-6" fill="none" stroke="${INK}" stroke-width="1.1" stroke-linecap="round"/><path d="M-7,9.5 C-10.6,9.5 -11,4.2 -7.4,3.6 C-7.8,-0.8 -1.4,-2.2 0.4,1.6 C1.6,-1.4 7.2,-1.6 7.4,2.8 C11.2,2.6 12,9.1 8.4,9.5 Z" fill="none" stroke="${INK}" stroke-width="1.3" stroke-linejoin="round" stroke-linecap="round"/>`,
       ring:      `<circle r="11" fill="none" stroke="${INK}" stroke-width="1.3"/><circle r="6.5" fill="none" stroke="${INK}" stroke-width="1.3"/><circle r="2.2" fill="${INK}"/>`,
       meal:      `<circle r="6.2" fill="none" stroke="${INK}" stroke-width="1.3"/><circle r="3.4" fill="none" stroke="${INK}" stroke-width="1"/>` +
                  S("M-11,-1 L-11,10", 1.4) + S("M-13,-10 L-13,-4 C-13,-2 -12.2,-1 -11,-1 C-9.8,-1 -9,-2 -9,-4 L-9,-10 M-11,-10 L-11,-4", 1.1) +
                  S("M11,-10 L11,10", 1.4) + F("M11,-10 C13.2,-8 13.6,-3 11.2,0.6 L9.8,0.6 L9.8,-9 Z"),
     };
-    function pick(title, type, night, dayDone, openSpace) {
+    function pick(title, type, night, dayDone, openSpace, preDay) {
+      if (preDay && !night) return "sunrise";   // nothing queued yet this morning (Junyan, 2026-09-04)
       if (openSpace && !night) return "lotus";
       const t = (title || "").toLowerCase();
       const has = (ws) => ws.some(w => t.includes(w));
@@ -577,13 +579,15 @@ const PLAN = {
     const blocks = allBlocks();
     let idx = manualIdx !== null ? Math.min(manualIdx, blocks.length-1) : currentIdx(blocks, now);
     let phase, label, remaining=0, total=0, sub="", next="";
-    let gTitle = null, gType = null, gOpen = false;
+    let gTitle = null, gType = null, gOpen = false, gPre = false;
 
     if (idx === -1) {
       const ni = nextIdx(blocks, now);
       if (ni === -1) { phase="done"; label="your day is complete"; }
       else {
-        phase="break"; label="open space"; gTitle = blocks[ni].t; gType = blocks[ni].type; gOpen = true;
+        // nothing has started yet today — "waking up", not "open space" (Junyan, 2026-09-04)
+        gPre = blocks.every(b => now < b.s);
+        phase="break"; label = gPre ? "waking up" : "open space"; gTitle = blocks[ni].t; gType = blocks[ni].type; gOpen = true;
         remaining = total = (blocks[ni].s - now)/1000;
         sub = "until " + fmtT(blocks[ni].s);
         next = `${blocks[ni].t} at ${fmtT(blocks[ni].s)}`;
@@ -608,7 +612,7 @@ const PLAN = {
     $("time-sub").textContent = sub;
     $("block-label").textContent = label;
     $("next-up").textContent = next;
-    GLYPH.show(blocks.length ? GLYPH.pick(gTitle, gType, document.documentElement.classList.contains("night"), phase === "done", gOpen) : "");
+    GLYPH.show(blocks.length ? GLYPH.pick(gTitle, gType, document.documentElement.classList.contains("night"), phase === "done", gOpen, gPre) : "");
     document.body.className = "mode-" + (phase === "fixed" ? "fixed" : phase) + (pausedAt ? "" : " running");
     // <html> paints the gradient, so it needs the same mode class
     document.documentElement.classList.remove("mode-focus","mode-break","mode-fixed","mode-done");
