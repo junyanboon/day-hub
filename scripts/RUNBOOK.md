@@ -2,7 +2,8 @@
 
 Once a day, GitHub Actions runs `scripts/rollover.py` (deterministic, no AI) and:
 
-1. Reads the four Google Calendars for TODAY (America/Toronto) via secret **iCal URLs**.
+1. Reads the four Google Calendars for TODAY (America/Toronto) via `scripts/calfeed.py`
+   — the **Calendar API** where configured, secret **iCal URLs** otherwise.
 2. Rewrites the Day Hub's **Today** and **Meals** tabs (only the content between the
    `<!-- ROLLOVER:*:START/END -->` markers in `index.html`) and commits if it changed.
 3. Creates today's **Notion Day Plan** page in the *Travel Activities Planner* data
@@ -22,16 +23,56 @@ In **github.com/junyanboon/day-hub → Settings → Secrets and variables → Ac
 
 | Secret | Value |
 |---|---|
-| `ICS_URL_JOINT`  | Joint Plans calendar → Settings → **Secret address in iCal format** |
-| `ICS_URL_JUNYAN` | "Junyan" / My Plan calendar → same secret iCal URL |
-| `ICS_URL_CANEY`  | Caney calendar (`junyan.boon@gmail.com`) → same secret iCal URL |
-| `ICS_URL_STAFF`  | Staff Scheduling calendar → same secret iCal URL (same value as fbs-monitor's `ICS_URL_STAFF`) |
+| `GOOGLE_SA_JSON` | Service-account key JSON (see **Calendar access** below). Raw JSON or base64 of it. |
+| `CAL_ID_JOINT` / `CAL_ID_JUNYAN` / `CAL_ID_CANEY` / `CAL_ID_STAFF` | Each calendar's id (see below). |
+| `ICS_URL_JOINT` / `ICS_URL_JUNYAN` / `ICS_URL_CANEY` / `ICS_URL_STAFF` | *Fallback.* Each calendar's **Secret address in iCal format**. Keep these until the API path is proven; `ICS_URL_STAFF` is the same value as fbs-monitor's. |
 | `NOTION_TOKEN`   | A Notion internal-integration token. **Share the *Travel Activities Planner* database with that integration** (••• → Connections). Reuse the fbs-monitor integration if it's easier — just add this DB to its connections. |
 | `NOTION_DAYPLAN_DB` | *(optional)* the Day-Plan database id. Defaults to `e3212b3245264da48a12dc6d8900490b`; only set if that ever changes. |
 
-To get a calendar's secret iCal URL: Google Calendar → hover the calendar → ⋮ →
-*Settings and sharing* → **Integrate calendar** → *Secret address in iCal format*.
-Treat these like passwords — anyone with the URL can read the calendar.
+## Calendar access — two backends, chosen per calendar
+
+`scripts/calfeed.py` reads a calendar through the **Calendar API** when both
+`GOOGLE_SA_JSON` and that calendar's `CAL_ID_*` are set, and falls back to
+`ICS_URL_*` otherwise. So calendars can be migrated one at a time, and removing a
+`CAL_ID_*` rolls that calendar back with no code change. Every run prints which
+backend each calendar used:
+
+```
+calendar 'Joint Plans' via google-api
+calendar 'Junyan' via ics-url
+```
+
+**Why the API is preferred.** Google's private iCal endpoints return intermittent —
+and sometimes sustained — 5xx. A 500 on the Joint Plans feed took *every* day-hub run
+down from 2026-09-03 14:17Z: ten consecutive failures, zero successes, while the
+Calendar API served the same calendar without complaint. The API also expands
+recurring events server-side and fetches only today's window.
+
+### Setting up the service account (one time)
+
+1. In a Google Cloud project, **enable the Google Calendar API**.
+2. Create a **service account**, then create a **JSON key** for it. Put the whole file
+   in the `GOOGLE_SA_JSON` secret (base64 it first if newlines get mangled).
+3. Copy the service account's email — it looks like
+   `something@project.iam.gserviceaccount.com`.
+4. For **each** of the four calendars: Google Calendar → hover the calendar → ⋮ →
+   *Settings and sharing* → **Share with specific people** → add that email with
+   **"See all event details"**. A calendar that is not shared returns HTTP 404 and the
+   run fails fast with a message saying exactly that.
+5. Read each calendar's id from the same settings page (*Integrate calendar* →
+   **Calendar ID**) and put it in the matching `CAL_ID_*` secret.
+
+No domain-wide delegation, no OAuth consent screen — sharing each calendar directly
+with the service account is enough, and it keeps the grant read-only and revocable
+per calendar.
+
+### The iCal fallback
+
+Google Calendar → hover the calendar → ⋮ → *Settings and sharing* →
+**Integrate calendar** → *Secret address in iCal format*. Treat these like passwords —
+anyone with the URL can read the calendar. Still required by the Cloudflare Worker in
+`still-api/`, which has its own copies as Worker secrets; migrating the GitHub side does
+not change the Worker.
 
 ## After setup
 
@@ -47,9 +88,20 @@ Treat these like passwords — anyone with the URL can read the calendar.
   when the title starts "Junyan", a deep-work block injected into a free 15:30–17:00,
   a Brazil countdown ≤7 days). It does *not* know one-off context like "bring $30 cash" —
   that's still the live co-pilot's job to add on top during the day.
-- **Fail-loud:** any calendar fetch/parse error aborts and writes nothing (no partial page).
+- **Fail-loud, but not on the first blip:** each calendar read gets 3 attempts, 3s then
+  9s apart.
+  - *Retried:* network errors, timeouts, 5xx, 429, `403 rateLimitExceeded` /
+    `quotaExceeded`, truncated bodies, and — on the API path — **404**.
+  - *Not retried:* `401` (the key is bad), `403 forbidden`, and a 4xx on an iCal URL
+    (it is revoked or wrong). These abort on the first attempt.
+  - **Why 404 is retried.** Measured 2026-09-04: a calendar shared minutes earlier
+    returned 404 on 1 of 5 identical requests while Google propagated the sharing.
+    Failing fast there turns a settling share into a dead run. A genuinely wrong or
+    unshared calendar still fails — it just takes 3 attempts to say so.
+  - Either way an exhausted calendar read aborts and writes nothing (no partial page).
 - If the Notion query can't be verified, it does **not** create a page (avoids duplicates).
-- Local dry-run: `pip install -r scripts/requirements.txt` then set the five env vars and
+- Local dry-run: `pip install -r scripts/requirements.txt`, set `NOTION_TOKEN` plus each
+  calendar's `CAL_ID_*` (with `GOOGLE_SA_JSON`) or `ICS_URL_*`, then
   `python scripts/rollover.py`.
 
 ---
@@ -59,8 +111,9 @@ Treat these like passwords — anyone with the URL can read the calendar.
 `.github/workflows/still.yml` runs `scripts/still_plan.py` (deterministic, no AI)
 roughly every 30 minutes, ~06:00–22:30 Toronto, and:
 
-1. Reads **Joint Plans** + **Junyan** for TODAY via the existing secret iCal URLs
-   (`ICS_URL_JOINT`, `ICS_URL_JUNYAN` — no new secrets needed). Staff Scheduling is
+1. Reads **Joint Plans** + **Junyan** for TODAY through the same `scripts/calfeed.py`
+   as the rollover, so it shares the `CAL_ID_*` / `ICS_URL_*` secrets and needs none of
+   its own. Staff Scheduling is
    deliberately excluded; Junyan removed it from Still on 2026-07-30.
 2. Treats every calendar event as a **fixed** block, skips Still's own
    `🌊 Focus — …` events, and fills the remaining daytime gaps with 50-minute
@@ -90,8 +143,9 @@ This replaces the local `still-day-resync` scheduled task, disabled 2026-07-31
 after it skipped every fire while the Mac was unattended in Brazil (the app sat
 on the previous day's plan). Do not re-enable it while this workflow runs.
 
-Local dry-run: `pip install -r scripts/requirements.txt`, set `ICS_URL_JOINT`
-and `ICS_URL_JUNYAN`, then `python scripts/still_plan.py`.
+Local dry-run: `pip install -r scripts/requirements.txt`, set either
+`GOOGLE_SA_JSON` + `CAL_ID_JOINT` + `CAL_ID_JUNYAN` or `ICS_URL_JOINT` +
+`ICS_URL_JUNYAN`, then `python scripts/still_plan.py`.
 
 ## Live refresh — `still-api` Worker
 

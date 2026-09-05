@@ -3,7 +3,8 @@
 Day Hub — deterministic morning rollover (GitHub Actions, Brazil-proof).
 
 Pure rails, no AI. Once a day it:
-  1. Reads the four Google Calendars (secret ICS URLs) for TODAY (America/Toronto).
+  1. Reads the four Google Calendars for TODAY (America/Toronto) via
+     scripts/calfeed.py — Calendar API where configured, secret ICS URL otherwise.
   2. Builds the Day Hub #tab-today + #tab-meals timelines and splices them into
      index.html between the ROLLOVER:* markers (leaving the rest of the app alone).
   3. Creates today's Notion "Day Plan" page in the Travel Activities Planner data
@@ -15,8 +16,9 @@ GITHUB_TOKEN (no PAT). Notion writes use NOTION_TOKEN.
 This mirrors the proven fbs-monitor / day-sheet cloud pattern. It replaces the local
 `day-hub-morning-rollover` scheduled task, which the local scheduler skips unattended.
 
-Fail policy: a calendar-source failure aborts nonzero and writes nothing (never a
-fabricated/partial page). Missing secrets → the workflow skip-greens before we run.
+Fail policy: a calendar-source failure that survives its retries aborts nonzero and
+writes nothing (never a fabricated/partial page). Missing secrets → the workflow
+skip-greens before we run.
 """
 
 import os
@@ -27,8 +29,8 @@ from datetime import datetime, timedelta, date
 from zoneinfo import ZoneInfo
 
 import requests
-import icalendar
-import recurring_ical_events
+
+import calfeed
 
 TZ = ZoneInfo("America/Toronto")
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -38,10 +40,10 @@ INDEX = os.path.join(HERE, "..", "index.html")
 # Each maps to a GitHub secret holding that calendar's PRIVATE iCal URL
 # (Google Calendar → Settings → "Secret address in iCal format").
 CALS = [
-    {"key": "joint",  "env": "ICS_URL_JOINT",  "label": "Joint"},
-    {"key": "myplan", "env": "ICS_URL_JUNYAN", "label": "My Plan"},
-    {"key": "caney",  "env": "ICS_URL_CANEY",  "label": "Caney"},
-    {"key": "staff",  "env": "ICS_URL_STAFF",  "label": "Staff"},
+    {"key": "joint",  "name": "JOINT",  "label": "Joint"},
+    {"key": "myplan", "name": "JUNYAN", "label": "My Plan"},
+    {"key": "caney",  "name": "CANEY",  "label": "Caney"},
+    {"key": "staff",  "name": "STAFF",  "label": "Staff"},
 ]
 
 # ── Notion ───────────────────────────────────────────────────────────────────
@@ -135,36 +137,17 @@ def classify(summary):
     return "📌", False, ""
 
 
-def fetch_events(env, url, day_start, day_end, label):
+def fetch_events(name, day_start, day_end, label):
     """Return [{summary, start(dt), end(dt), all_day(bool)}] for the window."""
-    try:
-        r = requests.get(url, timeout=30)
-        r.raise_for_status()
-        cal = icalendar.Calendar.from_ical(r.content)
-    except Exception as e:
-        die(f"calendar '{label}' ({env}) failed to fetch/parse: {e}")
-    occ = recurring_ical_events.of(cal).between(day_start, day_end)
     out = []
-    for e in occ:
-        summary = str(e.get("SUMMARY", "")).strip()
+    for e in calfeed.read_day(name, label, day_start, day_end):
+        summary = e["summary"]
         if not summary:
-            continue
-        status = str(e.get("STATUS", "")).upper()
-        if status == "CANCELLED":
             continue
         if summary.lower() in ("unavailable", "busy"):
             continue
-        dt = e.get("DTSTART").dt
-        de = e.get("DTEND").dt if e.get("DTEND") else None
-        all_day = not isinstance(dt, datetime)
-        if all_day:
-            out.append({"summary": summary, "start": None, "end": None,
-                        "all_day": True, "label": label})
-            continue
-        s = dt.astimezone(TZ)
-        en = de.astimezone(TZ) if isinstance(de, datetime) else None
-        out.append({"summary": summary, "start": s, "end": en,
-                    "all_day": False, "label": label})
+        out.append({"summary": summary, "start": e["start"], "end": e["end"],
+                    "all_day": e["all_day"], "label": label})
     return out
 
 
@@ -428,10 +411,9 @@ def main():
 
     events = []
     for c in CALS:
-        url = os.environ.get(c["env"], "").strip()
-        if not url:
-            die(f"missing secret {c['env']} for the {c['label']} calendar")
-        evs = fetch_events(c["env"], url, day_start, day_end, c["label"])
+        print(f"calendar '{c['label']}' via {calfeed.source_of(c['name'])}",
+              file=sys.stderr)
+        evs = fetch_events(c["name"], day_start, day_end, c["label"])
         if c["key"] == "staff":
             # Staff rows are reference only unless the title names Junyan.
             evs = [e for e in evs if e["summary"].lower().startswith("junyan")]

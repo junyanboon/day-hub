@@ -28,11 +28,18 @@ jobs:
       - name: Skip-green until secrets exist
         id: gate
         run: |
-          if [ -z "${{ secrets.ICS_URL_JOINT }}" ] || [ -z "${{ secrets.NOTION_TOKEN }}" ]; then
+          # Either calendar backend is enough, per calendar: the Calendar API
+          # needs GOOGLE_SA_JSON + CAL_ID_*, the fallback needs ICS_URL_*.
+          have_cal () {
+            if [ -n "$1" ] && [ -n "${{ secrets.GOOGLE_SA_JSON }}" ]; then return 0; fi
+            [ -n "$2" ]
+          }
+          if have_cal "${{ secrets.CAL_ID_JOINT }}" "${{ secrets.ICS_URL_JOINT }}" \
+          && [ -n "${{ secrets.NOTION_TOKEN }}" ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
             echo "ready=false" >> "$GITHUB_OUTPUT"
             echo "Secrets not configured yet — skipping (green). See scripts/RUNBOOK.md."
-          else
-            echo "ready=true" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Checkout
@@ -52,6 +59,11 @@ jobs:
       - name: Run rollover
         if: steps.gate.outputs.ready == 'true'
         env:
+          GOOGLE_SA_JSON: ${{ secrets.GOOGLE_SA_JSON }}
+          CAL_ID_JOINT:   ${{ secrets.CAL_ID_JOINT }}
+          CAL_ID_JUNYAN:  ${{ secrets.CAL_ID_JUNYAN }}
+          CAL_ID_CANEY:   ${{ secrets.CAL_ID_CANEY }}
+          CAL_ID_STAFF:   ${{ secrets.CAL_ID_STAFF }}
           ICS_URL_JOINT:  ${{ secrets.ICS_URL_JOINT }}
           ICS_URL_JUNYAN: ${{ secrets.ICS_URL_JUNYAN }}
           ICS_URL_CANEY:  ${{ secrets.ICS_URL_CANEY }}

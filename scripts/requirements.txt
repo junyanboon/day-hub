@@ -1,3 +1,10 @@
 requests>=2.31
+
+# Google Calendar API — the preferred calendar backend (scripts/calfeed.py).
+google-api-python-client>=2.100
+google-auth>=2.23
+
+# Secret iCal URL fallback. Still needed until every CAL_ID_* secret is set,
+# and the path the Cloudflare Worker in still-api/ uses.
 icalendar>=5.0
 recurring-ical-events>=2.2
