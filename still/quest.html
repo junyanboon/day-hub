@@ -6,10 +6,10 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Quest">
-<link rel="icon" type="image/svg+xml" href="icon.svg">
+<link rel="icon" type="image/svg+xml" href="quest-icon.svg">
 <link rel="manifest" href="quest.webmanifest">
 <meta name="theme-color" content="#191d3c">
-<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="apple-touch-icon" href="quest-icon-180.png">
 <title>Day Quest</title>
 <!--
   Day Quest — the game layer on Stillness (prototype, 2026-09-28).
@@ -777,7 +777,7 @@
     if (navigator.vibrate) navigator.vibrate([60,80,60]);
     if (store.get("quest-push")) return;   // the server pings this device instead
     if ("Notification" in window && Notification.permission === "granted") {
-      try { new Notification(title, { body, icon:"icon-180.png", tag:id }); } catch {}
+      try { new Notification(title, { body, icon:"quest-icon-180.png", tag:id }); } catch {}
     }
   }
   function pings(all, t){

@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- Day Quest icon: a night trail winding up to a gold flag. Full-bleed square;
+       iOS rounds the corners itself. PNGs: quest-icon-180.png, quest-icon-512.png. -->
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#6a5fc8"/>
+      <stop offset=".55" stop-color="#2f3170"/>
+      <stop offset="1" stop-color="#191d3c"/>
+    </linearGradient>
+    <radialGradient id="glow" cx=".5" cy=".5" r=".5">
+      <stop offset="0" stop-color="#ffd479" stop-opacity=".75"/>
+      <stop offset="1" stop-color="#ffd479" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="hill" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#8fe3b0"/>
+      <stop offset="1" stop-color="#3d6b70"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" fill="url(#sky)"/>
+
+  <!-- stars -->
+  <g fill="#fff">
+    <circle cx="70" cy="80" r="4" opacity=".8"/><circle cx="150" cy="46" r="3" opacity=".6"/>
+    <circle cx="232" cy="96" r="3.5" opacity=".7"/><circle cx="96" cy="170" r="2.5" opacity=".5"/>
+    <circle cx="440" cy="210" r="3" opacity=".6"/><circle cx="300" cy="40" r="2.5" opacity=".5"/>
+  </g>
+  <!-- sparkle -->
+  <path d="M110 250 l9 -26 9 26 26 9 -26 9 -9 26 -9 -26 -26 -9z" fill="#ffd479"/>
+  <path d="M420 300 l5 -15 5 15 15 5 -15 5 -5 15 -5 -15 -15 -5z" fill="#c9b6ff"/>
+
+  <!-- hills -->
+  <path d="M-10 420 C 90 330 190 350 270 400 C 340 440 430 360 530 330 L530 530 L-10 530Z" fill="url(#hill)" opacity=".9"/>
+  <path d="M-10 470 C 120 410 260 440 340 470 C 420 500 480 470 530 450 L530 530 L-10 530Z" fill="#244a5c"/>
+
+  <!-- the trail: dashed, winding from the bottom up to the flag -->
+  <path d="M120 500 C 200 460 330 470 300 400 C 275 340 170 350 210 280 C 245 220 330 230 356 176"
+        fill="none" stroke="#fff4d6" stroke-width="16" stroke-linecap="round" stroke-dasharray="2 34"/>
+
+  <!-- the goal: glow, pole, flag -->
+  <circle cx="372" cy="140" r="96" fill="url(#glow)"/>
+  <rect x="352" y="70" width="11" height="116" rx="5.5" fill="#fff4d6"/>
+  <path d="M362 74 C 400 60 420 92 458 78 L 458 142 C 420 156 400 124 362 138 Z" fill="#ffd479"/>
+  <path d="M362 74 C 400 60 420 92 458 78 L 458 96 C 420 110 400 78 362 92 Z" fill="#ffe7a8"/>
+  <ellipse cx="357" cy="188" rx="30" ry="9" fill="#191d3c" opacity=".35"/>
+
+  <!-- the traveller: a small glowing dot on the path -->
+  <circle cx="210" cy="280" r="20" fill="#fff" opacity=".25"/>
+  <circle cx="210" cy="280" r="11" fill="#fff"/>
+</svg>

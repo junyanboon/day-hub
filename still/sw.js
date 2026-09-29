@@ -8,7 +8,7 @@ self.addEventListener("push", (e) => {
   let d = {};
   try { d = e.data.json(); } catch { d = { title: "Day Quest", body: e.data ? e.data.text() : "" }; }
   e.waitUntil(self.registration.showNotification(d.title || "Day Quest", {
-    body: d.body || "", tag: d.tag, icon: "icon-180.png", badge: "icon-180.png",
+    body: d.body || "", tag: d.tag, icon: "quest-icon-180.png", badge: "quest-icon-180.png",
     data: { url: d.url || "quest.html" },
   }));
 });
