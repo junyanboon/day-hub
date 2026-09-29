@@ -7,6 +7,8 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Quest">
 <link rel="icon" type="image/svg+xml" href="icon.svg">
+<link rel="manifest" href="quest.webmanifest">
+<meta name="theme-color" content="#191d3c">
 <link rel="apple-touch-icon" href="icon-180.png">
 <title>Day Quest</title>
 <!--
@@ -67,6 +69,8 @@
   .bar { height:8px; border-radius:6px; background:rgba(0,0,0,.2); margin-top:6px; overflow:hidden; }
   .bar > i { display:block; height:100%; width:0; background:linear-gradient(90deg, var(--gold), #fff0c4);
     border-radius:6px; transition:width .8s cubic-bezier(.2,.8,.2,1); }
+  .gear { flex:none; width:36px; height:36px; border-radius:50%; background:var(--glass); font-size:17px; }
+  .gear.warn { box-shadow:0 0 0 2px var(--warn); }
   .combo { flex:none; text-align:center; min-width:52px; }
   .combo .n { font-size:22px; font-weight:700; line-height:1; }
   .combo .l { font-size:10px; letter-spacing:.08em; text-transform:uppercase; color:var(--ink-faint); margin-top:3px; }
@@ -211,6 +215,7 @@
       <div class="bar"><i id="xpBar"></i></div>
     </div>
     <div class="combo" id="combo"><div class="n" id="comboN">0</div><div class="l">streak</div></div>
+    <button class="gear" id="gear" aria-label="Settings">⚙️</button>
   </div>
   <div class="status"><span id="statusL">Loading your day…</span><span id="statusR"></span></div>
 
@@ -233,7 +238,24 @@
 <script>
 (() => {
   /* ---------- config + clock ---------- */
-  const API = "https://still.srv1948070.hstgr.cloud";
+  const API = new URLSearchParams(location.search).get("api") || "https://still.srv1948070.hstgr.cloud";
+
+  /* ---------- pairing ----------
+     The page is public, so it holds no secret. Pairing stores the code on
+     this device; the server then lets it save XP, change the calendar and
+     receive pings. A #pair=CODE link pairs in one tap. */
+  const store = { get(k){ try { return localStorage.getItem(k); } catch { return null; } },
+                  set(k, v){ try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch {} } };
+  const hashPair = /[#&]pair=([^&]+)/.exec(location.hash);
+  if (hashPair) { store.set("quest-key", decodeURIComponent(hashPair[1]).trim()); history.replaceState(null, "", location.pathname + location.search); }
+  const questKey = () => store.get("quest-key") || "";
+  async function qfetch(path, opts = {}){
+    const r = await fetch(API + path, { ...opts, cache:"no-store",
+      headers:{ "Content-Type":"application/json", "X-Quest-Key":questKey(), ...(opts.headers || {}) } });
+    const body = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(body.error || "HTTP " + r.status);
+    return body;
+  }
   const qs = new URLSearchParams(location.search);
   const DRY = qs.get("dry") === "1";
   const AT = qs.get("at");
@@ -258,7 +280,29 @@
   try { const d = JSON.parse(localStorage.getItem(GKEY)); if (d) G = { ...G, ...d }; } catch {}
   function freshDay(){ return { date:dayKey(), since:now().toISOString(), xp:0, combo:0, checks:{}, closes:{}, zaps:[], zap:null, side:null, log:[] }; }
   if (!G.day || G.day.date !== dayKey()) G.day = freshDay();
-  const saveG = () => { try { localStorage.setItem(GKEY, JSON.stringify(G)); } catch {} };
+  /* XP lives on this device AND on the server (still-api quest:state), so it
+     survives a cleared browser and is the same on phone and Mac. Newest wins. */
+  let syncTimer = null, syncErr = null;
+  const saveG = () => {
+    G.ts = Date.now();
+    try { localStorage.setItem(GKEY, JSON.stringify(G)); } catch {}
+    if (!questKey() || DRY) return;
+    clearTimeout(syncTimer);
+    syncTimer = setTimeout(() => qfetch("/quest/state", { method:"POST", body:JSON.stringify(G) })
+      .then(() => { syncErr = null; }).catch(e => { syncErr = e.message; }), 1500);
+  };
+  async function pullState(){
+    if (!questKey()) return;
+    try {
+      const srv = await qfetch("/quest/state");
+      syncErr = null;
+      if (srv && typeof srv.xp === "number" && (srv.ts || 0) > (G.ts || 0)) {
+        G = { ...G, ...srv };
+        if (!G.day || G.day.date !== dayKey()) G.day = freshDay();
+        try { localStorage.setItem(GKEY, JSON.stringify(G)); } catch {}
+      } else if ((G.ts || 0) > (srv.ts || 0)) saveG();   // this device is newer: push it up
+    } catch (e) { syncErr = e.message; }
+  }
 
   /* ---------- live data: plan + edit layer + tasks ---------- */
   let PLAN = null, OPS = { edits:{}, drops:[], adds:[], ts:0 }, TASKS = [], lastPull = null, pullErr = null;
@@ -285,7 +329,7 @@
   }
   async function pullAll(){
     try {
-      await Promise.all([pullPlan(), pullOps(), pullTasks().catch(() => {})]);
+      await Promise.all([pullPlan(), pullOps(), pullTasks().catch(() => {}), pullState()]);
       lastPull = new Date(); pullErr = null;
     } catch (e) { pullErr = String(e.message || e); }
     render();
@@ -512,6 +556,40 @@
       setBlock(o, b, s, e, t);
     });
   }
+  /* Calendar writes: a block that came from Google Calendar (it has an id) can
+     be moved or renamed in the calendar itself. Blocks moved along with it
+     ("move everything after") stay today-only, so a flight or a shared Joint
+     Plans event is never shifted in the calendar by accident. */
+  const canCal = b => !!(b.id && b.calId && questKey() && !DRY);
+  async function saveBlockCal(b, s, e, t, moveLater){
+    try {
+      await qfetch("/cal/event", { method:"POST", body:JSON.stringify({
+        id:b.id, calId:b.calId, raw:b.raw, s:s.toISOString(), e:e.toISOString(), title: t !== b.t ? t : "" }) });
+    } catch (err) {
+      alert(`Could not change the calendar (${err.message}). Saved for today only.`);
+      return saveBlock(b, s, e, t, moveLater);
+    }
+    log(`Changed ${b.t} in the calendar${t !== b.t ? ` to ${t}` : ""}: ${fmtT(s)} to ${fmtT(e)}`);
+    const de = e - b.e;
+    await writeOps(o => {
+      delete o.edits[b.key];   // the calendar now holds the change
+      if (moveLater && de) blocks().forEach(x => {
+        if (x.key === b.key || x.s < b.e) return;
+        setBlock(o, x, new Date(x.s.getTime() + de), new Date(x.e.getTime() + de), x.t);
+      });
+    });
+    await pullAll();
+  }
+  async function addBlockCal(t, s, e, makeRoom){
+    try { await qfetch("/cal/event", { method:"POST", body:JSON.stringify({ s:s.toISOString(), e:e.toISOString(), title:t }) }); }
+    catch (err) { alert(`Could not add it to the calendar (${err.message}). Added for today only.`); return addBlock(t, s, e, makeRoom); }
+    log(`Added ${t} to the calendar: ${fmtT(s)} to ${fmtT(e)}`);
+    if (makeRoom) await writeOps(o => blocks().forEach(x => {
+      if (x.s < s) return;
+      setBlock(o, x, new Date(x.s.getTime() + (e - s)), new Date(x.e.getTime() + (e - s)), x.t);
+    }));
+    await pullAll();
+  }
   function dropBlock(b){
     log(`Removed ${b.t} from today`);
     return writeOps(o => {
@@ -541,17 +619,21 @@
       <input id="eT" value="${esc(b.t)}" maxlength="80">
       <div class="row"><label>Start<input id="eS" type="time" value="${toField(b.s)}"></label>
         <label>End<input id="eE" type="time" value="${toField(b.e)}"></label></div>
-      <label class="check"><input id="eMove" type="checkbox"> Move everything after it too</label>
+      ${canCal(b) ? `<label class="check"><input id="eCal" type="checkbox" checked> Change it in Google Calendar (${esc(b.cal)})</label>` : ""}
+      <label class="check"><input id="eMove" type="checkbox"> Move everything after it too (today only)</label>
       <div class="actions"><button class="btn ghost" id="eCancel">Cancel</button><button class="btn primary" id="eSave">Save</button></div>
       <div class="actions"><button class="btn danger" id="eDrop">Remove from today</button></div>
-      <p style="font-size:12px">Changes last for today and show in Stillness too. To change a block for good, edit it in Google Calendar.</p>`);
+      <p style="font-size:12px">${canCal(b) ? "Remove only hides it for today. It never deletes the calendar event."
+        : b.id && !questKey() ? "Pair this device in ⚙️ to change the calendar too. Until then, changes last for today."
+        : "This block is not a calendar event (Stillness made it), so changes last for today."} Stillness shows every change.</p>`);
     $("eCancel").onclick = closeSheet;
     $("eSave").onclick = () => {
       const t = $("eT").value.trim() || b.t;
       const s = fromField($("eS").value, b.s);
       let e = fromField($("eE").value, b.s);
       if (e <= s) e = new Date(e.getTime() + 86400000);   // runs past midnight
-      closeSheet(); saveBlock(b, s, e, t, $("eMove").checked);
+      const cal = $("eCal") && $("eCal").checked;
+      closeSheet(); (cal ? saveBlockCal : saveBlock)(b, s, e, t, $("eMove").checked);
     };
     $("eDrop").onclick = () => { closeSheet(); dropBlock(b); };
   }
@@ -564,7 +646,8 @@
       <div class="row"><label>Start<input id="aS" type="time" value="${toField(t0)}"></label></div>
       <div class="chips" style="grid-template-columns:repeat(4,1fr)">${[15,30,60,90].map(m =>
         `<button class="chip ${m === dur ? "sel" : ""}" data-d="${m}" style="text-align:center">${m < 60 ? m + "m" : m/60 + "h"}</button>`).join("")}</div>
-      <label class="check"><input id="aRoom" type="checkbox"> Make room (push what follows later)</label>
+      ${questKey() && !DRY ? `<label class="check"><input id="aCal" type="checkbox" checked> Add it to Google Calendar (Junyan)</label>` : ""}
+      <label class="check"><input id="aRoom" type="checkbox"> Make room (push what follows later, today only)</label>
       <div class="actions"><button class="btn ghost" id="aCancel">Cancel</button><button class="btn primary" id="aGo">Add</button></div>`);
     $("sheet").querySelectorAll("[data-d]").forEach(c => c.onclick = () => {
       $("sheet").querySelectorAll("[data-d]").forEach(x => x.classList.remove("sel"));
@@ -574,7 +657,8 @@
     $("aGo").onclick = () => {
       const t = $("aT").value.trim(); if (!t) { $("aT").focus(); return; }
       const s = fromField($("aS").value, now()), e = new Date(s.getTime() + dur * 60000);
-      closeSheet(); addBlock(t, s, e, $("aRoom").checked);
+      const cal = $("aCal") && $("aCal").checked;
+      closeSheet(); (cal ? addBlockCal : addBlock)(t, s, e, $("aRoom").checked);
     };
     setTimeout(() => $("aT").focus(), 300);
   }
@@ -630,11 +714,68 @@
     $("xCancel").onclick = closeSheet;
   }
 
-  /* ---------- pings (page open only in this prototype) ---------- */
+  /* ---------- settings: pairing + phone pings ---------- */
+  const standalone = () => window.matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+  const b64u = s => { s = s.replace(/-/g, "+").replace(/_/g, "/"); s += "=".repeat((4 - s.length % 4) % 4);
+    return Uint8Array.from(atob(s), c => c.charCodeAt(0)); };
+  if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
+
+  async function enablePush(){
+    if (!questKey()) throw new Error("Pair this device first.");
+    if (!("serviceWorker" in navigator) || !("PushManager" in window))
+      throw new Error(standalone() ? "This browser cannot receive pings." : "On iPhone: Share, then Add to Home Screen. Open Quest from that icon and try again.");
+    const perm = await Notification.requestPermission();
+    if (perm !== "granted") throw new Error("Notifications are blocked. Allow them for Quest in Settings, then try again.");
+    const { key } = await (await fetch(API + "/push/key", { cache:"no-store" })).json();
+    if (!key) throw new Error("The server has no push keys yet.");
+    const reg = await navigator.serviceWorker.ready;
+    const sub = (await reg.pushManager.getSubscription()) ||
+      await reg.pushManager.subscribe({ userVisibleOnly:true, applicationServerKey:b64u(key) });
+    await qfetch("/push/subscribe", { method:"POST", body:JSON.stringify(sub) });
+    store.set("quest-push", "1");
+  }
+
+  function openSettings(){
+    const paired = !!questKey(), pushed = !!store.get("quest-push");
+    openSheet(`<h3>Settings</h3>
+      <p>${paired ? `Paired. XP saves to the server${syncErr ? ` <span style="color:var(--warn)">(last sync failed: ${esc(syncErr)})</span>` : ""}, and calendar changes are on.`
+        : "Pair this device to save XP, change the calendar and get phone pings."}</p>
+      <input id="pCode" placeholder="Pairing code" autocomplete="off" autocapitalize="characters" value="${paired ? "••••••••" : ""}">
+      <div class="actions"><button class="btn" id="pSave">${paired ? "Change code" : "Pair"}</button>
+        ${paired ? `<button class="btn ghost" id="pForget">Unpair</button>` : ""}</div>
+      <h3 style="margin-top:22px">Phone pings</h3>
+      <p id="pushMsg">${pushed ? "On for this device. The server pings you before and at each block."
+        : standalone() ? "Pings arrive even when Quest is closed." : "On iPhone, pings need Quest on your Home Screen: Share, then Add to Home Screen, then open it from the icon."}</p>
+      <div class="actions"><button class="btn primary" id="pushOn">${pushed ? "Re-connect pings" : "Turn on pings"}</button>
+        ${pushed ? `<button class="btn" id="pushTest">Send a test</button>` : ""}</div>
+      <div class="actions"><button class="btn ghost" id="sClose">Close</button></div>`);
+    $("sClose").onclick = closeSheet;
+    $("pSave").onclick = async () => {
+      const v = $("pCode").value.trim();
+      if (!v || v.startsWith("•")) { $("pCode").focus(); return; }
+      store.set("quest-key", v);
+      try { await qfetch("/quest/state"); await pullAll(); closeSheet(); log("Paired this device"); saveG(); }
+      catch (e) { store.set("quest-key", null); alert("That code did not work: " + e.message); }
+    };
+    if ($("pForget")) $("pForget").onclick = () => { store.set("quest-key", null); store.set("quest-push", null); closeSheet(); render(); };
+    $("pushOn").onclick = async () => {
+      $("pushMsg").textContent = "Connecting…";
+      try { await enablePush(); $("pushMsg").textContent = "Pings are on for this device."; }
+      catch (e) { $("pushMsg").textContent = e.message; }
+    };
+    if ($("pushTest")) $("pushTest").onclick = async () => {
+      try { const r = await qfetch("/push/test", { method:"POST" }); $("pushMsg").textContent = `Sent to ${r.sent} of ${r.devices} device(s).`; }
+      catch (e) { $("pushMsg").textContent = e.message; }
+    };
+  }
+  $("gear").onclick = openSettings;
+
+  /* ---------- pings while the page is open (devices without phone push) ---------- */
   const fired = new Set();
   function ping(id, title, body){
     if (fired.has(id)) return; fired.add(id);
     if (navigator.vibrate) navigator.vibrate([60,80,60]);
+    if (store.get("quest-push")) return;   // the server pings this device instead
     if ("Notification" in window && Notification.permission === "granted") {
       try { new Notification(title, { body, icon:"icon-180.png", tag:id }); } catch {}
     }
@@ -792,12 +933,7 @@
     put("log", G.day.log.length ? G.day.log.map(e =>
       `<div><span>${fmtT(new Date(e.at))}</span><span>${esc(e.msg)}</span>${e.xp ? `<span class="xp">+${e.xp}</span>` : ""}</div>`).join("")
       : `<div><span></span><span>Nothing yet. Check in to your first quest.</span></div>`);
-    if ("Notification" in window && Notification.permission === "default" && !$("pingAsk")) {
-      const b = document.createElement("button"); b.id = "pingAsk"; b.className = "ping-ask";
-      b.textContent = "Turn on pings for block starts";
-      b.onclick = () => Notification.requestPermission().then(() => b.remove());
-      $("log").after(b);
-    }
+    $("gear").classList.toggle("warn", !questKey() || !!syncErr);
     pings(all, t);
     tick();
   }
