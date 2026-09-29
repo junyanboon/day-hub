@@ -1,0 +1,813 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Quest">
+<link rel="icon" type="image/svg+xml" href="icon.svg">
+<link rel="apple-touch-icon" href="icon-180.png">
+<title>Day Quest</title>
+<!--
+  Day Quest — the game layer on Stillness (prototype, 2026-09-28).
+
+  Reads the same live sources as Stillness (still-api /plan, /ops, /tasks) and
+  writes through the same protocol, so a shift made here shows on the phone app
+  and the desktop orb. It adds what Stillness lacks: a check-in at every block
+  start, a "did it close?" at every block end, a one-tap log for whatever comes
+  up mid-block, and XP for keeping the day. Health blocks (sleep, practice,
+  body, fuel) score double: the One System map says defend them.
+
+  URL switches for testing:
+    ?dry=1                     never POST (no /ops, no /tasks/done writes)
+    ?at=2026-09-28T11:35       run a virtual clock from that moment (implies the
+                               plan for that date; real time keeps ticking)
+  Silent by design (Stillness dropped sound by request). Pings are browser
+  notifications + vibration while the page is open.
+-->
+<style>
+  :root {
+    --ink: rgba(255,255,255,.95);
+    --ink-soft: rgba(255,255,255,.7);
+    --ink-faint: rgba(255,255,255,.42);
+    --glass: rgba(255,255,255,.12);
+    --glass-2: rgba(255,255,255,.2);
+    --glass-border: rgba(255,255,255,.2);
+    --gold: #ffd479;
+    --good: #8fe3b0;
+    --warn: #ffc27a;
+    --bad: #ff9c9c;
+    --zap: #c9b6ff;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html { min-height:100%; background:#4a4580;
+    background-image: linear-gradient(180deg, #8a7fc4 0%, #6a5fa8 50%, #4a4580 100%);
+    background-attachment: fixed; transition: background-color 2s ease; }
+  html.mode-focus { background-image: linear-gradient(180deg, #5b8fd4 0%, #4a6fa5 45%, #5d5ba8 100%); background-color:#5d5ba8; }
+  html.mode-break { background-image: linear-gradient(180deg, #6fb98f 0%, #4a8f7b 50%, #3d6b70 100%); background-color:#3d6b70; }
+  html.mode-fixed { background-image: linear-gradient(180deg, #d4a45b 0%, #a5764a 45%, #8a5d7a 100%); background-color:#8a5d7a; }
+  html.mode-health{ background-image: linear-gradient(180deg, #6fb98f 0%, #4f8f86 50%, #4a5f8a 100%); background-color:#4a5f8a; }
+  html.mode-zap   { background-image: linear-gradient(180deg, #9a7fd4 0%, #6d5aa8 50%, #3f3a78 100%); background-color:#3f3a78; }
+  html.night      { background-image: linear-gradient(180deg, #2b3160 0%, #232850 50%, #191d3c 100%); background-color:#191d3c; }
+  body { background:transparent; color:var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
+    -webkit-font-smoothing:antialiased; }
+  #app { max-width:480px; margin:0 auto;
+    padding: calc(env(safe-area-inset-top) + 14px) 16px calc(env(safe-area-inset-bottom) + 110px); }
+  button { font:inherit; color:inherit; border:0; cursor:pointer; }
+
+  /* ---------- HUD ---------- */
+  .hud { display:flex; align-items:center; gap:12px; }
+  .avatar { width:46px; height:46px; border-radius:50%; background:var(--glass-2);
+    border:1px solid var(--glass-border); display:grid; place-items:center; font-size:24px; flex:none; }
+  .hud-mid { flex:1; min-width:0; }
+  .hud-title { font-size:13px; color:var(--ink-soft); display:flex; justify-content:space-between; }
+  .hud-title b { color:var(--ink); font-weight:600; }
+  .bar { height:8px; border-radius:6px; background:rgba(0,0,0,.2); margin-top:6px; overflow:hidden; }
+  .bar > i { display:block; height:100%; width:0; background:linear-gradient(90deg, var(--gold), #fff0c4);
+    border-radius:6px; transition:width .8s cubic-bezier(.2,.8,.2,1); }
+  .combo { flex:none; text-align:center; min-width:52px; }
+  .combo .n { font-size:22px; font-weight:700; line-height:1; }
+  .combo .l { font-size:10px; letter-spacing:.08em; text-transform:uppercase; color:var(--ink-faint); margin-top:3px; }
+  .combo.hot .n { color:var(--gold); text-shadow:0 0 12px rgba(255,212,121,.6); }
+
+  .status { font-size:11px; color:var(--ink-faint); margin:10px 2px 0; display:flex; justify-content:space-between; }
+  .status .dry { color:var(--warn); }
+
+  /* ---------- cards ---------- */
+  .card { background:var(--glass); border:1px solid var(--glass-border); border-radius:22px;
+    padding:18px; margin-top:14px; backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px); }
+  .eyebrow { font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--ink-soft);
+    display:flex; align-items:center; gap:8px; }
+  .eyebrow .tag { background:rgba(255,255,255,.18); border-radius:20px; padding:2px 8px; letter-spacing:.06em; }
+  .eyebrow .tag.x2 { background:rgba(143,227,176,.28); color:#dfffe9; }
+  .quest-title { font-size:26px; font-weight:600; line-height:1.15; margin-top:10px; display:flex; gap:10px; align-items:flex-start; }
+  .quest-title .em { font-size:28px; }
+  .quest-time { font-size:13px; color:var(--ink-soft); margin-top:6px; }
+  .count { display:flex; align-items:center; gap:14px; margin-top:16px; }
+  .ring { width:74px; height:74px; flex:none; }
+  .ring circle { fill:none; stroke-width:7; }
+  .ring .bg { stroke:rgba(255,255,255,.16); }
+  .ring .fg { stroke:#fff; stroke-linecap:round; transform:rotate(-90deg); transform-origin:50% 50%;
+    transition:stroke-dashoffset 1s linear; }
+  .count .big { font-size:34px; font-weight:300; font-variant-numeric:tabular-nums; }
+  .count .sub { font-size:12px; color:var(--ink-soft); }
+
+  .actions { display:flex; gap:8px; margin-top:16px; flex-wrap:wrap; }
+  .btn { flex:1; min-width:0; padding:13px 10px; border-radius:14px; background:rgba(255,255,255,.2);
+    font-size:15px; font-weight:600; white-space:nowrap; }
+  .btn.primary { background:#fff; color:#3b3670; }
+  .btn.ghost { background:transparent; border:1px solid var(--glass-border); color:var(--ink-soft); font-weight:500; }
+  .btn:active { transform:scale(.97); }
+  .btn[disabled] { opacity:.45; }
+
+  .loose { border-color:rgba(255,194,122,.45); background:rgba(255,194,122,.14); }
+  .loose .q { font-size:17px; font-weight:600; margin-top:6px; }
+
+  .next { display:flex; justify-content:space-between; align-items:center; font-size:14px; color:var(--ink-soft);
+    margin-top:12px; padding:0 4px; }
+  .next b { color:var(--ink); font-weight:600; }
+
+  /* side quest */
+  .side-list { margin-top:12px; display:flex; flex-direction:column; gap:8px; }
+  .side { display:flex; align-items:center; gap:10px; text-align:left; width:100%; padding:11px 12px;
+    border-radius:14px; background:rgba(255,255,255,.12); font-size:14px; }
+  .side .pr { flex:none; font-size:12px; }
+  .side .nm { flex:1; min-width:0; }
+  .side .xp { flex:none; font-size:12px; color:var(--gold); font-weight:600; }
+  .active-side { margin-top:12px; padding:12px; border-radius:14px; background:rgba(255,212,121,.16);
+    border:1px solid rgba(255,212,121,.4); }
+  .active-side .k { font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:var(--gold); }
+  .active-side .nm { font-size:16px; font-weight:600; margin-top:4px; }
+
+  /* ---------- trail ---------- */
+  h2 { font-size:12px; letter-spacing:.14em; text-transform:uppercase; color:var(--ink-soft); font-weight:600;
+    margin:26px 4px 10px; display:flex; justify-content:space-between; }
+  .trail { position:relative; padding-left:8px; }
+  .trail::before { content:""; position:absolute; left:25px; top:10px; bottom:10px; width:2px;
+    background:rgba(255,255,255,.2); border-radius:2px; }
+  .node { position:relative; display:flex; align-items:center; gap:12px; padding:7px 0; }
+  .dot { width:36px; height:36px; border-radius:50%; flex:none; display:grid; place-items:center; font-size:17px;
+    background:rgba(255,255,255,.12); border:2px solid rgba(255,255,255,.22); z-index:1; }
+  .node .txt { flex:1; min-width:0; }
+  .node .t { font-size:14px; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .node .m { font-size:12px; color:var(--ink-faint); margin-top:1px; }
+  .node .badge { font-size:12px; font-weight:600; flex:none; }
+  .node { cursor:pointer; border-radius:14px; }
+  .node:active { background:rgba(255,255,255,.08); }
+  .node.past { opacity:.62; }
+  .add-btn { background:rgba(255,255,255,.18); border-radius:20px; padding:4px 12px; font-size:12px; letter-spacing:.06em;
+    text-transform:none; font-weight:600; color:var(--ink); }
+  .row { display:flex; gap:8px; margin-top:12px; }
+  .row label { flex:1; font-size:12px; color:var(--ink-soft); }
+  .row label input { margin-top:4px; }
+  .check { display:flex; align-items:center; gap:10px; margin-top:14px; font-size:14px; color:var(--ink-soft); }
+  .sheet .check input { width:20px; height:20px; margin:0; flex:none; accent-color:#fff; }
+  .btn.danger { background:transparent; border:1px solid rgba(255,156,156,.5); color:var(--bad); font-weight:500; }
+  .node.now .dot { background:#fff; border-color:#fff; box-shadow:0 0 0 6px rgba(255,255,255,.18), 0 0 22px rgba(255,255,255,.5);
+    animation:pulse 2.4s ease-in-out infinite; }
+  .node.now .t { font-weight:700; }
+  .node.in .dot { border-color:var(--good); }
+  .node.late .dot { border-color:var(--warn); }
+  .node.skip .dot { border-color:var(--bad); }
+  .b-in { color:var(--good); } .b-late { color:var(--warn); } .b-skip { color:var(--bad); } .b-zap { color:var(--zap); }
+  @keyframes pulse { 50% { box-shadow:0 0 0 10px rgba(255,255,255,.08), 0 0 30px rgba(255,255,255,.6); } }
+
+  .log { font-size:13px; color:var(--ink-soft); }
+  .log div { padding:6px 4px; border-bottom:1px solid rgba(255,255,255,.08); display:flex; gap:8px; }
+  .log div span:first-child { color:var(--ink-faint); flex:none; width:58px; font-variant-numeric:tabular-nums; }
+  .log div span.xp { margin-left:auto; color:var(--gold); flex:none; }
+
+  /* ---------- zap button + sheet ---------- */
+  .zap { position:fixed; left:50%; transform:translateX(-50%); bottom:calc(env(safe-area-inset-bottom) + 18px);
+    width:min(448px, calc(100% - 32px)); padding:16px; border-radius:20px; font-size:17px; font-weight:700;
+    background:linear-gradient(135deg, #b9a4ff, #8f7cf0); color:#fff; box-shadow:0 10px 30px rgba(40,20,90,.45); z-index:5; }
+  .zap:active { transform:translateX(-50%) scale(.98); }
+  .zap.back { background:linear-gradient(135deg, #fff, #efeaff); color:#4a3f98; }
+
+  .scrim { position:fixed; inset:0; background:rgba(15,10,40,.45); z-index:9; display:none; }
+  .sheet { position:fixed; left:50%; bottom:0; transform:translate(-50%, 110%); width:min(480px, 100%);
+    background:#3d3872; border-radius:24px 24px 0 0; padding:20px 16px calc(env(safe-area-inset-bottom) + 20px);
+    z-index:10; transition:transform .28s cubic-bezier(.2,.8,.2,1); box-shadow:0 -10px 40px rgba(0,0,0,.35); }
+  .sheet.open { transform:translate(-50%, 0); }
+  .sheet h3 { font-size:19px; font-weight:600; }
+  .sheet p { font-size:14px; color:var(--ink-soft); margin-top:6px; line-height:1.4; }
+  .chips { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:14px; }
+  .chip { padding:14px 10px; border-radius:14px; background:rgba(255,255,255,.12); font-size:15px; text-align:left; }
+  .chip.sel { background:#fff; color:#3b3670; font-weight:600; }
+  .sheet input { width:100%; margin-top:12px; padding:13px 14px; border-radius:14px; border:1px solid var(--glass-border);
+    background:rgba(0,0,0,.18); color:var(--ink); font:inherit; font-size:16px; }
+  .sheet input::placeholder { color:var(--ink-faint); }
+
+  /* ---------- toasts ---------- */
+  .float { position:fixed; left:50%; top:30%; transform:translateX(-50%); font-size:30px; font-weight:800; color:var(--gold);
+    text-shadow:0 2px 14px rgba(0,0,0,.3); pointer-events:none; z-index:20; animation:rise 1.4s ease-out forwards; }
+  .float small { display:block; font-size:13px; font-weight:600; color:#fff; text-align:center; }
+  @keyframes rise { 0% { opacity:0; transform:translate(-50%, 20px) scale(.8); } 15% { opacity:1; transform:translate(-50%,0) scale(1.08); }
+    100% { opacity:0; transform:translate(-50%, -70px) scale(1); } }
+  .lvlup { position:fixed; inset:0; display:grid; place-items:center; z-index:30; pointer-events:none; }
+  .lvlup > div { background:rgba(20,15,50,.8); border:1px solid var(--gold); border-radius:24px; padding:26px 30px; text-align:center;
+    animation:pop 2.6s ease forwards; }
+  .lvlup .a { font-size:44px; } .lvlup .b { font-size:12px; letter-spacing:.14em; color:var(--gold); margin-top:8px; }
+  .lvlup .c { font-size:22px; font-weight:700; margin-top:4px; }
+  @keyframes pop { 0% { opacity:0; transform:scale(.7); } 12% { opacity:1; transform:scale(1.05); } 20% { transform:scale(1); }
+    85% { opacity:1; } 100% { opacity:0; } }
+
+  .empty { text-align:center; color:var(--ink-soft); padding:30px 10px; font-size:15px; }
+  .ping-ask { font-size:13px; color:var(--ink-soft); text-decoration:underline; background:none; margin-top:10px; }
+  .summary { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-top:14px; }
+  .summary div { background:rgba(255,255,255,.1); border-radius:14px; padding:12px 8px; text-align:center; }
+  .summary b { display:block; font-size:22px; }
+  .summary span { font-size:11px; color:var(--ink-soft); }
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="hud">
+    <div class="avatar" id="avatar">🧭</div>
+    <div class="hud-mid">
+      <div class="hud-title"><span><b id="lvlName">Wanderer</b> · Lv <span id="lvl">1</span></span><span id="xpTxt">0 / 100 XP</span></div>
+      <div class="bar"><i id="xpBar"></i></div>
+    </div>
+    <div class="combo" id="combo"><div class="n" id="comboN">0</div><div class="l">streak</div></div>
+  </div>
+  <div class="status"><span id="statusL">Loading your day…</span><span id="statusR"></span></div>
+
+  <div id="loose"></div>
+  <div id="main"></div>
+  <div id="nextLine"></div>
+
+  <h2><span>Today's trail <span id="trailMeta" style="font-weight:400;color:var(--ink-faint)"></span></span><button class="add-btn" id="addBtn">＋ Add</button></h2>
+  <div class="trail" id="trail"></div>
+
+  <h2><span>Quest log</span><span id="dayXp"></span></h2>
+  <div class="log" id="log"></div>
+</div>
+
+<button class="zap" id="zap">⚡ Something came up</button>
+
+<div class="scrim" id="scrim"></div>
+<div class="sheet" id="sheet"></div>
+
+<script>
+(() => {
+  /* ---------- config + clock ---------- */
+  const API = "https://still.srv1948070.hstgr.cloud";
+  const qs = new URLSearchParams(location.search);
+  const DRY = qs.get("dry") === "1";
+  const AT = qs.get("at");
+  const clockOffset = AT ? (new Date(AT).getTime() - Date.now()) : 0;
+  const now = () => new Date(Date.now() + clockOffset);
+  const dayKey = () => now().toDateString();
+  const ymd = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+
+  const fmtT = d => d.toLocaleTimeString([], { hour:"numeric", minute:"2-digit" });
+  // minutes and hours only, no seconds (Junyan, 2026-09-28)
+  const fmtHM = min => { const h = Math.floor(min / 60), m = min % 60;
+    return h ? (m ? `${h} hr ${m} min` : `${h} hr`) : `${m} min`; };
+  const fmtLeft = sec => fmtHM(Math.max(0, Math.ceil(sec / 60)));    // time remaining rounds up
+  const fmtAgo = sec => fmtHM(Math.max(0, Math.floor(sec / 60)));    // time elapsed rounds down
+  const fmtMin = min => min >= 60 ? `${Math.floor(min/60)}h ${min%60}m` : `${min} min`;
+  const $ = id => document.getElementById(id);
+  const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;" }[c]));
+
+  /* ---------- game state (localStorage, per viewer) ---------- */
+  const GKEY = "quest-v1";
+  let G = { xp:0, bestCombo:0, day:null };
+  try { const d = JSON.parse(localStorage.getItem(GKEY)); if (d) G = { ...G, ...d }; } catch {}
+  function freshDay(){ return { date:dayKey(), since:now().toISOString(), xp:0, combo:0, checks:{}, closes:{}, zaps:[], zap:null, side:null, log:[] }; }
+  if (!G.day || G.day.date !== dayKey()) G.day = freshDay();
+  const saveG = () => { try { localStorage.setItem(GKEY, JSON.stringify(G)); } catch {} };
+
+  /* ---------- live data: plan + edit layer + tasks ---------- */
+  let PLAN = null, OPS = { edits:{}, drops:[], adds:[], ts:0 }, TASKS = [], lastPull = null, pullErr = null;
+
+  async function pullPlan(){
+    const q = AT ? `?date=${ymd(now())}` : "";
+    const r = await fetch(API + "/plan" + q, { cache:"no-store" });
+    if (!r.ok) throw new Error("plan HTTP " + r.status);
+    const p = await r.json();
+    if (!p || !Array.isArray(p.blocks)) throw new Error("plan has no blocks");
+    PLAN = p;
+  }
+  async function pullOps(){
+    const r = await fetch(API + "/ops?d=" + encodeURIComponent(dayKey()), { cache:"no-store" });
+    if (!r.ok) return;
+    const d = await r.json();
+    if (d && d.date === dayKey()) OPS = { edits:d.edits||{}, drops:d.drops||[], adds:d.adds||[], ts:d.ts||0 };
+  }
+  async function pullTasks(){
+    const r = await fetch(API + "/tasks", { cache:"no-store" });
+    if (!r.ok) return;
+    const d = await r.json();
+    TASKS = (d.tasks || []).filter(t => !t.done);
+  }
+  async function pullAll(){
+    try {
+      await Promise.all([pullPlan(), pullOps(), pullTasks().catch(() => {})]);
+      lastPull = new Date(); pullErr = null;
+    } catch (e) { pullErr = String(e.message || e); }
+    render();
+  }
+  /* Same protocol as Stillness: the whole day's edit layer, last-write-wins on
+     ts. Pull first so a phone edit made a minute ago is not overwritten. */
+  async function writeOps(mutate){
+    await pullOps().catch(() => {});
+    mutate(OPS);
+    OPS.ts = Date.now();
+    if (DRY) { render(); return; }
+    await fetch(API + "/ops", { method:"POST", headers:{ "Content-Type":"application/json" },
+      body: JSON.stringify({ date:dayKey(), ...OPS }) }).catch(() => {});
+    render();
+  }
+
+  const keyOf = b => b.s + "|" + b.t;
+  function blocks(){
+    if (!PLAN) return [];
+    const out = [];
+    PLAN.blocks.forEach(b => {
+      const k = keyOf(b);
+      if (OPS.drops.includes(k)) return;
+      const ed = OPS.edits[k];
+      out.push({ ...b, key:k, s:new Date(ed?.s ?? b.s), e:new Date(ed?.e ?? b.e), t:ed?.t ?? b.t });
+    });
+    OPS.adds.forEach(a => out.push({ ...a, key:a.key, s:new Date(a.s), e:new Date(a.e), extra:true }));
+    return out.map(b => ({ ...b, kind:kindOf(b) })).sort((x,y) => x.s - y.s);
+  }
+  // Stillness's shift: every block from `from` onward moves by `min` minutes.
+  function shiftFrom(fromKey, min){
+    return writeOps(o => {
+      const ms = min * 60000, all = blocks(), from = all.find(b => b.key === fromKey);
+      if (!from) return;
+      all.forEach(b => {
+        if (b.s < from.s) return;
+        const s = new Date(b.s.getTime()+ms).toISOString(), e = new Date(b.e.getTime()+ms).toISOString();
+        if (b.extra) { const a = o.adds.find(x => x.key === b.key); if (a) { a.s = s; a.e = e; } }
+        else o.edits[b.key] = { s, e, t:b.t };
+      });
+    });
+  }
+
+  /* ---------- what kind of block is this ---------- */
+  const KINDS = {
+    rest:     { em:"🌙", name:"Rest",     health:true },
+    practice: { em:"🪷", name:"Practice", health:true },
+    body:     { em:"💪", name:"Body",     health:true },
+    fuel:     { em:"🥗", name:"Fuel",     health:true },
+    travel:   { em:"🧳", name:"Journey" },
+    call:     { em:"📞", name:"Call" },
+    dance:    { em:"💃", name:"Dance" },
+    open:     { em:"🗺️", name:"Open space" },
+    break:    { em:"🍃", name:"Breather" },
+    fixed:    { em:"📌", name:"Appointment" },
+  };
+  const RULES = [
+    [/sleep|nap\b|nap |wind.?down|\bbed\b|rest\b/i, "rest"],
+    [/shambhavi|sadhana|yoga|meditat|pooja|kriya|bhuta|breath/i, "practice"],
+    [/ride|drive|flight|airport|check.?in|security|transfer|uber|\btrain\b|lounge|board|pack|\b[A-Z]{2}\d{2,4}\b/i, "travel"],
+    [/gym|sauna|\brun\b|walk|mobility|swim|workout|training|stretch/i, "body"],
+    [/breakfast|lunch|dinner|\beat\b|cook|meal|pudding|veggie|snack|groceries/i, "fuel"],
+    [/zouk|dance|class|social|workshop|rehearsal/i, "dance"],
+    [/\bcall\b|meet|zoom|chat with/i, "call"],
+  ];
+  function kindOf(b){
+    if (b.type === "break") return "break";
+    if (/^open space/i.test(b.t) || b.type === "focus") return "open";
+    for (const [re, k] of RULES) if (re.test(b.t)) return k;
+    return "fixed";
+  }
+  const isHealth = b => !!KINDS[b.kind]?.health;
+
+  /* ---------- XP ---------- */
+  const TITLES = ["Wanderer","Pathfinder","Keeper of Hours","Warden","Timewright","Sage of the Day","Master of Stillness"];
+  const AVATARS = ["🧭","🥾","🏹","🛡️","⏳","🔮","🪷"];
+  const lvlOf = xp => Math.floor(Math.sqrt(xp / 60)) + 1;
+  const xpFor = l => 60 * (l-1) * (l-1);
+  const mult = () => 1 + 0.25 * Math.min(G.day.combo, 4);
+
+  function award(base, msg, opts = {}){
+    const before = lvlOf(G.xp);
+    const amt = Math.round(base * (opts.x2 ? 2 : 1) * (opts.combo ? mult() : 1));
+    G.xp += amt; G.day.xp += amt;
+    log(msg, amt);
+    floatXp(amt, opts.label || "");
+    const after = lvlOf(G.xp);
+    if (after > before) levelUp(after);
+    saveG();
+  }
+  function log(msg, xp = 0){
+    G.day.log.unshift({ at:now().toISOString(), msg, xp });
+    G.day.log = G.day.log.slice(0, 60);
+    saveG();
+  }
+  function bumpCombo(){ G.day.combo++; G.bestCombo = Math.max(G.bestCombo, G.day.combo); }
+  function breakCombo(){ if (G.day.combo >= 2) log(`Streak of ${G.day.combo} ended`); G.day.combo = 0; }
+
+  function floatXp(n, label){
+    const el = document.createElement("div");
+    el.className = "float"; el.innerHTML = `+${n} XP${label ? `<small>${esc(label)}</small>` : ""}`;
+    document.body.appendChild(el); setTimeout(() => el.remove(), 1500);
+    if (navigator.vibrate) navigator.vibrate(30);
+  }
+  function levelUp(l){
+    const i = Math.min(l-1, TITLES.length-1);
+    const el = document.createElement("div");
+    el.className = "lvlup";
+    el.innerHTML = `<div><div class="a">${AVATARS[i]}</div><div class="b">LEVEL ${l}</div><div class="c">${TITLES[i]}</div></div>`;
+    document.body.appendChild(el); setTimeout(() => el.remove(), 2700);
+    if (navigator.vibrate) navigator.vibrate([40,60,40]);
+  }
+
+  /* ---------- the day's loop ---------- */
+  // latest-starting block containing now wins (same rule as Stillness)
+  function currentOf(all, t){ let hit = null; all.forEach(b => { if (t >= b.s && t < b.e) hit = b; }); return hit; }
+  function nextOf(all, t){ return all.find(b => b.s > t) || null; }
+  const needsCheck = b => b.kind !== "break";
+  const ON_TIME_MIN = 5;
+
+  function checkIn(b){
+    const late = (now() - b.s) / 60000 > ON_TIME_MIN;
+    G.day.checks[b.key] = late ? "late" : "in";
+    if (late) { breakCombo(); award(10, `Started ${b.t} late`, { x2:isHealth(b), label:"started" }); }
+    else { bumpCombo(); award(20, `Started ${b.t} on time`, { x2:isHealth(b), combo:true, label: isHealth(b) ? "health block defended" : "on time" }); }
+    render();
+  }
+  function skip(b){
+    G.day.checks[b.key] = "skip"; G.day.closes[b.key] = "skipped";
+    breakCombo(); log(`Skipped ${b.t}`); saveG(); render();
+  }
+  function closeOut(b, how){
+    G.day.closes[b.key] = how;
+    if (how === "done") award(15, `Closed ${b.t}`, { x2:isHealth(b), label:"closed" });
+    else if (how === "carried") { log(`Carried ${b.t} forward`); saveG(); }
+    render();
+  }
+  function extend(b, min){
+    log(`Asked ${b.t} for +${min} min`);
+    return stretch(b, min);
+  }
+  // this block ends `min` later and everything after it moves by the same amount
+  function stretch(b, min){
+    return writeOps(o => {
+      const ms = min * 60000, all = blocks();
+      all.forEach(x => {
+        if (x.key === b.key) {
+          const e = new Date(x.e.getTime()+ms).toISOString();
+          if (x.extra) { const a = o.adds.find(y => y.key === x.key); if (a) a.e = e; }
+          else o.edits[x.key] = { s:x.s.toISOString(), e, t:x.t };
+        } else if (x.s >= b.e) {
+          const s = new Date(x.s.getTime()+ms).toISOString(), e = new Date(x.e.getTime()+ms).toISOString();
+          if (x.extra) { const a = o.adds.find(y => y.key === x.key); if (a) { a.s = s; a.e = e; } }
+          else o.edits[x.key] = { s, e, t:x.t };
+        }
+      });
+    });
+  }
+
+  /* side quests: one at a time (WIP limit 1) */
+  const PRI = t => /High/i.test(t.priority) ? 3 : /Medium/i.test(t.priority) ? 2 : 1;
+  const sideXp = t => [0, 15, 25, 40][PRI(t)];
+  // One System map, ticket 001: payment deadlines outrank everything else
+  const dueIn = t => { const m = /due (\d{4}-\d{2}-\d{2})/i.exec(t.task); return m ? Math.round((new Date(m[1] + "T12:00") - now()) / 86400000) : null; };
+  const urgent = t => { const d = dueIn(t); return d !== null && d <= 2; };
+  function sideChoices(){
+    return [...TASKS].sort((a,b) => (urgent(b) - urgent(a)) || (b.nextAction - a.nextAction) || (PRI(b) - PRI(a))).slice(0, 5);
+  }
+  function takeSide(id){
+    const t = TASKS.find(x => x.id === id); if (!t) return;
+    G.day.side = { id:t.id, task:t.task, priority:t.priority, at:now().toISOString() };
+    log(`Took side quest: ${t.task}`); saveG(); render();
+  }
+  async function finishSide(){
+    const s = G.day.side; if (!s) return;
+    if (!DRY) {
+      try {
+        const r = await fetch(API + "/tasks/done", { method:"POST", headers:{ "Content-Type":"application/json" },
+          body: JSON.stringify({ id:s.id, done:true }) });
+        if (!r.ok) throw new Error("HTTP " + r.status);
+      } catch (e) { alert("Could not mark it done in Notion: " + e.message); return; }
+    }
+    TASKS = TASKS.filter(t => t.id !== s.id);
+    G.day.side = null;
+    award(sideXp(s), `Side quest done: ${s.task}`, { label:"side quest" });
+    render();
+  }
+  function dropSide(){ if (!G.day.side) return; log(`Put down: ${G.day.side.task}`); G.day.side = null; saveG(); render(); }
+
+  /* ⚡ interruptions: log what came up, then come back */
+  const ZAPS = [["🧡","Caney"],["📞","Call or text"],["🏢","Studio or renter"],["🛒","Errand"],["🧠","Rabbit hole"],["✨","Other"]];
+  function startZap(type, note){
+    G.day.zap = { type, note, s:now().toISOString(), during: currentOf(blocks(), now())?.key || null };
+    log(`⚡ ${type}${note ? ": " + note : ""}`);
+    award(5, "Logged what came up", { label:"honest log" });
+    render();
+  }
+  function endZap(){
+    const z = G.day.zap; if (!z) return;
+    const mins = Math.max(1, Math.round((now() - new Date(z.s)) / 60000));
+    G.day.zaps.push({ ...z, e:now().toISOString(), mins });
+    G.day.zap = null; saveG();
+    const all = blocks(), cur = currentOf(all, now()), nxt = nextOf(all, now());
+    openRecover(mins, cur, nxt, z);
+  }
+
+  /* ---------- changing the schedule ----------
+     Same edit layer as Stillness (/ops): a change here shows on the phone app
+     and the desktop orb. Calendar blocks are keyed by their original start and
+     title; blocks you add are keyed "x<start ms>". */
+  function setBlock(o, b, s, e, t){
+    if (b.extra) { const a = o.adds.find(x => x.key === b.key); if (a) { a.s = s.toISOString(); a.e = e.toISOString(); a.t = t; } }
+    else o.edits[b.key] = { s:s.toISOString(), e:e.toISOString(), t };
+  }
+  function saveBlock(b, s, e, t, moveLater){
+    const ds = s - b.s, de = e - b.e;
+    log(`Changed ${b.t}${t !== b.t ? ` to ${t}` : ""}: ${fmtT(s)} to ${fmtT(e)}`);
+    return writeOps(o => {
+      // later blocks move by however much this one's end moved
+      if (moveLater && de) blocks().forEach(x => {
+        if (x.key === b.key || x.s < b.e) return;
+        setBlock(o, x, new Date(x.s.getTime() + de), new Date(x.e.getTime() + de), x.t);
+      });
+      setBlock(o, b, s, e, t);
+    });
+  }
+  function dropBlock(b){
+    log(`Removed ${b.t} from today`);
+    return writeOps(o => {
+      if (b.extra) o.adds = o.adds.filter(x => x.key !== b.key);
+      else { if (!o.drops.includes(b.key)) o.drops.push(b.key); delete o.edits[b.key]; }
+    });
+  }
+  function addBlock(t, s, e, makeRoom){
+    log(`Added ${t}: ${fmtT(s)} to ${fmtT(e)}`);
+    const dur = e - s;
+    return writeOps(o => {
+      if (makeRoom) blocks().forEach(x => {
+        if (x.s < s) return;
+        setBlock(o, x, new Date(x.s.getTime() + dur), new Date(x.e.getTime() + dur), x.t);
+      });
+      o.adds.push({ key:"x" + s.getTime(), s:s.toISOString(), e:e.toISOString(), t, type:"task", cal:"you" });
+    });
+  }
+  const toField = d => `${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`;
+  function fromField(v, ref){
+    const [h, m] = v.split(":").map(Number);
+    const d = new Date(ref); d.setHours(h, m, 0, 0); return d;
+  }
+
+  function openEdit(b){
+    openSheet(`<h3>Change this block</h3>
+      <input id="eT" value="${esc(b.t)}" maxlength="80">
+      <div class="row"><label>Start<input id="eS" type="time" value="${toField(b.s)}"></label>
+        <label>End<input id="eE" type="time" value="${toField(b.e)}"></label></div>
+      <label class="check"><input id="eMove" type="checkbox"> Move everything after it too</label>
+      <div class="actions"><button class="btn ghost" id="eCancel">Cancel</button><button class="btn primary" id="eSave">Save</button></div>
+      <div class="actions"><button class="btn danger" id="eDrop">Remove from today</button></div>
+      <p style="font-size:12px">Changes last for today and show in Stillness too. To change a block for good, edit it in Google Calendar.</p>`);
+    $("eCancel").onclick = closeSheet;
+    $("eSave").onclick = () => {
+      const t = $("eT").value.trim() || b.t;
+      const s = fromField($("eS").value, b.s);
+      let e = fromField($("eE").value, b.s);
+      if (e <= s) e = new Date(e.getTime() + 86400000);   // runs past midnight
+      closeSheet(); saveBlock(b, s, e, t, $("eMove").checked);
+    };
+    $("eDrop").onclick = () => { closeSheet(); dropBlock(b); };
+  }
+
+  function openAdd(){
+    const t0 = new Date(Math.ceil(now().getTime() / 300000) * 300000);
+    let dur = 30;
+    openSheet(`<h3>Add to today</h3>
+      <input id="aT" placeholder="What is it?" maxlength="80">
+      <div class="row"><label>Start<input id="aS" type="time" value="${toField(t0)}"></label></div>
+      <div class="chips" style="grid-template-columns:repeat(4,1fr)">${[15,30,60,90].map(m =>
+        `<button class="chip ${m === dur ? "sel" : ""}" data-d="${m}" style="text-align:center">${m < 60 ? m + "m" : m/60 + "h"}</button>`).join("")}</div>
+      <label class="check"><input id="aRoom" type="checkbox"> Make room (push what follows later)</label>
+      <div class="actions"><button class="btn ghost" id="aCancel">Cancel</button><button class="btn primary" id="aGo">Add</button></div>`);
+    $("sheet").querySelectorAll("[data-d]").forEach(c => c.onclick = () => {
+      $("sheet").querySelectorAll("[data-d]").forEach(x => x.classList.remove("sel"));
+      c.classList.add("sel"); dur = +c.dataset.d;
+    });
+    $("aCancel").onclick = closeSheet;
+    $("aGo").onclick = () => {
+      const t = $("aT").value.trim(); if (!t) { $("aT").focus(); return; }
+      const s = fromField($("aS").value, now()), e = new Date(s.getTime() + dur * 60000);
+      closeSheet(); addBlock(t, s, e, $("aRoom").checked);
+    };
+    setTimeout(() => $("aT").focus(), 300);
+  }
+
+  /* ---------- sheets ---------- */
+  function openSheet(html){
+    $("sheet").innerHTML = html; $("scrim").style.display = "block";
+    requestAnimationFrame(() => $("sheet").classList.add("open"));
+  }
+  function closeSheet(){ $("sheet").classList.remove("open"); $("scrim").style.display = "none"; }
+  $("scrim").onclick = closeSheet;
+
+  function openZapSheet(){
+    let sel = null;
+    openSheet(`<h3>What came up?</h3><p>Log it and go. The quest waits, and the clock keeps an honest count.</p>
+      <div class="chips">${ZAPS.map(([e,n]) => `<button class="chip" data-z="${esc(n)}">${e} ${esc(n)}</button>`).join("")}</div>
+      <input id="zapNote" placeholder="One line (optional)" maxlength="80">
+      <div class="actions"><button class="btn ghost" id="zCancel">Cancel</button><button class="btn primary" id="zGo" disabled>Go handle it</button></div>`);
+    $("sheet").querySelectorAll(".chip").forEach(c => c.onclick = () => {
+      $("sheet").querySelectorAll(".chip").forEach(x => x.classList.remove("sel"));
+      c.classList.add("sel"); sel = c.dataset.z; $("zGo").disabled = false;
+    });
+    $("zCancel").onclick = closeSheet;
+    $("zGo").onclick = () => { startZap(sel, $("zapNote").value.trim()); closeSheet(); };
+  }
+
+  function openRecover(mins, cur, nxt, z){
+    const shift = Math.ceil(mins / 5) * 5;
+    const gap = nxt ? Math.round((nxt.s - now()) / 60000) : null;
+    const tight = nxt && gap !== null && gap < 10;
+    openSheet(`<h3>Welcome back. ${mins} min on ${esc(z.type)}.</h3>
+      <p>${cur ? `You are in <b>${esc(cur.t)}</b> until ${fmtT(cur.e)}.` : "No block is running now."}
+      ${nxt ? ` Next: <b>${esc(nxt.t)}</b> at ${fmtT(nxt.s)}${gap !== null ? ` (in ${fmtMin(Math.max(0,gap))})` : ""}.` : ""}
+      ${tight ? " That is tight." : ""}</p>
+      <div class="actions" style="flex-direction:column">
+        <button class="btn primary" id="rAbsorb">Absorb it. Keep the plan</button>
+        ${cur || nxt ? `<button class="btn" id="rShift">Shift the rest of the day +${shift} min</button>` : ""}
+      </div>
+      <p style="font-size:12px;margin-top:10px">A shift writes to Stillness, so the phone and the orb move too.</p>`);
+    $("rAbsorb").onclick = () => { award(10, `Absorbed ${mins} min on ${z.type}`, { label:"back on the path" }); closeSheet(); render(); };
+    if (cur || nxt) $("rShift").onclick = async () => {
+      closeSheet(); log(`Shifted the day +${shift} min after ${z.type}`); saveG();
+      if (cur) await stretch(cur, shift); else await shiftFrom(nxt.key, shift);
+      award(5, "Replanned instead of drifting", { label:"replanned" });
+    };
+  }
+
+  function openExtend(b){
+    openSheet(`<h3>Need more time on ${esc(b.t)}?</h3><p>Everything after it moves by the same amount, in Stillness too.</p>
+      <div class="chips"><button class="chip" data-m="10">+10 min</button><button class="chip" data-m="15">+15 min</button>
+      <button class="chip" data-m="30">+30 min</button><button class="chip" id="xCancel">Cancel</button></div>`);
+    $("sheet").querySelectorAll("[data-m]").forEach(c => c.onclick = () => { closeSheet(); extend(b, +c.dataset.m); });
+    $("xCancel").onclick = closeSheet;
+  }
+
+  /* ---------- pings (page open only in this prototype) ---------- */
+  const fired = new Set();
+  function ping(id, title, body){
+    if (fired.has(id)) return; fired.add(id);
+    if (navigator.vibrate) navigator.vibrate([60,80,60]);
+    if ("Notification" in window && Notification.permission === "granted") {
+      try { new Notification(title, { body, icon:"icon-180.png", tag:id }); } catch {}
+    }
+  }
+  function pings(all, t){
+    all.forEach(b => {
+      if (!needsCheck(b)) return;
+      const toStart = (b.s - t) / 60000, toEnd = (b.e - t) / 60000;
+      if (toStart <= 5 && toStart > 4) ping("pre|" + b.key, `In 5 min: ${b.t}`, `Starts ${fmtT(b.s)}. Wrap up what you're on.`);
+      if (toStart <= 0 && toStart > -1) ping("go|" + b.key, `Quest start: ${b.t}`, `Check in now for full XP.`);
+      if (toEnd <= 5 && toEnd > 4 && G.day.checks[b.key]) ping("end|" + b.key, `5 min left: ${b.t}`, `Start closing it out.`);
+    });
+  }
+
+  /* ---------- render ----------
+     Markup is only replaced when it changes, so a tap is never lost to a
+     rebuild mid-press. Seconds live in data-until / data-since spans that
+     tick() fills in place. */
+  function put(id, html){ const el = $(id); if (el._h !== html) { el._h = html; el.innerHTML = html; } }
+  function tick(){
+    const t = now();
+    document.querySelectorAll("[data-until]").forEach(el => el.textContent = fmtLeft((new Date(el.dataset.until) - t) / 1000));
+    document.querySelectorAll("[data-since]").forEach(el => el.textContent = fmtAgo((t - new Date(el.dataset.since)) / 1000));
+    document.querySelectorAll("[data-ring-s]").forEach(el => {
+      const s = new Date(el.dataset.ringS), e = new Date(el.dataset.ringE), C = 2 * Math.PI * 30;
+      const frac = Math.max(0, Math.min(1, (e - t) / (e - s)));
+      el.style.strokeDashoffset = C * (1 - frac);
+    });
+  }
+  function render(){
+    if (G.day.date !== dayKey()) G.day = freshDay();
+    const t = now(), all = blocks();
+    const cur = currentOf(all, t), nxt = nextOf(all, t);
+
+    // HUD
+    const l = lvlOf(G.xp), lo = xpFor(l), hi = xpFor(l+1), ti = Math.min(l-1, TITLES.length-1);
+    $("lvl").textContent = l; $("lvlName").textContent = TITLES[ti]; $("avatar").textContent = AVATARS[ti];
+    $("xpTxt").textContent = `${G.xp - lo} / ${hi - lo} XP`;
+    $("xpBar").style.width = `${Math.min(100, (G.xp - lo) / (hi - lo) * 100)}%`;
+    $("comboN").textContent = G.day.combo; $("combo").classList.toggle("hot", G.day.combo >= 3);
+    $("statusL").innerHTML = pullErr ? `<span class="dry">Offline: ${esc(pullErr)}</span>`
+      : PLAN ? `Live from Stillness · ${lastPull ? fmtT(lastPull) : ""}` : "Loading your day…";
+    $("statusR").innerHTML = [DRY ? `<span class="dry">dry run</span>` : "", AT ? `<span class="dry">clock ${fmtT(t)}</span>` : ""].filter(Boolean).join(" · ");
+
+    // mode
+    const z = G.day.zap;
+    // one fixed colour, the night navy (Junyan, 2026-09-28): no mode changes
+    document.documentElement.className = "night";
+
+    // loose ends: the latest ended block that was started but never closed
+    const loose = all.filter(b => b.e <= t && G.day.checks[b.key] && G.day.checks[b.key] !== "skip" && !G.day.closes[b.key]).pop();
+    put("loose", loose && !z ? `<div class="card loose"><div class="eyebrow">Loose end</div>
+      <div class="q">Did “${esc(loose.t)}” actually close?</div>
+      <div class="actions"><button class="btn primary" data-close="done">Yes, done</button>
+      <button class="btn" data-close="carried">Carry forward</button></div></div>` : "");
+    $("loose").querySelectorAll("[data-close]").forEach(bn => bn.onclick = () => closeOut(loose, bn.dataset.close));
+
+    // main card
+    let html = "";
+    if (!PLAN) html = `<div class="card empty">Reading your calendars…</div>`;
+    else if (z) {
+      html = `<div class="card"><div class="eyebrow">⚡ Side-tracked</div>
+        <div class="quest-title"><span class="em">${(ZAPS.find(x => x[1] === z.type) || ["✨"])[0]}</span><span>${esc(z.type)}</span></div>
+        ${z.note ? `<div class="quest-time">${esc(z.note)}</div>` : ""}
+        <div class="count"><div><div class="big" data-since="${z.s}"></div><div class="sub">away from ${cur ? esc(cur.t) : "the plan"}</div></div></div></div>`;
+    } else if (!cur) {
+      const done = all.filter(b => b.e <= t && needsCheck(b));
+      const health = done.filter(isHealth);
+      if (!nxt) {
+        html = `<div class="card"><div class="eyebrow">Day complete</div>
+          <div class="quest-title"><span class="em">🏁</span><span>Wind down. The trail is walked.</span></div>
+          <div class="summary"><div><b>${G.day.xp}</b><span>XP today</span></div>
+          <div><b>${Object.values(G.day.checks).filter(v => v === "in").length}</b><span>on-time starts</span></div>
+          <div><b>${health.filter(b => ["in","late"].includes(G.day.checks[b.key])).length}/${health.length}</b><span>health kept</span></div></div></div>`;
+      } else {
+        html = `<div class="card"><div class="eyebrow">Between quests</div>
+          <div class="quest-title"><span class="em">${KINDS[nxt.kind].em}</span><span>${esc(nxt.t)}</span></div>
+          <div class="quest-time">Starts ${fmtT(nxt.s)} · in <span data-until="${nxt.s.toISOString()}"></span></div></div>`;
+      }
+    } else {
+      const K = KINDS[cur.kind], st = G.day.checks[cur.key];
+      const C = 2 * Math.PI * 30;
+      html = `<div class="card"><div class="eyebrow">${cur.kind === "open" ? "Open space" : "Main quest"}
+          ${cur.kind === "open" ? "" : `<span class="tag">${K.name}</span>`}${isHealth(cur) ? `<span class="tag x2">2× XP</span>` : ""}</div>
+        <div class="quest-title"><span class="em">${K.em}</span><span>${esc(cur.t)}</span></div>
+        <div class="quest-time">${fmtT(cur.s)} to ${fmtT(cur.e)}</div>
+        <div class="count"><svg class="ring" viewBox="0 0 74 74"><circle class="bg" cx="37" cy="37" r="30"/>
+          <circle class="fg" cx="37" cy="37" r="30" stroke-dasharray="${C}" data-ring-s="${cur.s.toISOString()}" data-ring-e="${cur.e.toISOString()}"/></svg>
+          <div><div class="big" data-until="${cur.e.toISOString()}"></div><div class="sub">left in this block</div></div></div>`;
+      if (needsCheck(cur) && !st) {
+        const lateBy = Math.floor((t - cur.s) / 60000);
+        html += `<div class="actions"><button class="btn primary" id="bIn">${lateBy > ON_TIME_MIN ? "I'm in (late)" : "I'm in"}</button>
+          <button class="btn ghost" id="bSkip">Skip</button></div>
+          <div class="quest-time" style="margin-top:8px">${lateBy <= ON_TIME_MIN ? `On-time window: ${ON_TIME_MIN - lateBy} min left` : `Started ${lateBy} min ago`}</div>`;
+      } else if (st && st !== "skip") {
+        html += `<div class="actions"><button class="btn" id="bMore">Need more time</button>
+          <button class="btn primary" id="bDone">Done early</button></div>`;
+      }
+      if (cur.kind === "open" && st && st !== "skip") {
+        const s = G.day.side;
+        if (s) html += `<div class="active-side"><div class="k">Side quest · +${sideXp(s)} XP</div><div class="nm">${esc(s.task)}</div>
+          <div class="actions"><button class="btn primary" id="sDone">Complete</button><button class="btn ghost" id="sDrop">Put down</button></div></div>`;
+        else if (TASKS.length) html += `<div class="eyebrow" style="margin-top:16px">Pick one side quest</div><div class="side-list">
+          ${sideChoices().map(t => `<button class="side" data-side="${t.id}"><span class="pr">${urgent(t) ? "⏰" : (t.priority||"").split(" ")[0] || "▫️"}</span>
+          <span class="nm">${esc(t.task)}${t.estimate ? ` <span style="color:var(--ink-faint)">· ${esc(t.estimate)}</span>` : ""}</span>
+          <span class="xp">+${sideXp(t)}</span></button>`).join("")}</div>`;
+      }
+      html += `</div>`;
+    }
+    put("main", html);
+    const on = (id, f) => { const el = $(id); if (el) el.onclick = f; };
+    on("bIn", () => checkIn(cur)); on("bSkip", () => skip(cur));
+    on("bMore", () => openExtend(cur));
+    on("bDone", () => { closeOut(cur, "done"); writeOps(o => {
+      const e = now().toISOString();
+      if (cur.extra) { const a = o.adds.find(x => x.key === cur.key); if (a) a.e = e; }
+      else o.edits[cur.key] = { s:cur.s.toISOString(), e, t:cur.t };
+    }); });
+    on("sDone", finishSide); on("sDrop", dropSide);
+    $("main").querySelectorAll("[data-side]").forEach(bn => bn.onclick = () => takeSide(bn.dataset.side));
+
+    put("nextLine", cur && nxt && !z ? `<div class="next"><span>Next: <b>${KINDS[nxt.kind].em} ${esc(nxt.t)}</b></span><span>${fmtT(nxt.s)}</span></div>` : "");
+
+    // zap button
+    $("zap").textContent = z ? "↩︎ Back to the quest" : "⚡ Something came up";
+    $("zap").classList.toggle("back", !!z);
+    $("zap").onclick = z ? endZap : openZapSheet;
+
+    // trail
+    const trailBlocks = all.filter(b => b.e > new Date(t.getFullYear(), t.getMonth(), t.getDate()));
+    // blocks that ended untouched before the game opened today fold away, so "now" sits near the top
+    const since = new Date(G.day.since || 0);
+    const hidden = trailBlocks.filter(b => b.e <= t && !G.day.checks[b.key] && b.s < since);
+    const shown = trailBlocks.filter(b => !hidden.includes(b));
+    put("trail", (hidden.length ? `<div class="node past"><div class="dot">⋯</div><div class="txt"><div class="m">${hidden.length} earlier block${hidden.length > 1 ? "s" : ""} before you opened the game</div></div></div>` : "") + shown.map(b => {
+      const st = G.day.checks[b.key], cl = G.day.closes[b.key];
+      const past = b.e <= t, isNow = cur && b.key === cur.key;
+      const zc = G.day.zaps.filter(x => x.during === b.key).length;
+      const badge = st === "in" ? `<span class="badge b-in">✓ on time</span>` : st === "late" ? `<span class="badge b-late">late</span>`
+        : st === "skip" ? `<span class="badge b-skip">skipped</span>` : past && needsCheck(b) && b.s >= new Date(G.day.since || 0) ? `<span class="badge" style="color:var(--ink-faint)">no check-in</span>` : "";
+      return `<div data-key="${esc(b.key)}" class="node ${past ? "past" : ""} ${isNow ? "now" : ""} ${st || ""}">
+        <div class="dot">${KINDS[b.kind].em}</div>
+        <div class="txt"><div class="t">${esc(b.t)}</div><div class="m">${fmtT(b.s)} to ${fmtT(b.e)}${isHealth(b) ? " · 2×" : ""}${cl === "done" ? " · closed" : cl === "carried" ? " · carried" : ""}</div></div>
+        ${zc ? `<span class="badge b-zap">⚡${zc}</span>` : ""}${badge}</div>`;
+    }).join("") || `<div class="empty">No blocks today.</div>`);
+    $("trail").querySelectorAll("[data-key]").forEach(n => n.onclick = () => {
+      const b = blocks().find(x => x.key === n.dataset.key); if (b) openEdit(b);
+    });
+    $("addBtn").onclick = openAdd;
+    const kept = trailBlocks.filter(b => ["in","late"].includes(G.day.checks[b.key])).length;
+    $("trailMeta").textContent = `${kept} / ${trailBlocks.filter(needsCheck).length} kept`;
+
+    // log
+    $("dayXp").textContent = `${G.day.xp} XP today`;
+    put("log", G.day.log.length ? G.day.log.map(e =>
+      `<div><span>${fmtT(new Date(e.at))}</span><span>${esc(e.msg)}</span>${e.xp ? `<span class="xp">+${e.xp}</span>` : ""}</div>`).join("")
+      : `<div><span></span><span>Nothing yet. Check in to your first quest.</span></div>`);
+    if ("Notification" in window && Notification.permission === "default" && !$("pingAsk")) {
+      const b = document.createElement("button"); b.id = "pingAsk"; b.className = "ping-ask";
+      b.textContent = "Turn on pings for block starts";
+      b.onclick = () => Notification.requestPermission().then(() => b.remove());
+      $("log").after(b);
+    }
+    pings(all, t);
+    tick();
+  }
+
+  /* tick every second; render() only touches the DOM when markup changed */
+  setInterval(() => { tick(); if (!$("sheet").classList.contains("open")) render(); }, 1000);
+  setInterval(pullAll, 2 * 60 * 1000);
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) pullAll(); });
+  pullAll();
+})();
+</script>
+</body>
+</html>
