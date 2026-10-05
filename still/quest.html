@@ -348,9 +348,14 @@
   const TZ = () => PLAN_TZ || Intl.DateTimeFormat().resolvedOptions().timeZone;
   const tzParts = (d, o) => Object.fromEntries(new Intl.DateTimeFormat("en-US", { timeZone:TZ(), ...o })
     .formatToParts(d).map(x => [x.type, x.value]));
+  const tzYmd = d => { const p = tzParts(d, { year:"numeric", month:"2-digit", day:"2-digit" }); return `${p.year}-${p.month}-${p.day}`; };
+  /* The game's day runs to 4 AM, or to the end of a late block that is still
+     going (sleep to 5 AM), not to midnight (Junyan, d67). pullPlan picks the
+     day; before it loads, "4 hours ago" stands in. */
+  let GAME_YMD = null;
+  const gameYmd = () => GAME_YMD || tzYmd(new Date(now() - 4 * 3600000));
   // same shape as Date.toDateString(), which Stillness uses for the /ops key
-  const dayKey = () => { const p = tzParts(now(), { weekday:"short", month:"short", day:"2-digit", year:"numeric" });
-    return `${p.weekday} ${p.month} ${p.day} ${p.year}`; };
+  const dayKey = () => new Date(gameYmd() + "T12:00:00Z").toLocaleDateString("en-US", { timeZone:"UTC", weekday:"short", month:"short", day:"2-digit", year:"numeric" }).replace(/,/g, "");
   function tzOff(d){
     const v = tzParts(d, { timeZoneName:"longOffset" }).timeZoneName || "";
     const m = v.match(/GMT([+-])(\d{2}):(\d{2})/);
@@ -373,7 +378,7 @@
   let G = { xp:0, bestCombo:0, day:null };
   try { const d = JSON.parse(localStorage.getItem(GKEY)); if (d) G = { ...G, ...d }; } catch {}
   function freshDay(){ return { date:dayKey(), since:now().toISOString(), o2:80, o2At:now().toISOString(), ledge:0, sw:false, caches:{}, camps:0, xp:0, combo:0, checks:{}, closes:{}, zaps:[], zap:null, side:null, log:[] }; }
-  if (!G.day || G.day.date !== dayKey()) G.day = freshDay();
+  if (!G.day) G.day = freshDay();   // a stale day is replaced once the plan says which day it is
   /* XP lives on this device AND on the server (still-api quest:state), so it
      survives a cleared browser and is the same on phone and Mac. Newest wins. */
   let syncTimer = null, syncErr = null;
@@ -401,14 +406,35 @@
   /* ---------- live data: plan + edit layer + tasks ---------- */
   let PLAN = null, OPS = { edits:{}, drops:[], adds:[], ts:0 }, TASKS = [], lastPull = null, pullErr = null;
 
-  async function pullPlan(){
-    const q = AT ? `?date=${ymd(now())}` : "";
-    const r = await fetch(API + "/plan" + q, { cache:"no-store" });
+  async function getPlan(date){
+    const r = await fetch(API + "/plan?date=" + date, { cache:"no-store" });
     if (!r.ok) throw new Error("plan HTTP " + r.status);
     const p = await r.json();
     if (!p || !Array.isArray(p.blocks)) throw new Error("plan has no blocks");
+    return p;
+  }
+  async function pullPlan(){
+    const t = now(), today = tzYmd(t);
+    let p = await getPlan(today);
+    PLAN_TZ = p.tz || null;
+    let day = today;
+    const hour = +tzParts(t, { hour:"numeric", hourCycle:"h23" }).hour;
+    if (hour < 12) {
+      // Stay on yesterday's mountain until 4 AM, or until its last block ends
+      // if that is later (capped at 9 AM, and at today's first fixed block).
+      const y = tzYmd(new Date(t - 86400000));
+      const prev = await getPlan(y).catch(() => null);
+      if (prev && prev.blocks.length) {
+        const at4 = new Date(`${today}T04:00:00Z`).getTime() - tzOff(t) * 60000;
+        const lastEnd = Math.max(...prev.blocks.map(b => +new Date(b.e)));
+        const firstFixed = p.blocks.filter(b => !/^open space|^rest$/i.test(b.t)).map(b => +new Date(b.s));
+        const cutoff = Math.max(at4, Math.min(lastEnd, at4 + 5 * 3600000, ...firstFixed));
+        if (+t < cutoff) { p = prev; day = y; }
+      }
+    }
     PLAN = p;
     PLAN_TZ = p.tz || null;
+    GAME_YMD = day;
   }
   async function pullOps(){
     const r = await fetch(API + "/ops?d=" + encodeURIComponent(dayKey()), { cache:"no-store" });
@@ -1260,7 +1286,7 @@
     if (G.mode !== "altitude") { G.mode = "altitude"; G.xp = d.xp = 0; }
   }
   function render(){
-    if (G.day.date !== dayKey()) G.day = freshDay();
+    if (PLAN && G.day.date !== dayKey()) G.day = freshDay();
     ensureDay();
     const t = now(), all = blocks();
     const cur = currentOf(all, t), nxt = nextOf(all, t);
