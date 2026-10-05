@@ -125,6 +125,44 @@
   .active-side .k { font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:var(--gold); }
   .active-side .nm { font-size:16px; font-weight:600; margin-top:4px; }
 
+
+  /* ---------- the mountain ---------- */
+  .place { color:var(--ink); font-weight:600; }
+  #mtn { margin-top:4px; }
+  .mtn-svg { width:100%; height:auto; display:block; border-radius:22px;
+    background:linear-gradient(#0f1229, #262c62); }
+  .mtn-svg .m1 { fill:#2d336f; } .mtn-svg .m2 { fill:#3a4184; opacity:.55; }
+  .mtn-svg .star { fill:#eef0ff; animation:tw 3s ease-in-out infinite; }
+  @keyframes tw { 50% { opacity:.2; } }
+  .mtn-svg .seg { fill:none; stroke:#4a518f; stroke-width:5; stroke-linecap:round; stroke-dasharray:1 9; }
+  .mtn-svg .seg.walked { stroke:var(--gold); stroke-dasharray:none; stroke-width:3; opacity:.85; }
+  .mtn-svg .stopg { cursor:pointer; }
+  .mtn-svg .stopg.past { opacity:.7; }
+  .mtn-svg .hit { fill:transparent; }
+  .mtn-svg .dotm { fill:#262c62; stroke:#a7abd8; stroke-width:2; }
+  .mtn-svg .dotm.done { fill:var(--good); stroke:var(--good); }
+  .mtn-svg .dotm.skip { stroke-dasharray:3 3; opacity:.5; }
+  .mtn-svg .ringm { fill:none; stroke:var(--gold); stroke-width:2; animation:mpulse 1.6s ease-in-out infinite; transform-box:fill-box; transform-origin:center; }
+  @keyframes mpulse { 50% { transform:scale(1.25); opacity:.4; } }
+  .mtn-svg .logr { fill:#9a7452; }
+  .mtn-svg .flame { fill:#3a4184; opacity:.8; }
+  .mtn-svg .flame2 { fill:var(--gold); opacity:0; }
+  .mtn-svg .glow { fill:#ff9c7a; opacity:0; }
+  .mtn-svg .fire.lit .flame { fill:#ff9c7a; opacity:1; transform-box:fill-box; transform-origin:50% 100%; animation:flick .6s ease-in-out infinite alternate; }
+  .mtn-svg .fire.lit .flame2 { opacity:1; transform-box:fill-box; transform-origin:50% 100%; animation:flick .45s ease-in-out infinite alternate-reverse; }
+  .mtn-svg .fire.lit .glow { opacity:.28; }
+  @keyframes flick { from { transform:scale(1,1) skewX(-3deg); } to { transform:scale(.9,1.12) skewX(4deg); } }
+  .mtn-svg .tm { font:600 9.5px ui-monospace, Menlo, monospace; fill:#a7abd8; }
+  .mtn-svg .nm { font:600 12.5px -apple-system, BlinkMacSystemFont, sans-serif; fill:#eef0ff; }
+  .mtn-svg .nm.gone { fill:#a7abd8; text-decoration:line-through; }
+  .mtn-svg .emo { font-size:22px; } .mtn-svg .emo.sm { font-size:15px; }
+  .mtn-svg .halo { fill:var(--gold); opacity:.25; animation:mpulse 2s ease-in-out infinite; transform-box:fill-box; transform-origin:center; }
+  .mtn-svg .me { fill:var(--gold); stroke:#141833; stroke-width:2; }
+  .mtn-svg .cloud ellipse { fill:#767bab; }
+  .mtn-svg .rain { stroke:#9fb4ff; stroke-width:1.5; stroke-linecap:round; animation:rain .7s linear infinite; }
+  @keyframes rain { from { transform:translateY(-3px); opacity:1; } to { transform:translateY(7px); opacity:0; } }
+  .mtn-svg .bolt { fill:var(--gold); animation:tw 1.2s steps(2) infinite; }
+  @media (prefers-reduced-motion: reduce) { .mtn-svg * { animation:none !important; } }
   /* ---------- trail ---------- */
   h2 { font-size:12px; letter-spacing:.14em; text-transform:uppercase; color:var(--ink-soft); font-weight:600;
     margin:26px 4px 10px; display:flex; justify-content:space-between; }
@@ -223,8 +261,8 @@
   <div id="main"></div>
   <div id="nextLine"></div>
 
-  <h2><span>Today's trail <span id="trailMeta" style="font-weight:400;color:var(--ink-faint)"></span></span><button class="add-btn" id="addBtn">＋ Add</button></h2>
-  <div class="trail" id="trail"></div>
+  <h2><span>Today's mountain <span id="trailMeta" style="font-weight:400;color:var(--ink-faint)"></span></span><button class="add-btn" id="addBtn">＋ Add</button></h2>
+  <div id="mtn"></div>
 
   <h2><span>Quest log</span><span id="dayXp"></span></h2>
   <div class="log" id="log"></div>
@@ -261,10 +299,25 @@
   const AT = qs.get("at");
   const clockOffset = AT ? (new Date(AT).getTime() - Date.now()) : 0;
   const now = () => new Date(Date.now() + clockOffset);
-  const dayKey = () => now().toDateString();
+
+  /* The day runs on the calendar's clock: the plan says which zone Junyan is
+     in (still-api reads it from his calendar, 2026-10-05). Before the plan
+     loads, the device's zone stands in. */
+  let PLAN_TZ = null;
+  const TZ = () => PLAN_TZ || Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const tzParts = (d, o) => Object.fromEntries(new Intl.DateTimeFormat("en-US", { timeZone:TZ(), ...o })
+    .formatToParts(d).map(x => [x.type, x.value]));
+  // same shape as Date.toDateString(), which Stillness uses for the /ops key
+  const dayKey = () => { const p = tzParts(now(), { weekday:"short", month:"short", day:"2-digit", year:"numeric" });
+    return `${p.weekday} ${p.month} ${p.day} ${p.year}`; };
+  function tzOff(d){
+    const v = tzParts(d, { timeZoneName:"longOffset" }).timeZoneName || "";
+    const m = v.match(/GMT([+-])(\d{2}):(\d{2})/);
+    return m ? (m[1] === "-" ? -1 : 1) * (+m[2] * 60 + +m[3]) : 0;
+  }
   const ymd = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
 
-  const fmtT = d => d.toLocaleTimeString([], { hour:"numeric", minute:"2-digit" });
+  const fmtT = d => d.toLocaleTimeString([], { hour:"numeric", minute:"2-digit", timeZone:TZ() });
   // minutes and hours only, no seconds (Junyan, 2026-09-28)
   const fmtHM = min => { const h = Math.floor(min / 60), m = min % 60;
     return h ? (m ? `${h} hr ${m} min` : `${h} hr`) : `${m} min`; };
@@ -314,6 +367,7 @@
     const p = await r.json();
     if (!p || !Array.isArray(p.blocks)) throw new Error("plan has no blocks");
     PLAN = p;
+    PLAN_TZ = p.tz || null;
   }
   async function pullOps(){
     const r = await fetch(API + "/ops?d=" + encodeURIComponent(dayKey()), { cache:"no-store" });
@@ -329,7 +383,8 @@
   }
   async function pullAll(){
     try {
-      await Promise.all([pullPlan(), pullOps(), pullTasks().catch(() => {}), pullState()]);
+      await pullPlan();   // first: it sets the zone, which decides today's date key
+      await Promise.all([pullOps(), pullTasks().catch(() => {}), pullState()]);
       lastPull = new Date(); pullErr = null;
     } catch (e) { pullErr = String(e.message || e); }
     render();
@@ -514,6 +569,8 @@
     }
     TASKS = TASKS.filter(t => t.id !== s.id);
     G.day.side = null;
+    const at = currentOf(blocks(), now());
+    (G.day.sideDone = G.day.sideDone || []).push(at ? at.key : "");   // a flag on the mountain
     award(sideXp(s), `Side quest done: ${s.task}`, { label:"side quest" });
     render();
   }
@@ -608,10 +665,14 @@
       o.adds.push({ key:"x" + s.getTime(), s:s.toISOString(), e:e.toISOString(), t, type:"task", cal:"you" });
     });
   }
-  const toField = d => `${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`;
+  // time inputs speak the calendar's clock, not the device's
+  const toField = d => { const p = tzParts(d, { hour:"2-digit", minute:"2-digit", hourCycle:"h23" });
+    return `${p.hour === "24" ? "00" : p.hour}:${p.minute}`; };
   function fromField(v, ref){
     const [h, m] = v.split(":").map(Number);
-    const d = new Date(ref); d.setHours(h, m, 0, 0); return d;
+    const p = tzParts(ref, { year:"numeric", month:"2-digit", day:"2-digit" });
+    const guess = Date.UTC(+p.year, +p.month - 1, +p.day, h, m);
+    return new Date(guess - tzOff(new Date(guess)) * 60000);
   }
 
   function openEdit(b){
@@ -638,8 +699,8 @@
     $("eDrop").onclick = () => { closeSheet(); dropBlock(b); };
   }
 
-  function openAdd(){
-    const t0 = new Date(Math.ceil(now().getTime() / 300000) * 300000);
+  function openAdd(from){
+    const t0 = new Date(Math.ceil(Math.max(now().getTime(), from ? from.getTime() : 0) / 300000) * 300000);
     let dur = 30;
     openSheet(`<h3>Add to today</h3>
       <input id="aT" placeholder="What is it?" maxlength="80">
@@ -805,6 +866,80 @@
       el.style.strokeDashoffset = C * (1 - frac);
     });
   }
+
+  /* ---------- the mountain (Trail, chosen 2026-10-05) ----------
+     One stop per calendar block. Runs of Open space and Rest fold into one
+     "Free time" stop. Anchors (sleep, practice, body, fuel) are campfires that
+     light on check-in. A side quest in progress is a dragon on its stop; a
+     finished one leaves a flag. A storm cloud follows you while you are away. */
+  function stopsOf(all){
+    const out = [];
+    for (const b of all) {
+      const free = b.kind === "open" || b.kind === "break";
+      const last = out[out.length - 1];
+      if (free && last && last.free && b.s - last.e <= 15 * 60000) { last.e = new Date(Math.max(last.e, b.e)); last.blocks.push(b); continue; }
+      if (b.kind === "break") continue;
+      out.push({ free, s:b.s, e:b.e, t: free ? "Free time" : b.t, kind:b.kind, blocks:[b] });
+    }
+    for (const st of out) {
+      const ch = st.blocks.map(b => G.day.checks[b.key]).filter(Boolean);
+      st.anchor = !st.free && isHealth(st.blocks[0]);
+      st.lit = ch.some(c => c === "in" || c === "late");
+      st.skipped = ch.length > 0 && ch.every(c => c === "skip");
+      st.flags = (G.day.sideDone || []).filter(k => st.blocks.some(b => b.key === k)).length;
+    }
+    return out;
+  }
+  function mountainSVG(stops, cur, t, zap){
+    if (!stops.length) return `<div class="empty">No blocks today.</div>`;
+    const n = stops.length, W = 340, ROW = 56, H = 96 + n * ROW;
+    const P = stops.map((_, i) => ({ x: Math.round(170 + 92 * Math.sin(i * 1.15 + 0.5)), y: H - 58 - i * ROW }));
+    const START = { x:170, y:H - 10 }, SUMMIT = { x:170, y:30 };
+    const ALL = [START, ...P, SUMMIT];
+    let curI = stops.findIndex(st => cur && st.blocks.some(b => b.key === cur.key));
+    const passed = stops.reduce((a, st, i) => st.e <= t ? i : a, -1);
+    const here = curI >= 0 ? curI : passed;              // between stops: wait at the last one passed
+    const tp = here < 0 ? START : here >= n ? SUMMIT : P[here];
+    let out = `<svg class="mtn-svg" viewBox="0 0 ${W} ${H}" role="img" aria-label="Today's trail, ${n} stops">`;
+    out += `<polygon class="m2" points="-20,${H} 60,${H * .38} 170,${H}"/><polygon class="m2" points="160,${H} 290,${H * .3} 380,${H}"/>`;
+    out += `<polygon class="m1" points="0,${H} 170,8 340,${H}"/>`;
+    for (let k = 0; k < 20; k++) { const sx = (k * 97) % 340, sy = (k * 53) % 150 + 6; if (Math.abs(sx - 170) < (sy + 10) * .5) continue;
+      out += `<circle class="star" cx="${sx}" cy="${sy}" r="${k % 3 ? .9 : 1.4}" style="animation-delay:${(k % 7) * .4}s"/>`; }
+    for (let k = 1; k < ALL.length; k++) {
+      const p0 = ALL[Math.max(k - 2, 0)], p1 = ALL[k - 1], p2 = ALL[k], p3 = ALL[Math.min(k + 1, ALL.length - 1)];
+      const c1x = p1.x + (p2.x - p0.x) / 6, c1y = p1.y + (p2.y - p0.y) / 6, c2x = p2.x - (p3.x - p1.x) / 6, c2y = p2.y - (p3.y - p1.y) / 6;
+      out += `<path class="seg${k - 1 <= here ? " walked" : ""}" d="M${p1.x},${p1.y} C${c1x},${c1y} ${c2x},${c2y} ${p2.x},${p2.y}"/>`;
+    }
+    out += `<text class="tm" x="${START.x}" y="${START.y + 2}" text-anchor="middle">MORNING</text>`;
+    out += `<text class="emo" x="${SUMMIT.x + 12}" y="${SUMMIT.y + 8}">⛺</text><text class="tm" x="${SUMMIT.x - 10}" y="${SUMMIT.y + 4}" text-anchor="end">CAMP</text>`;
+    stops.forEach((st, i) => {
+      const p = P[i], left = p.x >= 170, ax = left ? -22 : 22, anc = left ? "end" : "start";
+      const isCur = i === curI, past = st.e <= t && !isCur;
+      out += `<g class="stopg${past ? " past" : ""}" data-stop="${i}" transform="translate(${p.x},${p.y})">`;
+      out += `<circle class="hit" r="24"/>`;
+      if (st.anchor) {
+        out += `<g class="fire${st.lit ? " lit" : ""}"><circle class="glow" r="19"/>` +
+          `<rect class="logr" x="-10" y="4" width="20" height="4" rx="2" transform="rotate(18)"/><rect class="logr" x="-10" y="4" width="20" height="4" rx="2" transform="rotate(-18)"/>` +
+          `<path class="flame" d="M0,6 C-9,1 -7,-8 0,-17 C1,-10 8,-8 7,-1 C6,4 3,6 0,6Z"/><path class="flame2" d="M0,5 C-4,2 -3,-3 0,-8 C1,-4 4,-3 3,1 C3,4 1,5 0,5Z"/></g>`;
+      } else {
+        out += `<circle class="dotm${st.lit || (past && st.free) ? " done" : ""}${st.skipped ? " skip" : ""}" r="${st.free ? 6 : 8}"/>`;
+      }
+      if (isCur) out += `<circle class="ringm" r="15"/>`;
+      const name = st.t.length > 24 ? st.t.slice(0, 23) + "…" : st.t;
+      const tag = st.anchor ? " · anchor" : st.free ? ` · ${Math.round((st.e - st.s) / 60000)}m` : "";
+      out += `<text class="tm" x="${ax}" y="-3" text-anchor="${anc}">${fmtT(st.s)}${tag}</text>`;
+      out += `<text class="nm${st.skipped ? " gone" : ""}" x="${ax}" y="11" text-anchor="${anc}">${esc(name)}</text>`;
+      const badge = (isCur && st.free && G.day.side ? "🐉" : "") + "🚩".repeat(Math.min(st.flags, 3));
+      if (badge) out += `<text class="emo sm" x="${left ? 14 : -14}" y="-10" text-anchor="middle">${badge}</text>`;
+      out += `</g>`;
+    });
+    out += `<g class="trav" transform="translate(${tp.x},${tp.y})"><circle class="halo" r="16"/><circle class="me" r="7"/>`;
+    if (zap) out += `<g class="cloud" transform="translate(0,-40)"><ellipse cx="-9" cy="0" rx="11" ry="8"/><ellipse cx="6" cy="-4" rx="13" ry="10"/><ellipse cx="15" cy="2" rx="9" ry="7"/><ellipse cx="2" cy="4" rx="15" ry="6"/>` +
+      [-10, -2, 6, 14].map((x, k) => `<line class="rain" x1="${x}" y1="12" x2="${x - 2}" y2="17" style="animation-delay:${k * .17}s"/>`).join("") +
+      `<path class="bolt" d="M3,8 L-2,17 L2,17 L-1,24 L7,13 L3,13 L6,8Z"/></g>`;
+    out += `</g></svg>`;
+    return out;
+  }
   function render(){
     if (G.day.date !== dayKey()) G.day = freshDay();
     const t = now(), all = blocks();
@@ -816,8 +951,9 @@
     $("xpTxt").textContent = `${G.xp - lo} / ${hi - lo} XP`;
     $("xpBar").style.width = `${Math.min(100, (G.xp - lo) / (hi - lo) * 100)}%`;
     $("comboN").textContent = G.day.combo; $("combo").classList.toggle("hot", G.day.combo >= 3);
+    const where = PLAN && PLAN.where && PLAN.where.place;
     $("statusL").innerHTML = pullErr ? `<span class="dry">Offline: ${esc(pullErr)}</span>`
-      : PLAN ? `Live from Stillness · ${lastPull ? fmtT(lastPull) : ""}` : "Loading your day…";
+      : PLAN ? `<span class="place">📍 ${esc(where || "Home")}</span> ${fmtT(t)} local` : "Loading your day…";
     $("statusR").innerHTML = [DRY ? `<span class="dry">dry run</span>` : "", AT ? `<span class="dry">clock ${fmtT(t)}</span>` : ""].filter(Boolean).join(" · ");
 
     // mode
@@ -904,29 +1040,17 @@
     $("zap").classList.toggle("back", !!z);
     $("zap").onclick = z ? endZap : openZapSheet;
 
-    // trail
-    const trailBlocks = all.filter(b => b.e > new Date(t.getFullYear(), t.getMonth(), t.getDate()));
-    // blocks that ended untouched before the game opened today fold away, so "now" sits near the top
-    const since = new Date(G.day.since || 0);
-    const hidden = trailBlocks.filter(b => b.e <= t && !G.day.checks[b.key] && b.s < since);
-    const shown = trailBlocks.filter(b => !hidden.includes(b));
-    put("trail", (hidden.length ? `<div class="node past"><div class="dot">⋯</div><div class="txt"><div class="m">${hidden.length} earlier block${hidden.length > 1 ? "s" : ""} before you opened the game</div></div></div>` : "") + shown.map(b => {
-      const st = G.day.checks[b.key], cl = G.day.closes[b.key];
-      const past = b.e <= t, isNow = cur && b.key === cur.key;
-      const zc = G.day.zaps.filter(x => x.during === b.key).length;
-      const badge = st === "in" ? `<span class="badge b-in">✓ on time</span>` : st === "late" ? `<span class="badge b-late">late</span>`
-        : st === "skip" ? `<span class="badge b-skip">skipped</span>` : past && needsCheck(b) && b.s >= new Date(G.day.since || 0) ? `<span class="badge" style="color:var(--ink-faint)">no check-in</span>` : "";
-      return `<div data-key="${esc(b.key)}" class="node ${past ? "past" : ""} ${isNow ? "now" : ""} ${st || ""}">
-        <div class="dot">${KINDS[b.kind].em}</div>
-        <div class="txt"><div class="t">${esc(b.t)}</div><div class="m">${fmtT(b.s)} to ${fmtT(b.e)}${isHealth(b) ? " · 2×" : ""}${cl === "done" ? " · closed" : cl === "carried" ? " · carried" : ""}</div></div>
-        ${zc ? `<span class="badge b-zap">⚡${zc}</span>` : ""}${badge}</div>`;
-    }).join("") || `<div class="empty">No blocks today.</div>`);
-    $("trail").querySelectorAll("[data-key]").forEach(n => n.onclick = () => {
-      const b = blocks().find(x => x.key === n.dataset.key); if (b) openEdit(b);
+    // the mountain: today's stops, climbing from the morning to camp
+    const stops = stopsOf(all);
+    put("mtn", mountainSVG(stops, cur, t, z));
+    $("mtn").querySelectorAll("[data-stop]").forEach(n => n.onclick = () => {
+      const st = stops[+n.dataset.stop]; if (!st) return;
+      const fixed = st.blocks.find(b => b.kind !== "open" && b.kind !== "break");
+      if (fixed) openEdit(blocks().find(x => x.key === fixed.key) || fixed); else openAdd(st.s);
     });
-    $("addBtn").onclick = openAdd;
-    const kept = trailBlocks.filter(b => ["in","late"].includes(G.day.checks[b.key])).length;
-    $("trailMeta").textContent = `${kept} / ${trailBlocks.filter(needsCheck).length} kept`;
+    $("addBtn").onclick = () => openAdd();
+    const fires = stops.filter(st => st.anchor);
+    $("trailMeta").textContent = `${fires.filter(st => st.lit).length} / ${fires.length} fires lit`;
 
     // log
     $("dayXp").textContent = `${G.day.xp} XP today`;
