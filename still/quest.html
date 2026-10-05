@@ -126,6 +126,29 @@
   .active-side .nm { font-size:16px; font-weight:600; margin-top:4px; }
 
 
+
+  /* ---------- gym log ---------- */
+  .sheet.tall { max-height:90vh; max-height:90dvh; overflow-y:auto; }
+  .gym-head { display:flex; justify-content:space-between; align-items:center; }
+  .btn.small { flex:none; padding:8px 12px; font-size:13px; }
+  .glabel { display:block; font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--ink-soft); margin:14px 0 6px; }
+  #gProg { width:100%; padding:12px; border-radius:12px; background:rgba(0,0,0,.25); color:var(--ink); border:1px solid var(--glass-border); font:inherit; font-size:15px; }
+  .gmove { margin-top:12px; padding:12px; border-radius:14px; background:rgba(255,255,255,.08); }
+  .gtop { display:flex; justify-content:space-between; align-items:center; gap:8px; }
+  .gtop b { font-size:15px; }
+  .gl { display:flex; align-items:center; gap:6px; flex:none; }
+  .lv { width:32px; height:32px; border-radius:10px; background:rgba(255,255,255,.16); font-size:18px; }
+  .lvn { font:700 14px ui-monospace, Menlo, monospace; min-width:54px; text-align:center; }
+  .lvn.up { color:var(--gold); }
+  .gsub { font-size:12.5px; color:var(--ink-soft); margin-top:4px; }
+  .grow { display:grid; grid-template-columns:36px repeat(4, 1fr); gap:6px; margin-top:8px; align-items:center; }
+  .gk { font:600 11px ui-monospace, Menlo, monospace; color:var(--ink-faint); }
+  .sheet input.set { margin:0; padding:10px 4px; text-align:center; font-size:16px; border-radius:10px; min-width:0; }
+  .gchips { display:flex; flex-wrap:wrap; gap:6px; }
+  .gchip { padding:9px 12px; border-radius:20px; background:rgba(255,255,255,.12); font-size:14px; }
+  .gchip.on { background:var(--good); color:#173b2a; font-weight:600; }
+  .gfoot { display:flex; gap:8px; margin-top:16px; position:sticky; bottom:-20px; padding:10px 0; background:#3d3872; }
+  .gnote { font-size:12.5px; color:var(--ink-soft); margin-top:4px; }
   /* ---------- the mountain ---------- */
   .place { color:var(--ink); font-weight:600; }
   #mtn { margin-top:4px; }
@@ -724,12 +747,151 @@
     setTimeout(() => $("aT").focus(), 300);
   }
 
+
+  /* ---------- gym log (2026-10-05) ----------
+     Tapping a gym block opens a logger for Junyan's two programs, from his
+     Notion "Gym" page: Jack Woods rings calisthenics (Day 1 / Day 2, levels
+     1-7 per move) and Matthew I. Smith's Pike & Head to Toe mobility. Sets are
+     the Two Set Method he logs by hand: 2 warm-up + 2 working. Saving sends the
+     session to still-api, which keeps it and writes his Workout Tracker rows. */
+  const LADDER = {
+    PPU: ["Zero weight","Shoulders distance from rings","Tuck","Hips level with shoulders","Extend hips","Advanced tuck 90°","Full lay"],
+    FLR: ["Zero weight","Shoulders distance from rings","Tuck","Hips level with shoulders","Extend hips","Advanced tuck 90°","Full lay"],
+    HSPU: ["Zero weight","Pike","Elevate feet","Shoulder stand","Partial range strap assisted","Partial range unassisted","Archer push-ups"],
+    NC: ["Support with hands","Support with hands","Support with hands","No hands partial range","No hands negative","No hands positive","Weighted body flat"],
+    OAC: ["2-arm dead hang","One-arm dead hang","2-arm partial range","2-arm full range","Partial range negative OAC","Full range negative OAC","Partial range positive"],
+    SLS: ["Use arms, no weight","Negative only","Positive as well","10 kg","20 kg","30 kg","40 kg"],
+  };
+  const MOVE = { NC:"Nordic Hamstring Curl", OAC:"One-Arm Chin", SLS:"Single-Leg Squat", HSPU:"Handstand Push-Up", FLR:"Front Lever Rows", PPU:"Planche Push-Up" };
+  const PROGRAMS = {
+    "Jack Woods · Day 1": { strength:["NC","OAC","SLS"], mobility:["Bridge","Pike","Butterfly","Front Split","Pancake","Handstand"] },
+    "Jack Woods · Day 2": { strength:["HSPU","FLR","PPU"], mobility:["Bridge","Pike","Front Split","Pancake","V-sit"] },
+    "Matthew I. Smith · Phase 1": { mis:[["Rolling Feet","90s per side","1-2"],["Calf Stretch, single-leg standing","90s","2-3"],
+      ["Sciatic Nerve Ankle Joint Floss","8 reps · 3s up / 3s down","2-3"],["Hip Internal Rotation, lying","3 reps · 10s hold","2-3"],
+      ["Pike Hang, standing B-stance","5 reps · contract 5s / relax 5s","2-3"]] },
+    "Matthew I. Smith · Phase 2": { mis:[["Donkey Calf Stretch, single leg","90s","2-3"],["Your Pigeon Variation","30s","2-3"],
+      ["Sciatic Nerve Knee Joint Floss","8 reps · 3-1-3-1","2-3"],["Hip Internal Rotation, seated","8 reps · 3s lift / 3s rest","2-3"],
+      ["Pike Good Morning, standing round back","8 reps · 3-3-1-0","2-3"]] },
+    "Matthew I. Smith · Phase 3": { mis:[["Knee Extension Calf Stretch, single leg","8 reps · 3s","2-3"],["Sciatic Nerve Ankle Joint Glide","6 reps · 3-1-3-1","2-3"],
+      ["Pike Good Morning, leg elevated","8 reps · 2-3-1-0","2-3"],["Pike Active Lifts, seated single leg","5 reps · 1-1-1-5","2-3"]] },
+  };
+  const isGym = b => !!b && /\bgym\b|workout|calisthenics|rings/i.test(b.t);
+  const ymdLocal = () => { const p = tzParts(now(), { year:"numeric", month:"2-digit", day:"2-digit" }); return `${p.year}-${p.month}-${p.day}`; };
+  let GYM = null, gymTimer = null, gymInfo = { levels:{}, last:[] };
+
+  async function loadGymInfo(){
+    if (!questKey()) return;
+    try { gymInfo = await qfetch("/quest/workout"); } catch {}
+  }
+  function gymDraftKey(){ return "quest-gym-" + ymdLocal(); }
+  function newGym(program){
+    const P = PROGRAMS[program], e = {};
+    // start is null until the server knows his level: the first session sets it, it is not a level-up
+    (P.strength || []).forEach(c => { const start = gymInfo.levels?.[c]?.level || null;
+      e[c] = { level:start || 1, start, reps:["","","",""], lbs:["","","",""] }; });
+    (P.mobility || []).forEach(m => { e["m:" + m] = { done:false }; });
+    (P.mis || []).forEach(([m]) => { e["mis:" + m] = { sets:0 }; });
+    return { program, e, at: now().toISOString() };
+  }
+  function suggestProgram(){
+    const last = (gymInfo.last || []).slice().reverse().find(w => /Jack Woods/.test(w.program || ""));
+    return last && /Day 1/.test(last.program) ? "Jack Woods · Day 2" : "Jack Woods · Day 1";
+  }
+  function saveDraft(){ try { localStorage.setItem(gymDraftKey(), JSON.stringify(GYM)); } catch {} }
+
+  async function openGym(block){
+    if (block && !G.day.checks[block.key]) checkIn(block);       // opening the log means you're there
+    await loadGymInfo();
+    try { GYM = JSON.parse(localStorage.getItem(gymDraftKey())); } catch { GYM = null; }
+    if (!GYM || !PROGRAMS[GYM.program]) GYM = newGym(suggestProgram());
+    GYM.blockKey = block ? block.key : null;
+    drawGym();
+  }
+  function drawGym(){
+    const P = PROGRAMS[GYM.program];
+    const cell = (c, kind, i) => `<input class="set" id="g-${c}-${kind}-${i}" data-c="${c}" data-k="${kind}" data-i="${i}" inputmode="decimal"
+      placeholder="${["W1","W2","S1","S2"][i]}" value="${esc(GYM.e[c][kind][i])}" aria-label="${MOVE[c]} ${kind} ${["warm-up 1","warm-up 2","working set 1","working set 2"][i]}">`;
+    let h = `<div class="gym-head"><h3>🏋️ Gym log</h3><button class="btn ghost small" id="gClose">Close</button></div>
+      <label class="glabel" for="gProg">Program</label>
+      <select id="gProg">${Object.keys(PROGRAMS).map(k => `<option ${k === GYM.program ? "selected" : ""}>${k}</option>`).join("")}</select>`;
+    (P.strength || []).forEach(c => {
+      const x = GYM.e[c], up = x.start != null && x.level > x.start;
+      h += `<div class="gmove"><div class="gtop"><b>${MOVE[c]}</b><span class="gl">
+        <button class="lv" data-lv="${c}" data-d="-1" aria-label="Level down">−</button>
+        <span class="lvn${up ? " up" : ""}">L${x.level}</span>
+        <button class="lv" data-lv="${c}" data-d="1" aria-label="Level up">+</button></span></div>
+        <div class="gsub">${esc(LADDER[c][x.level - 1])}${up ? " · new level" : x.start == null ? " · first time: set your current level" : ""}</div>
+        <div class="grow"><span class="gk">reps</span>${[0,1,2,3].map(i => cell(c, "reps", i)).join("")}</div>
+        <div class="grow"><span class="gk">lbs</span>${[0,1,2,3].map(i => cell(c, "lbs", i)).join("")}</div></div>`;
+    });
+    if (P.mobility) h += `<div class="glabel">Mobility</div><div class="gchips">${P.mobility.map(m =>
+      `<button class="gchip${GYM.e["m:" + m].done ? " on" : ""}" data-mob="${esc(m)}">${GYM.e["m:" + m].done ? "✓ " : ""}${esc(m)}</button>`).join("")}</div>`;
+    (P.mis || []).forEach(([m, how, sets]) => {
+      const x = GYM.e["mis:" + m];
+      h += `<div class="gmove"><div class="gtop"><b>${esc(m)}</b><span class="gl">
+        <button class="lv" data-mis="${esc(m)}" data-d="-1" aria-label="One set fewer">−</button>
+        <span class="lvn">${x.sets} sets</span>
+        <button class="lv" data-mis="${esc(m)}" data-d="1" aria-label="One more set">+</button></span></div>
+        <div class="gsub">${esc(how)} · ${sets} sets</div></div>`;
+    });
+    h += `<div class="gfoot"><button class="btn" id="gRest">Rest 90s</button><button class="btn primary" id="gSave">Finish and save</button></div>
+      <p class="gnote" id="gMsg">Sets save to your Workout Tracker in Notion: 2 warm-up, 2 working, reps and lbs. Leave a box empty to skip it.</p>`;
+    openSheet(h, true);
+    const sh = $("sheet");
+    $("gClose").onclick = () => { saveDraft(); stopRest(); closeSheet(); };
+    $("gProg").onchange = e => { GYM = newGym(e.target.value); saveDraft(); drawGym(); };
+    sh.querySelectorAll("input.set").forEach(inp => inp.oninput = () => { GYM.e[inp.dataset.c][inp.dataset.k][+inp.dataset.i] = inp.value.trim(); saveDraft(); });
+    sh.querySelectorAll("[data-lv]").forEach(b => b.onclick = () => { const x = GYM.e[b.dataset.lv]; x.level = Math.min(7, Math.max(1, x.level + +b.dataset.d)); saveDraft(); drawGym(); });
+    sh.querySelectorAll("[data-mob]").forEach(b => b.onclick = () => { const x = GYM.e["m:" + b.dataset.mob]; x.done = !x.done; saveDraft(); drawGym(); });
+    sh.querySelectorAll("[data-mis]").forEach(b => b.onclick = () => { const x = GYM.e["mis:" + b.dataset.mis]; x.sets = Math.max(0, x.sets + +b.dataset.d); saveDraft(); drawGym(); });
+    $("gRest").onclick = startRest;
+    $("gSave").onclick = saveGym;
+  }
+  // the rest timer is the one place seconds make sense
+  function startRest(){
+    stopRest(); let left = 90; const b = $("gRest");
+    const step = () => { if (!b.isConnected) return stopRest(); b.textContent = left > 0 ? `Rest ${Math.floor(left / 60)}:${String(left % 60).padStart(2, "0")}` : "Go!";
+      if (left-- <= 0) { stopRest(); if (navigator.vibrate) navigator.vibrate([80, 60, 80]); } };
+    step(); gymTimer = setInterval(step, 1000);
+  }
+  function stopRest(){ clearInterval(gymTimer); gymTimer = null; }
+
+  async function saveGym(){
+    const P = PROGRAMS[GYM.program], entries = [];
+    (P.strength || []).forEach(c => { const x = GYM.e[c];
+      if (x.reps.some(v => v !== "") || (x.start != null && x.level !== x.start))
+        entries.push({ code:c, name:MOVE[c], kind:"strength", level:x.level, levelName:LADDER[c][x.level - 1], reps:x.reps, lbs:x.lbs }); });
+    (P.mobility || []).forEach(m => { if (GYM.e["m:" + m].done) entries.push({ name:m, kind:"mobility", setsDone:1, note:"mobility" }); });
+    (P.mis || []).forEach(([m, how]) => { const x = GYM.e["mis:" + m]; if (x.sets) entries.push({ name:m, kind:"mobility", setsDone:x.sets, note:how }); });
+    if (!entries.length) { $("gMsg").textContent = "Nothing logged yet. Fill in at least one set."; return; }
+    const ups = entries.filter(x => x.code && GYM.e[x.code].start != null && x.level > GYM.e[x.code].start);
+    const working = entries.reduce((a, x) => a + (x.reps ? x.reps.slice(2).filter(v => v !== "").length : (x.setsDone || 0)), 0);
+    $("gSave").disabled = true; $("gMsg").textContent = "Saving…";
+    let msg;
+    if (DRY) msg = "Test mode: nothing sent.";
+    else if (!questKey()) msg = "Pair this device in ⚙️ to save to Notion. Your sets are kept on this phone for now.";
+    else {
+      try {
+        const r = await qfetch("/quest/workout", { method:"POST", body:JSON.stringify({ date:ymdLocal(), program:GYM.program, entries }) });
+        msg = r.notion && r.notion.rows ? `Saved. ${r.notion.rows} rows added to your Workout Tracker.` : "Saved on the server.";
+        if (r.notion && r.notion.errors && r.notion.errors.length) msg += ` Notion refused ${r.notion.errors.length}: ${r.notion.errors[0]}`;
+        try { localStorage.removeItem(gymDraftKey()); } catch {}
+      } catch (e) { $("gSave").disabled = false; $("gMsg").textContent = "Could not save: " + e.message + ". Your sets are still here."; return; }
+    }
+    award(30 + 10 * working, `Gym log: ${GYM.program}, ${entries.length} moves`, { x2:true, label:"gym logged" });
+    ups.forEach((x, i) => setTimeout(() => award(60, `Level up: ${x.name} L${x.level} (${x.levelName})`, { label:`${x.code} level ${x.level}!` }), 900 * (i + 1)));
+    const b = GYM.blockKey && blocks().find(x => x.key === GYM.blockKey);
+    if (b && !G.day.closes[b.key]) G.day.closes[b.key] = "done";
+    saveG();
+    $("gMsg").textContent = msg; $("gSave").textContent = "Saved";
+  }
   /* ---------- sheets ---------- */
-  function openSheet(html){
+  function openSheet(html, tall){
     $("sheet").innerHTML = html; $("scrim").style.display = "block";
+    $("sheet").classList.toggle("tall", !!tall);
     requestAnimationFrame(() => $("sheet").classList.add("open"));
   }
-  function closeSheet(){ $("sheet").classList.remove("open"); $("scrim").style.display = "none"; }
+  function closeSheet(){ $("sheet").classList.remove("open"); $("scrim").style.display = "none"; stopRest(); }
   $("scrim").onclick = closeSheet;
 
   function openZapSheet(){
@@ -1010,6 +1172,7 @@
         html += `<div class="actions"><button class="btn" id="bMore">Need more time</button>
           <button class="btn primary" id="bDone">Done early</button></div>`;
       }
+      if (isGym(cur)) html += `<div class="actions"><button class="btn primary" id="bGym">🏋️ Open the gym log</button></div>`;
       if (cur.kind === "open" && st && st !== "skip") {
         const s = G.day.side;
         if (s) html += `<div class="active-side"><div class="k">Side quest · +${sideXp(s)} XP</div><div class="nm">${esc(s.task)}</div>
@@ -1031,6 +1194,7 @@
       else o.edits[cur.key] = { s:cur.s.toISOString(), e, t:cur.t };
     }); });
     on("sDone", finishSide); on("sDrop", dropSide);
+    on("bGym", () => openGym(cur));
     $("main").querySelectorAll("[data-side]").forEach(bn => bn.onclick = () => takeSide(bn.dataset.side));
 
     put("nextLine", cur && nxt && !z ? `<div class="next"><span>Next: <b>${KINDS[nxt.kind].em} ${esc(nxt.t)}</b></span><span>${fmtT(nxt.s)}</span></div>` : "");
@@ -1046,6 +1210,7 @@
     $("mtn").querySelectorAll("[data-stop]").forEach(n => n.onclick = () => {
       const st = stops[+n.dataset.stop]; if (!st) return;
       const fixed = st.blocks.find(b => b.kind !== "open" && b.kind !== "break");
+      if (fixed && isGym(fixed) && fixed.s - now() < 3 * 3600000) return openGym(blocks().find(x => x.key === fixed.key) || fixed);
       if (fixed) openEdit(blocks().find(x => x.key === fixed.key) || fixed); else openAdd(st.s);
     });
     $("addBtn").onclick = () => openAdd();
