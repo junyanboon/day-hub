@@ -149,6 +149,23 @@
   .gchip.on { background:var(--good); color:#173b2a; font-weight:600; }
   .gfoot { display:flex; gap:8px; margin-top:16px; position:sticky; bottom:-20px; padding:10px 0; background:#3d3872; }
   .gnote { font-size:12.5px; color:var(--ink-soft); margin-top:4px; }
+  /* ---------- altitude ---------- */
+  .hud-title { gap:8px; }
+  .hud-title > span:first-child { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  #altTxt { white-space:nowrap; flex:none; font-variant-numeric:tabular-nums; }
+  .o2row { display:flex; align-items:center; gap:6px; margin-top:5px; font:600 10.5px ui-monospace, Menlo, monospace; color:var(--ink-soft); }
+  .o2bar { flex:1; height:5px; border-radius:4px; background:rgba(0,0,0,.25); overflow:hidden; }
+  .o2bar i { display:block; height:100%; width:80%; background:#7fd8ff; border-radius:4px; transition:width .6s; }
+  .o2bar i.mid { background:#ffd479; } .o2bar i.thin { background:#ff9c9c; }
+  .cache { margin-top:14px; padding:12px; border-radius:14px; background:rgba(127,216,255,.1); border:1px dashed rgba(127,216,255,.45); }
+  .cache .ck { font:600 11px ui-monospace, Menlo, monospace; color:#7fd8ff; letter-spacing:.04em; }
+  .cache .ct { font-weight:700; font-size:16px; margin-top:4px; }
+  .cache .cx { font-size:14px; color:var(--ink-soft); margin-top:4px; line-height:1.4; }
+  .cache .cdone { margin-top:8px; font-size:13.5px; color:var(--good); }
+  .cline { width:100%; margin-top:10px; padding:11px 12px; border-radius:12px; border:1px solid var(--glass-border); background:rgba(0,0,0,.2); color:var(--ink); font:inherit; font-size:15px; }
+  .season { display:grid; gap:4px; margin-top:6px; font-size:13px; }
+  .season div { display:grid; grid-template-columns:1fr 1.3fr auto; gap:8px; color:var(--ink-soft); }
+  .season b { color:var(--ink); font-variant-numeric:tabular-nums; }
   /* ---------- the mountain ---------- */
   .place { color:var(--ink); font-weight:600; }
   #mtn { margin-top:4px; }
@@ -270,12 +287,13 @@
 <body>
 <div id="app">
   <div class="hud">
-    <div class="avatar" id="avatar">🧭</div>
+    <div class="avatar" id="avatar">🧗</div>
     <div class="hud-mid">
-      <div class="hud-title"><span><b id="lvlName">Wanderer</b> · Lv <span id="lvl">1</span></span><span id="xpTxt">0 / 100 XP</span></div>
+      <div class="hud-title"><span><b id="peakName">Today's peak</b></span><span id="altTxt">0 m</span></div>
       <div class="bar"><i id="xpBar"></i></div>
+      <div class="o2row"><span>O₂</span><div class="o2bar"><i id="o2Bar"></i></div><span id="o2Txt">80%</span></div>
     </div>
-    <div class="combo" id="combo"><div class="n" id="comboN">0</div><div class="l">streak</div></div>
+    <div class="combo" id="combo"><div class="n" id="comboN">·</div><div class="l" id="comboL">wind</div></div>
     <button class="gear" id="gear" aria-label="Settings">⚙️</button>
   </div>
   <div class="status"><span id="statusL">Loading your day…</span><span id="statusR"></span></div>
@@ -354,7 +372,7 @@
   const GKEY = "quest-v1";
   let G = { xp:0, bestCombo:0, day:null };
   try { const d = JSON.parse(localStorage.getItem(GKEY)); if (d) G = { ...G, ...d }; } catch {}
-  function freshDay(){ return { date:dayKey(), since:now().toISOString(), xp:0, combo:0, checks:{}, closes:{}, zaps:[], zap:null, side:null, log:[] }; }
+  function freshDay(){ return { date:dayKey(), since:now().toISOString(), o2:80, o2At:now().toISOString(), ledge:0, sw:false, caches:{}, camps:0, xp:0, combo:0, checks:{}, closes:{}, zaps:[], zap:null, side:null, log:[] }; }
   if (!G.day || G.day.date !== dayKey()) G.day = freshDay();
   /* XP lives on this device AND on the server (still-api quest:state), so it
      survives a cleared browser and is the same on phone and Mac. Newest wins. */
@@ -481,44 +499,153 @@
   }
   const isHealth = b => !!KINDS[b.kind]?.health;
 
-  /* ---------- XP ---------- */
-  const TITLES = ["Wanderer","Pathfinder","Keeper of Hours","Warden","Timewright","Sage of the Day","Master of Stillness"];
-  const AVATARS = ["🧭","🥾","🏹","🛡️","⏳","🔮","🪷"];
-  const lvlOf = xp => Math.floor(Math.sqrt(xp / 60)) + 1;
-  const xpFor = l => 60 * (l-1) * (l-1);
-  const mult = () => 1 + 0.25 * Math.min(G.day.combo, 4);
+  /* ---------- Altitude (Trail · Altitude, chosen 2026-10-05) ----------
+     XP is metres climbed. Each block's climb comes from a Difficulty/Terrain
+     route (geocaching style): (D + T) × 40 m. Oxygen is a second meter: every
+     climb uses some, it thins 4% an hour, and anchors (sleep, meals, gym,
+     Shambhavi) are campfires that refill it. Below 30% the climb still counts
+     but its metres wait on a ledge until the next campfire. Altitude never
+     drops. A comeback within 10 min after ⚡ gives a Second Wind: next climb ×2.
+     G.xp is the season's total metres, G.day.xp today's. */
+  const PEAKS = { Hurghada:"Red Sea Ridge", Cairo:"Muqattam Crest", Luxor:"Theban Hills", Aswan:"Granite Cataract",
+    Madrid:"Guadarrama Crest", Toronto:"Escarpment Line", London:"Thames Ridge", "São Paulo":"Serra do Mar" };
+  const placeNow = () => (PLAN && PLAN.where && PLAN.where.place) || "Home";
+  const peakName = () => PEAKS[placeNow()] || `${placeNow()} Ridge`;
+  function route(b){                                   // [Difficulty, Terrain]
+    if (isGym(b)) return [3, 4];
+    if (/tour|quad|hike|trek|safari|dive|snorkel|climb/i.test(b.t)) return [4, 5];
+    switch (b.kind) {
+      case "body": return [3, 3];   case "dance": return [3, 4];
+      case "travel": return (b.e - b.s) >= 2 * 3600000 ? [2, 3] : [1, 2];
+      case "practice": return [2, 1];  case "rest": return [2, 1];  case "call": return [2, 1];
+      case "fuel": return /dinner/i.test(b.t) ? [2, 1] : [1, 1];
+      case "open": return [1, 1];   default: return [2, 2];
+    }
+  }
+  const climbOf = b => { const [D, T] = route(b); return (D + T) * 40; };
+  const o2Cost = b => { const [D, T] = route(b); return (D + T) * 3; };
+  const FIRE = { rest:100, fuel:35, body:30, practice:30 };
+  const SIDE_M = 50;
+  const fmtM = m => `${Math.round(m).toLocaleString()} m`;
+  function o2Now(){ const d = G.day; const hrs = (now() - new Date(d.o2At || now())) / 3600000;
+    return Math.max(0, Math.min(100, (d.o2 ?? 80) - Math.max(0, hrs) * 4)); }
+  function settleO2(){ G.day.o2 = o2Now(); G.day.o2At = now().toISOString(); }
+  function summitOf(all){
+    const m = all.filter(needsCheck).reduce((a, b) => a + climbOf(b), 0) + SIDE_M * Math.min(3, TASKS.length);
+    return Math.max(500, Math.ceil(m / 50) * 50);
+  }
+  let SUMMIT_H = 0;
 
-  function award(base, msg, opts = {}){
-    const before = lvlOf(G.xp);
-    const amt = Math.round(base * (opts.x2 ? 2 : 1) * (opts.combo ? mult() : 1));
-    G.xp += amt; G.day.xp += amt;
-    log(msg, amt);
-    floatXp(amt, opts.label || "");
-    const after = lvlOf(G.xp);
-    if (after > before) levelUp(after);
+  function addAlt(m, msg, label){
+    m = Math.round(m); if (!m) { log(msg); return; }
+    G.xp += m; G.day.xp += m;
+    log(msg, m); floatXp(m, label || "");
+    (G.summits = G.summits || {})[G.day.date] = { place:placeNow(), peak:peakName(), alt:G.day.xp, h:SUMMIT_H };
+    if (SUMMIT_H && !G.day.summited && G.day.xp >= SUMMIT_H) {
+      G.day.summited = true;
+      setTimeout(() => banner("🏔️", "SUMMIT", `${peakName()} · ${fmtM(SUMMIT_H)}`), 900);
+      log(`Summit of ${peakName()} reached`);
+    }
     saveG();
   }
+  // every other reward is metres too (side quests, logging what came up, replans)
+  function award(m, msg, opts = {}){ addAlt(m, msg, opts.label); }
+
+  function climb(b, frac, why){
+    settleO2();
+    const thin = G.day.o2 < 30, sw = !!G.day.sw;
+    const m = Math.round((climbOf(b) + (isGym(b) ? 20 * (G.ropes || 0) : 0)) * frac * (sw ? 2 : 1));
+    G.day.sw = false;
+    G.day.o2 = Math.max(0, G.day.o2 - o2Cost(b) * (thin ? 2 : 1));
+    if (thin) { G.day.ledge = (G.day.ledge || 0) + m; log(`${why}: ${fmtM(m)} wait on a ledge (thin air). Light a campfire to bring them home.`); floatXp(0, "thin air: metres on a ledge"); saveG(); }
+    else addAlt(m, `${why}${sw ? " · second wind ×2" : ""}`, sw ? "second wind!" : "");
+  }
+  function campfire(b){
+    const f = FIRE[b.kind]; if (!f) return;
+    settleO2(); const was = Math.round(G.day.o2);
+    G.day.o2 = f >= 100 ? 100 : Math.min(100, G.day.o2 + f);
+    log(`🔥 Campfire at ${b.t}: oxygen ${was}% to ${Math.round(G.day.o2)}%`);
+    if (G.day.ledge) { const m = G.day.ledge; G.day.ledge = 0; addAlt(m, "Ledge metres brought home", "from the ledge"); }
+    saveG();
+  }
+
   function log(msg, xp = 0){
     G.day.log.unshift({ at:now().toISOString(), msg, xp });
-    G.day.log = G.day.log.slice(0, 60);
+    G.day.log = G.day.log.slice(0, 80);
     saveG();
   }
-  function bumpCombo(){ G.day.combo++; G.bestCombo = Math.max(G.bestCombo, G.day.combo); }
-  function breakCombo(){ if (G.day.combo >= 2) log(`Streak of ${G.day.combo} ended`); G.day.combo = 0; }
-
   function floatXp(n, label){
     const el = document.createElement("div");
-    el.className = "float"; el.innerHTML = `+${n} XP${label ? `<small>${esc(label)}</small>` : ""}`;
+    el.className = "float"; el.innerHTML = `${n ? `+${Math.round(n)} m` : ""}${label ? `<small>${esc(label)}</small>` : ""}`;
     document.body.appendChild(el); setTimeout(() => el.remove(), 1500);
     if (navigator.vibrate) navigator.vibrate(30);
   }
-  function levelUp(l){
-    const i = Math.min(l-1, TITLES.length-1);
+  function banner(icon, top, line){
     const el = document.createElement("div");
     el.className = "lvlup";
-    el.innerHTML = `<div><div class="a">${AVATARS[i]}</div><div class="b">LEVEL ${l}</div><div class="c">${TITLES[i]}</div></div>`;
+    el.innerHTML = `<div><div class="a">${icon}</div><div class="b">${esc(top)}</div><div class="c">${esc(line)}</div></div>`;
     document.body.appendChild(el); setTimeout(() => el.remove(), 2700);
     if (navigator.vibrate) navigator.vibrate([40,60,40]);
+  }
+
+  /* ---------- field caches: a real-world challenge on each block ----------
+     Geocaching vocabulary on purpose: type, D/T, Found it, Did not find (still
+     logged, still climbs a little). A find pitches a base camp, which can be
+     spent to rest through a free-time stop and keep its metres. */
+  const CTYPE = { trad:"📦 Traditional", multi:"🔢 Multi-stage", myst:"❓ Mystery", earth:"🌍 EarthCache", night:"🌙 Night cache" };
+  const CACHE_LIB = {
+    gym: [["multi",2,2,"Heaviest iron","Stage 1: find the heaviest dumbbell in the gym and log its weight. Stage 2: carry it 20 steps and put it back."],
+          ["myst",3,2,"Plate puzzle","Add up every plate on the most loaded bar in the room. Log the total in kg and in lbs."],
+          ["trad",1,1,"Best window","Find the gym's best window and log one thing you can see from it."]],
+    fuel: [["trad",1,1,"New protein","Find a protein you have not eaten yet this trip and put it on your plate."],
+           ["earth",2,1,"Grown here","Find one thing on the table grown near {place}. Ask where it comes from and log the place."],
+           ["myst",2,1,"Menu word","Find one word in the local language on a menu or sign. Learn what it means and log it."]],
+    dinner: [["trad",2,1,"Staff favourite","Ask a staff member their favourite local dish and log the name."],
+             ["myst",2,1,"Menu word","Find one word in the local language on the menu. Learn what it means and log it."]],
+    open: [["trad",2,2,"High point","Find the highest spot you can reach on foot within 10 minutes. Log the view in one line."],
+           ["earth",1,1,"Three sounds","Stand still for one minute anywhere outside. Log three sounds you can name."],
+           ["trad",2,2,"Sea colour","Find something for sale in {place} that is the colour of the sea. Log what it was."],
+           ["multi",2,3,"Oldest thing","Stage 1: find the oldest-looking thing within a short walk. Stage 2: find out how old it really is."]],
+    travel: [["earth",3,3,"Stone bands","At the first stop, pick up a stone and name its colour bands. What made them? Put it back after."],
+             ["multi",3,4,"Track reader","Stage 1: count the stops on the way. Stage 2: at the last one, find a track and guess who made it."],
+             ["trad",2,2,"Road sign","Find a sign with a place name you have never heard of. Log it."]],
+    rest: [["night",3,1,"Summer Triangle","After dark, find Vega, Deneb and Altair high in the west. A DNF is a fine log."],
+           ["night",1,1,"Five breaths","Lights off. Count five slow breaths before sleep. Log how you feel in two words."]],
+    practice: [["trad",1,1,"Sit spot","Practise facing a window. Log the first thing you see when you open your eyes."]],
+    call: [["trad",1,2,"Walk and talk","Take the call standing or walking. Log roughly how far you went."]],
+    dance: [["multi",3,3,"Borrowed move","Stage 1: learn one move from someone new. Stage 2: teach it back to Caney. Log the move."]],
+    fixed: [["trad",1,1,"Never seen","Find one thing here you have never seen before. Log it."]],
+  };
+  function cacheFor(b){
+    const lib = isGym(b) ? CACHE_LIB.gym : /dinner/i.test(b.t) ? CACHE_LIB.dinner
+      : /tour|quad|safari|hike/i.test(b.t) ? CACHE_LIB.travel : CACHE_LIB[b.kind] || CACHE_LIB.fixed;
+    const st = (G.day.caches[gk(b)] = G.day.caches[gk(b)] || { i:(b.s.getHours() + b.t.length) % lib.length, state:null, line:"" });
+    const [t, D, T, title, text] = lib[st.i % lib.length];
+    return { st, lib, t, D, T, title, text:text.replace("{place}", placeNow()) };
+  }
+  function cacheCard(b){
+    const c = cacheFor(b), done = c.st.state === "found" || c.st.state === "dnf";
+    return `<div class="cache"><div class="ck">${CTYPE[c.t]} · D${c.D} / T${c.T}</div>
+      <div class="ct">${esc(c.title)}</div><div class="cx">${esc(c.text)}</div>
+      ${done ? `<div class="cdone">${c.st.state === "found" ? "✓ Found it" : "Did not find, logged"}${c.st.line ? `: “${esc(c.st.line)}”` : ""}</div>`
+        : `<input id="cLine" class="cline" placeholder="Logbook line (optional)" maxlength="120" value="${esc(c.st.line)}">
+           <div class="actions"><button class="btn primary" id="cFound">Found it</button><button class="btn" id="cDnf">Did not find</button>
+           ${c.lib.length > 1 ? `<button class="btn ghost" id="cNext">Another</button>` : ""}</div>`}</div>`;
+  }
+  function logCache(b, state){
+    const c = cacheFor(b), line = ($("cLine") && $("cLine").value.trim()) || "";
+    c.st.state = state; c.st.line = line;
+    if (state === "found") { G.day.camps = (G.day.camps || 0) + 1;
+      addAlt(30 + 10 * c.D, `⛺ Found “${c.title}”${line ? `: ${line}` : ""}. Base camp pitched`, "cache found");
+      if (!(G.souvenirs = G.souvenirs || {})[placeNow()]) { G.souvenirs[placeNow()] = G.day.date; setTimeout(() => banner("🏅", "SOUVENIR", `First find in ${placeNow()}`), 1200); }
+    } else addAlt(10, `Did not find “${c.title}”${line ? `: ${line}` : ""}`, "DNF logged");
+    saveG(); render();
+  }
+  function restHere(b){
+    if (!(G.day.camps > 0)) return;
+    G.day.camps--; G.day.checks[gk(b)] = "rest"; settleO2(); G.day.o2 = Math.min(100, G.day.o2 + 10);
+    addAlt(climbOf(b), `⛺ Rested at base camp through ${b.t}. Kept its metres, +10% oxygen`, "rested");
+    render();
   }
 
   /* ---------- the day's loop ---------- */
@@ -549,13 +676,14 @@
   function checkIn(b){
     const late = (now() - b.s) / 60000 > ON_TIME_MIN;
     G.day.checks[gk(b)] = late ? "late" : "in";
-    if (late) { breakCombo(); award(10, `Started ${b.t} late`, { x2:isHealth(b), label:"started" }); }
-    else { bumpCombo(); award(20, `Started ${b.t} on time`, { x2:isHealth(b), combo:true, label: isHealth(b) ? "health block defended" : "on time" }); }
+    const [D, T] = route(b);
+    climb(b, late ? 0.5 : 1, `Climbed ${b.t} (D${D}/T${T})${late ? ", started late" : ""}`);
+    if (isHealth(b)) campfire(b);
     render();
   }
   function skip(b){
     G.day.checks[gk(b)] = "skip"; G.day.closes[gk(b)] = "skipped";
-    breakCombo(); log(`Skipped ${b.t}`); saveG(); render();
+    log(`Not today: ${b.t}. Nothing lost`); saveG(); render();
   }
   function closeOut(b, how){
     G.day.closes[gk(b)] = how;
@@ -587,7 +715,7 @@
 
   /* side quests: one at a time (WIP limit 1) */
   const PRI = t => /High/i.test(t.priority) ? 3 : /Medium/i.test(t.priority) ? 2 : 1;
-  const sideXp = t => [0, 15, 25, 40][PRI(t)];
+  const sideXp = t => SIDE_M + (urgent(t) ? 25 : 0);
   // One System map, ticket 001: payment deadlines outrank everything else
   const dueIn = t => { const m = /due (\d{4}-\d{2}-\d{2})/i.exec(t.task); return m ? Math.round((new Date(m[1] + "T12:00") - now()) / 86400000) : null; };
   const urgent = t => { const d = dueIn(t); return d !== null && d <= 2; };
@@ -631,6 +759,7 @@
     G.day.zaps.push({ ...z, e:now().toISOString(), mins });
     G.day.zap = null; saveG();
     const all = blocks(), cur = currentOf(all, now()), nxt = nextOf(all, now());
+    if (mins <= 10) { G.day.sw = true; log(`Back in ${mins} min: Second Wind, your next climb counts double`); floatXp(0, "second wind ready"); saveG(); }
     openRecover(mins, cur, nxt, z);
   }
 
@@ -896,8 +1025,11 @@
         try { localStorage.removeItem(gymDraftKey()); } catch {}
       } catch (e) { $("gSave").disabled = false; $("gMsg").textContent = "Could not save: " + e.message + ". Your sets are still here."; return; }
     }
-    award(30 + 10 * working, `Gym log: ${GYM.program}, ${entries.length} moves`, { x2:true, label:"gym logged" });
-    ups.forEach((x, i) => setTimeout(() => award(60, `Level up: ${x.name} L${x.level} (${x.levelName})`, { label:`${x.code} level ${x.level}!` }), 900 * (i + 1)));
+    const warm = entries.reduce((a, x) => a + (x.reps ? x.reps.slice(0, 2).filter(v => v !== "").length : 0), 0);
+    award(5 * warm + 15 * working, `Gym log: ${GYM.program}, ${entries.length} moves (${warm} warm-up, ${working} working sets)`, { label:"sets climbed" });
+    ups.forEach((x, i) => setTimeout(() => { G.ropes = (G.ropes || 0) + 1;
+      award(50, `Level up: ${x.name} L${x.level} (${x.levelName}). Fixed rope added: +20 m on every gym climb from now on`, { label:`${x.code} level ${x.level}!` });
+      banner("🪢", "FIXED ROPE", `${x.name} level ${x.level}`); }, 900 * (i + 1)));
     const b = GYM.blockKey && blocks().find(x => x.key === GYM.blockKey);
     if (b && !G.day.closes[gk(b)]) G.day.closes[gk(b)] = "done";
     saveG();
@@ -1091,7 +1223,7 @@
       out += `<path class="seg${k - 1 <= here ? " walked" : ""}" d="M${p1.x},${p1.y} C${c1x},${c1y} ${c2x},${c2y} ${p2.x},${p2.y}"/>`;
     }
     out += `<text class="tm" x="${START.x}" y="${START.y + 2}" text-anchor="middle">MORNING</text>`;
-    out += `<text class="emo" x="${SUMMIT.x + 12}" y="${SUMMIT.y + 8}">⛺</text><text class="tm" x="${SUMMIT.x - 10}" y="${SUMMIT.y + 4}" text-anchor="end">CAMP</text>`;
+    out += `<text class="emo" x="${SUMMIT.x + 12}" y="${SUMMIT.y + 8}">⛺</text><text class="tm" x="${SUMMIT.x - 10}" y="${SUMMIT.y + 4}" text-anchor="end">${esc(peakName().toUpperCase())} · ${fmtM(SUMMIT_H)}</text>`;
     stops.forEach((st, i) => {
       const p = P[i], left = p.x >= 170, ax = left ? -22 : 22, anc = left ? "end" : "start";
       const isCur = i === curI, past = st.e <= t && !isCur;
@@ -1106,7 +1238,7 @@
       }
       if (isCur) out += `<circle class="ringm" r="15"/>`;
       const name = st.t.length > 24 ? st.t.slice(0, 23) + "…" : st.t;
-      const tag = st.anchor ? " · anchor" : st.free ? ` · ${Math.round((st.e - st.s) / 60000)}m` : "";
+      const tag = ` · +${st.blocks.filter(needsCheck).reduce((a, b) => a + climbOf(b), 0)} m`;
       out += `<text class="tm" x="${ax}" y="-3" text-anchor="${anc}">${fmtT(st.s)}${tag}</text>`;
       out += `<text class="nm${st.skipped ? " gone" : ""}" x="${ax}" y="11" text-anchor="${anc}">${esc(name)}</text>`;
       const badge = (isCur && st.free && G.day.side ? "🐉" : "") + "🚩".repeat(Math.min(st.flags, 3));
@@ -1120,17 +1252,30 @@
     out += `</g></svg>`;
     return out;
   }
+  // Days saved before Altitude (2026-10-05) lack its fields; the season starts at 0 m
+  function ensureDay(){
+    const d = G.day;
+    if (d.o2 == null) { d.o2 = 80; d.o2At = now().toISOString(); }
+    d.caches = d.caches || {}; d.camps = d.camps || 0; d.ledge = d.ledge || 0;
+    if (G.mode !== "altitude") { G.mode = "altitude"; G.xp = d.xp = 0; }
+  }
   function render(){
     if (G.day.date !== dayKey()) G.day = freshDay();
+    ensureDay();
     const t = now(), all = blocks();
     const cur = currentOf(all, t), nxt = nextOf(all, t);
 
     // HUD
-    const l = lvlOf(G.xp), lo = xpFor(l), hi = xpFor(l+1), ti = Math.min(l-1, TITLES.length-1);
-    $("lvl").textContent = l; $("lvlName").textContent = TITLES[ti]; $("avatar").textContent = AVATARS[ti];
-    $("xpTxt").textContent = `${G.xp - lo} / ${hi - lo} XP`;
-    $("xpBar").style.width = `${Math.min(100, (G.xp - lo) / (hi - lo) * 100)}%`;
-    $("comboN").textContent = G.day.combo; $("combo").classList.toggle("hot", G.day.combo >= 3);
+    SUMMIT_H = PLAN ? summitOf(all) : 0;
+    $("peakName").textContent = PLAN ? peakName() : "Today's peak";
+    $("altTxt").textContent = SUMMIT_H ? `${Math.round(G.day.xp).toLocaleString()} / ${fmtM(SUMMIT_H)}` : fmtM(G.day.xp);
+    $("xpBar").style.width = `${SUMMIT_H ? Math.min(100, G.day.xp / SUMMIT_H * 100) : 0}%`;
+    const o2 = Math.round(o2Now());
+    $("o2Bar").style.width = o2 + "%"; $("o2Txt").textContent = o2 + "%";
+    $("o2Bar").className = o2 < 30 ? "thin" : o2 < 60 ? "mid" : "";
+    $("comboN").textContent = G.day.sw ? "×2" : G.day.ledge ? `${G.day.ledge}` : (G.day.camps || "·");
+    $("comboL").textContent = G.day.sw ? "2nd wind" : G.day.ledge ? "m ledge" : G.day.camps ? "camps" : "wind";
+    $("combo").classList.toggle("hot", !!G.day.sw);
     const where = PLAN && PLAN.where && PLAN.where.place;
     $("statusL").innerHTML = pullErr ? `<span class="dry">Offline: ${esc(pullErr)}</span>`
       : PLAN ? `<span class="place">📍 ${esc(where || "Home")}</span> ${fmtT(t)} local` : "Loading your day…";
@@ -1161,11 +1306,15 @@
       const done = all.filter(b => b.e <= t && needsCheck(b));
       const health = done.filter(isHealth);
       if (!nxt) {
-        html = `<div class="card"><div class="eyebrow">Day complete</div>
-          <div class="quest-title"><span class="em">🏁</span><span>Wind down. The trail is walked.</span></div>
-          <div class="summary"><div><b>${G.day.xp}</b><span>XP today</span></div>
-          <div><b>${Object.values(G.day.checks).filter(v => v === "in").length}</b><span>on-time starts</span></div>
-          <div><b>${health.filter(b => ["in","late"].includes(G.day.checks[gk(b)])).length}/${health.length}</b><span>health kept</span></div></div></div>`;
+        const season = Object.entries(G.summits || {}).sort((a, b) => a[0] < b[0] ? 1 : -1).slice(0, 7);
+        html = `<div class="card"><div class="eyebrow">Summit card · ${esc(peakName())}</div>
+          <div class="quest-title"><span class="em">${G.day.summited ? "🏔️" : "⛺"}</span><span>You reached ${fmtM(G.day.xp)} of ${fmtM(SUMMIT_H)}</span></div>
+          <div class="summary"><div><b>${health.filter(b => ["in","late"].includes(G.day.checks[gk(b)])).length}/${health.length}</b><span>fires lit</span></div>
+          <div><b>${G.day.zaps.filter(x => x.mins <= 10).length}</b><span>quick comebacks</span></div>
+          <div><b>${Object.values(G.day.caches || {}).filter(c => c.state === "found").length}</b><span>caches found</span></div></div>
+          <div class="eyebrow" style="margin-top:14px">Season peaks</div>
+          <div class="season">${season.map(([d, x]) => `<div><span>${esc(x.place)}</span><span>${esc(x.peak)}</span><b>${fmtM(x.alt)}${x.h ? ` / ${fmtM(x.h)}` : ""}</b></div>`).join("")}</div>
+          <div class="quest-time" style="margin-top:8px">Season total ${fmtM(G.xp)}. Nothing is ever taken off.</div></div>`;
       } else {
         html = `<div class="card"><div class="eyebrow">Between quests</div>
           <div class="quest-title"><span class="em">${KINDS[nxt.kind].em}</span><span>${esc(nxt.t)}</span></div>
@@ -1175,7 +1324,7 @@
       const K = KINDS[cur.kind], st = G.day.checks[gk(cur)];
       const C = 2 * Math.PI * 30;
       html = `<div class="card"><div class="eyebrow">${cur.kind === "open" ? "Open space" : "Main quest"}
-          ${cur.kind === "open" ? "" : `<span class="tag">${K.name}</span>`}${isHealth(cur) ? `<span class="tag x2">2× XP</span>` : ""}</div>
+          ${cur.kind === "open" ? "" : `<span class="tag">${K.name}</span>`}<span class="tag" style="text-transform:none">▲ ${climbOf(cur)} m</span>${isHealth(cur) ? `<span class="tag x2">🔥 campfire</span>` : ""}</div>
         <div class="quest-title"><span class="em">${K.em}</span><span>${esc(cur.t)}</span></div>
         <div class="quest-time">${fmtT(cur.s)} to ${fmtT(cur.e)}</div>
         <div class="count"><svg class="ring" viewBox="0 0 74 74"><circle class="bg" cx="37" cy="37" r="30"/>
@@ -1191,6 +1340,8 @@
           <button class="btn primary" id="bDone">Done early</button></div>`;
       }
       if (isGym(cur)) html += `<div class="actions"><button class="btn primary" id="bGym">🏋️ Open the gym log</button></div>`;
+      if (cur.kind === "open" && !st && G.day.camps > 0) html += `<div class="actions"><button class="btn" id="bRest">⛺ Rest here (${G.day.camps} base camp${G.day.camps > 1 ? "s" : ""}): keep +${climbOf(cur)} m</button></div>`;
+      if (st === "in" || st === "late") html += cacheCard(cur);
       if (cur.kind === "open" && st && st !== "skip") {
         const s = G.day.side;
         if (s) html += `<div class="active-side"><div class="k">Side quest · +${sideXp(s)} XP</div><div class="nm">${esc(s.task)}</div>
@@ -1213,6 +1364,10 @@
     }); });
     on("sDone", finishSide); on("sDrop", dropSide);
     on("bGym", () => openGym(cur));
+    on("bRest", () => restHere(cur));
+    on("cFound", () => logCache(cur, "found")); on("cDnf", () => logCache(cur, "dnf"));
+    on("cNext", () => { const c = cacheFor(cur); c.st.i++; saveG(); render(); });
+    if ($("cLine")) $("cLine").oninput = e => { cacheFor(cur).st.line = e.target.value; };
     $("main").querySelectorAll("[data-side]").forEach(bn => bn.onclick = () => takeSide(bn.dataset.side));
 
     put("nextLine", cur && nxt && !z ? `<div class="next"><span>Next: <b>${KINDS[nxt.kind].em} ${esc(nxt.t)}</b></span><span>${fmtT(nxt.s)}</span></div>` : "");
