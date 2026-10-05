@@ -526,21 +526,39 @@
   function currentOf(all, t){ let hit = null; all.forEach(b => { if (t >= b.s && t < b.e) hit = b; }); return hit; }
   function nextOf(all, t){ return all.find(b => b.s > t) || null; }
   const needsCheck = b => b.kind !== "break";
+  // Check-ins follow the calendar event, not its time: a block that moves (in
+  // Google Calendar or in Stillness) keeps "started" and "closed". Blocks with
+  // no event id (Stillness's own, or added today) use their edit key.
+  const gk = b => b && b.id ? "id:" + b.id : b && b.key;
   const ON_TIME_MIN = 5;
+  // The check-in button says what you are starting (Junyan, 2026-10-05: "I don't get the I'm in button")
+  function startLabel(b){
+    if (isGym(b)) return "▶ Start the workout";
+    if (/sleep|bed|wind.?down/i.test(b.t)) return "🌙 Going to bed";
+    if (/nap|rest\b/i.test(b.t)) return "😌 Lying down";
+    const k = b.kind;
+    if (k === "practice") return "🪷 Starting practice";
+    if (k === "fuel") return "🍽️ Sitting down to eat";
+    if (k === "call") return "📞 Starting the call";
+    if (k === "travel") return "🧳 Heading out";
+    if (k === "dance") return "💃 Starting to dance";
+    if (k === "open") return "▶ Start free time";
+    return "▶ Starting now";
+  }
 
   function checkIn(b){
     const late = (now() - b.s) / 60000 > ON_TIME_MIN;
-    G.day.checks[b.key] = late ? "late" : "in";
+    G.day.checks[gk(b)] = late ? "late" : "in";
     if (late) { breakCombo(); award(10, `Started ${b.t} late`, { x2:isHealth(b), label:"started" }); }
     else { bumpCombo(); award(20, `Started ${b.t} on time`, { x2:isHealth(b), combo:true, label: isHealth(b) ? "health block defended" : "on time" }); }
     render();
   }
   function skip(b){
-    G.day.checks[b.key] = "skip"; G.day.closes[b.key] = "skipped";
+    G.day.checks[gk(b)] = "skip"; G.day.closes[gk(b)] = "skipped";
     breakCombo(); log(`Skipped ${b.t}`); saveG(); render();
   }
   function closeOut(b, how){
-    G.day.closes[b.key] = how;
+    G.day.closes[gk(b)] = how;
     if (how === "done") award(15, `Closed ${b.t}`, { x2:isHealth(b), label:"closed" });
     else if (how === "carried") { log(`Carried ${b.t} forward`); saveG(); }
     render();
@@ -593,7 +611,7 @@
     TASKS = TASKS.filter(t => t.id !== s.id);
     G.day.side = null;
     const at = currentOf(blocks(), now());
-    (G.day.sideDone = G.day.sideDone || []).push(at ? at.key : "");   // a flag on the mountain
+    (G.day.sideDone = G.day.sideDone || []).push(at ? gk(at) : "");   // a flag on the mountain
     award(sideXp(s), `Side quest done: ${s.task}`, { label:"side quest" });
     render();
   }
@@ -800,7 +818,7 @@
   function saveDraft(){ try { localStorage.setItem(gymDraftKey(), JSON.stringify(GYM)); } catch {} }
 
   async function openGym(block){
-    if (block && !G.day.checks[block.key]) checkIn(block);       // opening the log means you're there
+    if (block && !G.day.checks[gk(block)]) checkIn(block);       // opening the log means you're there
     await loadGymInfo();
     try { GYM = JSON.parse(localStorage.getItem(gymDraftKey())); } catch { GYM = null; }
     if (!GYM || !PROGRAMS[GYM.program]) GYM = newGym(suggestProgram());
@@ -881,7 +899,7 @@
     award(30 + 10 * working, `Gym log: ${GYM.program}, ${entries.length} moves`, { x2:true, label:"gym logged" });
     ups.forEach((x, i) => setTimeout(() => award(60, `Level up: ${x.name} L${x.level} (${x.levelName})`, { label:`${x.code} level ${x.level}!` }), 900 * (i + 1)));
     const b = GYM.blockKey && blocks().find(x => x.key === GYM.blockKey);
-    if (b && !G.day.closes[b.key]) G.day.closes[b.key] = "done";
+    if (b && !G.day.closes[gk(b)]) G.day.closes[gk(b)] = "done";
     saveG();
     $("gMsg").textContent = msg; $("gSave").textContent = "Saved";
   }
@@ -1009,7 +1027,7 @@
       const toStart = (b.s - t) / 60000, toEnd = (b.e - t) / 60000;
       if (toStart <= 5 && toStart > 4) ping("pre|" + b.key, `In 5 min: ${b.t}`, `Starts ${fmtT(b.s)}. Wrap up what you're on.`);
       if (toStart <= 0 && toStart > -1) ping("go|" + b.key, `Quest start: ${b.t}`, `Check in now for full XP.`);
-      if (toEnd <= 5 && toEnd > 4 && G.day.checks[b.key]) ping("end|" + b.key, `5 min left: ${b.t}`, `Start closing it out.`);
+      if (toEnd <= 5 && toEnd > 4 && G.day.checks[gk(b)]) ping("end|" + b.key, `5 min left: ${b.t}`, `Start closing it out.`);
     });
   }
 
@@ -1044,11 +1062,11 @@
       out.push({ free, s:b.s, e:b.e, t: free ? "Free time" : b.t, kind:b.kind, blocks:[b] });
     }
     for (const st of out) {
-      const ch = st.blocks.map(b => G.day.checks[b.key]).filter(Boolean);
+      const ch = st.blocks.map(b => G.day.checks[gk(b)]).filter(Boolean);
       st.anchor = !st.free && isHealth(st.blocks[0]);
       st.lit = ch.some(c => c === "in" || c === "late");
       st.skipped = ch.length > 0 && ch.every(c => c === "skip");
-      st.flags = (G.day.sideDone || []).filter(k => st.blocks.some(b => b.key === k)).length;
+      st.flags = (G.day.sideDone || []).filter(k => st.blocks.some(b => gk(b) === k)).length;
     }
     return out;
   }
@@ -1124,7 +1142,7 @@
     document.documentElement.className = "night";
 
     // loose ends: the latest ended block that was started but never closed
-    const loose = all.filter(b => b.e <= t && G.day.checks[b.key] && G.day.checks[b.key] !== "skip" && !G.day.closes[b.key]).pop();
+    const loose = all.filter(b => b.e <= t && G.day.checks[gk(b)] && G.day.checks[gk(b)] !== "skip" && !G.day.closes[gk(b)]).pop();
     put("loose", loose && !z ? `<div class="card loose"><div class="eyebrow">Loose end</div>
       <div class="q">Did “${esc(loose.t)}” actually close?</div>
       <div class="actions"><button class="btn primary" data-close="done">Yes, done</button>
@@ -1147,14 +1165,14 @@
           <div class="quest-title"><span class="em">🏁</span><span>Wind down. The trail is walked.</span></div>
           <div class="summary"><div><b>${G.day.xp}</b><span>XP today</span></div>
           <div><b>${Object.values(G.day.checks).filter(v => v === "in").length}</b><span>on-time starts</span></div>
-          <div><b>${health.filter(b => ["in","late"].includes(G.day.checks[b.key])).length}/${health.length}</b><span>health kept</span></div></div></div>`;
+          <div><b>${health.filter(b => ["in","late"].includes(G.day.checks[gk(b)])).length}/${health.length}</b><span>health kept</span></div></div></div>`;
       } else {
         html = `<div class="card"><div class="eyebrow">Between quests</div>
           <div class="quest-title"><span class="em">${KINDS[nxt.kind].em}</span><span>${esc(nxt.t)}</span></div>
           <div class="quest-time">Starts ${fmtT(nxt.s)} · in <span data-until="${nxt.s.toISOString()}"></span></div></div>`;
       }
     } else {
-      const K = KINDS[cur.kind], st = G.day.checks[cur.key];
+      const K = KINDS[cur.kind], st = G.day.checks[gk(cur)];
       const C = 2 * Math.PI * 30;
       html = `<div class="card"><div class="eyebrow">${cur.kind === "open" ? "Open space" : "Main quest"}
           ${cur.kind === "open" ? "" : `<span class="tag">${K.name}</span>`}${isHealth(cur) ? `<span class="tag x2">2× XP</span>` : ""}</div>
@@ -1165,9 +1183,9 @@
           <div><div class="big" data-until="${cur.e.toISOString()}"></div><div class="sub">left in this block</div></div></div>`;
       if (needsCheck(cur) && !st) {
         const lateBy = Math.floor((t - cur.s) / 60000);
-        html += `<div class="actions"><button class="btn primary" id="bIn">${lateBy > ON_TIME_MIN ? "I'm in (late)" : "I'm in"}</button>
-          <button class="btn ghost" id="bSkip">Skip</button></div>
-          <div class="quest-time" style="margin-top:8px">${lateBy <= ON_TIME_MIN ? `On-time window: ${ON_TIME_MIN - lateBy} min left` : `Started ${lateBy} min ago`}</div>`;
+        html += `<div class="actions"><button class="btn primary" id="bIn">${startLabel(cur)}</button>
+          <button class="btn ghost" id="bSkip">Not today</button></div>
+          <div class="quest-time" style="margin-top:8px">${lateBy <= ON_TIME_MIN ? `Tap when you actually start. Full points for the next ${ON_TIME_MIN - lateBy} min.` : `Tap when you start. It began ${lateBy} min ago, still worth half.`}</div>`;
       } else if (st && st !== "skip") {
         html += `<div class="actions"><button class="btn" id="bMore">Need more time</button>
           <button class="btn primary" id="bDone">Done early</button></div>`;
