@@ -1111,8 +1111,8 @@
   function openSettings(){
     const paired = !!questKey(), pushed = !!store.get("quest-push");
     openSheet(`<h3>Settings</h3>
-      <p>${paired ? `Paired. XP saves to the server${syncErr ? ` <span style="color:var(--warn)">(last sync failed: ${esc(syncErr)})</span>` : ""}, and calendar changes are on.`
-        : "Pair this device to save XP, change the calendar and get phone pings."}</p>
+      <p>${paired ? `Paired. Your climb saves to the server${syncErr ? ` <span style="color:var(--warn)">(last sync failed: ${esc(syncErr)})</span>` : ""}, and calendar changes are on.`
+        : "Pair this device to save your climb, change the calendar and get phone pings."}</p>
       <input id="pCode" placeholder="Pairing code" autocomplete="off" autocapitalize="characters" value="${paired ? "••••••••" : ""}">
       <div class="actions"><button class="btn" id="pSave">${paired ? "Change code" : "Pair"}</button>
         ${paired ? `<button class="btn ghost" id="pForget">Unpair</button>` : ""}</div>
@@ -1158,7 +1158,7 @@
       if (!needsCheck(b)) return;
       const toStart = (b.s - t) / 60000, toEnd = (b.e - t) / 60000;
       if (toStart <= 5 && toStart > 4) ping("pre|" + b.key, `In 5 min: ${b.t}`, `Starts ${fmtT(b.s)}. Wrap up what you're on.`);
-      if (toStart <= 0 && toStart > -1) ping("go|" + b.key, `Quest start: ${b.t}`, `Check in now for full XP.`);
+      if (toStart <= 0 && toStart > -1) ping("go|" + b.key, `Time to climb: ${b.t}`, `Tap Start within 5 min for the full climb.`);
       if (toEnd <= 5 && toEnd > 4 && G.day.checks[gk(b)]) ping("end|" + b.key, `5 min left: ${b.t}`, `Start closing it out.`);
     });
   }
@@ -1344,7 +1344,7 @@
       if (st === "in" || st === "late") html += cacheCard(cur);
       if (cur.kind === "open" && st && st !== "skip") {
         const s = G.day.side;
-        if (s) html += `<div class="active-side"><div class="k">Side quest · +${sideXp(s)} XP</div><div class="nm">${esc(s.task)}</div>
+        if (s) html += `<div class="active-side"><div class="k">Side quest · +${sideXp(s)} m</div><div class="nm">${esc(s.task)}</div>
           <div class="actions"><button class="btn primary" id="sDone">Complete</button><button class="btn ghost" id="sDrop">Put down</button></div></div>`;
         else if (TASKS.length) html += `<div class="eyebrow" style="margin-top:16px">Pick one side quest</div><div class="side-list">
           ${sideChoices().map(t => `<button class="side" data-side="${t.id}"><span class="pr">${urgent(t) ? "⏰" : (t.priority||"").split(" ")[0] || "▫️"}</span>
@@ -1391,7 +1391,7 @@
     $("trailMeta").textContent = `${fires.filter(st => st.lit).length} / ${fires.length} fires lit`;
 
     // log
-    $("dayXp").textContent = `${G.day.xp} XP today`;
+    $("dayXp").textContent = `${fmtM(G.day.xp)} today`;
     put("log", G.day.log.length ? G.day.log.map(e =>
       `<div><span>${fmtT(new Date(e.at))}</span><span>${esc(e.msg)}</span>${e.xp ? `<span class="xp">+${e.xp}</span>` : ""}</div>`).join("")
       : `<div><span></span><span>Nothing yet. Check in to your first quest.</span></div>`);
