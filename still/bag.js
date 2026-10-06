@@ -306,7 +306,6 @@ ${eye(47)}${eye(73)}
 <path d="M56.5 53 L63.5 53 L60 62 Z" fill="url(#${u}k)"/><path d="M57.6 53.6 L60 55.2 L62.4 53.6" stroke="#fff3c4" stroke-width=".8" fill="none" opacity=".75"/>
 <path d="M50 96 l-2 5 M53 97 l0 5 M56 96 l2 5 M64 96 l-2 5 M67 97 l0 5 M70 96 l2 5" stroke="#e6a94a" stroke-width="2" stroke-linecap="round"/>
 <path d="M86 40 C91 54 92 72 86 86" fill="none" stroke="#b3a4ff" stroke-width="1.8" stroke-linecap="round" opacity=".8"/>
-<path d="M89.5 14 L83.5 32" stroke="#b3a4ff" stroke-width="1.2" stroke-linecap="round" opacity=".7"/>
 <ellipse cx="52" cy="27" rx="10" ry="4" fill="#fff" opacity=".2"/>`;
     },
 
