@@ -1,0 +1,364 @@
+/* Day Quest bag (inventory), d103. Pairs with bag.js. Every class is prefixed bag- or ba-. */
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&display=swap');
+
+.bag-root, .bag-qroot, .bag-layer {
+  --bag-ink: rgba(255,255,255,.95);
+  --bag-soft: rgba(255,255,255,.7);
+  --bag-faint: rgba(255,255,255,.42);
+  --bag-gold: #ffd479;
+  --bag-zap: #c9b6ff;
+  --bag-display: "Cinzel", "Iowan Old Style", Georgia, serif;
+  color: var(--bag-ink);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+.bag-root *, .bag-qroot *, .bag-layer * { box-sizing: border-box; }
+.bag-root button, .bag-qroot button, .bag-layer button { font: inherit; color: inherit; border: 0; cursor: pointer; background: none; margin: 0; }
+.bag-root p, .bag-layer p { margin: 0; }
+
+/* ---------------- panel (dark navy leather) ---------------- */
+.bag-panel {
+  position: relative; padding: 18px 14px 14px; border-radius: 26px;
+  background:
+    radial-gradient(120% 70% at 50% -12%, rgba(140,125,230,.24), transparent 60%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .06 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"),
+    linear-gradient(180deg, #282d5e 0%, #1d2149 55%, #15183a 100%);
+  border: 1px solid rgba(255,255,255,.10);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.14), inset 0 -3px 12px rgba(0,0,0,.45), 0 20px 50px rgba(6,6,30,.55);
+}
+.bag-panel::before {
+  content: ""; position: absolute; inset: 7px; border-radius: 20px; pointer-events: none;
+  border: 1.5px dashed rgba(255,212,121,.17);
+}
+.bag-rivet {
+  position: absolute; width: 7px; height: 7px; border-radius: 50%; pointer-events: none;
+  background: radial-gradient(circle at 35% 30%, #fff6d8, #c9a052 45%, #4f3a14 100%);
+  box-shadow: 0 1px 2px rgba(0,0,0,.7);
+}
+.bag-rivet.tl { top: 13px; left: 13px; } .bag-rivet.tr { top: 13px; right: 13px; }
+.bag-rivet.bl { bottom: 13px; left: 13px; } .bag-rivet.br { bottom: 13px; right: 13px; }
+.bag-head { display: flex; align-items: baseline; justify-content: space-between; padding: 0 16px 12px; }
+.bag-title {
+  font-family: var(--bag-display); font-size: 21px; font-weight: 700; letter-spacing: .1em; color: #f4ead2;
+  text-shadow: 0 1px 0 rgba(0,0,0,.6), 0 0 18px rgba(255,212,121,.28);
+}
+.bag-cap { font-size: 12px; color: var(--bag-faint); font-variant-numeric: tabular-nums; letter-spacing: .06em; }
+.bag-grid {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; padding: 10px; border-radius: 18px;
+  background: rgba(5,6,25,.38);
+  box-shadow: inset 0 2px 9px rgba(0,0,0,.6), inset 0 -1px 0 rgba(255,255,255,.06), 0 1px 0 rgba(255,255,255,.05);
+}
+.bag-qhead { display: flex; justify-content: space-between; align-items: center; min-height: 28px; margin: 14px 8px 8px; }
+.bag-qlabel { font-size: 11px; letter-spacing: .16em; text-transform: uppercase; color: rgba(255,212,121,.78); font-weight: 600; }
+.bag-quick {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; padding: 10px; border-radius: 18px;
+  background: linear-gradient(180deg, rgba(255,212,121,.08), rgba(5,6,25,.38));
+  box-shadow: inset 0 2px 9px rgba(0,0,0,.55), 0 0 0 1px rgba(255,212,121,.14);
+}
+.bag-quick .bag-sock { aspect-ratio: auto; height: 80px; }
+.bag-hint { text-align: center; font-size: 12px; color: var(--bag-faint); margin: 12px 0 2px; }
+
+/* ---------------- sockets ---------------- */
+.bag-sock {
+  position: relative; aspect-ratio: 1 / 1; border-radius: 14px; overflow: hidden; isolation: isolate;
+  touch-action: manipulation; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
+  background: radial-gradient(circle at 50% 38%, #262d5e 0%, #1a1e44 55%, #11142e 100%);
+  box-shadow: inset 0 3px 6px rgba(0,0,0,.72), inset 0 -1px 1px rgba(255,255,255,.08), 0 1px 0 rgba(255,255,255,.05);
+  transition: transform .18s ease, box-shadow .18s ease;
+  outline: none;
+}
+.bag-sock::before {
+  content: ""; position: absolute; inset: 6px; border-radius: 10px; z-index: 0; pointer-events: none;
+  border: 1px solid rgba(0,0,0,.38); box-shadow: 0 1px 0 rgba(255,255,255,.06), inset 0 1px 0 rgba(255,255,255,.04);
+}
+.bag-sock::after {
+  content: ""; position: absolute; left: 50%; top: 50%; width: 10px; height: 10px; z-index: 0; pointer-events: none;
+  transform: translate(-50%,-50%) rotate(45deg);
+  border: 1px solid rgba(255,255,255,.08); box-shadow: 1px 1px 0 rgba(0,0,0,.45);
+}
+.bag-sock.has { cursor: grab; }
+.bag-sock.has::after { display: none; }
+.bag-sock:focus-visible { box-shadow: inset 0 3px 6px rgba(0,0,0,.6), 0 0 0 2px var(--bag-zap); }
+.bag-sock > .bag-art {
+  position: absolute; inset: 0; margin: auto; z-index: 2; pointer-events: none;
+  width: 78%; height: 78%; max-width: 64px; max-height: 64px;
+}
+.bag-key { position: absolute; left: 8px; top: 5px; z-index: 3; font-size: 10px; font-weight: 700; color: rgba(255,212,121,.55); pointer-events: none; }
+.bag-n {
+  position: absolute; right: 7px; bottom: 4px; z-index: 3; pointer-events: none;
+  font-size: 12px; font-weight: 800; color: #fff; font-variant-numeric: tabular-nums;
+  text-shadow: 0 1px 2px #000, 0 0 6px rgba(0,0,0,.9);
+}
+.bag-new {
+  position: absolute; right: 6px; top: 6px; width: 8px; height: 8px; border-radius: 50%; z-index: 3; pointer-events: none;
+  background: var(--bag-gold); box-shadow: 0 0 8px var(--bag-gold); animation: bag-dot 1.6s ease-in-out infinite;
+}
+
+/* rarity rims */
+.bag-rim {
+  position: absolute; inset: 0; border-radius: inherit; padding: 2px; overflow: hidden; z-index: 1; pointer-events: none;
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+}
+.bag-rim > b { position: absolute; left: 50%; top: 50%; width: 200%; height: 200%; margin: -100% 0 0 -100%; }
+.r-common .bag-rim > b { background: conic-gradient(from 210deg, #7d87a5, #f4f7ff, #a3acc6, #e6ebf7, #7d87a5); opacity: .8; }
+.r-rare .bag-rim > b { background: conic-gradient(#5b6cff, #c08cff, #6fd0ff, #8f6bff, #e0b8ff, #5b6cff); animation: bag-spin 4.5s linear infinite; }
+.r-sacred .bag-rim { padding: 2.5px; }
+.r-sacred .bag-rim > b { background: conic-gradient(#b9862b, #fff1c2, #ffd479, #e0a640, #fff6da, #b9862b); animation: bag-spin 9s linear infinite; }
+.bag-glow { position: absolute; inset: 0; z-index: 0; pointer-events: none; }
+.r-common .bag-glow { background: radial-gradient(circle at 50% 56%, rgba(207,216,236,.16), transparent 66%); }
+.r-rare .bag-glow { background: radial-gradient(circle at 50% 56%, rgba(143,120,255,.34), transparent 66%); }
+.r-sacred .bag-glow { background: radial-gradient(circle at 50% 56%, rgba(255,212,121,.42), transparent 68%); animation: bag-hglow 3.5s ease-in-out infinite alternate; }
+
+/* sacred sparkles */
+.bag-spark {
+  position: absolute; width: 8px; height: 8px; margin: -4px 0 0 -4px; z-index: 3; pointer-events: none;
+  background: radial-gradient(circle, #fff 0 20%, #ffe39a 45%, rgba(255,212,121,0) 72%);
+  clip-path: polygon(50% 0, 60% 40%, 100% 50%, 60% 60%, 50% 100%, 40% 60%, 0 50%, 40% 40%);
+  transform: scale(0); animation: bag-spark 3.2s ease-in-out infinite;
+}
+
+/* drag states */
+.bag-dragging .bag-sock { box-shadow: inset 0 3px 6px rgba(0,0,0,.72), 0 0 0 1px rgba(201,182,255,.26); }
+.bag-sock.bag-over {
+  transform: scale(1.07);
+  box-shadow: inset 0 3px 6px rgba(0,0,0,.5), 0 0 0 2px var(--bag-zap), 0 0 22px rgba(201,182,255,.6);
+  background: radial-gradient(circle at 50% 45%, #3a3a86 0%, #1f2352 70%);
+}
+.bag-sock.bag-src > :not(.bag-key) { opacity: .2; }
+.bag-sock.bag-land > .bag-art { animation: bag-land .5s cubic-bezier(.2,1.5,.4,1); }
+.bag-ghost {
+  position: fixed; left: 0; top: 0; z-index: 4000; pointer-events: none; will-change: transform; border-radius: 50%;
+  background: radial-gradient(circle, rgba(201,182,255,.35), transparent 68%);
+}
+.bag-ghost.r-sacred { background: radial-gradient(circle, rgba(255,212,121,.45), transparent 68%); }
+.bag-ghost .bag-art { width: 100%; height: 100%; filter: drop-shadow(0 14px 12px rgba(0,0,0,.55)); }
+
+/* ---------------- main-screen quick bar ---------------- */
+.bag-qbar {
+  display: flex; gap: 10px; align-items: center; padding: 8px; border-radius: 20px;
+  background: rgba(14,16,42,.5); box-shadow: inset 0 0 0 1px rgba(255,255,255,.12), inset 0 2px 8px rgba(0,0,0,.4);
+  -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
+}
+.bag-qbar .bag-sock { flex: 0 0 64px; width: 64px; height: 64px; aspect-ratio: auto; }
+.bag-qbar .bag-sock > .bag-art { width: 82%; height: 82%; }
+.bag-qbar .bag-timer { margin-left: auto; }
+.bag-timer {
+  display: inline-flex; gap: 6px; align-items: center; padding: 4px 11px 4px 5px; border-radius: 20px;
+  background: rgba(143,155,255,.2); box-shadow: inset 0 0 0 1px rgba(170,150,255,.55);
+  font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; color: #ece6ff;
+}
+.bag-timer-ico { width: 22px; height: 22px; }
+
+/* ---------------- detail card ---------------- */
+.bag-scrim {
+  position: fixed; inset: 0; z-index: 3000; background: rgba(8,8,30,.58); opacity: 0; transition: opacity .25s;
+  -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px);
+}
+.bag-scrim.open { opacity: 1; }
+.bag-sheet {
+  position: fixed; left: 50%; bottom: 0; z-index: 3001; width: min(480px, 100%);
+  max-height: 94vh; max-height: 94dvh; overflow-y: auto; overscroll-behavior: contain;
+  transform: translate(-50%, 110%); transition: transform .32s cubic-bezier(.2,.8,.2,1);
+  padding: 10px 20px calc(env(safe-area-inset-bottom) + 20px); border-radius: 26px 26px 0 0;
+  background:
+    radial-gradient(120% 55% at 50% 0%, rgba(130,115,230,.3), transparent 62%),
+    linear-gradient(180deg, #2a2f63 0%, #1d2149 60%, #171a3c 100%);
+  box-shadow: 0 -12px 50px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.16);
+}
+.bag-sheet.r-sacred { background: radial-gradient(120% 55% at 50% 0%, rgba(255,212,121,.24), transparent 62%), linear-gradient(180deg, #2c2c5e 0%, #1d2149 60%, #171a3c 100%); }
+.bag-sheet.r-common { background: radial-gradient(120% 55% at 50% 0%, rgba(160,200,240,.2), transparent 62%), linear-gradient(180deg, #283063 0%, #1d2149 60%, #171a3c 100%); }
+.bag-sheet.open { transform: translate(-50%, 0); }
+.bag-grab { width: 40px; height: 5px; border-radius: 3px; background: rgba(255,255,255,.25); margin: 0 auto 2px; }
+.bag-x { position: absolute; right: 12px; top: 12px; width: 34px; height: 34px; border-radius: 50%; background: rgba(255,255,255,.1) !important; font-size: 22px; line-height: 34px; color: var(--bag-soft) !important; z-index: 2; }
+.bag-hero { position: relative; width: 210px; height: 210px; margin: 2px auto 0; display: grid; place-items: center; }
+.bag-hero-glow { position: absolute; inset: 0; border-radius: 50%; animation: bag-hglow 4s ease-in-out infinite alternate; }
+.bag-hero.r-common .bag-hero-glow { background: radial-gradient(circle, rgba(170,215,255,.32), transparent 64%); }
+.bag-hero.r-rare .bag-hero-glow { background: radial-gradient(circle, rgba(150,125,255,.5), rgba(111,208,255,.12) 45%, transparent 66%); }
+.bag-hero.r-sacred .bag-hero-glow { background: radial-gradient(circle, rgba(255,226,150,.6), rgba(255,156,198,.16) 45%, transparent 68%); }
+.bag-hero-float { position: relative; z-index: 1; width: 180px; height: 180px; animation: bag-float 5s ease-in-out infinite; }
+.bag-hero-float .bag-art { width: 100%; height: 100%; filter: drop-shadow(0 16px 18px rgba(0,0,0,.45)); }
+.bag-hero .bag-spark { width: 12px; height: 12px; margin: -6px 0 0 -6px; }
+.bag-dname {
+  text-align: center; font-family: var(--bag-display); font-size: 26px; font-weight: 700; letter-spacing: .04em; margin-top: 2px;
+  text-shadow: 0 2px 12px rgba(0,0,0,.4);
+}
+.bag-sheet.r-sacred .bag-dname { color: #fff1c8; text-shadow: 0 0 18px rgba(255,212,121,.45); }
+.bag-dmeta { display: flex; justify-content: center; gap: 10px; align-items: center; margin-top: 8px; }
+.bag-tag { font-size: 11px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; padding: 3px 10px; border-radius: 20px; }
+.bag-tag.r-common { color: #e9eef9; background: rgba(207,216,236,.14); box-shadow: inset 0 0 0 1px rgba(207,216,236,.5); }
+.bag-tag.r-rare { color: #ebe4ff; background: linear-gradient(90deg, rgba(91,108,255,.4), rgba(192,140,255,.4)); box-shadow: inset 0 0 0 1px rgba(170,150,255,.65), 0 0 14px rgba(143,120,255,.4); }
+.bag-tag.r-sacred { color: #2a1d05; background: linear-gradient(90deg, #ffd479, #fff1c2, #ffd479); box-shadow: 0 0 16px rgba(255,212,121,.55); }
+.bag-count { font-size: 13px; color: var(--bag-soft); }
+.bag-flav { text-align: center; font-style: italic; font-size: 15px; color: var(--bag-soft); margin: 12px 10px 0 !important; line-height: 1.4; }
+.bag-lines { margin-top: 14px; display: grid; gap: 8px; }
+.bag-lines > div {
+  padding: 10px 12px; border-radius: 14px; background: rgba(255,255,255,.07);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.07); font-size: 14px; line-height: 1.38;
+}
+.bag-lines b { display: block; font-size: 10.5px; letter-spacing: .14em; text-transform: uppercase; color: rgba(255,212,121,.82); margin-bottom: 3px; font-weight: 700; }
+.bag-acts { margin-top: 16px; }
+.bag-use {
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  width: 100%; padding: 16px; border-radius: 16px; font-size: 18px !important; font-weight: 700; letter-spacing: .05em;
+  color: #1b1840 !important; background: linear-gradient(180deg, #ffffff, #e2d9ff) !important;
+  box-shadow: 0 8px 24px rgba(120,100,255,.38), inset 0 -2px 0 rgba(0,0,0,.12);
+  transition: transform .12s ease;
+}
+.bag-sheet.r-sacred .bag-use { background: linear-gradient(180deg, #fff6da, #ffd479) !important; box-shadow: 0 8px 24px rgba(255,212,121,.38), inset 0 -2px 0 rgba(0,0,0,.12); }
+.bag-use:active { transform: scale(.98); }
+.bag-use[disabled] { opacity: .5; cursor: default; }
+.bag-busy { opacity: .85 !important; }
+.bag-spin { width: 16px; height: 16px; border-radius: 50%; border: 2px solid rgba(27,24,64,.25); border-top-color: #1b1840; animation: bag-spin .8s linear infinite; }
+.bag-row { display: flex; gap: 8px; margin-top: 8px; }
+.bag-btn {
+  flex: 1; min-width: 0; padding: 13px 10px; border-radius: 14px; background: rgba(255,255,255,.12) !important;
+  font-size: 15px; font-weight: 600; box-shadow: inset 0 0 0 1px rgba(255,255,255,.1); transition: transform .12s ease;
+}
+.bag-btn:active { transform: scale(.97); }
+.bag-btn[disabled] { opacity: .45; cursor: default; }
+.bag-drop { flex: 0 0 32%; color: #ffc6c6 !important; }
+.bag-drop-yes { background: rgba(255,156,156,.24) !important; color: #ffe0e0 !important; }
+.bag-ghostbtn { background: transparent !important; box-shadow: inset 0 0 0 1px rgba(255,255,255,.24); color: var(--bag-soft) !important; }
+.bag-wide { width: 100%; }
+.bag-confirm p, .bag-ask { text-align: center; font-size: 15px; color: var(--bag-ink); margin-bottom: 4px !important; line-height: 1.4; }
+.bag-choices { display: grid; gap: 8px; margin: 10px 0; }
+.bag-choice { padding: 15px; font-size: 16px; background: linear-gradient(90deg, rgba(255,212,121,.2), rgba(255,255,255,.08)) !important; box-shadow: inset 0 0 0 1px rgba(255,212,121,.3); }
+
+/* ---------------- toasts ---------------- */
+.bag-toasts {
+  position: fixed; left: 50%; top: calc(env(safe-area-inset-top) + 12px); transform: translateX(-50%);
+  width: min(440px, calc(100% - 32px)); z-index: 5000; display: flex; flex-direction: column; gap: 8px; pointer-events: none;
+}
+.bag-toast {
+  pointer-events: auto; display: flex; align-items: center; gap: 12px; padding: 10px 14px 10px 10px; border-radius: 18px;
+  background: rgba(24,27,62,.94); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
+  box-shadow: 0 12px 30px rgba(0,0,0,.45), inset 0 0 0 1px rgba(255,255,255,.13);
+  animation: bag-toast-in .4s cubic-bezier(.2,1.2,.4,1); transition: opacity .4s, transform .4s;
+}
+.bag-toast.out { opacity: 0; transform: translateY(-10px); }
+.bag-toast-found.r-rare { box-shadow: 0 12px 30px rgba(0,0,0,.45), inset 0 0 0 1px rgba(170,150,255,.6), 0 0 24px rgba(143,120,255,.3); }
+.bag-toast-found.r-sacred { box-shadow: 0 12px 30px rgba(0,0,0,.45), inset 0 0 0 1px rgba(255,212,121,.7), 0 0 26px rgba(255,212,121,.35); }
+.bag-toast-art {
+  flex: none; width: 50px; height: 50px; border-radius: 13px; display: grid; place-items: center;
+  background: radial-gradient(circle at 50% 50%, #2a3166, #161a3c);
+  box-shadow: inset 0 2px 5px rgba(0,0,0,.6);
+}
+.bag-toast-art.r-rare { background: radial-gradient(circle, rgba(143,120,255,.45), #161a3c 72%); }
+.bag-toast-art.r-sacred { background: radial-gradient(circle, rgba(255,212,121,.5), #161a3c 72%); }
+.bag-toast-art .bag-art { width: 44px; height: 44px; }
+.bag-toast-found .bag-toast-art .bag-art { animation: bag-land .6s cubic-bezier(.2,1.5,.4,1); }
+.bag-toast-tx { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.bag-toast-h { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--bag-gold); font-weight: 700; }
+.bag-toast-b { font-size: 14px; line-height: 1.35; color: var(--bag-ink); }
+.bag-toast-full .bag-toast-h, .bag-toast-info .bag-toast-h { color: var(--bag-zap); }
+.bag-toast-used .bag-toast-h { color: #8fe3b0; }
+
+/* ---------------- full-screen overlays ---------------- */
+.bag-ov {
+  position: fixed; inset: 0; z-index: 4500; display: flex; flex-direction: column; align-items: center; justify-content: space-between;
+  padding: calc(env(safe-area-inset-top) + 18px) 20px calc(env(safe-area-inset-bottom) + 24px);
+  background: radial-gradient(90% 60% at 50% 42%, #2e3a7c 0%, #1f2552 45%, #11132c 100%);
+  opacity: 0; transition: opacity .45s ease;
+}
+.bag-ov.open { opacity: 1; }
+.bag-ov-top { width: 100%; max-width: 480px; display: flex; justify-content: space-between; align-items: center; font-size: 14px; color: var(--bag-soft); }
+.bag-ov-name { font-family: var(--bag-display); font-weight: 700; letter-spacing: .06em; color: #f4ead2; display: flex; align-items: center; gap: 8px; font-size: 16px; }
+.bag-ov-ico { width: 34px; height: 34px; }
+.bag-ov-left { font-variant-numeric: tabular-nums; }
+.bag-ov-mid { display: flex; flex-direction: column; align-items: center; gap: 22px; width: 100%; }
+.bag-ov-sub { text-align: center; font-size: 15px; color: var(--bag-soft); max-width: 340px; line-height: 1.45; min-height: 2.9em; }
+.bag-ov-btns { width: 100%; max-width: 420px; display: flex; flex-direction: column; gap: 10px; }
+.bag-ov-btns .bag-btn { flex: none; }
+
+.bag-bstage { position: relative; width: min(78vw, 320px); aspect-ratio: 1 / 1; display: grid; place-items: center; }
+.bag-bring { position: absolute; inset: 0; width: 100%; height: 100%; transform: rotate(-90deg); }
+.bag-bring circle { fill: none; stroke-width: 3; }
+.bag-bring .bg { stroke: rgba(255,255,255,.1); }
+.bag-bring .fg { stroke: #9fe6ff; stroke-linecap: round; filter: drop-shadow(0 0 4px rgba(159,230,255,.6)); }
+.bag-bhalo { position: absolute; width: 74%; height: 74%; border-radius: 50%; background: radial-gradient(circle, rgba(127,214,255,.38), transparent 70%); will-change: transform, opacity; }
+.bag-borb {
+  position: absolute; width: 66%; height: 66%; border-radius: 50%; transform: scale(.55); will-change: transform;
+  background: radial-gradient(circle at 38% 32%, #eafcff 0%, #8fe0ff 22%, #3f8fe0 58%, #2a3f9a 100%);
+  box-shadow: 0 0 60px rgba(111,200,255,.55), inset -10px -14px 30px rgba(20,30,90,.55), inset 8px 10px 20px rgba(255,255,255,.35);
+  transition: background .8s ease;
+}
+.bag-ov-breath[data-phase="hold"] .bag-borb { background: radial-gradient(circle at 38% 32%, #f4fbff 0%, #b6e8ff 22%, #6a8fe8 58%, #3a3f9a 100%); }
+.bag-ov-breath.done .bag-borb { transition: transform 1.2s ease, background .8s ease; background: radial-gradient(circle at 38% 32%, #f2fff6 0%, #a6f0cc 24%, #4fb59a 60%, #2a5f7a 100%); }
+.bag-btext { position: relative; z-index: 1; text-align: center; text-shadow: 0 2px 12px rgba(10,20,60,.65); }
+.bag-bword { font-size: 22px; font-weight: 600; letter-spacing: .02em; }
+.bag-bnum { font-size: 46px; font-weight: 200; font-variant-numeric: tabular-nums; line-height: 1.1; min-height: 1.1em; }
+
+.bag-bell-stage { position: relative; width: 220px; height: 220px; display: grid; place-items: center; }
+.bag-bell-stage .bag-hero-glow { background: radial-gradient(circle, rgba(150,125,255,.5), rgba(255,212,121,.14) 45%, transparent 66%); }
+.bag-bell-art { position: relative; width: 190px; height: 190px; filter: drop-shadow(0 16px 18px rgba(0,0,0,.45)); }
+.bag-bell-t { font-size: 66px; font-weight: 200; font-variant-numeric: tabular-nums; letter-spacing: .02em; line-height: 1; }
+.bag-ov-bell.done .bag-bell-t { color: #8fe3b0; }
+
+/* ---------------- illustration motion ---------------- */
+.bag-art .ba-wave { animation: bag-wave 3s linear infinite; }
+.bag-art .ba-wave2 { animation: bag-wave2 4.6s linear infinite; }
+.bag-art .ba-shim { animation: bag-shim 4.6s ease-in-out infinite; }
+.bag-art .ba-bub { animation: bag-bub 3.4s ease-in infinite; opacity: 0; }
+.bag-art .ba-core { transform-box: fill-box; transform-origin: center; animation: bag-core 14s ease-in-out infinite; }
+.bag-art .ba-sheen { animation: bag-sheen 6.5s ease-in-out infinite; }
+.bag-art .ba-rune { animation: bag-rune 3.2s ease-in-out infinite alternate; }
+.bag-art .ba-orbit { animation: bag-orbit 5s linear infinite; }
+.bag-art .ba-trail { animation: bag-trail 1.6s linear infinite; }
+.bag-art .ba-pulse { transform-box: fill-box; transform-origin: center; animation: bag-pulse 2.2s ease-in-out infinite; }
+.bag-art .ba-lid { transform-box: fill-box; transform-origin: 50% 0; transform: scaleY(0); animation: bag-blink 5.5s ease-in-out infinite; }
+.bag-art .ba-flame { transform-box: fill-box; transform-origin: 50% 100%; animation: bag-flame 1.8s ease-in-out infinite; }
+.bag-art .ba-flick { animation: bag-flick 2.6s ease-in-out infinite; }
+.bag-art .ba-sway { transform-box: view-box; transform-origin: 60px 12px; animation: bag-sway 3.4s ease-in-out infinite; }
+.bag-art .ba-clap { transform-box: view-box; transform-origin: 60px 82px; animation: bag-clap 3.4s ease-in-out infinite; }
+.bag-art .ba-ring { animation: bag-ringo 3.4s ease-out infinite; opacity: 0; }
+.bag-art .ba-aura { transform-box: fill-box; transform-origin: center; animation: bag-aura 4.5s ease-in-out infinite; }
+.bag-art .ba-petal { animation: bag-petal 3.6s ease-in-out infinite; }
+.bag-art .ba-ripple { transform-box: fill-box; transform-origin: center; animation: bag-ripple 4s ease-out infinite; }
+.bag-art .ba-tw { transform-box: fill-box; transform-origin: center; animation: bag-tw 2.6s ease-in-out infinite; transform: scale(0); }
+
+@keyframes bag-wave { from { transform: translateX(0); } to { transform: translateX(-30px); } }
+@keyframes bag-wave2 { from { transform: translateX(-30px); } to { transform: translateX(0); } }
+@keyframes bag-shim { 0% { transform: translateX(-30px); opacity: 0; } 20% { opacity: 1; } 60%, 100% { transform: translateX(80px); opacity: 0; } }
+@keyframes bag-bub { 0% { transform: translateY(0); opacity: 0; } 15% { opacity: .9; } 85% { opacity: .6; } 100% { transform: translateY(-28px); opacity: 0; } }
+@keyframes bag-core { 0%, 100% { transform: scale(.72); } 28.6%, 57.1% { transform: scale(1.12); } }
+@keyframes bag-sheen { 0% { transform: translateX(-40px); } 45%, 100% { transform: translateX(130px); } }
+@keyframes bag-rune { from { opacity: .4; } to { opacity: 1; } }
+@keyframes bag-orbit { to { stroke-dashoffset: -40; } }
+@keyframes bag-trail { to { stroke-dashoffset: -12; } }
+@keyframes bag-pulse { 0%, 100% { transform: scale(.8); opacity: .6; } 50% { transform: scale(1.25); opacity: 1; } }
+@keyframes bag-blink { 0%, 88%, 100% { transform: scaleY(0); } 91%, 93% { transform: scaleY(1); } }
+@keyframes bag-flame {
+  0%, 100% { transform: scale(1, 1) skewX(0deg); } 20% { transform: scale(.94, 1.06) skewX(2deg); }
+  40% { transform: scale(1.04, .95) skewX(-2deg); } 60% { transform: scale(.97, 1.08) skewX(1deg); } 80% { transform: scale(1.02, .97) skewX(-1deg); }
+}
+@keyframes bag-flick { 0%, 100% { opacity: .85; } 15% { opacity: .6; } 30% { opacity: .95; } 45% { opacity: .7; } 70% { opacity: 1; } 85% { opacity: .75; } }
+@keyframes bag-sway { 0%, 100% { transform: rotate(-7deg); } 50% { transform: rotate(7deg); } }
+@keyframes bag-clap { 0%, 100% { transform: rotate(5deg); } 50% { transform: rotate(-5deg); } }
+@keyframes bag-ringo { 0%, 100% { opacity: 0; } 8% { opacity: .85; } 45% { opacity: 0; } 50% { opacity: 0; } 58% { opacity: .85; } 95% { opacity: 0; } }
+@keyframes bag-aura { 0%, 100% { opacity: .55; transform: scale(.94); } 50% { opacity: 1; transform: scale(1.04); } }
+@keyframes bag-petal { 0%, 100% { stroke-opacity: .12; } 50% { stroke-opacity: .95; } }
+@keyframes bag-ripple { from { transform: scale(.7); opacity: .75; } to { transform: scale(1.18); opacity: 0; } }
+@keyframes bag-tw { 0%, 100% { transform: scale(0); opacity: 0; } 50% { transform: scale(1); opacity: 1; } }
+
+@keyframes bag-spin { to { transform: rotate(360deg); } }
+@keyframes bag-dot { 0%, 100% { transform: scale(.85); opacity: .75; } 50% { transform: scale(1.15); opacity: 1; } }
+@keyframes bag-spark { 0%, 100% { transform: scale(0) translateY(0); opacity: 0; } 40% { transform: scale(1) translateY(-3px) rotate(30deg); opacity: 1; } 70% { transform: scale(.4) translateY(-7px) rotate(60deg); opacity: .4; } }
+@keyframes bag-hglow { from { opacity: .7; transform: scale(.94); } to { opacity: 1; transform: scale(1.04); } }
+@keyframes bag-float { 0%, 100% { transform: translateY(0) rotate(-1deg); } 50% { transform: translateY(-9px) rotate(1deg); } }
+@keyframes bag-land { 0% { transform: scale(.6); } 60% { transform: scale(1.12); } 100% { transform: scale(1); } }
+@keyframes bag-toast-in { from { opacity: 0; transform: translateY(-14px) scale(.96); } to { opacity: 1; transform: none; } }
+
+@media (min-width: 700px) {
+  .bag-quick .bag-sock { height: 88px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bag-root *, .bag-qroot *, .bag-layer * { animation: none !important; transition-duration: .01ms !important; }
+  .bag-art .ba-shim, .bag-art .ba-ring { opacity: 0; }
+  .bag-art .ba-bub { opacity: .6; }
+  .bag-art .ba-tw { transform: none; }
+  .bag-spark { transform: scale(.7); opacity: .8; }
+}

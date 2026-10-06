@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#191d3c">
+<link rel="icon" type="image/svg+xml" href="quest-icon.svg">
+<title>Day Quest Bag</title>
+<!-- Day Quest bag demo (d103). Fake state and fake actions; nothing leaves this page. -->
+<link rel="stylesheet" href="bag.css">
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html { min-height:100%; background:#191d3c;
+    background-image: linear-gradient(180deg, #2b3160 0%, #232850 50%, #191d3c 100%); background-attachment:fixed; }
+  body { background:transparent; color:rgba(255,255,255,.95);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif; -webkit-font-smoothing:antialiased; }
+  #app { max-width:480px; margin:0 auto; padding: calc(env(safe-area-inset-top) + 16px) 16px calc(env(safe-area-inset-bottom) + 40px); }
+  .top { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:12px; padding:0 2px; }
+  .top h1 { font-size:13px; letter-spacing:.14em; text-transform:uppercase; color:rgba(255,255,255,.62); font-weight:600; }
+  .top span { font-size:12px; color:rgba(255,255,255,.42); }
+  .card { background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.14); border-radius:22px; padding:12px 12px 12px;
+    margin-bottom:16px; backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px); }
+  .lbl { font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:rgba(255,255,255,.6); margin:0 4px 8px; }
+  .tools { display:flex; gap:8px; margin-top:16px; }
+  .tools button { flex:1; padding:14px 10px; border-radius:14px; border:0; background:rgba(255,255,255,.16); color:#fff;
+    font:inherit; font-size:15px; font-weight:600; cursor:pointer; }
+  .tools button.primary { background:#fff; color:#3b3670; }
+  .tools button:active { transform:scale(.97); }
+  .note { font-size:12px; color:rgba(255,255,255,.45); margin-top:14px; line-height:1.5; text-align:center; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="top"><h1>Day Quest bag</h1><span>demo</span></div>
+
+  <div class="card">
+    <div class="lbl">Main screen quick bar</div>
+    <div id="quick"></div>
+  </div>
+
+  <div id="bag"></div>
+
+  <div class="tools">
+    <button class="primary" id="give">Give random item</button>
+    <button id="reset">Reset demo</button>
+  </div>
+  <p class="note">Demo only. The actions are pretend and nothing leaves this page.<br>Tap an item to look closer. Hold it to drag it.</p>
+</div>
+
+<script src="bag.js"></script>
+<script>
+  const KEY = 'dayquest-bag-demo-v1';
+  const IDS = Object.keys(Bag.ITEMS);
+  function fresh() {
+    const slots = IDS.slice(); while (slots.length < 16) slots.push(null);
+    const counts = {}; IDS.forEach(id => counts[id] = 1);
+    return { bag: { slots, quick: [null, null, null], counts, seen: {}, log: [] } };
+  }
+  let G = null;
+  try { G = JSON.parse(localStorage.getItem(KEY)); } catch (e) {}
+  if (!G || !G.bag) G = fresh();
+  function save() { try { localStorage.setItem(KEY, JSON.stringify(G)); } catch (e) {} }
+
+  const wait = ms => new Promise(r => setTimeout(r, ms));
+  let water = 1000;
+  const at = mins => new Date(Date.now() + mins * 60000).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  const actions = {
+    breath: async (item, info) => info.completed
+      ? 'Breath reset logged: 3 minutes. Notice how you feel now.'
+      : `Breath reset logged: ${info.seconds} seconds.`,
+    water: async () => { water += 500; return `500 ml logged. ${water.toLocaleString()} ml so far today.`; },
+    buffer: async () => { await wait(400); return `15 minutes added. Your next block now starts at ${at(35)}.`; },
+    map: async () => { await wait(900); return 'Replanned: 3 blocks moved, dinner kept at 7 PM.'; },
+    scout: async () => { await wait(900); return "Scout Owl sent to research Saturday's video shoot. Notes land in the prep list."; },
+    lantern: async () => 'Wind-down started. Lights low, screens off, bed by 10:30 PM.',
+    bell: async (item, info) => `Focus block logged. The bell rings at ${new Date(info.endsAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}.`,
+    lotus: async (item, info) => { await wait(500); return `This block is now recovery: ${info.choice}.`; }
+  };
+
+  Bag.mount(document.getElementById('bag'), { getState: () => G, save, actions });
+  Bag.mountQuick(document.getElementById('quick'));
+
+  document.getElementById('give').addEventListener('click', () => {
+    const id = IDS[Math.floor(Math.random() * IDS.length)];
+    Bag.give(id, 1, Bag.ITEMS[id].found);
+  });
+  document.getElementById('reset').addEventListener('click', () => {
+    try { localStorage.removeItem(KEY); } catch (e) {}
+    G = fresh(); save(); Bag.close(); Bag.render();
+  });
+</script>
+</body>
+</html>
