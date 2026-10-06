@@ -1,0 +1,17 @@
+{
+  "id": "plan.html",
+  "name": "Planner",
+  "short_name": "Planner",
+  "description": "Junyan's desktop calendar: day, week and month over his Google calendars.",
+  "start_url": "plan.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#191d3c",
+  "theme_color": "#191d3c",
+  "icons": [
+    { "src": "quest-icon.svg", "sizes": "any", "type": "image/svg+xml" },
+    { "src": "quest-icon-180.png", "sizes": "180x180", "type": "image/png" },
+    { "src": "quest-icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "quest-icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
