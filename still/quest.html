@@ -421,7 +421,7 @@
   }
 
   /* ---------- live data: plan + edit layer + tasks ---------- */
-  let PLAN = null, OPS = { edits:{}, drops:[], adds:[], ts:0 }, TASKS = [], lastPull = null, pullErr = null;
+  let PLAN = null, OPS = { edits:{}, drops:[], adds:[], ts:0 }, TASKS = [], lastPull = null, pullErr = null, INSIGHTS = {};
 
   async function getPlan(date){
     const r = await fetch(API + "/plan?date=" + date, { cache:"no-store" });
@@ -470,6 +470,7 @@
       await pullPlan();   // first: it sets the zone, which decides today's date key
       await Promise.all([pullOps(), pullTasks().catch(() => {}), pullState()]);
       seedFromOura();
+      if (questKey()) qfetch("/quest/insights").then(j => { INSIGHTS = j || {}; }).catch(() => {});
       lastPull = new Date(); pullErr = null;
     } catch (e) { pullErr = String(e.message || e); }
     render();
@@ -548,7 +549,7 @@
      kind of block it is: food blue, body purple, travel yellow, a major event
      red, work green, everything else (sleep, free time) silver. The trail shows
      a short name; the full calendar title stays on the event. */
-  const SYM = {"barbell":"M2 12h1 M6 8h-2a1 1 0 0 0 -1 1v6a1 1 0 0 0 1 1h2 M6 7v10a1 1 0 0 0 1 1h1a1 1 0 0 0 1 -1v-10a1 1 0 0 0 -1 -1h-1a1 1 0 0 0 -1 1 M9 12h6 M15 7v10a1 1 0 0 0 1 1h1a1 1 0 0 0 1 -1v-10a1 1 0 0 0 -1 -1h-1a1 1 0 0 0 -1 1 M18 8h2a1 1 0 0 1 1 1v6a1 1 0 0 1 -1 1h-2 M22 12h-1","briefcase":"M3 9a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v9a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2l0 -9 M8 7v-2a2 2 0 0 1 2 -2h4a2 2 0 0 1 2 2v2 M12 12l0 .01 M3 13a20 20 0 0 0 18 0","bus":"M4 17a2 2 0 1 0 4 0a2 2 0 1 0 -4 0 M16 17a2 2 0 1 0 4 0a2 2 0 1 0 -4 0 M4 17h-2v-11a1 1 0 0 1 1 -1h14a5 7 0 0 1 5 7v5h-2m-4 0h-8 M16 5l1.5 7l4.5 0 M2 10l15 0 M7 5l0 5 M12 5l0 5","car":"M5 17a2 2 0 1 0 4 0a2 2 0 1 0 -4 0 M15 17a2 2 0 1 0 4 0a2 2 0 1 0 -4 0 M5 17h-2v-6l2 -5h9l4 5h1a2 2 0 0 1 2 2v4h-2m-4 0h-6m-6 -6h15m-6 0v-5","coffee":"M3 14c.83 .642 2.077 1.017 3.5 1c1.423 .017 2.67 -.358 3.5 -1c.83 -.642 2.077 -1.017 3.5 -1c1.423 -.017 2.67 .358 3.5 1 M8 3a2.4 2.4 0 0 0 -1 2a2.4 2.4 0 0 0 1 2 M12 3a2.4 2.4 0 0 0 -1 2a2.4 2.4 0 0 0 1 2 M3 10h14v5a6 6 0 0 1 -6 6h-2a6 6 0 0 1 -6 -6v-5 M16.746 16.726a3 3 0 1 0 .252 -5.555","compass":"M8 16l2 -6l6 -2l-2 6l-6 2 M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0 M12 3l0 2 M12 19l0 2 M3 12l2 0 M19 12l2 0","confetti":"M4 5h2 M5 4v2 M11.5 4l-.5 2 M18 5h2 M19 4v2 M15 9l-1 1 M18 13l2 -.5 M18 19h2 M19 18v2 M14 16.518l-6.518 -6.518l-4.39 9.58a1 1 0 0 0 1.329 1.329l9.579 -4.39","luggage":"M6 8a2 2 0 0 1 2 -2h8a2 2 0 0 1 2 2v10a2 2 0 0 1 -2 2h-8a2 2 0 0 1 -2 -2l0 -10 M9 6v-1a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v1 M6 10h12 M6 16h12 M9 20v1 M15 20v1","map-pin":"M9 11a3 3 0 1 0 6 0a3 3 0 0 0 -6 0 M17.657 16.657l-4.243 4.243a2 2 0 0 1 -2.827 0l-4.244 -4.243a8 8 0 1 1 11.314 0","moon-stars":"M12 3c.132 0 .263 0 .393 0a7.5 7.5 0 0 0 7.92 12.446a9 9 0 1 1 -8.313 -12.454l0 .008 M17 4a2 2 0 0 0 2 2a2 2 0 0 0 -2 2a2 2 0 0 0 -2 -2a2 2 0 0 0 2 -2 M19 11h2m-1 -1v2","motorbike":"M2 16a3 3 0 1 0 6 0a3 3 0 1 0 -6 0 M16 16a3 3 0 1 0 6 0a3 3 0 1 0 -6 0 M7.5 14h5l4 -4h-10.5m1.5 4l4 -4 M13 6h2l1.5 3l2 4","music":"M3 17a3 3 0 1 0 6 0a3 3 0 0 0 -6 0 M13 17a3 3 0 1 0 6 0a3 3 0 0 0 -6 0 M9 17v-13h10v13 M9 8h10","phone":"M5 4h4l2 5l-2.5 1.5a11 11 0 0 0 5 5l1.5 -2.5l5 2v4a2 2 0 0 1 -2 2a16 16 0 0 1 -15 -15a2 2 0 0 1 2 -2","plane":"M16 10h4a2 2 0 0 1 0 4h-4l-4 7h-3l2 -7h-4l-2 2h-3l2 -4l-2 -4h3l2 2h4l-2 -7h3l4 7","ship":"M2 20a2.4 2.4 0 0 0 2 1a2.4 2.4 0 0 0 2 -1a2.4 2.4 0 0 1 2 -1a2.4 2.4 0 0 1 2 1a2.4 2.4 0 0 0 2 1a2.4 2.4 0 0 0 2 -1a2.4 2.4 0 0 1 2 -1a2.4 2.4 0 0 1 2 1a2.4 2.4 0 0 0 2 1a2.4 2.4 0 0 0 2 -1 M4 18l-1 -5h18l-2 4 M5 13v-6h8l4 6 M7 7v-4h-1","stretching":"M15 5a1 1 0 1 0 2 0a1 1 0 1 0 -2 0 M5 20l5 -.5l1 -2 M18 20v-5h-5.5l2.5 -6.5l-5.5 1l1.5 2","swimming":"M15 9a1 1 0 1 0 2 0a1 1 0 1 0 -2 0 M6 11l4 -2l3.5 3l-1.5 2 M3 16.75a2.4 2.4 0 0 0 1 .25a2.4 2.4 0 0 0 2 -1a2.4 2.4 0 0 1 2 -1a2.4 2.4 0 0 1 2 1a2.4 2.4 0 0 0 2 1a2.4 2.4 0 0 0 2 -1a2.4 2.4 0 0 1 2 -1a2.4 2.4 0 0 1 2 1a2.4 2.4 0 0 0 2 1a2.4 2.4 0 0 0 1 -.25","tools-kitchen-2":"M19 3v12h-5c-.023 -3.681 .184 -7.406 5 -12m0 12v6h-1v-3m-10 -14v17m-3 -17v3a3 3 0 1 0 6 0v-3","train":"M21 13c0 -3.87 -3.37 -7 -10 -7h-8 M3 15h16a2 2 0 0 0 2 -2 M3 6v5h17.5 M3 11v4 M8 11v-5 M13 11v-4.5 M3 19h18","users":"M5 7a4 4 0 1 0 8 0a4 4 0 1 0 -8 0 M3 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2 M16 3.13a4 4 0 0 1 0 7.75 M21 21v-2a4 4 0 0 0 -3 -3.85","walk":"M12 4a1 1 0 1 0 2 0a1 1 0 1 0 -2 0 M7 21l3 -4 M16 21l-2 -4l-3 -3l1 -6 M6 12l2 -3l4 -1l3 3l3 1","yoga":"M4 20h4l1.5 -3 M17 20l-1 -5h-5l1 -7 M4 10l4 -1l4 -1l4 1.5l4 1.5 M10.007 5a2 2 0 1 0 4 0a2 2 0 1 0 -4 0"};
+  const SYM = {"camera":"M5 7h1a2 2 0 0 0 2 -2a1 1 0 0 1 1 -1h6a1 1 0 0 1 1 1a2 2 0 0 0 2 2h1a2 2 0 0 1 2 2v9a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2v-9a2 2 0 0 1 2 -2 M9 13a3 3 0 1 0 6 0a3 3 0 0 0 -6 0","barbell":"M2 12h1 M6 8h-2a1 1 0 0 0 -1 1v6a1 1 0 0 0 1 1h2 M6 7v10a1 1 0 0 0 1 1h1a1 1 0 0 0 1 -1v-10a1 1 0 0 0 -1 -1h-1a1 1 0 0 0 -1 1 M9 12h6 M15 7v10a1 1 0 0 0 1 1h1a1 1 0 0 0 1 -1v-10a1 1 0 0 0 -1 -1h-1a1 1 0 0 0 -1 1 M18 8h2a1 1 0 0 1 1 1v6a1 1 0 0 1 -1 1h-2 M22 12h-1","briefcase":"M3 9a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v9a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2l0 -9 M8 7v-2a2 2 0 0 1 2 -2h4a2 2 0 0 1 2 2v2 M12 12l0 .01 M3 13a20 20 0 0 0 18 0","bus":"M4 17a2 2 0 1 0 4 0a2 2 0 1 0 -4 0 M16 17a2 2 0 1 0 4 0a2 2 0 1 0 -4 0 M4 17h-2v-11a1 1 0 0 1 1 -1h14a5 7 0 0 1 5 7v5h-2m-4 0h-8 M16 5l1.5 7l4.5 0 M2 10l15 0 M7 5l0 5 M12 5l0 5","car":"M5 17a2 2 0 1 0 4 0a2 2 0 1 0 -4 0 M15 17a2 2 0 1 0 4 0a2 2 0 1 0 -4 0 M5 17h-2v-6l2 -5h9l4 5h1a2 2 0 0 1 2 2v4h-2m-4 0h-6m-6 -6h15m-6 0v-5","coffee":"M3 14c.83 .642 2.077 1.017 3.5 1c1.423 .017 2.67 -.358 3.5 -1c.83 -.642 2.077 -1.017 3.5 -1c1.423 -.017 2.67 .358 3.5 1 M8 3a2.4 2.4 0 0 0 -1 2a2.4 2.4 0 0 0 1 2 M12 3a2.4 2.4 0 0 0 -1 2a2.4 2.4 0 0 0 1 2 M3 10h14v5a6 6 0 0 1 -6 6h-2a6 6 0 0 1 -6 -6v-5 M16.746 16.726a3 3 0 1 0 .252 -5.555","compass":"M8 16l2 -6l6 -2l-2 6l-6 2 M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0 M12 3l0 2 M12 19l0 2 M3 12l2 0 M19 12l2 0","confetti":"M4 5h2 M5 4v2 M11.5 4l-.5 2 M18 5h2 M19 4v2 M15 9l-1 1 M18 13l2 -.5 M18 19h2 M19 18v2 M14 16.518l-6.518 -6.518l-4.39 9.58a1 1 0 0 0 1.329 1.329l9.579 -4.39","luggage":"M6 8a2 2 0 0 1 2 -2h8a2 2 0 0 1 2 2v10a2 2 0 0 1 -2 2h-8a2 2 0 0 1 -2 -2l0 -10 M9 6v-1a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v1 M6 10h12 M6 16h12 M9 20v1 M15 20v1","map-pin":"M9 11a3 3 0 1 0 6 0a3 3 0 0 0 -6 0 M17.657 16.657l-4.243 4.243a2 2 0 0 1 -2.827 0l-4.244 -4.243a8 8 0 1 1 11.314 0","moon-stars":"M12 3c.132 0 .263 0 .393 0a7.5 7.5 0 0 0 7.92 12.446a9 9 0 1 1 -8.313 -12.454l0 .008 M17 4a2 2 0 0 0 2 2a2 2 0 0 0 -2 2a2 2 0 0 0 -2 -2a2 2 0 0 0 2 -2 M19 11h2m-1 -1v2","motorbike":"M2 16a3 3 0 1 0 6 0a3 3 0 1 0 -6 0 M16 16a3 3 0 1 0 6 0a3 3 0 1 0 -6 0 M7.5 14h5l4 -4h-10.5m1.5 4l4 -4 M13 6h2l1.5 3l2 4","music":"M3 17a3 3 0 1 0 6 0a3 3 0 0 0 -6 0 M13 17a3 3 0 1 0 6 0a3 3 0 0 0 -6 0 M9 17v-13h10v13 M9 8h10","phone":"M5 4h4l2 5l-2.5 1.5a11 11 0 0 0 5 5l1.5 -2.5l5 2v4a2 2 0 0 1 -2 2a16 16 0 0 1 -15 -15a2 2 0 0 1 2 -2","plane":"M16 10h4a2 2 0 0 1 0 4h-4l-4 7h-3l2 -7h-4l-2 2h-3l2 -4l-2 -4h3l2 2h4l-2 -7h3l4 7","ship":"M2 20a2.4 2.4 0 0 0 2 1a2.4 2.4 0 0 0 2 -1a2.4 2.4 0 0 1 2 -1a2.4 2.4 0 0 1 2 1a2.4 2.4 0 0 0 2 1a2.4 2.4 0 0 0 2 -1a2.4 2.4 0 0 1 2 -1a2.4 2.4 0 0 1 2 1a2.4 2.4 0 0 0 2 1a2.4 2.4 0 0 0 2 -1 M4 18l-1 -5h18l-2 4 M5 13v-6h8l4 6 M7 7v-4h-1","stretching":"M15 5a1 1 0 1 0 2 0a1 1 0 1 0 -2 0 M5 20l5 -.5l1 -2 M18 20v-5h-5.5l2.5 -6.5l-5.5 1l1.5 2","swimming":"M15 9a1 1 0 1 0 2 0a1 1 0 1 0 -2 0 M6 11l4 -2l3.5 3l-1.5 2 M3 16.75a2.4 2.4 0 0 0 1 .25a2.4 2.4 0 0 0 2 -1a2.4 2.4 0 0 1 2 -1a2.4 2.4 0 0 1 2 1a2.4 2.4 0 0 0 2 1a2.4 2.4 0 0 0 2 -1a2.4 2.4 0 0 1 2 -1a2.4 2.4 0 0 1 2 1a2.4 2.4 0 0 0 2 1a2.4 2.4 0 0 0 1 -.25","tools-kitchen-2":"M19 3v12h-5c-.023 -3.681 .184 -7.406 5 -12m0 12v6h-1v-3m-10 -14v17m-3 -17v3a3 3 0 1 0 6 0v-3","train":"M21 13c0 -3.87 -3.37 -7 -10 -7h-8 M3 15h16a2 2 0 0 0 2 -2 M3 6v5h17.5 M3 11v4 M8 11v-5 M13 11v-4.5 M3 19h18","users":"M5 7a4 4 0 1 0 8 0a4 4 0 1 0 -8 0 M3 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2 M16 3.13a4 4 0 0 1 0 7.75 M21 21v-2a4 4 0 0 0 -3 -3.85","walk":"M12 4a1 1 0 1 0 2 0a1 1 0 1 0 -2 0 M7 21l3 -4 M16 21l-2 -4l-3 -3l1 -6 M6 12l2 -3l4 -1l3 3l3 1","yoga":"M4 20h4l1.5 -3 M17 20l-1 -5h-5l1 -7 M4 10l4 -1l4 -1l4 1.5l4 1.5 M10.007 5a2 2 0 1 0 4 0a2 2 0 1 0 -4 0"};
   const GROUPS = {
     food:   { ring:"#85B7EB", fill:"#0c3a66", name:"Food" },
     body:   { ring:"#AFA9EC", fill:"#2e2a6b", name:"Body" },
@@ -560,11 +561,11 @@
   const MAJOR = /party|festival|wedding|concert|\bshow\b|congress|competition|birthday|performance|gala|\btour\b|quad|safari|\bdive\b|snorkel|excursion/i;
   function groupOf(b){
     if (MAJOR.test(b.t)) return "major";
-    if (/work|meeting|admin|email|focus|annex|desk|client/i.test(b.t)) return "work";
+    if (/work|meeting|admin|email|focus|annex|desk|client|video|shoot|film/i.test(b.t)) return "work";
     return { fuel:"food", body:"body", practice:"body", dance:"body", travel:"travel", call:"work" }[b.kind] || "calm";
   }
   const SYM_RULES = [
-    [/^open space|^free time/i, "compass"], [/sleep|\bbed\b|\bnap\b|wind.?down/i, "moon-stars"],
+    [/^open space|^free time/i, "compass"], [/video|shoot|film/i, "camera"], [/sleep|\bbed\b|\bnap\b|wind.?down/i, "moon-stars"],
     [/gym|workout|training|weights/i, "barbell"], [/breakfast|coffee/i, "coffee"],
     [/lunch|dinner|\beat\b|meal|snack|cook|brunch/i, "tools-kitchen-2"], [/swim|pool|beach/i, "swimming"],
     [/stretch|mobility/i, "stretching"], [/yoga|shambhavi|meditat|sadhana|kriya|breath/i, "yoga"],
@@ -988,6 +989,8 @@
   function openStop(b){
     if (isGym(b)) return openGym(b);
     if (isMeal(b)) return openMeal(b);
+    if (isSadhana(b)) return openSadhana(b);
+    if (groupOf(b) === "work" || INSIGHTS[gk(b)]) return openWork(b);
     return openEdit(b);
   }
   function winHead(b){
@@ -1026,6 +1029,61 @@
     };
     $("mEdit").onclick = () => openEdit(b);
     if ($("mSkip")) $("mSkip").onclick = () => { skip(b); closeSheet(); };
+  }
+
+  // Sadhana (d86): Shambhavi with a 21-minute timer that starts with the tap
+  const SHAMBHAVI_MIN = 21;
+  let sadTimer = null;
+  function openSadhana(b){
+    const all = blocks(), k = gk(b), st = G.day.checks[k], closed = !!G.day.closes[k];
+    const S = ((G.day.sad = G.day.sad || {})[k] = G.day.sad[k] || {});
+    const endAt = S.at ? new Date(+new Date(S.at) + SHAMBHAVI_MIN * 60000) : null, t = now();
+    const lastFood = lastMealBefore(t, all), empty = emptyStomach(t, all);
+    openSheet(`${winHead(b)}
+      <p>${empty ? "Empty stomach: +5 prana on top." : `Last food ended ${fmtT(lastFood)}, ${fmtHM(Math.round((t - lastFood) / 60000))} ago. Isha asks for an empty stomach; do it anyway, lightly.`}</p>
+      <div class="count"><div><div class="big">${endAt && endAt > t ? `<span data-until="${endAt.toISOString()}"></span>` : endAt ? "Complete" : `${SHAMBHAVI_MIN} min`}</div>
+        <div class="sub">${endAt && endAt > t ? "left in Shambhavi" : endAt ? "Shambhavi done" : "Shambhavi Mahamudra Kriya"}</div></div></div>
+      <div class="actions">${!S.at && st !== "skip" ? `<button class="btn primary" id="sStart">🪷 Start Shambhavi</button>` : ""}
+        ${S.at && !closed ? `<button class="btn primary" id="sDone">Done</button>` : ""}</div>
+      <div class="actions"><button class="btn ghost" id="sEdit">Change time or name</button>${!st ? `<button class="btn ghost" id="sSkip">Not today</button>` : ""}</div>`);
+    clearTimeout(sadTimer);
+    if (endAt && endAt > t && !closed) sadTimer = setTimeout(() => {
+      banner("🪷", "SHAMBHAVI", "21 minutes. Sit a moment longer."); if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+      if ($("sheet").classList.contains("open")) openSadhana(b);
+    }, endAt - t);
+    if ($("sStart")) $("sStart").onclick = () => { S.at = now().toISOString(); if (!st) checkIn(b); else saveG(); openSadhana(blocks().find(x => gk(x) === k) || b); };
+    if ($("sDone")) $("sDone").onclick = () => { closeOut(b, "done"); closeSheet(); };
+    $("sEdit").onclick = () => openEdit(b);
+    if ($("sSkip")) $("sSkip").onclick = () => { skip(b); closeSheet(); };
+  }
+
+  // Work (green): a prep checklist and how-to links the insight agent researched,
+  // plus the one thing that closes this block
+  function openWork(b){
+    const k = gk(b), st = G.day.checks[k], closed = !!G.day.closes[k], t = now();
+    const I = INSIGHTS[k] || { items:[], links:[] };
+    const W = ((G.day.work = G.day.work || {})[k] = G.day.work[k] || { tick:{}, goal:"" });
+    const n = I.items.length, done = I.items.filter((_, i) => W.tick[i]).length;
+    openSheet(`${winHead(b)}
+      <div class="win-lb">What closes this</div>
+      <input id="wGoal" class="cline" placeholder="The one outcome that means this is done" maxlength="120" value="${esc(W.goal)}">
+      <div class="win-lb">Prep ${n ? `${done}/${n}` : ""}</div>
+      ${n ? I.items.map((x, i) => `<button class="wck${W.tick[i] ? " on" : ""}" data-tick="${i}"><span class="bx">${W.tick[i] ? "✓" : ""}</span><span>${esc(x.t)}${x.why ? `<br><small style="color:var(--ink-faint)">${esc(x.why)}</small>` : ""}</span></button>`).join("")
+        : `<p>No prep list yet. The insight agent adds one for events that need it.</p>`}
+      ${(I.links || []).length ? `<div class="win-lb">Learn</div>${I.links.map(l => `<a class="wck" href="${esc(l.url)}" target="_blank" rel="noopener"><span class="bx">▶</span><span>${esc(l.title)}${l.note ? `<br><small style="color:var(--ink-faint)">${esc(l.note)}</small>` : ""}</span></a>`).join("")}` : ""}
+      <div class="actions">${!st && (b.s - t < 30 * 60000) ? `<button class="btn primary" id="wIn">${startLabel(b)}</button>` : ""}
+        ${(st === "in" || st === "late") && !closed ? `<button class="btn primary" id="wDone">Done</button>` : ""}</div>
+      <div class="actions"><button class="btn ghost" id="wEdit">Change time or name</button>${!st ? `<button class="btn ghost" id="wSkip">Not today</button>` : ""}</div>`, true);
+    $("wGoal").onchange = e => { W.goal = e.target.value.trim(); saveG(); };
+    $("sheet").querySelectorAll("[data-tick]").forEach(bn => bn.onclick = () => {
+      W.tick[bn.dataset.tick] = !W.tick[bn.dataset.tick];
+      if (n && I.items.every((_, i) => W.tick[i]) && !W.paid) { W.paid = true; addPrana(3, `Fully prepped: ${shortName(b)}`, "prepped"); } else saveG();
+      openWork(b);
+    });
+    if ($("wIn")) $("wIn").onclick = () => { checkIn(b); openWork(blocks().find(x => gk(x) === k) || b); };
+    if ($("wDone")) $("wDone").onclick = () => { closeOut(b, "done"); closeSheet(); };
+    $("wEdit").onclick = () => openEdit(b);
+    if ($("wSkip")) $("wSkip").onclick = () => { skip(b); closeSheet(); };
   }
 
   function openEdit(b){
