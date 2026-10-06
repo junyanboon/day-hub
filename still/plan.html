@@ -286,14 +286,14 @@
     const [a, b] = viewRange();
     const rk = a + "|" + b;
     if (!force && S.range === rk) return;
-    S.loading = true;
+    S.loading = true; $("tzl").dataset.busy = "1"; $("tzl").textContent += " · loading…";
     try {
       const d = await qfetch(`/planner/events?from=${encodeURIComponent(zdate(a).toISOString())}&to=${encodeURIComponent(zdate(b).toISOString())}`);
       if (viewRange().join("|") !== rk) return;          // the user moved on meanwhile
       S.events = d.events; S.range = rk;
       for (const er of d.errors || []) toast(`${er.name}: ${er.error}`);
     } catch (e) { toast("Could not load events: " + e.message); }
-    finally { S.loading = false; }
+    finally { S.loading = false; delete $("tzl").dataset.busy; }
     render();
   }
 
@@ -488,6 +488,7 @@
 
   document.addEventListener("pointerdown", (ev) => {
     if (ev.button !== 0) return;
+    if (!ev.target.closest(".draft")) closeDraft();      // clicking away cancels a new event
     const card = ev.target.closest(".ev");
     const col = ev.target.closest(".col");
     if (card && col) {
@@ -582,7 +583,6 @@
           createEvent({ calId: dc.id, title, start: a.toISOString(), end: b.toISOString() });
         }
       };
-      inp.onblur = () => setTimeout(() => { if (document.activeElement !== inp && !inp.value.trim()) closeDraft(); }, 150);
     }
   }
 
