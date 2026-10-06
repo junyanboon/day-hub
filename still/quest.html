@@ -69,6 +69,13 @@
   .bar { height:8px; border-radius:6px; background:rgba(0,0,0,.2); margin-top:6px; overflow:hidden; }
   .bar > i { display:block; height:100%; width:0; background:linear-gradient(90deg, var(--gold), #fff0c4);
     border-radius:6px; transition:width .8s cubic-bezier(.2,.8,.2,1); }
+  .bar > i.mid { background:linear-gradient(90deg, #ffb36b, #ffd479); } .bar > i.low { background:linear-gradient(90deg, #ff7f7f, #ffb0a0); }
+  .o2row { gap:12px; } .o2row .ok { color:#8fe3b0; }
+  .float.down { color:#ff9c9c; } .log div span.xp.neg { color:#ff9c9c; }
+  .pline { width:100%; height:80px; margin-top:10px; } .pline path { fill:none; stroke:var(--gold); stroke-width:2.5; stroke-linejoin:round; }
+  .pline .p70 { stroke:rgba(255,255,255,.25); stroke-dasharray:4 4; }
+  .brief li { margin:4px 0; } .brief ul { margin:8px 0 0; padding-left:18px; color:var(--ink-soft); font-size:14px; }
+  .warnline { margin-top:10px; font-size:13px; color:#ffcf8a; }
   .gear { flex:none; width:36px; height:36px; border-radius:50%; background:var(--glass); font-size:17px; }
   .gear.warn { box-shadow:0 0 0 2px var(--warn); }
   .combo { flex:none; text-align:center; min-width:52px; }
@@ -291,15 +298,16 @@
   <div class="hud">
     <div class="avatar" id="avatar">🧗</div>
     <div class="hud-mid">
-      <div class="hud-title"><span><b id="peakName">Today's peak</b></span><span id="altTxt">0 m</span></div>
+      <div class="hud-title"><span><b id="peakName">Prana</b></span><span id="altTxt">60%</span></div>
       <div class="bar"><i id="xpBar"></i></div>
-      <div class="o2row"><span>O₂</span><div class="o2bar"><i id="o2Bar"></i></div><span id="o2Txt">80%</span></div>
+      <div class="o2row" id="o2Txt"></div>
     </div>
-    <div class="combo" id="combo"><div class="n" id="comboN">·</div><div class="l" id="comboL">wind</div></div>
+    <div class="combo" id="combo"><div class="n" id="comboN">·</div><div class="l" id="comboL">days 70+</div></div>
     <button class="gear" id="gear" aria-label="Settings">⚙️</button>
   </div>
   <div class="status"><span id="statusL">Loading your day…</span><span id="statusR"></span></div>
 
+  <div id="brief"></div>
   <div id="loose"></div>
   <div id="main"></div>
   <div id="nextLine"></div>
@@ -379,7 +387,7 @@
   const GKEY = "quest-v1";
   let G = { xp:0, bestCombo:0, day:null };
   try { const d = JSON.parse(localStorage.getItem(GKEY)); if (d) G = { ...G, ...d }; } catch {}
-  function freshDay(){ return { date:dayKey(), since:now().toISOString(), o2:80, o2At:now().toISOString(), ledge:0, sw:false, caches:{}, camps:0, xp:0, combo:0, checks:{}, closes:{}, zaps:[], zap:null, side:null, log:[] }; }
+  function freshDay(){ return { date:dayKey(), since:now().toISOString(), prana:null, pl:[], caches:{}, missed:{}, xp:0, checks:{}, closes:{}, zaps:[], zap:null, side:null, log:[] }; }
   if (!G.day) G.day = freshDay();   // a stale day is replaced once the plan says which day it is
   /* XP lives on this device AND on the server (still-api quest:state), so it
      survives a cleared browser and is the same on phone and Mac. Newest wins. */
@@ -454,6 +462,7 @@
     try {
       await pullPlan();   // first: it sets the zone, which decides today's date key
       await Promise.all([pullOps(), pullTasks().catch(() => {}), pullState()]);
+      seedFromOura();
       lastPull = new Date(); pullErr = null;
     } catch (e) { pullErr = String(e.message || e); }
     render();
@@ -583,74 +592,103 @@
       <path d="${SYM[symOf(b)] || SYM["map-pin"]}" transform="translate(-11,-11) scale(.92)" fill="none" stroke="${lit ? g.fill : g.ring}" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
   }
 
-  /* ---------- Altitude (Trail · Altitude, chosen 2026-10-05) ----------
-     XP is metres climbed. Each block's climb comes from a Difficulty/Terrain
-     route (geocaching style): (D + T) × 40 m. Oxygen is a second meter: every
-     climb uses some, it thins 4% an hour, and anchors (sleep, meals, gym,
-     Shambhavi) are campfires that refill it. Below 30% the climb still counts
-     but its metres wait on a ledge until the next campfire. Altitude never
-     drops. A comeback within 10 min after ⚡ gives a Second Wind: next climb ×2.
-     G.xp is the season's total metres, G.day.xp today's. */
+  /* ---------- Prana (Junyan, 2026-10-06, d75) ----------
+     One score, 0 to 100: is he on top of his day in real life? Sadhana moves it
+     most, then health habits (Bryan Johnson's Blueprint: training, meals in the
+     window, bed on time), then keeping the schedule. It never leaks with time:
+     only what he does, or lets slip, moves it. The day starts from last night's
+     Oura sleep score when there is one, else 60. Metres are gone (he did not
+     like them); the mountain stays as the map of the day. */
   const PEAKS = { Hurghada:"Red Sea Ridge", Cairo:"Muqattam Crest", Luxor:"Theban Hills", Aswan:"Granite Cataract",
     Madrid:"Guadarrama Crest", Toronto:"Escarpment Line", London:"Thames Ridge", "São Paulo":"Serra do Mar" };
   const placeNow = () => (PLAN && PLAN.where && PLAN.where.place) || "Home";
   const peakName = () => PEAKS[placeNow()] || `${placeNow()} Ridge`;
-  function route(b){                                   // [Difficulty, Terrain]
-    if (isGym(b)) return [3, 4];
-    if (/tour|quad|hike|trek|safari|dive|snorkel|climb/i.test(b.t)) return [4, 5];
-    switch (b.kind) {
-      case "body": return [3, 3];   case "dance": return [3, 4];
-      case "travel": return (b.e - b.s) >= 2 * 3600000 ? [2, 3] : [1, 2];
-      case "practice": return [2, 1];  case "rest": return [2, 1];  case "call": return [2, 1];
-      case "fuel": return /dinner/i.test(b.t) ? [2, 1] : [1, 1];
-      case "open": return [1, 1];   default: return [2, 2];
-    }
+  const isSadhana = b => b.kind === "practice" || /shambhavi|sadhana|kriya/i.test(b.t);
+  const isSleep = b => b.kind === "rest" && /sleep|\bbed\b/i.test(b.t);
+  const isMeal = b => b.kind === "fuel";
+  // what a block is worth in prana: [on time, late, "not today", missed]
+  function stakes(b){
+    if (isSadhana(b)) return [20, 12, -8, -15];
+    if (isSleep(b)) return [10, 4, -4, -8];
+    if (isGym(b) || b.kind === "body") return [12, 6, -4, -6];
+    if (isMeal(b)) return [6, 3, -2, -4];
+    if (b.kind === "open" || b.kind === "break") return [2, 1, 0, 0];
+    return [5, 2, 0, -3];
   }
-  const climbOf = b => { const [D, T] = route(b); return (D + T) * 40; };
-  const o2Cost = b => { const [D, T] = route(b); return (D + T) * 3; };
-  const FIRE = { rest:100, fuel:35, body:30, practice:30 };
-  const SIDE_M = 50;
-  const fmtM = m => `${Math.round(m).toLocaleString()} m`;
-  function o2Now(){ const d = G.day; const hrs = (now() - new Date(d.o2At || now())) / 3600000;
-    return Math.max(0, Math.min(100, (d.o2 ?? 80) - Math.max(0, hrs) * 4)); }
-  function settleO2(){ G.day.o2 = o2Now(); G.day.o2At = now().toISOString(); }
-  function summitOf(all){
-    const m = all.filter(needsCheck).reduce((a, b) => a + climbOf(b), 0) + SIDE_M * Math.min(3, TASKS.length);
-    return Math.max(500, Math.ceil(m / 50) * 50);
-  }
-  let SUMMIT_H = 0;
-
-  function addAlt(m, msg, label){
-    m = Math.round(m); if (!m) { log(msg); return; }
-    G.xp += m; G.day.xp += m;
-    log(msg, m); floatXp(m, label || "");
-    (G.summits = G.summits || {})[G.day.date] = { place:placeNow(), peak:peakName(), alt:G.day.xp, h:SUMMIT_H };
-    if (SUMMIT_H && !G.day.summited && G.day.xp >= SUMMIT_H) {
-      G.day.summited = true;
-      setTimeout(() => banner("🏔️", "SUMMIT", `${peakName()} · ${fmtM(SUMMIT_H)}`), 900);
-      log(`Summit of ${peakName()} reached`);
-    }
+  const onTimeMin = b => isSleep(b) ? 30 : ON_TIME_MIN;   // bedtime counts within 30 min (Blueprint: same time nightly)
+  const SIDE_P = 5;
+  const prana = () => G.day.prana ?? 60;
+  function addPrana(d, msg, label){
+    d = Math.round(d);
+    G.day.prana = Math.max(0, Math.min(100, prana() + d));
+    (G.day.pl = G.day.pl || []).push([now().toISOString(), G.day.prana]);
+    (G.days = G.days || {})[G.day.date] = { place:placeNow(), prana:G.day.prana };
+    log(msg, d); if (d) floatXp(d, label || "");
     saveG();
   }
-  // every other reward is metres too (side quests, logging what came up, replans)
-  function award(m, msg, opts = {}){ addAlt(m, msg, opts.label); }
-
-  function climb(b, frac, why){
-    settleO2();
-    const thin = G.day.o2 < 30, sw = !!G.day.sw;
-    const m = Math.round((climbOf(b) + (isGym(b) ? 20 * (G.ropes || 0) : 0)) * frac * (sw ? 2 : 1));
-    G.day.sw = false;
-    G.day.o2 = Math.max(0, G.day.o2 - o2Cost(b) * (thin ? 2 : 1));
-    if (thin) { G.day.ledge = (G.day.ledge || 0) + m; log(`${why}: ${fmtM(m)} wait on a ledge (thin air). Light a campfire to bring them home.`); floatXp(0, "thin air: metres on a ledge"); saveG(); }
-    else addAlt(m, `${why}${sw ? " · second wind ×2" : ""}`, sw ? "second wind!" : "");
+  function award(d, msg, opts = {}){ addPrana(d, msg, opts.label); }
+  // 3 hours with no food before practice or bed: Isha asks for an empty
+  // stomach, Blueprint finishes eating well before sleep (d77, d78)
+  const GAP = 3 * 3600000;
+  function lastMealBefore(t, all){ let e = null; all.forEach(b => { if (isMeal(b) && +b.e <= +t && (!e || b.e > e)) e = b.e; }); return e; }
+  const emptyStomach = (t, all) => { const e = lastMealBefore(t, all); return !e || t - e >= GAP; };
+  // days in a row that ended at 70% or more (d74); today counts once it is there
+  function streak(){
+    const days = G.days || {}; let n = 0;
+    for (let i = 1; i < 400; i++) {
+      const k = new Date(new Date(gameYmd() + "T12:00:00Z") - i * 86400000).toLocaleDateString("en-US", { timeZone:"UTC", weekday:"short", month:"short", day:"2-digit", year:"numeric" }).replace(/,/g, "");
+      if (days[k] && days[k].prana >= 70) n++; else break;
+    }
+    return n + (prana() >= 70 ? 1 : 0);
   }
-  function campfire(b){
-    const f = FIRE[b.kind]; if (!f) return;
-    settleO2(); const was = Math.round(G.day.o2);
-    G.day.o2 = f >= 100 ? 100 : Math.min(100, G.day.o2 + f);
-    log(`🔥 Campfire at ${b.t}: oxygen ${was}% to ${Math.round(G.day.o2)}%`);
-    if (G.day.ledge) { const m = G.day.ledge; G.day.ledge = 0; addAlt(m, "Ledge metres brought home", "from the ledge"); }
-    saveG();
+  // last night's Oura sleep score sets where the day starts (d79)
+  async function seedFromOura(){
+    if (!G.day || G.day.ouraTried || (G.day.pl || []).length > 1) return;
+    G.day.ouraTried = true;
+    try {
+      const r = await fetch(API + "/sleep", { cache:"no-store" }); if (!r.ok) return;
+      const j = await r.json();
+      if (j.day === gameYmd() && typeof j.score === "number") {
+        const start = Math.round(40 + j.score * 0.4);
+        G.day.prana = start; G.day.pl = [[now().toISOString(), start]];
+        log(`Slept ${j.score} (Oura): prana starts at ${start}%`); render();
+      }
+    } catch {}
+  }
+  // the day's prana as a step line, with the 70% mark (d74)
+  function pranaLine(){
+    const pts = (G.day.pl || []).map(([a, v]) => [+new Date(a), v]);
+    if (!pts.length) pts.push([+now(), prana()]);
+    const t0 = pts[0][0], t1 = Math.max(+now(), pts[pts.length - 1][0] + 60000), W = 300, H = 70;
+    const X = x => Math.round((x - t0) / (t1 - t0) * W), Y = v => Math.round(H - v / 100 * H);
+    let d = `M0,${Y(pts[0][1])}`;
+    pts.forEach(([x, v], i) => { if (i) d += ` L${X(x)},${Y(pts[i - 1][1])} L${X(x)},${Y(v)}`; });
+    d += ` L${W},${Y(pts[pts.length - 1][1])}`;
+    return `<svg viewBox="0 -4 ${W} ${H + 8}" class="pline" aria-label="Prana through the day"><line x1="0" x2="${W}" y1="${Y(70)}" y2="${Y(70)}" class="p70"/><path d="${d}"/></svg>`;
+  }
+  // d77: no sadhana on the calendar? find 30 min with nothing fixed and no food in the 3 hr before
+  function sadhanaSlot(all){
+    if (!all.length || all.some(isSadhana)) return null;
+    const step = 15 * 60000, len = 30 * 60000, sl = all.find(isSleep);
+    const end = sl ? +sl.s - 30 * 60000 : +all[all.length - 1].e;
+    for (let s = Math.max(Math.ceil(+now() / step) * step, +all[0].s - 3600000); s + len <= end; s += step) {
+      const S = new Date(s), E = new Date(s + len);
+      if (all.some(b => b.kind !== "open" && b.kind !== "break" && b.s < E && b.e > S)) continue;
+      if (emptyStomach(S, all)) return S;
+    }
+    return null;
+  }
+  function addSadhana(S){
+    const E = new Date(+S + 30 * 60000);
+    log(`Added Shambhavi at ${fmtT(S)}`);
+    return writeOps(o => o.adds.push({ key:"x" + S.getTime(), s:S.toISOString(), e:E.toISOString(), t:"Shambhavi", type:"task", cal:"you" }));
+  }
+  // d78: a meal that ends less than 3 hr before bed or practice
+  function mealWarn(b, all){
+    if (!isMeal(b)) return "";
+    const nx = all.find(x => (isSleep(x) || isSadhana(x)) && x.s >= b.e);
+    if (!nx || nx.s - b.e >= GAP) return "";
+    return `Ends ${fmtT(b.e)}, ${isSleep(nx) ? "bed" : shortName(nx)} at ${fmtT(nx.s)}: only ${fmtHM(Math.round((nx.s - b.e) / 60000))} to digest. Aim for 3 hr.`;
   }
 
   function log(msg, xp = 0){
@@ -660,7 +698,7 @@
   }
   function floatXp(n, label){
     const el = document.createElement("div");
-    el.className = "float"; el.innerHTML = `${n ? `+${Math.round(n)} m` : ""}${label ? `<small>${esc(label)}</small>` : ""}`;
+    el.className = "float" + (n < 0 ? " down" : ""); el.innerHTML = `${n ? `${n > 0 ? "+" : "−"}${Math.abs(Math.round(n))} prana` : ""}${label ? `<small>${esc(label)}</small>` : ""}`;
     document.body.appendChild(el); setTimeout(() => el.remove(), 1500);
     if (navigator.vibrate) navigator.vibrate(30);
   }
@@ -674,8 +712,7 @@
 
   /* ---------- field caches: a real-world challenge on each block ----------
      Geocaching vocabulary on purpose: type, D/T, Found it, Did not find (still
-     logged, still climbs a little). A find pitches a base camp, which can be
-     spent to rest through a free-time stop and keep its metres. */
+     logged, still worth a little prana). */
   const CTYPE = { trad:"📦 Traditional", multi:"🔢 Multi-stage", myst:"❓ Mystery", earth:"🌍 EarthCache", night:"🌙 Night cache" };
   const CACHE_LIB = {
     gym: [["multi",2,2,"Heaviest iron","Stage 1: find the heaviest dumbbell in the gym and log its weight. Stage 2: carry it 20 steps and put it back."],
@@ -719,19 +756,12 @@
   function logCache(b, state){
     const c = cacheFor(b), line = ($("cLine") && $("cLine").value.trim()) || "";
     c.st.state = state; c.st.line = line;
-    if (state === "found") { G.day.camps = (G.day.camps || 0) + 1;
-      addAlt(30 + 10 * c.D, `⛺ Found “${c.title}”${line ? `: ${line}` : ""}. Base camp pitched`, "cache found");
+    if (state === "found") {
+      addPrana(3, `Found “${c.title}”${line ? `: ${line}` : ""}`, "cache found");
       if (!(G.souvenirs = G.souvenirs || {})[placeNow()]) { G.souvenirs[placeNow()] = G.day.date; setTimeout(() => banner("🏅", "SOUVENIR", `First find in ${placeNow()}`), 1200); }
-    } else addAlt(10, `Did not find “${c.title}”${line ? `: ${line}` : ""}`, "DNF logged");
+    } else addPrana(1, `Did not find “${c.title}”${line ? `: ${line}` : ""}`, "DNF logged");
     saveG(); render();
   }
-  function restHere(b){
-    if (!(G.day.camps > 0)) return;
-    G.day.camps--; G.day.checks[gk(b)] = "rest"; settleO2(); G.day.o2 = Math.min(100, G.day.o2 + 10);
-    addAlt(climbOf(b), `⛺ Rested at base camp through ${b.t}. Kept its metres, +10% oxygen`, "rested");
-    render();
-  }
-
   /* ---------- the day's loop ---------- */
   // latest-starting block containing now wins (same rule as Stillness)
   function currentOf(all, t){ let hit = null; all.forEach(b => { if (t >= b.s && t < b.e) hit = b; }); return hit; }
@@ -758,21 +788,35 @@
   }
 
   function checkIn(b){
-    const late = (now() - b.s) / 60000 > ON_TIME_MIN;
+    const all = blocks(), late = (now() - b.s) / 60000 > onTimeMin(b);
     G.day.checks[gk(b)] = late ? "late" : "in";
-    const [D, T] = route(b);
-    climb(b, late ? 0.5 : 1, `Climbed ${b.t} (D${D}/T${T})${late ? ", started late" : ""}`);
-    if (isHealth(b)) campfire(b);
+    const [on, lt] = stakes(b);
+    let d = late ? lt : on, why = `${late ? "Started late" : "On time"}: ${shortName(b)}`;
+    if (isSadhana(b) && emptyStomach(now(), all)) { d += 5; why += ", on an empty stomach"; }
+    if (isMeal(b)) { const sl = all.find(x => isSleep(x) && x.s > b.s);
+      if (sl && sl.s - b.e < GAP) { d -= 5; why += ", under 3 hr before bed"; } }
+    addPrana(d, why, late ? "late start" : "on time");
     render();
   }
   function skip(b){
     G.day.checks[gk(b)] = "skip"; G.day.closes[gk(b)] = "skipped";
-    log(`Not today: ${b.t}. Nothing lost`); saveG(); render();
+    const d = stakes(b)[2];
+    if (d) addPrana(d, `Not today: ${shortName(b)}`, "not today"); else { log(`Not today: ${shortName(b)}`); saveG(); }
+    render();
+  }
+  // a block that ended with no tap: ask, and count it only if it really did not happen
+  function settleMissed(b, happened, quiet){
+    G.day.missed = G.day.missed || {};
+    if (G.day.missed[gk(b)]) return;
+    G.day.missed[gk(b)] = happened ? "yes" : "no";
+    if (happened) { G.day.checks[gk(b)] = "late"; G.day.closes[gk(b)] = "done"; addPrana(stakes(b)[1], `Did it, forgot to tap: ${shortName(b)}`, "logged"); }
+    else { G.day.checks[gk(b)] = "skip"; G.day.closes[gk(b)] = "missed"; addPrana(stakes(b)[3], `Missed: ${shortName(b)}`, quiet ? "" : "missed"); }
+    if (!quiet) render();
   }
   function closeOut(b, how){
     G.day.closes[gk(b)] = how;
-    if (how === "done") award(15, `Closed ${b.t}`, { x2:isHealth(b), label:"closed" });
-    else if (how === "carried") { log(`Carried ${b.t} forward`); saveG(); }
+    if (how === "done") award(2, `Closed ${shortName(b)}`, { label:"closed" });
+    else if (how === "carried") { log(`Carried ${shortName(b)} forward`); saveG(); }
     render();
   }
   function extend(b, min){
@@ -799,7 +843,7 @@
 
   /* side quests: one at a time (WIP limit 1) */
   const PRI = t => /High/i.test(t.priority) ? 3 : /Medium/i.test(t.priority) ? 2 : 1;
-  const sideXp = t => SIDE_M + (urgent(t) ? 25 : 0);
+  const sideXp = t => SIDE_P + (urgent(t) ? 3 : 0);
   // One System map, ticket 001: payment deadlines outrank everything else
   const dueIn = t => { const m = /due (\d{4}-\d{2}-\d{2})/i.exec(t.task); return m ? Math.round((new Date(m[1] + "T12:00") - now()) / 86400000) : null; };
   const urgent = t => { const d = dueIn(t); return d !== null && d <= 2; };
@@ -834,7 +878,7 @@
   function startZap(type, note){
     G.day.zap = { type, note, s:now().toISOString(), during: currentOf(blocks(), now())?.key || null };
     log(`⚡ ${type}${note ? ": " + note : ""}`);
-    award(5, "Logged what came up", { label:"honest log" });
+    saveG();
     render();
   }
   function endZap(){
@@ -843,7 +887,8 @@
     G.day.zaps.push({ ...z, e:now().toISOString(), mins });
     G.day.zap = null; saveG();
     const all = blocks(), cur = currentOf(all, now()), nxt = nextOf(all, now());
-    if (mins <= 10) { G.day.sw = true; log(`Back in ${mins} min: Second Wind, your next climb counts double`); floatXp(0, "second wind ready"); saveG(); }
+    if (mins <= 10) addPrana(2, `Back in ${mins} min`, "quick comeback");
+    else addPrana(-Math.min(10, Math.floor(mins / 10)), `${mins} min away on ${z.type}`, "time away");
     openRecover(mins, cur, nxt, z);
   }
 
@@ -1110,10 +1155,10 @@
       } catch (e) { $("gSave").disabled = false; $("gMsg").textContent = "Could not save: " + e.message + ". Your sets are still here."; return; }
     }
     const warm = entries.reduce((a, x) => a + (x.reps ? x.reps.slice(0, 2).filter(v => v !== "").length : 0), 0);
-    award(5 * warm + 15 * working, `Gym log: ${GYM.program}, ${entries.length} moves (${warm} warm-up, ${working} working sets)`, { label:"sets climbed" });
-    ups.forEach((x, i) => setTimeout(() => { G.ropes = (G.ropes || 0) + 1;
-      award(50, `Level up: ${x.name} L${x.level} (${x.levelName}). Fixed rope added: +20 m on every gym climb from now on`, { label:`${x.code} level ${x.level}!` });
-      banner("🪢", "FIXED ROPE", `${x.name} level ${x.level}`); }, 900 * (i + 1)));
+    award(Math.min(8, working), `Gym log: ${GYM.program}, ${entries.length} moves (${warm} warm-up, ${working} working sets)`, { label:"sets logged" });
+    ups.forEach((x, i) => setTimeout(() => {
+      award(5, `Level up: ${x.name} L${x.level} (${x.levelName})`, { label:`${x.code} level ${x.level}!` });
+      banner("🪢", "LEVEL UP", `${x.name} level ${x.level}`); }, 900 * (i + 1)));
     const b = GYM.blockKey && blocks().find(x => x.key === GYM.blockKey);
     if (b && !G.day.closes[gk(b)]) G.day.closes[gk(b)] = "done";
     saveG();
@@ -1155,11 +1200,11 @@
         ${cur || nxt ? `<button class="btn" id="rShift">Shift the rest of the day +${shift} min</button>` : ""}
       </div>
       <p style="font-size:12px;margin-top:10px">A shift writes to Stillness, so the phone and the orb move too.</p>`);
-    $("rAbsorb").onclick = () => { award(10, `Absorbed ${mins} min on ${z.type}`, { label:"back on the path" }); closeSheet(); render(); };
+    $("rAbsorb").onclick = () => { award(2, `Absorbed ${mins} min on ${z.type}`, { label:"back on the path" }); closeSheet(); render(); };
     if (cur || nxt) $("rShift").onclick = async () => {
       closeSheet(); log(`Shifted the day +${shift} min after ${z.type}`); saveG();
       if (cur) await stretch(cur, shift); else await shiftFrom(nxt.key, shift);
-      award(5, "Replanned instead of drifting", { label:"replanned" });
+      award(2, "Replanned instead of drifting", { label:"replanned" });
     };
   }
 
@@ -1195,8 +1240,8 @@
   function openSettings(){
     const paired = !!questKey(), pushed = !!store.get("quest-push");
     openSheet(`<h3>Settings</h3>
-      <p>${paired ? `Paired. Your climb saves to the server${syncErr ? ` <span style="color:var(--warn)">(last sync failed: ${esc(syncErr)})</span>` : ""}, and calendar changes are on.`
-        : "Pair this device to save your climb, change the calendar and get phone pings."}</p>
+      <p>${paired ? `Paired. Your prana saves to the server${syncErr ? ` <span style="color:var(--warn)">(last sync failed: ${esc(syncErr)})</span>` : ""}, and calendar changes are on.`
+        : "Pair this device to save your prana, change the calendar and get phone pings."}</p>
       <input id="pCode" placeholder="Pairing code" autocomplete="off" autocapitalize="characters" value="${paired ? "••••••••" : ""}">
       <div class="actions"><button class="btn" id="pSave">${paired ? "Change code" : "Pair"}</button>
         ${paired ? `<button class="btn ghost" id="pForget">Unpair</button>` : ""}</div>
@@ -1242,7 +1287,7 @@
       if (!needsCheck(b)) return;
       const toStart = (b.s - t) / 60000, toEnd = (b.e - t) / 60000;
       if (toStart <= 5 && toStart > 4) ping("pre|" + b.key, `In 5 min: ${b.t}`, `Starts ${fmtT(b.s)}. Wrap up what you're on.`);
-      if (toStart <= 0 && toStart > -1) ping("go|" + b.key, `Time to climb: ${b.t}`, `Tap Start within 5 min for the full climb.`);
+      if (toStart <= 0 && toStart > -1) ping("go|" + b.key, `Now: ${shortName(b)}`, `Tap Start within ${onTimeMin(b)} min for full prana.`);
       if (toEnd <= 5 && toEnd > 4 && G.day.checks[gk(b)]) ping("end|" + b.key, `5 min left: ${b.t}`, `Start closing it out.`);
     });
   }
@@ -1307,7 +1352,7 @@
       out += `<path class="seg${k - 1 <= here ? " walked" : ""}" d="M${p1.x},${p1.y} C${c1x},${c1y} ${c2x},${c2y} ${p2.x},${p2.y}"/>`;
     }
     out += `<text class="tm" x="${START.x}" y="${START.y + 2}" text-anchor="middle">MORNING</text>`;
-    out += `<text class="emo" x="${SUMMIT.x + 12}" y="${SUMMIT.y + 8}">⛺</text><text class="tm" x="${SUMMIT.x - 10}" y="${SUMMIT.y + 4}" text-anchor="end">${esc(peakName().toUpperCase())} · ${fmtM(SUMMIT_H)}</text>`;
+    out += `<text class="emo" x="${SUMMIT.x + 12}" y="${SUMMIT.y + 8}">⛺</text><text class="tm" x="${SUMMIT.x - 10}" y="${SUMMIT.y + 4}" text-anchor="end">${esc(peakName().toUpperCase())}</text>`;
     stops.forEach((st, i) => {
       const p = P[i], left = p.x >= 170, ax = left ? -24 : 24, anc = left ? "end" : "start";
       const isCur = i === curI, past = st.e <= t && !isCur;
@@ -1321,8 +1366,7 @@
         `<path class="flame" d="M0,6 C-9,1 -7,-8 0,-17 C1,-10 8,-8 7,-1 C6,4 3,6 0,6Z"/><path class="flame2" d="M0,5 C-4,2 -3,-3 0,-8 C1,-4 4,-3 3,1 C3,4 1,5 0,5Z"/></g>`;
       if (isCur) out += `<circle class="ringm" r="${r + 4}"/>`;
       const name = st.t.length > 24 ? st.t.slice(0, 23) + "…" : st.t;
-      const tag = ` · +${st.blocks.filter(needsCheck).reduce((a, b) => a + climbOf(b), 0)} m`;
-      out += `<text class="tm" x="${ax}" y="-3" text-anchor="${anc}">${fmtT(st.s)}${tag}</text>`;
+      out += `<text class="tm" x="${ax}" y="-3" text-anchor="${anc}">${fmtT(st.s)}</text>`;
       out += `<text class="nm${st.skipped ? " gone" : ""}" x="${ax}" y="11" text-anchor="${anc}">${esc(name)}</text>`;
       const flags = (isCur && st.free && G.day.side ? "🐉" : "") + "🚩".repeat(Math.min(st.flags, 3));
       if (flags) out += `<text class="emo sm" x="${left ? 16 : -16}" y="-12" text-anchor="middle">${flags}</text>`;
@@ -1338,9 +1382,10 @@
   // Days saved before Altitude (2026-10-05) lack its fields; the season starts at 0 m
   function ensureDay(){
     const d = G.day;
-    if (d.o2 == null) { d.o2 = 80; d.o2At = now().toISOString(); }
-    d.caches = d.caches || {}; d.camps = d.camps || 0; d.ledge = d.ledge || 0;
-    if (G.mode !== "altitude") { G.mode = "altitude"; G.xp = d.xp = 0; }
+    d.caches = d.caches || {}; d.missed = d.missed || {};
+    if (d.prana == null) { d.prana = 60; d.pranaSince = now().toISOString(); d.pl = [[now().toISOString(), 60]]; }
+    if (!d.pranaSince) d.pranaSince = d.since || now().toISOString();
+    if (G.mode !== "prana") { G.mode = "prana"; delete G.summits; delete G.ropes; delete G.souvenirs; }
   }
   function render(){
     if (PLAN && G.day.date !== dayKey()) G.day = freshDay();
@@ -1349,16 +1394,21 @@
     const cur = currentOf(all, t), nxt = nextOf(all, t);
 
     // HUD
-    SUMMIT_H = PLAN ? summitOf(all) : 0;
-    $("peakName").textContent = PLAN ? peakName() : "Today's peak";
-    $("altTxt").textContent = SUMMIT_H ? `${Math.round(G.day.xp).toLocaleString()} / ${fmtM(SUMMIT_H)}` : fmtM(G.day.xp);
-    $("xpBar").style.width = `${SUMMIT_H ? Math.min(100, G.day.xp / SUMMIT_H * 100) : 0}%`;
-    const o2 = Math.round(o2Now());
-    $("o2Bar").style.width = o2 + "%"; $("o2Txt").textContent = o2 + "%";
-    $("o2Bar").className = o2 < 30 ? "thin" : o2 < 60 ? "mid" : "";
-    $("comboN").textContent = G.day.sw ? "×2" : G.day.ledge ? `${G.day.ledge}` : (G.day.camps || "·");
-    $("comboL").textContent = G.day.sw ? "2nd wind" : G.day.ledge ? "m ledge" : G.day.camps ? "camps" : "wind";
-    $("combo").classList.toggle("hot", !!G.day.sw);
+    const P = Math.round(prana());
+    $("peakName").textContent = "Prana";
+    $("altTxt").textContent = `${P}%`;
+    $("xpBar").style.width = `${P}%`;
+    $("xpBar").className = P < 40 ? "low" : P < 70 ? "mid" : "";
+    // today's three pillars: sadhana, body, on time
+    const did = b => ["in","late"].includes(G.day.checks[gk(b)]);
+    const sad = all.filter(isSadhana), bod = all.filter(b => isGym(b) || b.kind === "body"), timed = all.filter(b => needsCheck(b) && b.kind !== "open" && b.s <= t);
+    $("o2Txt").innerHTML = `<span class="${sad.some(did) ? "ok" : ""}">Sadhana ${sad.some(did) ? "✓" : sad.length ? "·" : "none planned"}</span>` +
+      `<span class="${bod.some(did) ? "ok" : ""}">Body ${bod.some(did) ? "✓" : "·"}</span>` +
+      `<span>On time ${timed.filter(b => G.day.checks[gk(b)] === "in").length}/${timed.length}</span>`;
+    const sk = streak();
+    $("comboN").textContent = sk || "·";
+    $("comboL").textContent = "days 70+";
+    $("combo").classList.toggle("hot", P >= 70);
     const where = PLAN && PLAN.where && PLAN.where.place;
     $("statusL").innerHTML = pullErr ? `<span class="dry">Offline: ${esc(pullErr)}</span>`
       : PLAN ? `<span class="place">📍 ${esc(where || "Home")}</span> ${fmtT(t)} local` : "Loading your day…";
@@ -1371,11 +1421,44 @@
 
     // loose ends: the latest ended block that was started but never closed
     const loose = all.filter(b => b.e <= t && G.day.checks[gk(b)] && G.day.checks[gk(b)] !== "skip" && !G.day.closes[gk(b)]).pop();
-    put("loose", loose && !z ? `<div class="card loose"><div class="eyebrow">Loose end</div>
-      <div class="q">Did “${esc(loose.t)}” actually close?</div>
+    // a block that ended with no tap since prana began: ask; 3 hr unanswered counts as missed
+    const since = new Date(G.day.pranaSince || G.day.since);
+    const untapped = all.filter(b => needsCheck(b) && b.kind !== "open" && b.e <= t && b.e > since && !G.day.checks[gk(b)] && !G.day.missed[gk(b)]);
+    untapped.filter(b => t - b.e > 3 * 3600000).forEach(b => settleMissed(b, false, true));
+    const ask = untapped.filter(b => t - b.e <= 3 * 3600000).pop();
+    put("loose", z ? "" : loose ? `<div class="card loose"><div class="eyebrow">Loose end</div>
+      <div class="q">Did “${esc(shortName(loose))}” actually close?</div>
       <div class="actions"><button class="btn primary" data-close="done">Yes, done</button>
-      <button class="btn" data-close="carried">Carry forward</button></div></div>` : "");
+      <button class="btn" data-close="carried">Carry forward</button></div></div>`
+      : ask ? `<div class="card loose"><div class="eyebrow">No tap</div>
+      <div class="q">Did ${esc(shortName(ask))} happen? (${fmtT(ask.s)})</div>
+      <div class="actions"><button class="btn primary" data-miss="yes">Yes, forgot to tap</button>
+      <button class="btn" data-miss="no">No, it didn't</button></div></div>` : "");
     $("loose").querySelectorAll("[data-close]").forEach(bn => bn.onclick = () => closeOut(loose, bn.dataset.close));
+    $("loose").querySelectorAll("[data-miss]").forEach(bn => bn.onclick = () => settleMissed(ask, bn.dataset.miss === "yes"));
+
+    // d82: the morning brief, until he taps "Got it"; d77: a Shambhavi slot when none is planned
+    const slot = PLAN && !z ? sadhanaSlot(all) : null;
+    const hourNow = +tzParts(t, { hour:"numeric", hourCycle:"h23" }).hour;
+    const ahead = all.filter(b => b.e > t && b.kind !== "open" && b.kind !== "break");
+    let bh = "";
+    if (PLAN && !z && !G.day.briefDone && (hourNow < 13 || hourNow < 4)) {
+      const sad = all.find(isSadhana), big = ahead.filter(b => !isMeal(b) && !isSleep(b) && !isSadhana(b)).slice(0, 3);
+      const go = ahead.find(b => ["travel", "major"].includes(groupOf(b)));
+      const warns = all.filter(isMeal).map(b => mealWarn(b, all)).filter(Boolean);
+      bh = `<div class="card brief"><div class="eyebrow">Morning brief · ${esc(placeNow())}</div><ul>
+        <li><b>Sadhana:</b> ${sad ? `${esc(shortName(sad))} at ${fmtT(sad.s)}` : slot ? `nothing planned. Best slot ${fmtT(slot)}` : "nothing planned, and no 3 hr food gap left today"}</li>
+        ${big.map(b => `<li>${fmtT(b.s)} <b>${esc(shortName(b))}</b></li>`).join("")}
+        ${go ? `<li><b>Leave by ${fmtT(new Date(+go.s - 30 * 60000))}</b> for ${esc(shortName(go))}</li>` : ""}
+        ${warns.map(w => `<li class="warnline">${esc(w)}</li>`).join("")}</ul>
+        <div class="actions">${!sad && slot ? `<button class="btn primary" id="bSad">Add Shambhavi at ${fmtT(slot)}</button>` : ""}<button class="btn${!sad && slot ? "" : " primary"}" id="bBrief">Got it</button></div></div>`;
+    } else if (slot) {
+      bh = `<div class="card brief"><div class="eyebrow">Sadhana</div><div class="q">No Shambhavi planned today. Best slot: <b>${fmtT(slot)}</b> (3 hr after food)</div>
+        <div class="actions"><button class="btn primary" id="bSad">Add it</button></div></div>`;
+    }
+    put("brief", bh);
+    if ($("bBrief")) $("bBrief").onclick = () => { G.day.briefDone = true; saveG(); render(); };
+    if ($("bSad")) $("bSad").onclick = () => addSadhana(slot);
 
     // main card
     let html = "";
@@ -1389,15 +1472,14 @@
       const done = all.filter(b => b.e <= t && needsCheck(b));
       const health = done.filter(isHealth);
       if (!nxt) {
-        const season = Object.entries(G.summits || {}).sort((a, b) => a[0] < b[0] ? 1 : -1).slice(0, 7);
-        html = `<div class="card"><div class="eyebrow">Summit card · ${esc(peakName())}</div>
-          <div class="quest-title"><span class="em">${G.day.summited ? "🏔️" : "⛺"}</span><span>You reached ${fmtM(G.day.xp)} of ${fmtM(SUMMIT_H)}</span></div>
-          <div class="summary"><div><b>${health.filter(b => ["in","late"].includes(G.day.checks[gk(b)])).length}/${health.length}</b><span>fires lit</span></div>
-          <div><b>${G.day.zaps.filter(x => x.mins <= 10).length}</b><span>quick comebacks</span></div>
-          <div><b>${Object.values(G.day.caches || {}).filter(c => c.state === "found").length}</b><span>caches found</span></div></div>
-          <div class="eyebrow" style="margin-top:14px">Season peaks</div>
-          <div class="season">${season.map(([d, x]) => `<div><span>${esc(x.place)}</span><span>${esc(x.peak)}</span><b>${fmtM(x.alt)}${x.h ? ` / ${fmtM(x.h)}` : ""}</b></div>`).join("")}</div>
-          <div class="quest-time" style="margin-top:8px">Season total ${fmtM(G.xp)}. Nothing is ever taken off.</div></div>`;
+        const P2 = Math.round(prana()), sk2 = streak();
+        html = `<div class="card"><div class="eyebrow">Day card · ${esc(placeNow())}</div>
+          <div class="quest-title"><span class="em">${P2 >= 70 ? "🌕" : P2 >= 40 ? "🌗" : "🌑"}</span><span>Prana ${P2}%</span></div>
+          ${pranaLine()}
+          <div class="summary"><div><b>${all.filter(isSadhana).some(b => ["in","late"].includes(G.day.checks[gk(b)])) ? "✓" : "·"}</b><span>sadhana</span></div>
+          <div><b>${health.filter(b => ["in","late"].includes(G.day.checks[gk(b)])).length}/${health.length}</b><span>fires lit</span></div>
+          <div><b>${sk2}</b><span>days at 70+</span></div></div>
+          <div class="quest-time" style="margin-top:8px">${P2 >= 70 ? "A 70+ day. The streak grows." : `Finish at 70% or more to grow the streak.`}</div></div>`;
       } else {
         html = `<div class="card"><div class="eyebrow">Between quests</div>
           <div class="quest-title">${badge(nxt)}<span>${esc(shortName(nxt))}</span></div>
@@ -1407,23 +1489,27 @@
       const K = KINDS[cur.kind], st = G.day.checks[gk(cur)];
       const C = 2 * Math.PI * 30;
       html = `<div class="card"><div class="eyebrow">${cur.kind === "open" ? "Open space" : "Main quest"}
-          ${cur.kind === "open" || !GROUPS[groupOf(cur)].name ? "" : `<span class="tag" style="color:${GROUPS[groupOf(cur)].ring}">${GROUPS[groupOf(cur)].name}</span>`}<span class="tag" style="text-transform:none">▲ ${climbOf(cur)} m</span>${isHealth(cur) ? `<span class="tag x2">🔥 campfire</span>` : ""}</div>
+          ${cur.kind === "open" || !GROUPS[groupOf(cur)].name ? "" : `<span class="tag" style="color:${GROUPS[groupOf(cur)].ring}">${GROUPS[groupOf(cur)].name}</span>`}<span class="tag" style="text-transform:none">+${stakes(cur)[0]} prana</span>${isHealth(cur) ? `<span class="tag x2">🔥 campfire</span>` : ""}</div>
         <div class="quest-title">${badge(cur, 34, st && st !== "skip")}<span>${esc(shortName(cur))}</span></div>
         <div class="quest-time">${fmtT(cur.s)} to ${fmtT(cur.e)}${shortName(cur) !== cur.t && cur.kind !== "open" ? ` · ${esc(cur.t)}` : ""}</div>
+        ${mealWarn(cur, all) ? `<div class="warnline">${esc(mealWarn(cur, all))}</div>` : ""}
         <div class="count"><svg class="ring" viewBox="0 0 74 74"><circle class="bg" cx="37" cy="37" r="30"/>
           <circle class="fg" cx="37" cy="37" r="30" stroke-dasharray="${C}" data-ring-s="${cur.s.toISOString()}" data-ring-e="${cur.e.toISOString()}"/></svg>
           <div><div class="big" data-until="${cur.e.toISOString()}"></div><div class="sub">left in this block</div></div></div>`;
       if (needsCheck(cur) && !st) {
         const lateBy = Math.floor((t - cur.s) / 60000);
-        html += `<div class="actions"><button class="btn primary" id="bIn">${startLabel(cur)}</button>
+        const grace = onTimeMin(cur), nudge = lateBy >= 10 && lateBy > grace && cur.kind !== "open";
+        html += nudge ? `<div class="quest-time" style="margin-top:12px">It started ${lateBy} min ago. Start, push or drop?</div>
+          <div class="actions"><button class="btn primary" id="bIn">${startLabel(cur)}</button>
+          <button class="btn" id="bPush">Start in 15 min</button><button class="btn ghost" id="bSkip">Drop it</button></div>`
+          : `<div class="actions"><button class="btn primary" id="bIn">${startLabel(cur)}</button>
           <button class="btn ghost" id="bSkip">Not today</button></div>
-          <div class="quest-time" style="margin-top:8px">${lateBy <= ON_TIME_MIN ? `Tap when you actually start. Full points for the next ${ON_TIME_MIN - lateBy} min.` : `Tap when you start. It began ${lateBy} min ago, still worth half.`}</div>`;
+          <div class="quest-time" style="margin-top:8px">${lateBy <= grace ? `Tap when you actually start. Full prana for the next ${grace - lateBy} min.` : `Tap when you start. It began ${lateBy} min ago, still worth some.`}</div>`;
       } else if (st && st !== "skip") {
         html += `<div class="actions"><button class="btn" id="bMore">Need more time</button>
           <button class="btn primary" id="bDone">Done early</button></div>`;
       }
       if (isGym(cur)) html += `<div class="actions"><button class="btn primary" id="bGym">🏋️ Open the gym log</button></div>`;
-      if (cur.kind === "open" && !st && G.day.camps > 0) html += `<div class="actions"><button class="btn" id="bRest">⛺ Rest here (${G.day.camps} base camp${G.day.camps > 1 ? "s" : ""}): keep +${climbOf(cur)} m</button></div>`;
       if (st === "in" || st === "late") html += cacheCard(cur);
       if (cur.kind === "open" && st && st !== "skip") {
         const s = G.day.side;
@@ -1440,6 +1526,8 @@
     const on = (id, f) => { const el = $(id); if (el) el.onclick = f; };
     on("bIn", () => checkIn(cur)); on("bSkip", () => skip(cur));
     on("bMore", () => openExtend(cur));
+    on("bPush", () => { const S = new Date(Math.ceil((+now() + 15 * 60000) / 300000) * 300000), E = new Date(+S + (cur.e - cur.s));
+      log(`Pushed ${shortName(cur)} to ${fmtT(S)}`); writeOps(o => setBlock(o, cur, S, E, cur.t)); });
     on("bDone", () => { closeOut(cur, "done"); writeOps(o => {
       const e = now().toISOString();
       if (cur.extra) { const a = o.adds.find(x => x.key === cur.key); if (a) a.e = e; }
@@ -1447,7 +1535,6 @@
     }); });
     on("sDone", finishSide); on("sDrop", dropSide);
     on("bGym", () => openGym(cur));
-    on("bRest", () => restHere(cur));
     on("cFound", () => logCache(cur, "found")); on("cDnf", () => logCache(cur, "dnf"));
     on("cNext", () => { const c = cacheFor(cur); c.st.i++; saveG(); render(); });
     if ($("cLine")) $("cLine").oninput = e => { cacheFor(cur).st.line = e.target.value; };
@@ -1474,9 +1561,9 @@
     $("trailMeta").textContent = `${fires.filter(st => st.lit).length} / ${fires.length} fires lit`;
 
     // log
-    $("dayXp").textContent = `${fmtM(G.day.xp)} today`;
+    $("dayXp").textContent = `prana ${Math.round(prana())}%`;
     put("log", G.day.log.length ? G.day.log.map(e =>
-      `<div><span>${fmtT(new Date(e.at))}</span><span>${esc(e.msg)}</span>${e.xp ? `<span class="xp">+${e.xp}</span>` : ""}</div>`).join("")
+      `<div><span>${fmtT(new Date(e.at))}</span><span>${esc(e.msg)}</span>${e.xp ? `<span class="xp${e.xp < 0 ? " neg" : ""}">${e.xp > 0 ? "+" : "−"}${Math.abs(e.xp)}</span>` : ""}</div>`).join("")
       : `<div><span></span><span>Nothing yet. Check in to your first quest.</span></div>`);
     $("gear").classList.toggle("warn", !questKey() || !!syncErr);
     pings(all, t);
