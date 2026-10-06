@@ -584,7 +584,7 @@
   const SHORT = [
     [/^open space/i, "Free time"], [/sleep/i, "Sleep"], [/gym|workout/i, "Gym"], [/breakfast/i, "Breakfast"],
     [/brunch/i, "Brunch"], [/lunch/i, "Lunch"], [/dinner/i, t => /pack/i.test(t) ? "Dinner + pack" : "Dinner"],
-    [/quad/i, "Quad bikes"], [/check.?out/i, "Check-out"], [/walk/i, "Walk"],
+    [/quad/i, "Quad bikes"], [/check.?out/i, "Check-out"], [/walk/i, "Walk"], [/video|shoot|film/i, "Video shoot"],
   ];
   function shortName(b){
     const t = String(b.t || "");
@@ -783,6 +783,7 @@
   // The check-in button says what you are starting (Junyan, 2026-10-05: "I don't get the I'm in button")
   function startLabel(b){
     if (isGym(b)) return "▶ Start the workout";
+    if (/video|shoot|film/i.test(b.t)) return "🎬 Starting the shoot";
     if (/sleep|bed|wind.?down/i.test(b.t)) return "🌙 Going to bed";
     if (/nap|rest\b/i.test(b.t)) return "😌 Lying down";
     const k = b.kind;
