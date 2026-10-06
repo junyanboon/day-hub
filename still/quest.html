@@ -585,7 +585,7 @@
     return { rest:"moon-stars", body:"stretching", fuel:"tools-kitchen-2", practice:"yoga", travel:"luggage", call:"phone", dance:"music" }[b.kind] || "map-pin";
   }
   const SHORT = [
-    [/^open space/i, "Free time"], [/sleep/i, "Sleep"], [/gym|workout/i, "Gym"], [/breakfast/i, "Breakfast"],
+    [/^open space/i, "Your move"], [/sleep/i, "Sleep"], [/gym|workout/i, "Gym"], [/breakfast/i, "Breakfast"],
     [/brunch/i, "Brunch"], [/lunch/i, "Lunch"], [/dinner/i, t => /pack/i.test(t) ? "Dinner + pack" : "Dinner"],
     [/quad/i, "Quad bikes"], [/check.?out/i, "Check-out"], [/walk/i, "Walk"], [/video|shoot|film/i, "Video shoot"],
   ];
@@ -618,14 +618,22 @@
   const isSleep = b => b.kind === "rest" && /sleep|\bbed\b/i.test(b.t);
   const isMeal = b => b.kind === "fuel";
   // what a block is worth in prana: [on time, late, "not today", missed]
-  function stakes(b){
-    if (isSadhana(b)) return [20, 12, -8, -15];
-    if (isSleep(b)) return [10, 4, -4, -8];
-    if (isGym(b) || b.kind === "body") return [12, 6, -4, -6];
-    if (isMeal(b)) return [6, 3, -2, -4];
-    if (b.kind === "open" || b.kind === "break") return [2, 1, 0, 0];
-    return [5, 2, 0, -3];
+  /* Prana is an energy reading (d102, NVC: no rewards, no punishment). Sadhana,
+     food and recovery fill it when they start; effort spends it over the time
+     it actually ran (work, travel, training, big events). A late, skipped or
+     missed block costs nothing: the app asks what he needs instead. */
+  const RECOVER = [["Isha Kriya", 12], ["Upa Yoga", 20], ["NSDR", 20]];
+  const isRecovery = b => /isha kriya|upa yoga|nsdr|yoga nidra|\bnap\b|recover/i.test(b.t);
+  function energy(b){                                  // { up: one-time fill at start, rate: spent per hour while it runs }
+    if (isSadhana(b)) return { up:20, rate:0 };
+    if (isRecovery(b)) return { up:12, rate:0 };
+    if (isMeal(b)) return { up:8, rate:0 };
+    if (isSleep(b) || b.kind === "open" || b.kind === "break") return { up:0, rate:0 };
+    if (isGym(b) || b.kind === "body" || b.kind === "dance") return { up:0, rate:6 };
+    const g = groupOf(b);
+    return { up:0, rate: g === "major" ? 6 : g === "travel" ? 5 : g === "work" ? 4 : 3 };
   }
+  const energyTag = b => { const e = energy(b); return e.up ? `fills +${e.up}` : e.rate ? `uses about ${e.rate} an hour` : ""; };
   const onTimeMin = b => isSleep(b) ? 30 : ON_TIME_MIN;   // bedtime counts within 30 min (Blueprint: same time nightly)
   const SIDE_P = 5;
   const prana = () => G.day.prana ?? 60;
@@ -768,16 +776,16 @@
     const c = cacheFor(b), line = ($("cLine") && $("cLine").value.trim()) || "";
     c.st.state = state; c.st.line = line;
     if (state === "found") {
-      addPrana(3, `Found “${c.title}”${line ? `: ${line}` : ""}`, "cache found");
+      log(`Found “${c.title}”${line ? `: ${line}` : ""}`); floatXp(0, "cache found");
       if (!(G.souvenirs = G.souvenirs || {})[placeNow()]) { G.souvenirs[placeNow()] = G.day.date; setTimeout(() => banner("🏅", "SOUVENIR", `First find in ${placeNow()}`), 1200); }
-    } else addPrana(1, `Did not find “${c.title}”${line ? `: ${line}` : ""}`, "DNF logged");
+    } else log(`Did not find “${c.title}”${line ? `: ${line}` : ""}`, "DNF logged");
     saveG(); render();
   }
   /* ---------- the day's loop ---------- */
   // latest-starting block containing now wins (same rule as Stillness)
   function currentOf(all, t){ let hit = null; all.forEach(b => { if (t >= b.s && t < b.e) hit = b; }); return hit; }
   function nextOf(all, t){ return all.find(b => b.s > t) || null; }
-  const needsCheck = b => b.kind !== "break";
+  const needsCheck = b => b.kind !== "break" && b.kind !== "open";   // open time is a choice, not a check-in
   // Check-ins follow the calendar event, not its time: a block that moves (in
   // Google Calendar or in Stillness) keeps "started" and "closed". Blocks with
   // no event id (Stillness's own, or added today) use their edit key.
@@ -796,39 +804,75 @@
     if (k === "call") return "📞 Starting the call";
     if (k === "travel") return "🧳 Heading out";
     if (k === "dance") return "💃 Starting to dance";
-    if (k === "open") return "▶ Start free time";
+    if (k === "open") return "▶ Your move";
     return "▶ Starting now";
   }
 
   function checkIn(b){
     const all = blocks(), late = (now() - b.s) / 60000 > onTimeMin(b);
     G.day.checks[gk(b)] = late ? "late" : "in";
-    const [on, lt] = stakes(b);
-    let d = late ? lt : on, why = `${late ? "Started late" : "On time"}: ${shortName(b)}`;
-    if (isSadhana(b) && emptyStomach(now(), all)) { d += 5; why += ", on an empty stomach"; }
-    if (isMeal(b)) { const sl = all.find(x => isSleep(x) && x.s > b.s);
-      if (sl && sl.s - b.e < GAP) { d -= 5; why += ", under 3 hr before bed"; } }
-    addPrana(d, why, late ? "late start" : "on time");
+    G.day.started = G.day.started || {}; G.day.started[gk(b)] = now().toISOString();
+    let { up } = energy(b), why = `Started ${shortName(b)}`;
+    if (isSadhana(b) && emptyStomach(now(), all)) { up += 5; why += " on an empty stomach"; }
+    if (up) addPrana(up, why, "filled"); else { log(why); saveG(); }
     render();
+  }
+  // effort is counted once, for the time a started block really ran
+  function spend(b){
+    const k = gk(b); G.day.spent = G.day.spent || {};
+    if (G.day.spent[k]) return;
+    const r = energy(b).rate; G.day.spent[k] = true;
+    if (!r) return saveG();
+    const from = new Date((G.day.started || {})[k] || b.s), to = new Date(Math.min(+now(), +b.e));
+    const hrs = Math.max(0, (to - from) / 3600000);
+    const d = Math.round(r * hrs);
+    if (d) addPrana(-d, `${shortName(b)} used ${d} (${fmtHM(Math.round(hrs * 60))})`, ""); else saveG();
   }
   function skip(b){
     G.day.checks[gk(b)] = "skip"; G.day.closes[gk(b)] = "skipped";
-    const d = stakes(b)[2];
-    if (d) addPrana(d, `Not today: ${shortName(b)}`, "not today"); else { log(`Not today: ${shortName(b)}`); saveG(); }
-    render();
+    log(`Not today: ${shortName(b)}`); saveG(); render();
+    openNeeds(b);
+  }
+  // NVC: no judgement, just what would help now
+  const NEEDS = [["rest", "Rest"], ["food", "Food"], ["move", "Movement"], ["people", "Connection"], ["focus", "Focus"], ["on", "Just moving on"]];
+  function openNeeds(b){
+    openSheet(`<h3>All good. What do you need right now?</h3>
+      <p>${b ? esc(shortName(b)) + " is off today. " : ""}Pick what's true; the app adjusts.</p>
+      <div class="actions" style="flex-wrap:wrap">${NEEDS.map(([k, l]) => `<button class="btn" data-need="${k}">${l}</button>`).join("")}</div>`);
+    $("sheet").querySelectorAll("[data-need]").forEach(bn => bn.onclick = () => {
+      const k = bn.dataset.need;
+      (G.day.needs = G.day.needs || []).push({ at:now().toISOString(), need:k, after:b ? shortName(b) : "" });
+      log(`Needed: ${NEEDS.find(x => x[0] === k)[1]}`); saveG();
+      if (k === "rest") return openRecoverMenu();
+      closeSheet(); render();
+    });
+  }
+  function openRecoverMenu(){
+    openSheet(`<h3>Recover now</h3><p>Starts now and goes on today's plan.</p>
+      <div class="actions" style="flex-direction:column">${RECOVER.map(([t, m]) => `<button class="btn" data-rec="${t}|${m}">${t} · ${m} min</button>`).join("")}</div>`);
+    $("sheet").querySelectorAll("[data-rec]").forEach(bn => bn.onclick = () => { const [t, m] = bn.dataset.rec.split("|"); closeSheet(); startNow(t, +m); });
+  }
+  // put a block on today's plan starting now, and start it
+  async function startNow(t, min){
+    const S = new Date(Math.floor(+now() / 60000) * 60000), E = new Date(+S + min * 60000), key = "x" + S.getTime();
+    log(`Your move: ${t}`);
+    await writeOps(o => o.adds.push({ key, s:S.toISOString(), e:E.toISOString(), t, type:"task", cal:"you" }));
+    const b = blocks().find(x => x.key === key); if (b) checkIn(b); else render();
   }
   // a block that ended with no tap: ask, and count it only if it really did not happen
   function settleMissed(b, happened, quiet){
     G.day.missed = G.day.missed || {};
     if (G.day.missed[gk(b)]) return;
     G.day.missed[gk(b)] = happened ? "yes" : "no";
-    if (happened) { G.day.checks[gk(b)] = "late"; G.day.closes[gk(b)] = "done"; addPrana(stakes(b)[1], `Did it, forgot to tap: ${shortName(b)}`, "logged"); }
-    else { G.day.checks[gk(b)] = "skip"; G.day.closes[gk(b)] = "missed"; addPrana(stakes(b)[3], `Missed: ${shortName(b)}`, quiet ? "" : "missed"); }
+    if (happened) { G.day.checks[gk(b)] = "late"; G.day.closes[gk(b)] = "done"; const u = energy(b).up;
+      if (u) addPrana(u, `Did it, forgot to tap: ${shortName(b)}`, "logged"); else { log(`Did it, forgot to tap: ${shortName(b)}`); saveG(); } spend(b); }
+    else { G.day.checks[gk(b)] = "skip"; G.day.closes[gk(b)] = "missed"; log(`Didn't happen: ${shortName(b)}`); saveG(); }
     if (!quiet) render();
   }
   function closeOut(b, how){
     G.day.closes[gk(b)] = how;
-    if (how === "done") award(2, `Closed ${shortName(b)}`, { label:"closed" });
+    if (G.day.checks[gk(b)] === "in" || G.day.checks[gk(b)] === "late") spend(b);
+    if (how === "done") { log(`Closed ${shortName(b)}`); saveG(); }
     else if (how === "carried") { log(`Carried ${shortName(b)} forward`); saveG(); }
     render();
   }
@@ -881,7 +925,7 @@
     G.day.side = null;
     const at = currentOf(blocks(), now());
     (G.day.sideDone = G.day.sideDone || []).push(at ? gk(at) : "");   // a flag on the mountain
-    award(sideXp(s), `Side quest done: ${s.task}`, { label:"side quest" });
+    log(`Done: ${s.task}`); floatXp(0, "done"); saveG();
     render();
   }
   function dropSide(){ if (!G.day.side) return; log(`Put down: ${G.day.side.task}`); G.day.side = null; saveG(); render(); }
@@ -900,8 +944,6 @@
     G.day.zaps.push({ ...z, e:now().toISOString(), mins });
     G.day.zap = null; saveG();
     const all = blocks(), cur = currentOf(all, now()), nxt = nextOf(all, now());
-    if (mins <= 10) addPrana(2, `Back in ${mins} min`, "quick comeback");
-    else addPrana(-Math.min(10, Math.floor(mins / 10)), `${mins} min away on ${z.type}`, "time away");
     openRecover(mins, cur, nxt, z);
   }
 
@@ -1023,13 +1065,12 @@
       <div class="actions"><button class="btn ghost" id="mEdit">Change time or name</button>${!st ? `<button class="btn ghost" id="mSkip">Not today</button>` : ""}</div>`, true);
     $("sheet").querySelectorAll("[data-plate]").forEach(bn => bn.onclick = () => {
       M.plate[bn.dataset.plate] = !M.plate[bn.dataset.plate];
-      if (PLATE.every(([id]) => M.plate[id]) && !M.fullPaid) { M.fullPaid = true; addPrana(2, `Full plate at ${shortName(b)}`, "full plate"); } else saveG();
+      saveG();
       openMeal(b);
     });
     $("mPhone").onclick = () => { M.phone = !M.phone; saveG(); openMeal(b); };
     if ($("mIn")) $("mIn").onclick = () => { checkIn(b); openMeal(blocks().find(x => gk(x) === k) || b); };
     if ($("mDone")) $("mDone").onclick = () => {
-      if (M.phone && !M.phonePaid) { M.phonePaid = true; addPrana(2, `Ate ${shortName(b)} with the phone down`, "present"); }
       closeOut(b, "done"); closeSheet();
     };
     $("mEdit").onclick = () => openEdit(b);
@@ -1045,7 +1086,7 @@
     const endAt = S.at ? new Date(+new Date(S.at) + SHAMBHAVI_MIN * 60000) : null, t = now();
     const lastFood = lastMealBefore(t, all), empty = emptyStomach(t, all);
     openSheet(`${winHead(b)}
-      <p>${empty ? "Empty stomach: +5 prana on top." : `Last food ended ${fmtT(lastFood)}, ${fmtHM(Math.round((t - lastFood) / 60000))} ago. Isha asks for an empty stomach; do it anyway, lightly.`}</p>
+      <p>${empty ? "Empty stomach: a good time to practice." : `Last food ended ${fmtT(lastFood)}, ${fmtHM(Math.round((t - lastFood) / 60000))} ago. Isha asks for an empty stomach; do it anyway, lightly.`}</p>
       <div class="count"><div><div class="big">${endAt && endAt > t ? `<span data-until="${endAt.toISOString()}"></span>` : endAt ? "Complete" : `${SHAMBHAVI_MIN} min`}</div>
         <div class="sub">${endAt && endAt > t ? "left in Shambhavi" : endAt ? "Shambhavi done" : "Shambhavi Mahamudra Kriya"}</div></div></div>
       <div class="actions">${!S.at && st !== "skip" ? `<button class="btn primary" id="sStart">🪷 Start Shambhavi</button>` : ""}
@@ -1089,7 +1130,7 @@
     $("wGoal").onchange = e => { W.goal = e.target.value.trim(); saveG(); };
     $("sheet").querySelectorAll("[data-tick]").forEach(bn => bn.onclick = () => {
       W.tick[bn.dataset.tick] = !W.tick[bn.dataset.tick];
-      if (n && I.items.every((_, i) => W.tick[i]) && !W.paid) { W.paid = true; addPrana(3, `Fully prepped: ${shortName(b)}`, "prepped"); } else saveG();
+      saveG();
       openWork(b);
     });
     if ($("wIn")) $("wIn").onclick = () => { checkIn(b); openWork(blocks().find(x => gk(x) === k) || b); };
@@ -1280,9 +1321,9 @@
       } catch (e) { $("gSave").disabled = false; $("gMsg").textContent = "Could not save: " + e.message + ". Your sets are still here."; return; }
     }
     const warm = entries.reduce((a, x) => a + (x.reps ? x.reps.slice(0, 2).filter(v => v !== "").length : 0), 0);
-    award(Math.min(8, working), `Gym log: ${GYM.program}, ${entries.length} moves (${warm} warm-up, ${working} working sets)`, { label:"sets logged" });
+    log(`Gym log: ${GYM.program}, ${entries.length} moves (${warm} warm-up, ${working} working sets)`); saveG();
     ups.forEach((x, i) => setTimeout(() => {
-      award(5, `Level up: ${x.name} L${x.level} (${x.levelName})`, { label:`${x.code} level ${x.level}!` });
+      log(`Level up: ${x.name} L${x.level} (${x.levelName})`); saveG();
       banner("🪢", "LEVEL UP", `${x.name} level ${x.level}`); }, 900 * (i + 1)));
     const b = GYM.blockKey && blocks().find(x => x.key === GYM.blockKey);
     if (b && !G.day.closes[gk(b)]) G.day.closes[gk(b)] = "done";
@@ -1325,11 +1366,11 @@
         ${cur || nxt ? `<button class="btn" id="rShift">Shift the rest of the day +${shift} min</button>` : ""}
       </div>
       <p style="font-size:12px;margin-top:10px">A shift writes to Stillness, so the phone and the orb move too.</p>`);
-    $("rAbsorb").onclick = () => { award(2, `Absorbed ${mins} min on ${z.type}`, { label:"back on the path" }); closeSheet(); render(); };
+    $("rAbsorb").onclick = () => { log(`Absorbed ${mins} min on ${z.type}`); saveG(); closeSheet(); render(); };
     if (cur || nxt) $("rShift").onclick = async () => {
       closeSheet(); log(`Shifted the day +${shift} min after ${z.type}`); saveG();
       if (cur) await stretch(cur, shift); else await shiftFrom(nxt.key, shift);
-      award(2, "Replanned instead of drifting", { label:"replanned" });
+      log("Replanned the rest of the day"); saveG();
     };
   }
 
@@ -1445,7 +1486,7 @@
       const last = out[out.length - 1];
       if (free && last && last.free && b.s - last.e <= 15 * 60000) { last.e = new Date(Math.max(last.e, b.e)); last.blocks.push(b); continue; }
       if (b.kind === "break") continue;
-      out.push({ free, s:b.s, e:b.e, t: free ? "Free time" : shortName(b), kind:b.kind, blocks:[b] });
+      out.push({ free, s:b.s, e:b.e, t: free ? "Your move" : shortName(b), kind:b.kind, blocks:[b] });
     }
     for (const st of out) {
       const ch = st.blocks.map(b => G.day.checks[gk(b)]).filter(Boolean);
@@ -1551,6 +1592,7 @@
     const untapped = all.filter(b => needsCheck(b) && b.kind !== "open" && b.e <= t && b.e > since && !G.day.checks[gk(b)] && !G.day.missed[gk(b)]);
     untapped.filter(b => t - b.e > 3 * 3600000).forEach(b => settleMissed(b, false, true));
     const ask = untapped.filter(b => t - b.e <= 3 * 3600000).pop();
+    all.filter(b => b.e <= t && ["in", "late"].includes(G.day.checks[gk(b)]) && !(G.day.spent || {})[gk(b)]).forEach(spend);
     put("loose", z ? "" : loose ? `<div class="card loose"><div class="eyebrow">Loose end</div>
       <div class="q">Did “${esc(shortName(loose))}” actually close?</div>
       <div class="actions"><button class="btn primary" data-close="done">Yes, done</button>
@@ -1581,7 +1623,15 @@
       bh = `<div class="card brief"><div class="eyebrow">Sadhana</div><div class="q">No Shambhavi planned today. Best slot: <b>${fmtT(slot)}</b> (3 hr after food)</div>
         <div class="actions"><button class="btn primary" id="bSad">Add it</button></div></div>`;
     }
+    // running low: offer recovery, at most once every 2 hours
+    const low = PLAN && !z && prana() < 40 && (!G.day.lowAt || +t - +new Date(G.day.lowAt) > 2 * 3600000) && !(cur && isRecovery(cur));
+    if (!bh && low) bh = `<div class="card brief"><div class="eyebrow">Running low · ${Math.round(prana())}%</div>
+      <div class="q">You've given a lot today. Want to refill before what's next?</div>
+      <div class="actions" style="flex-wrap:wrap">${RECOVER.map(([n, m]) => `<button class="btn" data-now="${n}|${m}">${n} · ${m} min</button>`).join("")}
+      <button class="btn ghost" id="bLowOk">I'm OK</button></div></div>`;
     put("brief", bh);
+    $("brief").querySelectorAll("[data-now]").forEach(bn => bn.onclick = () => { G.day.lowAt = now().toISOString(); const [n, m] = bn.dataset.now.split("|"); startNow(n, +m); });
+    if ($("bLowOk")) $("bLowOk").onclick = () => { G.day.lowAt = now().toISOString(); saveG(); render(); };
     if ($("bBrief")) $("bBrief").onclick = () => { G.day.briefDone = true; saveG(); render(); };
     if ($("bSad")) $("bSad").onclick = () => addSadhana(slot);
 
@@ -1613,8 +1663,8 @@
     } else {
       const K = KINDS[cur.kind], st = G.day.checks[gk(cur)];
       const C = 2 * Math.PI * 30;
-      html = `<div class="card"><div class="eyebrow">${cur.kind === "open" ? "Open space" : "Main quest"}
-          ${cur.kind === "open" || !GROUPS[groupOf(cur)].name ? "" : `<span class="tag" style="color:${GROUPS[groupOf(cur)].ring}">${GROUPS[groupOf(cur)].name}</span>`}<span class="tag" style="text-transform:none">+${stakes(cur)[0]} prana</span>${isHealth(cur) ? `<span class="tag x2">🔥 campfire</span>` : ""}</div>
+      html = `<div class="card"><div class="eyebrow">${cur.kind === "open" ? "Your move" : "Main quest"}
+          ${cur.kind === "open" || !GROUPS[groupOf(cur)].name ? "" : `<span class="tag" style="color:${GROUPS[groupOf(cur)].ring}">${GROUPS[groupOf(cur)].name}</span>`}${energyTag(cur) ? `<span class="tag" style="text-transform:none">${energyTag(cur)}</span>` : ""}${isHealth(cur) ? `<span class="tag x2">🔥 campfire</span>` : ""}</div>
         <div class="quest-title">${badge(cur, 34, st && st !== "skip")}<span>${esc(shortName(cur))}</span></div>
         <div class="quest-time">${fmtT(cur.s)} to ${fmtT(cur.e)}${shortName(cur) !== cur.t && cur.kind !== "open" ? ` · ${esc(cur.t)}` : ""}</div>
         ${mealWarn(cur, all) ? `<div class="warnline">${esc(mealWarn(cur, all))}</div>` : ""}
@@ -1636,14 +1686,24 @@
       }
       if (isGym(cur)) html += `<div class="actions"><button class="btn primary" id="bGym">🏋️ Open the gym log</button></div>`;
       if (st === "in" || st === "late") html += cacheCard(cur);
-      if (cur.kind === "open" && st && st !== "skip") {
-        const s = G.day.side;
-        if (s) html += `<div class="active-side"><div class="k">Side quest · +${sideXp(s)} m</div><div class="nm">${esc(s.task)}</div>
+      if (cur.kind === "open") {
+        // "There's no such thing as free time" (Junyan, 2026-10-06): recover, catch up, or work
+        const sd = G.day.side, P0 = prana();
+        const catchUp = all.filter(b => (isSadhana(b) || isGym(b) || b.kind === "body") && b.e <= t
+          && !["in", "late"].includes(G.day.checks[gk(b)])).slice(-2);
+        const rec = P0 < 60 ? RECOVER : RECOVER.slice(0, 1);
+        if (sd) html += `<div class="active-side"><div class="k">Working on</div><div class="nm">${esc(sd.task)}</div>
           <div class="actions"><button class="btn primary" id="sDone">Complete</button><button class="btn ghost" id="sDrop">Put down</button></div></div>`;
-        else if (TASKS.length) html += `<div class="eyebrow" style="margin-top:16px">Pick one side quest</div><div class="side-list">
-          ${sideChoices().map(t => `<button class="side" data-side="${t.id}"><span class="pr">${urgent(t) ? "⏰" : (t.priority||"").split(" ")[0] || "▫️"}</span>
-          <span class="nm">${esc(t.task)}${t.estimate ? ` <span style="color:var(--ink-faint)">· ${esc(t.estimate)}</span>` : ""}</span>
-          <span class="xp">+${sideXp(t)}</span></button>`).join("")}</div>`;
+        else {
+          html += `<div class="quest-time" style="margin-top:10px">Choose what's next. Prana ${Math.round(P0)}%.</div>`;
+          if (catchUp.length) html += `<div class="eyebrow" style="margin-top:14px">Catch up</div><div class="side-list">${catchUp.map(b =>
+            `<button class="side" data-now="${esc(shortName(b))}|${Math.min(60, Math.round((b.e - b.s) / 60000))}"><span class="pr">${badge(b, 26)}</span><span class="nm">${esc(shortName(b))} now</span><span class="xp">${Math.min(60, Math.round((b.e - b.s) / 60000))} min</span></button>`).join("")}</div>`;
+          html += `<div class="eyebrow" style="margin-top:14px">Recover${P0 < 60 ? " (you're running low)" : ""}</div><div class="side-list">${rec.map(([n, m]) =>
+            `<button class="side" data-now="${n}|${m}"><span class="pr">🪷</span><span class="nm">${n}</span><span class="xp">${m} min</span></button>`).join("")}</div>`;
+          if (TASKS.length) html += `<div class="eyebrow" style="margin-top:14px">Work</div><div class="side-list">
+            ${sideChoices().map(x => `<button class="side" data-side="${x.id}"><span class="pr">${urgent(x) ? "⏰" : (x.priority||"").split(" ")[0] || "▫️"}</span>
+            <span class="nm">${esc(x.task)}${x.estimate ? ` <span style="color:var(--ink-faint)">· ${esc(x.estimate)}</span>` : ""}</span></button>`).join("")}</div>`;
+        }
       }
       html += `</div>`;
     }
@@ -1664,6 +1724,7 @@
     on("cNext", () => { const c = cacheFor(cur); c.st.i++; saveG(); render(); });
     if ($("cLine")) $("cLine").oninput = e => { cacheFor(cur).st.line = e.target.value; };
     $("main").querySelectorAll("[data-side]").forEach(bn => bn.onclick = () => takeSide(bn.dataset.side));
+    $("main").querySelectorAll("[data-now]").forEach(bn => bn.onclick = () => { const [n, m] = bn.dataset.now.split("|"); startNow(n, +m); });
     const qt = $("main").querySelector(".quest-title"), tb = cur || nxt;
     if (qt && tb && !z && tb.kind !== "open") qt.onclick = () => openStop(tb);
 
