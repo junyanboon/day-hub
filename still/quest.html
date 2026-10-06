@@ -299,6 +299,8 @@
   .summary b { display:block; font-size:22px; }
   .summary span { font-size:11px; color:var(--ink-soft); }
 </style>
+<link rel="stylesheet" href="bag.css">
+<script src="bag.js"></script>
 </head>
 <body>
 <div id="app">
@@ -310,6 +312,7 @@
       <div class="o2row" id="o2Txt"></div>
     </div>
     <div class="combo" id="combo"><div class="n" id="comboN">·</div><div class="l" id="comboL">days 70+</div></div>
+    <button class="gear" id="bagBtn" aria-label="Bag">🎒</button>
     <button class="gear" id="gear" aria-label="Settings">⚙️</button>
   </div>
   <div class="status"><span id="statusL">Loading your day…</span><span id="statusR"></span></div>
@@ -318,6 +321,7 @@
   <div id="loose"></div>
   <div id="main"></div>
   <div id="nextLine"></div>
+  <div id="questQuick" style="margin:10px 0 4px"></div>
 
   <h2><span>Today's mountain <span id="trailMeta" style="font-weight:400;color:var(--ink-faint)"></span></span><button class="add-btn" id="addBtn">＋ Add</button></h2>
   <div id="mtn"></div>
@@ -414,6 +418,7 @@
       syncErr = null;
       if (srv && typeof srv.xp === "number" && (srv.ts || 0) > (G.ts || 0)) {
         G = { ...G, ...srv };
+        if (hasBag()) setTimeout(() => { try { Bag.render(); } catch {} }, 0);
         if (!G.day || G.day.date !== dayKey()) G.day = freshDay();
         try { localStorage.setItem(GKEY, JSON.stringify(G)); } catch {}
       } else if ((G.ts || 0) > (srv.ts || 0)) saveG();   // this device is newer: push it up
@@ -815,6 +820,12 @@
     let { up } = energy(b), why = `Started ${shortName(b)}`;
     if (isSadhana(b) && emptyStomach(now(), all)) { up += 5; why += " on an empty stomach"; }
     if (up) addPrana(up, why, "filled"); else { log(why); saveG(); }
+    // the bag hands out tools at real moments
+    if (isSadhana(b)) giveItem("breath", "After Shambhavi.");
+    if (isMeal(b)) giveItem("water", `At ${shortName(b)}.`);
+    if (isSleep(b) && !late) giveItem("lantern", "On-time bedtime.");
+    G.day.onRun = late ? 0 : (G.day.onRun || 0) + 1;
+    if (G.day.onRun >= 3) { G.day.onRun = 0; giveItem("buffer", "Three on-time starts in a row."); }
     render();
   }
   // effort is counted once, for the time a started block really ran
@@ -872,6 +883,7 @@
   function closeOut(b, how){
     G.day.closes[gk(b)] = how;
     if (G.day.checks[gk(b)] === "in" || G.day.checks[gk(b)] === "late") spend(b);
+    if (how === "done" && groupOf(b) === "work") giveItem("bell", `Closed ${shortName(b)}.`);
     if (how === "done") { log(`Closed ${shortName(b)}`); saveG(); }
     else if (how === "carried") { log(`Carried ${shortName(b)} forward`); saveG(); }
     render();
@@ -935,6 +947,7 @@
   function startZap(type, note){
     G.day.zap = { type, note, s:now().toISOString(), during: currentOf(blocks(), now())?.key || null };
     log(`⚡ ${type}${note ? ": " + note : ""}`);
+    giveItem("map", "After something came up.");
     saveG();
     render();
   }
@@ -1130,6 +1143,7 @@
     $("wGoal").onchange = e => { W.goal = e.target.value.trim(); saveG(); };
     $("sheet").querySelectorAll("[data-tick]").forEach(bn => bn.onclick = () => {
       W.tick[bn.dataset.tick] = !W.tick[bn.dataset.tick];
+      if (n && I.items.every((_, i) => W.tick[i]) && !W.scout) { W.scout = true; giveItem("scout", `Prepped ${shortName(b)}.`); }
       saveG();
       openWork(b);
     });
@@ -1438,6 +1452,50 @@
   }
   $("gear").onclick = openSettings;
 
+  /* ---------- the bag (d103, ticket 11): tools used in the moment, not rewards ----------
+     bag.js draws it (video-game grid, drag and drop, illustrated items); this
+     wires each item to what it does in the day and hands items out at real moments. */
+  const hasBag = () => typeof window.Bag !== "undefined";
+  function giveItem(id, why){
+    if (!hasBag()) return;
+    try { Bag.give(id, 1, why); } catch {}
+  }
+  function nextFixed(){ const t = now(); return blocks().find(b => b.s > t && b.kind !== "open" && b.kind !== "break"); }
+  const BAG_CTX = {
+    getState: () => G,
+    save: () => saveG(),
+    openBag: () => openBag(),
+    actions: {
+      water: async () => { G.day.water = (G.day.water || 0) + 500; addPrana(2, "Drank 500 ml", "water"); render();
+        return `500 ml logged. ${G.day.water.toLocaleString()} ml today.`; },
+      breath: async (item, o = {}) => { if (o.completed) { addPrana(4, "Breath reset", "breath"); render(); return "Reset done. Carry it into the next thing."; } return "Stopped early. That still counts as a pause."; },
+      buffer: async () => { const n = nextFixed(); if (!n) return "Nothing fixed is coming up.";
+        await shiftFrom(n.key, 15); return `${shortName(n)} moved 15 min later. Breathe.`; },
+      map: async () => { const n = nextFixed(); if (!n) return "Nothing left to replan today.";
+        setTimeout(() => openShiftMenu(n), 50); return "Pick how much room you need."; },
+      scout: async () => { const t = now(), n = blocks().find(b => b.s > t && ["work", "major", "travel"].includes(groupOf(b)) && !INSIGHTS[gk(b)]);
+        if (!n) return "Everything coming up already has a prep list.";
+        (G.research = G.research || []).push({ key:gk(n), title:n.t, s:n.s.toISOString() }); saveG();
+        return `The scout is on ${shortName(n)}. Its list lands on the next run (6 AM or 8 PM).`; },
+      lantern: async () => { G.day.windDown = now().toISOString(); saveG(); const sl = blocks().find(isSleep);
+        return `Wind-down started. Phone on the charger, lights low${sl ? `. Bed at ${fmtT(sl.s)}` : ""}.`; },
+      lotus: async (item, o = {}) => { const r = RECOVER.find(x => x[0] === o.choice) || RECOVER[0]; startNow(r[0], r[1]); return `${r[0]} for ${r[1]} min. It's on your plan now.`; },
+      bell: async (item, o = {}) => `Focus until ${fmtT(new Date(o.endsAt || +now() + 50 * 60000))}.`,
+    },
+  };
+  function openShiftMenu(n){
+    openSheet(`<h3>Make room</h3><p>Moves ${esc(shortName(n))} and everything after it, today only.</p>
+      <div class="actions" style="flex-wrap:wrap">${[15, 30, 60].map(m => `<button class="btn" data-sh="${m}">+${m} min</button>`).join("")}</div>`);
+    $("sheet").querySelectorAll("[data-sh]").forEach(bn => bn.onclick = async () => { closeSheet(); log(`Map: shifted the day +${bn.dataset.sh} min`); await shiftFrom(n.key, +bn.dataset.sh); });
+  }
+  function openBag(){
+    if (!hasBag()) return;
+    openSheet(`<div id="bagView"></div>`, true);
+    Bag.mount($("bagView"), BAG_CTX);
+  }
+  $("bagBtn").onclick = openBag;
+  if (hasBag()) { try { Bag.mount(document.createElement("div"), BAG_CTX); Bag.mountQuick($("questQuick")); } catch (e) { console.warn("bag", e); } }
+
   /* ---------- pings while the page is open (devices without phone push) ---------- */
   const fired = new Set();
   function ping(id, title, body){
@@ -1631,6 +1689,7 @@
       <button class="btn ghost" id="bLowOk">I'm OK</button></div></div>`;
     put("brief", bh);
     $("brief").querySelectorAll("[data-now]").forEach(bn => bn.onclick = () => { G.day.lowAt = now().toISOString(); const [n, m] = bn.dataset.now.split("|"); startNow(n, +m); });
+    if (low && !G.day.lotusGiven) { G.day.lotusGiven = true; giveItem("lotus", "Your energy is low today."); }
     if ($("bLowOk")) $("bLowOk").onclick = () => { G.day.lowAt = now().toISOString(); saveG(); render(); };
     if ($("bBrief")) $("bBrief").onclick = () => { G.day.briefDone = true; saveG(); render(); };
     if ($("bSad")) $("bSad").onclick = () => addSadhana(slot);
