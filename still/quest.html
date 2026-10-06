@@ -470,7 +470,10 @@
       await pullPlan();   // first: it sets the zone, which decides today's date key
       await Promise.all([pullOps(), pullTasks().catch(() => {}), pullState()]);
       seedFromOura();
-      if (questKey()) qfetch("/quest/insights").then(j => { INSIGHTS = j || {}; }).catch(() => {});
+      if (questKey()) qfetch("/quest/insights").then(j => { INSIGHTS = j || {};
+        // the insight agent answered: drop those "Research this" requests
+        const left = (G.research || []).filter(r => !INSIGHTS[r.key]);
+        if (left.length !== (G.research || []).length) { G.research = left; saveG(); } }).catch(() => {});
       lastPull = new Date(); pullErr = null;
     } catch (e) { pullErr = String(e.message || e); }
     render();
@@ -992,7 +995,7 @@
     if (isGym(b)) return openGym(b);
     if (isMeal(b)) return openMeal(b);
     if (isSadhana(b)) return openSadhana(b);
-    if (groupOf(b) === "work" || INSIGHTS[gk(b)]) return openWork(b);
+    if (["work", "major", "travel"].includes(groupOf(b)) || INSIGHTS[gk(b)]) return openWork(b);
     return openEdit(b);
   }
   function winHead(b){
@@ -1077,7 +1080,8 @@
       <input id="wGoal" class="cline" placeholder="The one outcome that means this is done" maxlength="120" value="${esc(W.goal)}">
       <div class="win-lb">Prep ${n ? `${done}/${n}` : ""}</div>
       ${n ? I.items.map((x, i) => `<button class="wck${W.tick[i] ? " on" : ""}" data-tick="${i}"><span class="bx">${W.tick[i] ? "✓" : ""}</span><span>${esc(x.t)}${x.why ? `<br><small style="color:var(--ink-faint)">${esc(x.why)}</small>` : ""}</span></button>`).join("")
-        : `<p>No prep list yet. The insight agent adds one for events that need it.</p>`}
+        : `<p>No prep list yet. The insight agent looks at what's coming at 6 AM and 8 PM.</p>
+           ${(G.research || []).some(r => r.key === k) ? `<p>Asked. It researches this on its next run.</p>` : `<div class="actions"><button class="btn" id="wAsk">🔎 Research this</button></div>`}`}
       ${I.links.length ? `<div class="win-lb">Learn</div>${I.links.map(linkRow).join("")}` : ""}
       <div class="actions">${!st && (b.s - t < 30 * 60000) ? `<button class="btn primary" id="wIn">${startLabel(b)}</button>` : ""}
         ${(st === "in" || st === "late") && !closed ? `<button class="btn primary" id="wDone">Done</button>` : ""}</div>
@@ -1089,6 +1093,7 @@
       openWork(b);
     });
     if ($("wIn")) $("wIn").onclick = () => { checkIn(b); openWork(blocks().find(x => gk(x) === k) || b); };
+    if ($("wAsk")) $("wAsk").onclick = () => { (G.research = G.research || []).push({ key:k, title:b.t, s:b.s.toISOString() }); saveG(); openWork(b); };
     if ($("wDone")) $("wDone").onclick = () => { closeOut(b, "done"); closeSheet(); };
     $("wEdit").onclick = () => openEdit(b);
     if ($("wSkip")) $("wSkip").onclick = () => { skip(b); closeSheet(); };
