@@ -784,6 +784,7 @@
   function startLabel(b){
     if (isGym(b)) return "▶ Start the workout";
     if (/video|shoot|film/i.test(b.t)) return "🎬 Starting the shoot";
+    if (MAJOR.test(b.t)) return "🚀 We're off";
     if (/sleep|bed|wind.?down/i.test(b.t)) return "🌙 Going to bed";
     if (/nap|rest\b/i.test(b.t)) return "😌 Lying down";
     const k = b.kind;
@@ -1062,16 +1063,22 @@
   // plus the one thing that closes this block
   function openWork(b){
     const k = gk(b), st = G.day.checks[k], closed = !!G.day.closes[k], t = now();
-    const I = INSIGHTS[k] || { items:[], links:[] };
+    const I0 = INSIGHTS[k] || { items:[], links:[] };
+    // the insight agent sends prep items, mindset lines (kind "mind"), how-to links and hype media (kind "hype")
+    const I = { items:I0.items.filter(x => x.kind !== "mind"), mind:I0.items.filter(x => x.kind === "mind"),
+      links:(I0.links || []).filter(x => x.kind !== "hype"), hype:(I0.links || []).filter(x => x.kind === "hype") };
+    const linkRow = l => `<a class="wck" href="${esc(l.url)}" target="_blank" rel="noopener"><span class="bx">▶</span><span>${esc(l.title)}${l.note ? `<br><small style="color:var(--ink-faint)">${esc(l.note)}</small>` : ""}</span></a>`;
     const W = ((G.day.work = G.day.work || {})[k] = G.day.work[k] || { tick:{}, goal:"" });
     const n = I.items.length, done = I.items.filter((_, i) => W.tick[i]).length;
     openSheet(`${winHead(b)}
+      ${I.hype.length ? `<div class="win-lb">Get excited</div>${I.hype.map(linkRow).join("")}` : ""}
+      ${I.mind.length ? `<div class="win-lb">Get your head in it</div>${I.mind.map(x => `<p style="margin-top:8px">${esc(x.t)}</p>`).join("")}` : ""}
       <div class="win-lb">What closes this</div>
       <input id="wGoal" class="cline" placeholder="The one outcome that means this is done" maxlength="120" value="${esc(W.goal)}">
       <div class="win-lb">Prep ${n ? `${done}/${n}` : ""}</div>
       ${n ? I.items.map((x, i) => `<button class="wck${W.tick[i] ? " on" : ""}" data-tick="${i}"><span class="bx">${W.tick[i] ? "✓" : ""}</span><span>${esc(x.t)}${x.why ? `<br><small style="color:var(--ink-faint)">${esc(x.why)}</small>` : ""}</span></button>`).join("")
         : `<p>No prep list yet. The insight agent adds one for events that need it.</p>`}
-      ${(I.links || []).length ? `<div class="win-lb">Learn</div>${I.links.map(l => `<a class="wck" href="${esc(l.url)}" target="_blank" rel="noopener"><span class="bx">▶</span><span>${esc(l.title)}${l.note ? `<br><small style="color:var(--ink-faint)">${esc(l.note)}</small>` : ""}</span></a>`).join("")}` : ""}
+      ${I.links.length ? `<div class="win-lb">Learn</div>${I.links.map(linkRow).join("")}` : ""}
       <div class="actions">${!st && (b.s - t < 30 * 60000) ? `<button class="btn primary" id="wIn">${startLabel(b)}</button>` : ""}
         ${(st === "in" || st === "late") && !closed ? `<button class="btn primary" id="wDone">Done</button>` : ""}</div>
       <div class="actions"><button class="btn ghost" id="wEdit">Change time or name</button>${!st ? `<button class="btn ghost" id="wSkip">Not today</button>` : ""}</div>`, true);
