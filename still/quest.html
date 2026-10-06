@@ -263,6 +263,13 @@
     z-index:10; transition:transform .28s cubic-bezier(.2,.8,.2,1); box-shadow:0 -10px 40px rgba(0,0,0,.35); }
   .sheet.open { transform:translate(-50%, 0); }
   .sheet h3 { font-size:19px; font-weight:600; }
+  .win-hd { display:flex; gap:12px; align-items:center; }
+  .win-hd .tt { font-size:21px; font-weight:600; } .win-hd .sb { font-size:13px; color:var(--ink-soft); }
+  .win-lb { font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:var(--ink-faint); margin-top:16px; }
+  .wck { display:flex; gap:10px; align-items:center; width:100%; text-align:left; padding:11px 2px; border-top:1px solid rgba(255,255,255,.08); font-size:15px; color:var(--ink); background:none; }
+  .wck .bx { width:22px; height:22px; border-radius:6px; border:2px solid var(--ink-faint); flex:none; display:flex; align-items:center; justify-content:center; font-size:14px; }
+  .wck.on .bx { background:#85B7EB; border-color:#85B7EB; color:#0c3a66; }
+  .quest-title { cursor:pointer; }
   .sheet p { font-size:14px; color:var(--ink-soft); margin-top:6px; line-height:1.4; }
   .chips { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:14px; }
   .chip { padding:14px 10px; border-radius:14px; background:rgba(255,255,255,.12); font-size:15px; text-align:left; }
@@ -974,6 +981,53 @@
     return new Date(guess - tzOff(new Date(guess)) * 60000);
   }
 
+  /* ---------- stop windows (d70) ----------
+     Tapping a stop opens a window made for that situation. Built live with
+     Junyan through 2026-10-06, one situation at a time; anything not built
+     yet opens the plain edit box. */
+  function openStop(b){
+    if (isGym(b)) return openGym(b);
+    if (isMeal(b)) return openMeal(b);
+    return openEdit(b);
+  }
+  function winHead(b){
+    const st = G.day.checks[gk(b)];
+    return `<div class="win-hd">${badge(b, 44, st === "in" || st === "late")}<div><div class="tt">${esc(shortName(b))}</div>
+      <div class="sb">${fmtT(b.s)} to ${fmtT(b.e)}${shortName(b) !== b.t ? ` · ${esc(b.t)}` : ""}</div></div></div>`;
+  }
+  // Food (blue). Vegan Blueprint plate, eaten with attention; 3 hr clear of bed and practice.
+  const PLATE = [["protein", "Protein: tofu, tempeh, legumes or seitan"], ["veg", "Veg or fruit, half the plate"], ["water", "A full glass of water"]];
+  function openMeal(b){
+    const all = blocks(), t = now(), st = G.day.checks[gk(b)], k = gk(b);
+    const M = ((G.day.meals = G.day.meals || {})[k] = G.day.meals[k] || { plate:{}, phone:false });
+    const running = t >= b.s && t < b.e, started = st === "in" || st === "late", closed = !!G.day.closes[k];
+    const warn = mealWarn(b, all), lastFood = lastMealBefore(b.s, all);
+    openSheet(`${winHead(b)}
+      ${warn ? `<div class="warnline">${esc(warn)}</div>` : ""}
+      ${lastFood ? `<p>Last food ended ${fmtT(lastFood)} (${fmtHM(Math.round((b.s - lastFood) / 60000))} before this).</p>` : ""}
+      <div class="win-lb">On the plate</div>
+      ${PLATE.map(([id, txt]) => `<button class="wck${M.plate[id] ? " on" : ""}" data-plate="${id}"><span class="bx">${M.plate[id] ? "✓" : ""}</span>${txt}</button>`).join("")}
+      <div class="win-lb">Eat with attention</div>
+      <button class="wck${M.phone ? " on" : ""}" id="mPhone"><span class="bx">${M.phone ? "✓" : ""}</span>Phone face down until I'm done</button>
+      <div class="actions">${!st && (running || b.s - t < 30 * 60000) ? `<button class="btn primary" id="mIn">${startLabel(b)}</button>` : ""}
+        ${started && !closed ? `<button class="btn primary" id="mDone">Done eating</button>` : ""}
+        ${closed ? `<span class="quest-time">Closed. ${M.plate.protein && M.plate.veg && M.plate.water ? "Full plate." : ""}</span>` : ""}</div>
+      <div class="actions"><button class="btn ghost" id="mEdit">Change time or name</button>${!st ? `<button class="btn ghost" id="mSkip">Not today</button>` : ""}</div>`, true);
+    $("sheet").querySelectorAll("[data-plate]").forEach(bn => bn.onclick = () => {
+      M.plate[bn.dataset.plate] = !M.plate[bn.dataset.plate];
+      if (PLATE.every(([id]) => M.plate[id]) && !M.fullPaid) { M.fullPaid = true; addPrana(2, `Full plate at ${shortName(b)}`, "full plate"); } else saveG();
+      openMeal(b);
+    });
+    $("mPhone").onclick = () => { M.phone = !M.phone; saveG(); openMeal(b); };
+    if ($("mIn")) $("mIn").onclick = () => { checkIn(b); openMeal(blocks().find(x => gk(x) === k) || b); };
+    if ($("mDone")) $("mDone").onclick = () => {
+      if (M.phone && !M.phonePaid) { M.phonePaid = true; addPrana(2, `Ate ${shortName(b)} with the phone down`, "present"); }
+      closeOut(b, "done"); closeSheet();
+    };
+    $("mEdit").onclick = () => openEdit(b);
+    if ($("mSkip")) $("mSkip").onclick = () => { skip(b); closeSheet(); };
+  }
+
   function openEdit(b){
     openSheet(`<h3>Change this block</h3>
       <input id="eT" value="${esc(b.t)}" maxlength="80">
@@ -1539,6 +1593,8 @@
     on("cNext", () => { const c = cacheFor(cur); c.st.i++; saveG(); render(); });
     if ($("cLine")) $("cLine").oninput = e => { cacheFor(cur).st.line = e.target.value; };
     $("main").querySelectorAll("[data-side]").forEach(bn => bn.onclick = () => takeSide(bn.dataset.side));
+    const qt = $("main").querySelector(".quest-title"), tb = cur || nxt;
+    if (qt && tb && !z && tb.kind !== "open") qt.onclick = () => openStop(tb);
 
     put("nextLine", cur && nxt && !z ? `<div class="next"><span>Next: <b>${esc(shortName(nxt))}</b></span><span>${fmtT(nxt.s)}</span></div>` : "");
 
@@ -1554,7 +1610,7 @@
       const st = stops[+n.dataset.stop]; if (!st) return;
       const fixed = st.blocks.find(b => b.kind !== "open" && b.kind !== "break");
       if (fixed && isGym(fixed) && fixed.s - now() < 3 * 3600000) return openGym(blocks().find(x => x.key === fixed.key) || fixed);
-      if (fixed) openEdit(blocks().find(x => x.key === fixed.key) || fixed); else openAdd(st.s);
+      if (fixed) openStop(blocks().find(x => x.key === fixed.key) || fixed); else openAdd(st.s);
     });
     $("addBtn").onclick = () => openAdd();
     const fires = stops.filter(st => st.anchor);
