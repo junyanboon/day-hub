@@ -1,0 +1,131 @@
+/* Day Quest on a wide screen is a dashboard (Junyan, 2026-10-08: "widgets that I
+   can move around and fill up the whole page").
+   At 1100 px and wider, each part of the page (prana, right now, habits, the
+   mountain, skills, the log, and any part added later) becomes a widget on a
+   12-column grid. Drag a widget by its title bar, resize it from any edge or
+   corner; the others make room. The layout is kept per device (localStorage
+   quest-dash-v1); "Reset layout" brings back the default. The phone keeps the
+   single column. Grid engine: gridstack 10.3.1 from jsDelivr; if it fails to
+   load, the page stays a single column. ?nodash=1 turns it off. */
+(function () {
+  "use strict";
+  const MIN_W = 1100, KEY = "quest-dash-v1", ROWS = 16;
+  const mq = window.matchMedia(`(min-width: ${MIN_W}px)`);
+  if (!mq.matches || /[?&]nodash=1/.test(location.search)) {
+    mq.addEventListener && mq.addEventListener("change", (e) => { if (e.matches) location.reload(); });
+    return;
+  }
+  mq.addEventListener && mq.addEventListener("change", (e) => { if (!e.matches) location.reload(); });
+
+  // known parts of the page, by the ids quest.html draws into
+  const KNOWN = [
+    { id: "hud", title: "", pick: [".hud", ".status"] },
+    { id: "now", title: "Right now", pick: ["#brief", "#loose", "#main", "#nextLine"] },
+    { id: "quick", title: "Quick slots", pick: ["#questQuick"] },
+    { id: "habits", title: "", pick: ["#habits"] },
+  ];
+  const DEFAULT = {
+    hud: { x: 0, y: 0, w: 12, h: 2 },
+    now: { x: 0, y: 2, w: 4, h: 8 }, quick: { x: 0, y: 10, w: 4, h: 2 }, log: { x: 0, y: 12, w: 4, h: 4 },
+    mtn: { x: 4, y: 2, w: 5, h: 8 }, skills: { x: 4, y: 10, w: 5, h: 6 },
+    habits: { x: 9, y: 2, w: 3, h: 14 },
+  };
+  const load = (tag, attrs) => new Promise((ok, fail) => {
+    const el = document.createElement(tag);
+    Object.assign(el, attrs); el.onload = ok; el.onerror = fail;
+    document.head.appendChild(el);
+  });
+  const saved = () => { try { return JSON.parse(localStorage.getItem(KEY)) || {}; } catch { return {}; } };
+
+  // group #app's children into widgets: the known ones, then one per <h2> section
+  function groups(app) {
+    const kids = [...app.children], used = new Set(), out = [];
+    for (const k of KNOWN) {
+      const nodes = k.pick.map((sel) => app.querySelector(`:scope > ${sel}`)).filter(Boolean);
+      if (!nodes.length) continue;
+      nodes.forEach((n) => used.add(n));
+      out.push({ id: k.id, title: k.title, nodes, head: null });
+    }
+    let cur = null;
+    for (const n of kids) {
+      if (used.has(n)) { cur = null; continue; }
+      if (n.tagName === "H2") {
+        const body = n.nextElementSibling, bid = body && body.id;
+        const id = bid === "mtn" ? "mtn" : bid === "log" ? "log" : bid === "skillsRow" ? "skills" : "w-" + (bid || out.length);
+        cur = { id, title: n.textContent.trim(), nodes: [n], head: n };
+        out.push(cur);
+      } else if (cur) cur.nodes.push(n);
+      else out.push(cur = { id: "w-" + (n.id || out.length), title: "", nodes: [n], head: null });
+    }
+    return out;
+  }
+
+  async function build() {
+    await Promise.all([
+      load("link", { rel: "stylesheet", href: "https://cdn.jsdelivr.net/npm/gridstack@10.3.1/dist/gridstack.min.css" }),
+      load("script", { src: "https://cdn.jsdelivr.net/npm/gridstack@10.3.1/dist/gridstack-all.js" }),
+    ]);
+    const app = document.getElementById("app");
+    if (!app || !window.GridStack) return;
+    const css = document.createElement("style");
+    css.textContent = `
+      body.dash #app { max-width:none; padding:10px 12px 84px; }
+      body.dash .grid-stack-item-content { background:var(--glass); border:1px solid var(--glass-border); border-radius:18px;
+        padding:8px 14px 12px; overflow:auto; backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px); scrollbar-width:thin; }
+      body.dash .w-head { cursor:grab; user-select:none; -webkit-user-select:none; }
+      body.dash .w-head:active { cursor:grabbing; }
+      body.dash .w-grip { display:flex; justify-content:space-between; font-size:11px; letter-spacing:.12em; text-transform:uppercase;
+        color:var(--ink-faint); margin:0 -4px 6px; padding:2px 4px; }
+      body.dash .w-hud .w-grip { margin-bottom:2px; }
+      body.dash .grid-stack-item-content > h2.w-head { margin-top:2px; }
+      body.dash .w-now .card:first-of-type, body.dash .w-now > div > .card:first-child { margin-top:4px; }
+      body.dash .grid-stack-placeholder > .placeholder-content { background:rgba(255,255,255,.08); border:1px dashed rgba(255,255,255,.35); border-radius:18px; }
+      body.dash .ui-resizable-handle { opacity:0; transition:opacity .2s; } body.dash .grid-stack-item:hover .ui-resizable-handle { opacity:.6; }
+      .dash-reset { position:fixed; left:14px; bottom:14px; z-index:50; background:var(--glass); border:1px solid var(--glass-border);
+        color:var(--ink-soft); font-size:12px; padding:7px 12px; border-radius:999px; backdrop-filter:blur(10px); opacity:.35; transition:opacity .2s; }
+      .dash-reset:hover { opacity:1; }
+      body.dash .w-grip:has(> span:first-child:empty) { position:absolute; top:4px; right:10px; margin:0; z-index:2; }`;
+    document.head.appendChild(css);
+    const lay = saved(), grid = document.createElement("div");
+    grid.className = "grid-stack";
+    let nextY = ROWS;
+    for (const g of groups(app)) {
+      const pos = lay[g.id] || DEFAULT[g.id] || { x: 0, y: nextY, w: 4, h: 5 };
+      if (!lay[g.id] && !DEFAULT[g.id]) nextY += 5;
+      const item = document.createElement("div");
+      item.className = "grid-stack-item";
+      item.setAttribute("gs-id", g.id);
+      ["x", "y", "w", "h"].forEach((k) => item.setAttribute("gs-" + k, pos[k]));
+      const box = document.createElement("div");
+      box.className = "grid-stack-item-content w-" + g.id;
+      if (g.head) g.head.classList.add("w-head");
+      else {
+        const h = document.createElement("div");
+        h.className = "w-head w-grip";
+        h.innerHTML = `<span>${g.title}</span><span aria-hidden="true">⋮⋮</span>`;
+        box.appendChild(h);
+      }
+      g.nodes.forEach((n) => box.appendChild(n));
+      item.appendChild(box);
+      grid.appendChild(item);
+    }
+    app.appendChild(grid);
+    document.body.classList.add("dash");
+    const fit = () => Math.max(36, Math.floor((window.innerHeight - 24) / ROWS));
+    const gs = window.GridStack.init({ column: 12, cellHeight: fit(), margin: 6, handle: ".w-head", float: false, animate: true,
+      resizable: { handles: "e,se,s,sw,w" } }, grid);
+    gs.on("change", () => {
+      const out = {};
+      for (const n of gs.save(false)) out[n.id] = { x: n.x, y: n.y, w: n.w, h: n.h };
+      try { localStorage.setItem(KEY, JSON.stringify(out)); } catch {}
+    });
+    let rt = null;
+    window.addEventListener("resize", () => { clearTimeout(rt); rt = setTimeout(() => gs.cellHeight(fit()), 150); });
+    const reset = document.createElement("button");
+    reset.className = "dash-reset"; reset.textContent = "↺ Reset layout";
+    reset.onclick = () => { try { localStorage.removeItem(KEY); } catch {} location.reload(); };
+    document.body.appendChild(reset);
+  }
+  const go = () => build().catch((e) => console.warn("dashboard off:", e));
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", go); else go();
+})();
