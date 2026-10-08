@@ -819,14 +819,16 @@
   /* ---------- Steps side quest (Junyan, 2026-10-09, d165) ----------
      Oura's step count for today on its own card; at 8,000 a one-time prana boost,
      because walking gives him energy. Each device reads Oura itself; only the
-     "done" flag travels with the game. */
+     "done" flag travels with the game. Reads still-api /steps (public like
+     /sleep; the VPS passes it to the Cloudflare Worker that holds the Oura token). */
   const STEP_GOAL = 8000;
   let STEPS = null;
   const stepGain = () => Math.round(5 * gainMult());
   async function pullSteps(){
-    if (!questKey() || !G.day) return;
+    if (!G.day) return;
     try {
-      const j = await qfetch("/quest/activity");
+      const r = await fetch(API + "/steps", { cache:"no-store" }); if (!r.ok) return;
+      const j = await r.json();
       const d = (j.days || []).find(x => x.day === gameYmd());
       STEPS = d ? d.steps : 0;
       if (STEPS >= STEP_GOAL && !G.day.stepsDone && !DRY) {
