@@ -99,6 +99,11 @@
   .htile.full { background:linear-gradient(160deg, rgba(255,212,121,.30), rgba(255,212,121,.08)); border-color:rgba(255,212,121,.6); }
   .htile.full .hc { color:var(--gold); }
   .htile.auto { border-style:dashed; } .htile.auto b { color:var(--ink-faint); } .htile.earned { border-color:rgba(143,227,176,.7); }
+  .pa-btn { width:100%; display:flex; align-items:center; gap:12px; margin-top:12px; padding:14px 16px; border-radius:18px;
+    background:linear-gradient(135deg, rgba(255,212,121,.22), rgba(143,227,176,.14)); border:1px solid rgba(255,212,121,.45); text-align:left; }
+  .pa-btn:active { transform:scale(.98); }
+  .pa-i { font-size:24px; } .pa-t { flex:1; font-weight:700; font-size:16px; } .pa-t small { display:block; font-weight:400; font-size:12px; color:var(--ink-soft); margin-top:2px; }
+  .pa-go { font-size:24px; color:var(--gold); }
   .fx-layer { position:fixed; inset:0; pointer-events:none; z-index:200; overflow:hidden; }
   .fx-p { position:absolute; font-size:18px; will-change:transform, opacity; }
   .fx-p.spark { width:6px; height:6px; border-radius:50%; }
@@ -720,7 +725,9 @@
      250 ml cup a tap). [id, full label, prana, max a day, icon, tile label, flags, group].
      flags: "flat" = every tap gives the same, "auto" = the game counts it from the
      calendar and check-ins (evening ones pay out the next morning). Ids that existed
-     before keep their meaning except water, now 250 ml. */
+     before keep their meaning except water, now 250 ml. No movement here: training,
+     cardio, cold and walks take energy, and their calendar blocks spend it (Junyan,
+     2026-10-08: "training doesn't increase my prana"). */
   const HABITS = [
     ["daylight", "10 min outdoor light in the first hour awake, no sunglasses", 4, 1, "🌅", "10 min sun", "", "Morning"],
     ["water", "Water, one 250 ml cup", 0.6, 12, "💧", "250 ml water", "flat", "Morning"],
@@ -744,13 +751,6 @@
     ["ferment", "Fermented food: 100 g yogurt, kefir or sauerkraut", 2, 1, "🥛", "100 g ferment", "", "Food"],
     ["nosugar", "No added sugar or sweet drinks today", 3, 1, "🚫", "No added sugar", "", "Food"],
     ["noalcohol", "No alcohol today", 3, 1, "🍷", "No alcohol", "", "Food"],
-    ["move", "Training session, 45 min (counts itself from the gym check-in)", 5, 1, "🏋️", "Training 45'", "", "Move"],
-    ["zone2", "30 min zone 2 cardio (you can talk, not sing)", 4, 1, "🚴", "Zone 2 30'", "", "Move"],
-    ["walkmeal", "10 min walk within 30 min after a meal", 3, 3, "🚶", "Walk after meal", "", "Move"],
-    ["snack", "Movement snack: 20 squats or 2 min of stairs", 0.6, 6, "🦵", "20 squats", "flat", "Move"],
-    ["steps", "8,000 steps", 3, 1, "👟", "8k steps", "", "Move"],
-    ["mobility", "10 min mobility or stretching", 2, 1, "🤸", "Stretch 10'", "", "Move"],
-    ["cold", "2 min cold shower", 3, 1, "❄️", "Cold 2'", "", "Move"],
     ["nature", "15 min outside among trees, water or sky", 2, 1, "🌳", "Nature 15'", "", "Mind"],
     ["people", "15 min real talk with someone you love", 3, 1, "💬", "Real talk 15'", "", "Mind"],
     ["read", "20 pages of a book", 2, 1, "📖", "20 pages", "", "Mind"],
@@ -778,6 +778,32 @@
     addPrana(g, h[1], h[1].toLowerCase());
     if (!quiet) render();
   }
+  /* ---------- Prana actions: the habit tiles ---------- */
+  function habitsHTML(){
+    const tile = ([id, full, , max, icon, short, flag]) => {
+      const n = G.day.habits[id] || 0, g = habitGain(id), auto = flag === "auto", earned = auto && (G.day.earn || {})[id];
+      const cls = ["htile", !auto && !g ? "full" : "", auto ? "auto" : "", earned || (auto && n) ? "earned" : "", id === "water" ? "water" : ""].filter(Boolean).join(" ");
+      const cnt = id === "water" ? `<span class="hc">${n ? `${n * 250} ml` : ""}</span>` : max > 1 && n ? `<span class="hc">${n}/${max}</span>` : n ? `<span class="hc">✓</span>` : "";
+      const fill = max > 1 && n ? `<i class="glass" style="height:${Math.round(n / max * 100)}%"></i>` : "";
+      const tg = auto ? (n ? "✓ last night" : earned ? "✓ tonight" : "auto") : g ? `+${g}` : "";
+      return `<button class="${cls}" data-habit="${id}" title="${esc(full)}">${fill}<span class="hi">${icon}</span><span class="hl">${esc(short)}</span>${cnt}<b>${tg}</b></button>`;
+    };
+    const hDone = HABITS.filter(h => (G.day.habits[h[0]] || 0) > 0).length;
+    return `<div class="hhead"><span class="eyebrow">Prana actions · level ${lvl()} · ${hDone}/${HABITS.length}</span>` +
+      `<button class="hsnd" data-hsnd aria-label="Tap sounds">${window.QuestFx && QuestFx.soundOn() ? "🔊" : "🔇"}</button></div>` +
+      ["Morning", "Practice", "Food", "Mind", "Evening"].map(gr => `<div class="hgrp"><div class="hgl">${gr}</div><div class="hgrid">${HABITS.filter(h => h[7] === gr).map(tile).join("")}</div></div>`).join("");
+  }
+  function bindHabits(root){
+    root.querySelectorAll("[data-habit]").forEach(bn => bn.onclick = () => tapHabit(bn));
+    root.querySelectorAll("[data-hsnd]").forEach(bn => bn.onclick = () => { QuestFx.setSound(!QuestFx.soundOn()); refreshActions(); render(); });
+  }
+  const actionsOpen = () => $("sheet").classList.contains("open") && $("paBody");
+  function refreshActions(){ if (actionsOpen()) { $("paBody").innerHTML = habitsHTML(); bindHabits($("paBody")); } }
+  function openActions(){
+    openSheet(`<div id="paBody">${habitsHTML()}</div><div class="actions"><button class="btn ghost" id="paClose">Done</button></div>`, true);
+    bindHabits($("paBody"));
+    $("paClose").onclick = closeSheet;
+  }
   // a habit tile tapped: count it, burst, sound, then the springy redraw
   const HCOL = { Morning:"#ffd479", Practice:"#c9a7ff", Food:"#8fe3b0", Move:"#7fd0ff", Mind:"#ffb3c7", Evening:"#a7b4ff" };
   function tapHabit(bn){
@@ -791,8 +817,8 @@
     const full = G.day.habits[id] >= h[3];
     addPrana(g, h[1].replace(/ \(.*$/, ""), h[5], !!fx);
     if (fx) fx.tap(rect, { icon:h[4], gain:g, full, water:id === "water", color:HCOL[h[7]] });
-    render();
-    if (fx) fx.pop($("habits").querySelector(`[data-habit="${id}"]`));
+    render(); refreshActions();
+    if (fx) fx.pop((actionsOpen() ? $("paBody") : $("habits")).querySelector(`[data-habit="${id}"]`));
   }
   // a new day: keep the carry, check the level, wait for sleep to refill
   function rollDay(){
@@ -1016,11 +1042,10 @@
     const k = gk(b); G.day.spent = G.day.spent || {};
     if (G.day.spent[k]) return;
     const r = energy(b).rate; G.day.spent[k] = true;
-    if (!r) { if (isGym(b) || b.kind === "body") logHabit("move", true); return saveG(); }
+    if (!r) return saveG();
     const from = new Date((G.day.started || {})[k] || b.s), to = new Date(Math.min(+now(), +b.e));
     const hrs = Math.max(0, (to - from) / 3600000);
     const d = Math.round(r * hrs * spendMult());
-    if (isGym(b) || b.kind === "body") logHabit("move", true);
     if (d) addPrana(-d, `${shortName(b)} used ${d} (${fmtHM(Math.round(hrs * 60))})`, ""); else saveG();
   }
   function skip(b){
@@ -2163,20 +2188,13 @@
       if (G.day.checks[gk(slp)] === "in") e2.bedtime = 1;
       if (JSON.stringify(e2) !== JSON.stringify(was)) { G.day.earn = e2; saveG(); }
     }
-    const tile = ([id, full, , max, icon, short, flag]) => {
-      const n = G.day.habits[id] || 0, g = habitGain(id), auto = flag === "auto", earned = auto && (G.day.earn || {})[id];
-      const cls = ["htile", !auto && !g ? "full" : "", auto ? "auto" : "", earned || (auto && n) ? "earned" : "", id === "water" ? "water" : ""].filter(Boolean).join(" ");
-      const cnt = id === "water" ? `<span class="hc">${n ? `${n * 250} ml` : ""}</span>` : max > 1 && n ? `<span class="hc">${n}/${max}</span>` : n ? `<span class="hc">✓</span>` : "";
-      const fill = max > 1 && n ? `<i class="glass" style="height:${Math.round(n / max * 100)}%"></i>` : "";
-      const tg = auto ? (n ? "✓ last night" : earned ? "✓ tonight" : "auto") : g ? `+${g}` : "";
-      return `<button class="${cls}" data-habit="${id}" title="${esc(full)}">${fill}<span class="hi">${icon}</span><span class="hl">${esc(short)}</span>${cnt}<b>${tg}</b></button>`;
-    };
+    // the phone shows one button that opens them; the desktop dashboard shows the tiles (2026-10-08)
     const hDone = HABITS.filter(h => (G.day.habits[h[0]] || 0) > 0).length;
-    put("habits", PLAN ? `<div class="hhead"><span class="eyebrow">Healthy habits · level ${lvl()} · ${hDone}/${HABITS.length}</span>` +
-      `<button class="hsnd" id="hSnd" aria-label="Tap sounds">${window.QuestFx && QuestFx.soundOn() ? "🔊" : "🔇"}</button></div>` +
-      ["Morning", "Practice", "Food", "Move", "Mind", "Evening"].map(gr => `<div class="hgrp"><div class="hgl">${gr}</div><div class="hgrid">${HABITS.filter(h => h[7] === gr).map(tile).join("")}</div></div>`).join("") : "");
-    $("habits").querySelectorAll("[data-habit]").forEach(bn => bn.onclick = () => tapHabit(bn));
-    if ($("hSnd")) $("hSnd").onclick = () => { QuestFx.setSound(!QuestFx.soundOn()); render(); };
+    if (document.body.classList.contains("dash")) { put("habits", PLAN ? habitsHTML() : ""); bindHabits($("habits")); }
+    else {
+      put("habits", PLAN ? `<button class="pa-btn" id="paBtn"><span class="pa-i">✨</span><span class="pa-t">Prana actions<small>${hDone ? `${hDone} done today · ` : ""}things that fill you up</small></span><span class="pa-go">›</span></button>` : "");
+      if ($("paBtn")) $("paBtn").onclick = openActions;
+    }
     $("brief").querySelectorAll("[data-now]").forEach(bn => bn.onclick = () => { G.day.lowAt = now().toISOString(); const [n, m] = bn.dataset.now.split("|"); startNow(n, +m); });
     if (low && !G.day.lotusGiven) { G.day.lotusGiven = true; giveItem("lotus", "Your energy is low today."); }
     if ($("bLowOk")) $("bLowOk").onclick = () => { G.day.lowAt = now().toISOString(); saveG(); render(); };
