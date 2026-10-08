@@ -75,6 +75,9 @@
   .pline { width:100%; height:80px; margin-top:10px; } .pline path { fill:none; stroke:var(--gold); stroke-width:2.5; stroke-linejoin:round; }
   .pline .p70 { stroke:rgba(255,255,255,.25); stroke-dasharray:4 4; }
   .brief li { margin:4px 0; } .brief ul { margin:8px 0 0; padding-left:18px; color:var(--ink-soft); font-size:14px; }
+  .habits { display:flex; flex-wrap:wrap; gap:8px; margin:10px 0 6px; }
+  .habit { display:flex; align-items:center; gap:6px; padding:8px 12px; border-radius:999px; background:var(--glass); font-size:14px; color:var(--ink); }
+  .habit b { color:var(--gold); font-weight:600; font-size:13px; } .habit.full { opacity:.45; } .habit .n { color:#8fe3b0; font-size:12px; }
   .warnline { margin-top:10px; font-size:13px; color:#ffcf8a; }
   .gear { flex:none; width:36px; height:36px; border-radius:50%; background:var(--glass); font-size:17px; }
   .gear.warn { box-shadow:0 0 0 2px var(--warn); }
@@ -322,6 +325,7 @@
   <div id="main"></div>
   <div id="nextLine"></div>
   <div id="questQuick" style="margin:10px 0 4px"></div>
+  <div id="habits"></div>
 
   <h2><span>Today's mountain <span id="trailMeta" style="font-weight:400;color:var(--ink-faint)"></span></span><button class="add-btn" id="addBtn">＋ Add</button></h2>
   <div id="mtn"></div>
@@ -399,7 +403,7 @@
   let G = { xp:0, bestCombo:0, day:null };
   try { const d = JSON.parse(localStorage.getItem(GKEY)); if (d) G = { ...G, ...d }; } catch {}
   function freshDay(){ return { date:dayKey(), since:now().toISOString(), prana:null, pl:[], caches:{}, missed:{}, xp:0, checks:{}, closes:{}, zaps:[], zap:null, side:null, log:[] }; }
-  if (!G.day) G.day = freshDay();   // a stale day is replaced once the plan says which day it is
+  if (!G.day) G.day = freshDay();   // a stale day is rolled over once the plan says which day it is
   /* XP lives on this device AND on the server (still-api quest:state), so it
      survives a cleared browser and is the same on phone and Mac. Newest wins. */
   let syncTimer = null, syncErr = null;
@@ -419,7 +423,7 @@
       if (srv && typeof srv.xp === "number" && (srv.ts || 0) > (G.ts || 0)) {
         G = { ...G, ...srv };
         if (hasBag()) setTimeout(() => { try { Bag.render(); } catch {} }, 0);
-        if (!G.day || G.day.date !== dayKey()) G.day = freshDay();
+        if (!G.day || G.day.date !== dayKey()) rollDay();
         try { localStorage.setItem(GKEY, JSON.stringify(G)); } catch {}
       } else if ((G.ts || 0) > (srv.ts || 0)) saveG();   // this device is newer: push it up
     } catch (e) { syncErr = e.message; }
@@ -629,16 +633,66 @@
      missed block costs nothing: the app asks what he needs instead. */
   const RECOVER = [["Isha Kriya", 12], ["Upa Yoga", 20], ["NSDR", 20]];
   const isRecovery = b => /isha kriya|upa yoga|nsdr|yoga nidra|\bnap\b|recover/i.test(b.t);
-  function energy(b){                                  // { up: one-time fill at start, rate: spent per hour while it runs }
-    if (isSadhana(b)) return { up:20, rate:0 };
-    if (isRecovery(b)) return { up:12, rate:0 };
-    if (isMeal(b)) return { up:8, rate:0 };
-    if (isSleep(b) || b.kind === "open" || b.kind === "break") return { up:0, rate:0 };
-    if (isGym(b) || b.kind === "body" || b.kind === "dance") return { up:0, rate:6 };
+  function energy(b){                                  // { rate: spent per hour while it runs }
+    if (isSadhana(b) || isRecovery(b) || isMeal(b) || isSleep(b) || b.kind === "open" || b.kind === "break") return { rate:0 };
+    if (isGym(b) || b.kind === "body" || b.kind === "dance") return { rate:6 };
     const g = groupOf(b);
-    return { up:0, rate: g === "major" ? 6 : g === "travel" ? 5 : g === "work" ? 4 : 3 };
+    // sitting on a bus or plane costs less than work; a tour is fun but still effort (d129)
+    return { rate: g === "work" ? 5 : g === "major" ? 4 : g === "travel" ? 2 : 3 };
   }
-  const energyTag = b => { const e = energy(b); return e.up ? `fills +${e.up}` : e.rate ? `uses about ${e.rate} an hour` : ""; };
+  /* ---------- Prana v2 (Junyan, 2026-10-08, d129) ----------
+     It carries over: today starts where yesterday ended, plus what sleep gave
+     back (Oura sleep score, or the hours he slept). Activities spend it.
+     Healthy habits he ticks fill it, with smaller returns for repeats. Ten
+     levels: level 1 fills easily and spends gently; each level fills less and
+     spends more. Mostly ending days high moves him up; mostly low moves him down. */
+  const HABITS = [
+    ["shambhavi", "Shambhavi", 18, 1], ["kriya", "Isha Kriya or Upa Yoga", 8, 2], ["blueprint", "Blueprint meal", 6, 3],
+    ["water", "Water 500 ml", 2, 6], ["daylight", "Morning daylight", 4, 1], ["move", "Training or a walk", 5, 2],
+    ["early", "Last meal 3 hr before bed", 5, 1], ["screens", "No screens last hour", 5, 1],
+  ];
+  const DIM = [1, .7, .5, .35, .25, .2];
+  const lvl = () => (G.pr && G.pr.level) || 1;
+  const gainMult = () => 1.5 - (lvl() - 1) * 0.1;      // level 1: x1.5 ... level 10: x0.6
+  const spendMult = () => 0.8 + (lvl() - 1) * 0.06;    // level 1: x0.8 ... level 10: x1.34
+  function habitGain(id){
+    const h = HABITS.find(x => x[0] === id); if (!h) return 0;
+    const n = (G.day.habits || {})[id] || 0;
+    return n >= h[3] ? 0 : Math.max(1, Math.round(h[2] * DIM[n] * gainMult()));
+  }
+  function logHabit(id, quiet){
+    const h = HABITS.find(x => x[0] === id); if (!h) return;
+    G.day.habits = G.day.habits || {};
+    const g = habitGain(id);
+    if (!g) { if (!quiet) floatXp(0, `${h[1]}: done for today`); return; }
+    G.day.habits[id] = (G.day.habits[id] || 0) + 1;
+    addPrana(g, h[1], h[1].toLowerCase());
+    if (!quiet) render();
+  }
+  // a new day: keep the carry, check the level, wait for sleep to refill
+  function rollDay(){
+    const prev = G.day;
+    G.pr = G.pr || { level:1, ends:[], changedAt:null };
+    if (prev && prev.date && prev.prana != null && !G.pr.ends.some(e => e.d === prev.date)) {
+      G.pr.ends.push({ d:prev.date, p:Math.round(prev.prana) }); G.pr.ends = G.pr.ends.slice(-30);
+    }
+    const carry = prev && prev.prana != null ? Math.round(prev.prana) : (G.pr.ends.length ? G.pr.ends[G.pr.ends.length - 1].p : 60);
+    const last = G.pr.ends.slice(-7), since = G.pr.changedAt ? (+now() - +new Date(G.pr.changedAt)) / 86400000 : 99;
+    if (last.length >= 5 && since >= 7) {
+      if (last.filter(e => e.p >= 80).length >= 5 && G.pr.level < 10) { G.pr.level++; G.pr.changedAt = now().toISOString(); setTimeout(() => banner("🌄", `LEVEL ${G.pr.level}`, "It got easy, so it asks a little more now."), 800); }
+      else if (last.filter(e => e.p <= 25).length >= 4 && G.pr.level > 1) { G.pr.level--; G.pr.changedAt = now().toISOString(); setTimeout(() => banner("🌱", `LEVEL ${G.pr.level}`, "It got heavy, so it's gentler now."), 800); }
+    }
+    G.day = freshDay();
+    G.day.prana = carry; G.day.carry = carry; G.day.pl = [[now().toISOString(), carry]];
+    saveG();
+  }
+  function refillSleep(points, why){
+    if (G.day.slept) return;
+    G.day.slept = true;
+    addPrana(points, why, "sleep");
+    render();
+  }
+  const energyTag = b => { if (isSadhana(b)) return `fills +${habitGain("shambhavi")}`; const r = energy(b).rate; return r ? `uses about ${Math.round(r * spendMult())} an hour` : ""; };
   const onTimeMin = b => isSleep(b) ? 30 : ON_TIME_MIN;   // bedtime counts within 30 min (Blueprint: same time nightly)
   const SIDE_P = 5;
   const prana = () => G.day.prana ?? 60;
@@ -646,7 +700,7 @@
     d = Math.round(d);
     G.day.prana = Math.max(0, Math.min(100, prana() + d));
     (G.day.pl = G.day.pl || []).push([now().toISOString(), G.day.prana]);
-    (G.days = G.days || {})[G.day.date] = { place:placeNow(), prana:G.day.prana };
+    (G.days = G.days || {})[G.day.date] = { place:placeNow(), prana:G.day.prana, level:lvl() };
     log(msg, d); if (d) floatXp(d, label || "");
     saveG();
   }
@@ -667,15 +721,13 @@
   }
   // last night's Oura sleep score sets where the day starts (d79)
   async function seedFromOura(){
-    if (!G.day || G.day.ouraTried || (G.day.pl || []).length > 1) return;
+    if (!G.day || G.day.ouraTried || G.day.slept) return;
     G.day.ouraTried = true;
     try {
       const r = await fetch(API + "/sleep", { cache:"no-store" }); if (!r.ok) return;
       const j = await r.json();
       if (j.day === gameYmd() && typeof j.score === "number") {
-        const start = Math.round(40 + j.score * 0.4);
-        G.day.prana = start; G.day.pl = [[now().toISOString(), start]];
-        log(`Slept ${j.score} (Oura): prana starts at ${start}%`); render();
+        refillSleep(Math.round(j.score * 0.6), `Slept ${j.score} (Oura)`);
       }
     } catch {}
   }
@@ -817,9 +869,9 @@
     const all = blocks(), late = (now() - b.s) / 60000 > onTimeMin(b);
     G.day.checks[gk(b)] = late ? "late" : "in";
     G.day.started = G.day.started || {}; G.day.started[gk(b)] = now().toISOString();
-    let { up } = energy(b), why = `Started ${shortName(b)}`;
-    if (isSadhana(b) && emptyStomach(now(), all)) { up += 5; why += " on an empty stomach"; }
-    if (up) addPrana(up, why, "filled"); else { log(why); saveG(); }
+    log(`Started ${shortName(b)}`); saveG();
+    if (isSadhana(b)) logHabit("shambhavi", true);
+    if (isRecovery(b)) logHabit("kriya", true);
     // the bag hands out tools at real moments
     if (isSadhana(b)) giveItem("breath", "After Shambhavi.");
     if (isMeal(b)) giveItem("water", `At ${shortName(b)}.`);
@@ -833,10 +885,11 @@
     const k = gk(b); G.day.spent = G.day.spent || {};
     if (G.day.spent[k]) return;
     const r = energy(b).rate; G.day.spent[k] = true;
-    if (!r) return saveG();
+    if (!r) { if (isGym(b) || b.kind === "body") logHabit("move", true); return saveG(); }
     const from = new Date((G.day.started || {})[k] || b.s), to = new Date(Math.min(+now(), +b.e));
     const hrs = Math.max(0, (to - from) / 3600000);
-    const d = Math.round(r * hrs);
+    const d = Math.round(r * hrs * spendMult());
+    if (isGym(b) || b.kind === "body") logHabit("move", true);
     if (d) addPrana(-d, `${shortName(b)} used ${d} (${fmtHM(Math.round(hrs * 60))})`, ""); else saveG();
   }
   function skip(b){
@@ -875,8 +928,8 @@
     G.day.missed = G.day.missed || {};
     if (G.day.missed[gk(b)]) return;
     G.day.missed[gk(b)] = happened ? "yes" : "no";
-    if (happened) { G.day.checks[gk(b)] = "late"; G.day.closes[gk(b)] = "done"; const u = energy(b).up;
-      if (u) addPrana(u, `Did it, forgot to tap: ${shortName(b)}`, "logged"); else { log(`Did it, forgot to tap: ${shortName(b)}`); saveG(); } spend(b); }
+    if (happened) { G.day.checks[gk(b)] = "late"; G.day.closes[gk(b)] = "done"; log(`Did it, forgot to tap: ${shortName(b)}`); saveG();
+      if (isSadhana(b)) logHabit("shambhavi", true); spend(b); }
     else { G.day.checks[gk(b)] = "skip"; G.day.closes[gk(b)] = "missed"; log(`Didn't happen: ${shortName(b)}`); saveG(); }
     if (!quiet) render();
   }
@@ -1075,6 +1128,7 @@
       <div class="actions">${!st && (running || b.s - t < 30 * 60000) ? `<button class="btn primary" id="mIn">${startLabel(b)}</button>` : ""}
         ${started && !closed ? `<button class="btn primary" id="mDone">Done eating</button>` : ""}
         ${closed ? `<span class="quest-time">Closed. ${M.plate.protein && M.plate.veg && M.plate.water ? "Full plate." : ""}</span>` : ""}</div>
+      <div class="actions"><button class="btn" id="mBp">🥗 Blueprint meal${habitGain("blueprint") ? ` +${habitGain("blueprint")}` : " (done)"}</button></div>
       <div class="actions"><button class="btn ghost" id="mEdit">Change time or name</button>${!st ? `<button class="btn ghost" id="mSkip">Not today</button>` : ""}</div>`, true);
     $("sheet").querySelectorAll("[data-plate]").forEach(bn => bn.onclick = () => {
       M.plate[bn.dataset.plate] = !M.plate[bn.dataset.plate];
@@ -1087,6 +1141,7 @@
       closeOut(b, "done"); closeSheet();
     };
     $("mEdit").onclick = () => openEdit(b);
+    $("mBp").onclick = () => { logHabit("blueprint"); openMeal(b); };
     if ($("mSkip")) $("mSkip").onclick = () => { skip(b); closeSheet(); };
   }
 
@@ -1466,9 +1521,9 @@
     save: () => saveG(),
     openBag: () => openBag(),
     actions: {
-      water: async () => { G.day.water = (G.day.water || 0) + 500; addPrana(2, "Drank 500 ml", "water"); render();
+      water: async () => { G.day.water = (G.day.water || 0) + 500; logHabit("water");
         return `500 ml logged. ${G.day.water.toLocaleString()} ml today.`; },
-      breath: async (item, o = {}) => { if (o.completed) { addPrana(4, "Breath reset", "breath"); render(); return "Reset done. Carry it into the next thing."; } return "Stopped early. That still counts as a pause."; },
+      breath: async (item, o = {}) => { if (o.completed) { addPrana(Math.round(3 * gainMult()), "Breath reset", "breath"); render(); return "Reset done. Carry it into the next thing."; } return "Stopped early. That still counts as a pause."; },
       buffer: async () => { const n = nextFixed(); if (!n) return "Nothing fixed is coming up.";
         await shiftFrom(n.key, 15); return `${shortName(n)} moved 15 min later. Breathe.`; },
       map: async () => { const n = nextFixed(); if (!n) return "Nothing left to replan today.";
@@ -1607,19 +1662,21 @@
   function ensureDay(){
     const d = G.day;
     d.caches = d.caches || {}; d.missed = d.missed || {};
-    if (d.prana == null) { d.prana = 60; d.pranaSince = now().toISOString(); d.pl = [[now().toISOString(), 60]]; }
+    G.pr = G.pr || { level:1, ends:[], changedAt:null };
+    if (d.prana == null) { const c = G.pr.ends.length ? G.pr.ends[G.pr.ends.length - 1].p : 60; d.prana = c; d.carry = c; d.pranaSince = now().toISOString(); d.pl = [[now().toISOString(), c]]; }
+    d.habits = d.habits || {};
     if (!d.pranaSince) d.pranaSince = d.since || now().toISOString();
     if (G.mode !== "prana") { G.mode = "prana"; delete G.summits; delete G.ropes; delete G.souvenirs; }
   }
   function render(){
-    if (PLAN && G.day.date !== dayKey()) G.day = freshDay();
+    if (PLAN && G.day.date !== dayKey()) rollDay();
     ensureDay();
     const t = now(), all = blocks();
     const cur = currentOf(all, t), nxt = nextOf(all, t);
 
     // HUD
     const P = Math.round(prana());
-    $("peakName").textContent = "Prana";
+    $("peakName").textContent = `Prana · Lv ${lvl()}`;
     $("altTxt").textContent = `${P}%`;
     $("xpBar").style.width = `${P}%`;
     $("xpBar").className = P < 40 ? "low" : P < 70 ? "mid" : "";
@@ -1687,7 +1744,16 @@
       <div class="q">You've given a lot today. Want to refill before what's next?</div>
       <div class="actions" style="flex-wrap:wrap">${RECOVER.map(([n, m]) => `<button class="btn" data-now="${n}|${m}">${n} · ${m} min</button>`).join("")}
       <button class="btn ghost" id="bLowOk">I'm OK</button></div></div>`;
+    // no Oura yet: ask how long he slept, once each morning
+    if (!bh && PLAN && !z && !G.day.slept && hourNow >= 4 && hourNow < 13) bh = `<div class="card brief"><div class="eyebrow">Good morning</div>
+      <div class="q">How long did you sleep? Sleep refills your prana (you're at ${Math.round(prana())}%).</div>
+      <div class="actions" style="flex-wrap:wrap">${[5, 6, 7, 8, 9].map(h => `<button class="btn" data-slept="${h}">${h} h</button>`).join("")}</div></div>`;
     put("brief", bh);
+    $("brief").querySelectorAll("[data-slept]").forEach(bn => bn.onclick = () => refillSleep(+bn.dataset.slept * 7, `Slept ${bn.dataset.slept} h`));
+    put("habits", PLAN ? `<div class="eyebrow" style="margin-top:6px">Healthy habits · level ${lvl()}</div><div class="habits">${HABITS.map(([id, label, , max]) => {
+      const n = G.day.habits[id] || 0, g = habitGain(id);
+      return `<button class="habit${g ? "" : " full"}" data-habit="${id}">${label}${n ? ` <span class="n">${max > 1 ? `${n}/${max}` : "✓"}</span>` : ""}${g ? ` <b>+${g}</b>` : ""}</button>`; }).join("")}</div>` : "");
+    $("habits").querySelectorAll("[data-habit]").forEach(bn => bn.onclick = () => logHabit(bn.dataset.habit));
     $("brief").querySelectorAll("[data-now]").forEach(bn => bn.onclick = () => { G.day.lowAt = now().toISOString(); const [n, m] = bn.dataset.now.split("|"); startNow(n, +m); });
     if (low && !G.day.lotusGiven) { G.day.lotusGiven = true; giveItem("lotus", "Your energy is low today."); }
     if ($("bLowOk")) $("bLowOk").onclick = () => { G.day.lowAt = now().toISOString(); saveG(); render(); };
