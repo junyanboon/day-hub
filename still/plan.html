@@ -19,7 +19,10 @@
   The look and the stop rules (symbols, colour groups, short names) come from
   quest-core.js, copied from quest.html.
 
-  URL switches: ?api=URL (another still-api), ?dry=1 (never write).
+  URL switches: ?api=URL (another still-api), ?dry=1 (never write), ?embed=1 (inside
+  Day Quest's "Bend time" overlay, 2026-10-08: opens on the day, no side panel or
+  pairing chrome; on a touchscreen, swipe scrolls, tap an event to edit it, tap an
+  empty slot to add one, drag an event's bottom edge to resize).
 -->
 <style>
   :root {
@@ -164,6 +167,13 @@
 
   @media (max-width: 1180px) { :root { --side: 270px; } .top h1 { min-width:0; font-size:16px; } }
   @media (max-width: 900px) { #app { grid-template-columns: 1fr; } .side { display:none; } }
+  @media (max-width: 640px) {
+    .panel { left:8px; right:8px; width:auto; top:auto; bottom:8px; max-height:82vh; }
+    .top { flex-wrap:wrap; gap:6px; padding:8px 10px; } .top h1 { font-size:15px; }
+  }
+  body.embed .side, body.embed #cals, body.embed #tzl, body.embed #bGear { display:none !important; }
+  body.embed #app { grid-template-columns:1fr; }
+  .ev .rz { touch-action:none; } @media (pointer:coarse) { .ev .rz { height:14px; } }
 </style>
 </head>
 <body>
@@ -198,6 +208,8 @@
   const Q = window.QuestCore;
   const qs = new URLSearchParams(location.search);
   const API = qs.get("api") || "https://still.srv1948070.hstgr.cloud";
+  const EMBED = qs.get("embed") === "1";
+  if (EMBED) document.body.classList.add("embed");
   const DRY = qs.get("dry") === "1";
   const $ = (id) => document.getElementById(id);
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c]));
@@ -241,7 +253,7 @@
 
   /* ---------- state ---------- */
   const S = {
-    view: store.get("planner-view") || "week",
+    view: EMBED ? "day" : store.get("planner-view") || "week",
     anchor: null,
     cals: [],
     hidden: new Set(JSON.parse(store.get("planner-hidden") || "[]")),
@@ -497,16 +509,24 @@
       deco(e);
       drag = { kind: ev.target.classList.contains("rz") ? "resize" : "move", e, card, col, x0: ev.clientX, y0: ev.clientY,
         grab: minuteAt(col, ev.clientY) - minOfDay(e.s) - (keyOf(e.s) === col.dataset.day ? 0 : 0), started: false, ro: !writable(e) };
-      ev.preventDefault();
+      if (ev.pointerType !== "touch" || drag.kind === "resize") ev.preventDefault();
     } else if (col && !ev.target.closest(".draft") && questKey()) {
       closeDraft();
       const m0 = Math.floor(minuteAt(col, ev.clientY - SNAP * PXM / 2) / SNAP) * SNAP;
-      drag = { kind: "create", col, m0, m1: m0 + 30, x0: ev.clientX, y0: ev.clientY, started: false };
-      ev.preventDefault();
+      drag = { kind: "create", col, m0, m1: m0 + 30, x0: ev.clientX, y0: ev.clientY, started: false, touch: ev.pointerType === "touch" };
+      if (!drag.touch) ev.preventDefault();
     }
+  });
+  // the browser took the gesture for scrolling (touch): forget the drag
+  document.addEventListener("pointercancel", () => {
+    if (!drag) return;
+    document.querySelector(".ev.ghost")?.remove();
+    if (drag.card) drag.card.classList.remove("dim");
+    drag = null;
   });
   document.addEventListener("pointermove", (ev) => {
     if (!drag) return;
+    if (drag.touch && drag.kind === "create") return;   // a finger on an empty slot scrolls; a tap adds
     if (!drag.started && Math.hypot(ev.clientX - drag.x0, ev.clientY - drag.y0) < 4) return;
     if (drag.ro) return;
     drag.started = true;
@@ -638,7 +658,7 @@
     else { const [y, m] = S.anchor.split("-").map(Number); const d = new Date(Date.UTC(y, m - 1 + n, 1)); S.anchor = d.toISOString().slice(0, 10); }
     go();
   }
-  function setView(v){ S.view = v; store.set("planner-view", v); renderGrid.kept = false; go(); }
+  function setView(v){ S.view = v; if (!EMBED) store.set("planner-view", v); renderGrid.kept = false; go(); }
   function go(){ closeDraft(); render(); loadEvents(); }
 
   /* ---------- edit panel ---------- */

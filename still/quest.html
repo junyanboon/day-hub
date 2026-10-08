@@ -99,6 +99,13 @@
   .htile.full { background:linear-gradient(160deg, rgba(255,212,121,.30), rgba(255,212,121,.08)); border-color:rgba(255,212,121,.6); }
   .htile.full .hc { color:var(--gold); }
   .htile.auto { border-style:dashed; } .htile.auto b { color:var(--ink-faint); } .htile.earned { border-color:rgba(143,227,176,.7); }
+  .calx { position:fixed; inset:0; z-index:60; display:flex; flex-direction:column; background:#191d3c;
+    transform:translateY(100%); transition:transform .25s cubic-bezier(.2,.8,.2,1); padding-top:env(safe-area-inset-top); }
+  .calx.open { transform:none; }
+  .calx-top { display:flex; justify-content:space-between; align-items:center; padding:10px 14px; font-size:17px; }
+  .calx-top .btn { flex:none; padding:8px 16px; }
+  .calx iframe { flex:1; width:100%; border:0; background:#191d3c; }
+  .calx-zap { margin:8px 14px calc(env(safe-area-inset-bottom) + 10px); padding:10px; border-radius:14px; background:var(--glass); color:var(--ink-soft); font-size:13px; }
   .pa-btn { width:100%; display:flex; align-items:center; gap:12px; margin-top:12px; padding:14px 16px; border-radius:18px;
     background:linear-gradient(135deg, rgba(255,212,121,.22), rgba(143,227,176,.14)); border:1px solid rgba(255,212,121,.45); text-align:left; }
   .pa-btn:active { transform:scale(.98); }
@@ -777,6 +784,28 @@
     addPrana(g, h[1], h[1].toLowerCase());
     if (!quiet) render();
   }
+  /* ---------- Bend time: the calendar, full screen, to change the day now ----------
+     The desktop planner (plan.html?embed=1, same pairing) in a frame: tap an event
+     to change its time, name or calendar, tap an empty slot to add one. Closing it
+     pulls the plan again so the mountain shows the change. The old "Something came
+     up" interruption log stays one tap away at the bottom. */
+  function openCal(){
+    if ($("calx")) return;
+    const q = new URLSearchParams({ embed:"1" });
+    if (DRY) q.set("dry", "1");
+    if (qs.get("api")) q.set("api", qs.get("api"));
+    const el = document.createElement("div");
+    el.id = "calx"; el.className = "calx";
+    el.innerHTML = `<div class="calx-top"><b>🪄 Bend time</b><button class="btn" id="calxDone">Done</button></div>
+      <iframe src="plan.html?${q}" title="Calendar"></iframe>
+      <button class="calx-zap" id="calxZap">⚡ Log an interruption instead</button>`;
+    document.body.appendChild(el);
+    requestAnimationFrame(() => el.classList.add("open"));
+    const close = () => { el.classList.remove("open"); setTimeout(() => el.remove(), 250); pullAll(); };
+    $("calxDone").onclick = close;
+    $("calxZap").onclick = () => { close(); setTimeout(openZapSheet, 260); };
+  }
+
   /* ---------- Prana actions: the habit tiles ---------- */
   function habitsHTML(){
     const tile = ([id, full, , max, icon, short, flag]) => {
@@ -2300,9 +2329,10 @@
     put("nextLine", cur && nxt && !z ? `<div class="next"><span>Next: <b>${esc(shortName(nxt))}</b></span><span>${fmtT(nxt.s)}</span></div>` : "");
 
     // zap button
-    $("zap").textContent = z ? "↩︎ Back to the quest" : "⚡ Something came up";
+    // the big button opens the calendar to change the day right there (Junyan, 2026-10-08, d163)
+    $("zap").textContent = z ? "↩︎ Back to the quest" : "🪄 Bend time";
     $("zap").classList.toggle("back", !!z);
-    $("zap").onclick = z ? endZap : openZapSheet;
+    $("zap").onclick = z ? endZap : openCal;
 
     // the mountain: today's stops, climbing from the morning to camp
     const stops = stopsOf(all);
