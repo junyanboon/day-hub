@@ -106,6 +106,12 @@
   .calx-top .btn { flex:none; padding:8px 16px; }
   .calx iframe { flex:1; width:100%; border:0; background:#191d3c; }
   .calx-zap { margin:8px 14px calc(env(safe-area-inset-bottom) + 10px); padding:10px; border-radius:14px; background:var(--glass); color:var(--ink-soft); font-size:13px; }
+  .sq { display:flex; gap:12px; align-items:center; margin-top:12px; padding:12px 14px; border-radius:16px; background:var(--glass); border:1px solid var(--glass-border); }
+  .sq.done { border-color:rgba(143,227,176,.65); background:linear-gradient(135deg, rgba(143,227,176,.18), rgba(127,208,255,.10)); }
+  .sq-i { font-size:22px; } .sq-t { flex:1; font-weight:600; font-size:14px; }
+  .sq-t small { display:block; font-weight:400; font-size:12px; color:var(--ink-soft); margin-top:2px; }
+  .sq-bar { display:block; height:6px; border-radius:4px; background:rgba(0,0,0,.25); margin-top:7px; overflow:hidden; }
+  .sq-bar b { display:block; height:100%; width:0; background:linear-gradient(90deg, #7fd0ff, #8fe3b0); border-radius:4px; transition:width .8s cubic-bezier(.2,.8,.2,1); }
   .pa-btn { width:100%; display:flex; align-items:center; gap:12px; margin-top:12px; padding:14px 16px; border-radius:18px;
     background:linear-gradient(135deg, rgba(255,212,121,.22), rgba(143,227,176,.14)); border:1px solid rgba(255,212,121,.45); text-align:left; }
   .pa-btn:active { transform:scale(.98); }
@@ -560,6 +566,7 @@
       await pullPlan();   // first: it sets the zone, which decides today's date key
       await Promise.all([pullOps(), pullTasks().catch(() => {}), pullState()]);
       seedFromOura();
+      pullSteps();
       if (questKey()) qfetch("/quest/insights").then(j => { INSIGHTS = j || {};
         // the insight agent answered: drop those "Research this" requests
         const left = (G.research || []).filter(r => !INSIGHTS[r.key]);
@@ -784,7 +791,7 @@
     addPrana(g, h[1], h[1].toLowerCase());
     if (!quiet) render();
   }
-  /* ---------- Bend time: the calendar, full screen, to change the day now ----------
+  /* ---------- Change course: the calendar, full screen, to change the day now ----------
      The desktop planner (plan.html?embed=1, same pairing) in a frame: tap an event
      to change its time, name or calendar, tap an empty slot to add one. Closing it
      pulls the plan again so the mountain shows the change. The old "Something came
@@ -796,7 +803,7 @@
     if (qs.get("api")) q.set("api", qs.get("api"));
     const el = document.createElement("div");
     el.id = "calx"; el.className = "calx";
-    el.innerHTML = `<div class="calx-top"><b>🪄 Bend time</b><button class="btn" id="calxDone">Done</button></div>
+    el.innerHTML = `<div class="calx-top"><b>🧭 Change course</b><button class="btn" id="calxDone">Done</button></div>
       <iframe src="plan.html?${q}" title="Calendar"></iframe>
       <button class="calx-zap" id="calxZap">⚡ Log an interruption instead</button>`;
     document.body.appendChild(el);
@@ -804,6 +811,36 @@
     const close = () => { el.classList.remove("open"); setTimeout(() => el.remove(), 250); pullAll(); };
     $("calxDone").onclick = close;
     $("calxZap").onclick = () => { close(); setTimeout(openZapSheet, 260); };
+  }
+
+  /* ---------- Steps side quest (Junyan, 2026-10-09, d165) ----------
+     Oura's step count for today on its own card; at 8,000 a one-time prana boost,
+     because walking gives him energy. Each device reads Oura itself; only the
+     "done" flag travels with the game. */
+  const STEP_GOAL = 8000;
+  let STEPS = null;
+  const stepGain = () => Math.round(5 * gainMult());
+  async function pullSteps(){
+    if (!questKey() || !G.day) return;
+    try {
+      const j = await qfetch("/quest/activity");
+      const d = (j.days || []).find(x => x.day === gameYmd());
+      STEPS = d ? d.steps : 0;
+      if (STEPS >= STEP_GOAL && !G.day.stepsDone && !DRY) {
+        G.day.stepsDone = true;
+        addPrana(stepGain(), "8,000 steps (Oura)", "8,000 steps");
+        render();
+        const el = document.querySelector(".sq");
+        if (el && window.QuestFx) QuestFx.tap(el.getBoundingClientRect(), { icon:"👟", gain:stepGain(), full:true });
+      }
+    } catch {}
+  }
+  function stepsHTML(){
+    if (STEPS == null) return "";
+    const done = G.day.stepsDone || STEPS >= STEP_GOAL, pct = Math.min(100, Math.round(STEPS / STEP_GOAL * 100));
+    return `<div class="sq${done ? " done" : ""}"><span class="sq-i">👟</span><span class="sq-t">Side quest · ${STEPS.toLocaleString()} / 8,000 steps` +
+      `<small>${done ? "Done. Walking gave you a boost." : `${(STEP_GOAL - STEPS).toLocaleString()} to go, then +${stepGain()} prana`}</small>` +
+      `<i class="sq-bar"><b style="width:${pct}%"></b></i></span></div>`;
   }
 
   /* ---------- Prana actions: the habit tiles ---------- */
@@ -2218,9 +2255,9 @@
     }
     // the phone shows one button that opens them; the desktop dashboard shows the tiles (2026-10-08)
     const hDone = HABITS.filter(h => (G.day.habits[h[0]] || 0) > 0).length;
-    if (document.body.classList.contains("dash")) { put("habits", PLAN ? habitsHTML() : ""); bindHabits($("habits")); }
+    if (document.body.classList.contains("dash")) { put("habits", PLAN ? stepsHTML() + habitsHTML() : ""); bindHabits($("habits")); }
     else {
-      put("habits", PLAN ? `<button class="pa-btn" id="paBtn"><span class="pa-i">✨</span><span class="pa-t">Prana actions<small>${hDone ? `${hDone} done today · ` : ""}things that fill you up</small></span><span class="pa-go">›</span></button>` : "");
+      put("habits", PLAN ? stepsHTML() + `<button class="pa-btn" id="paBtn"><span class="pa-i">✨</span><span class="pa-t">Prana actions<small>${hDone ? `${hDone} done today · ` : ""}things that fill you up</small></span><span class="pa-go">›</span></button>` : "");
       if ($("paBtn")) $("paBtn").onclick = openActions;
     }
     $("brief").querySelectorAll("[data-now]").forEach(bn => bn.onclick = () => { G.day.lowAt = now().toISOString(); const [n, m] = bn.dataset.now.split("|"); startNow(n, +m); });
@@ -2330,7 +2367,7 @@
 
     // zap button
     // the big button opens the calendar to change the day right there (Junyan, 2026-10-08, d163)
-    $("zap").textContent = z ? "↩︎ Back to the quest" : "🪄 Bend time";
+    $("zap").textContent = z ? "↩︎ Back to the quest" : "🧭 Change course";
     $("zap").classList.toggle("back", !!z);
     $("zap").onclick = z ? endZap : openCal;
 

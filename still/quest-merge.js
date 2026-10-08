@@ -17,8 +17,8 @@
   const ms = (s) => { const t = Date.parse(s); return isNaN(t) ? 0 : t; };
   const LOG_MAX = 80, BAG_LOG_MAX = 60;
   const evKey = (e) => (e && e.at) + "|" + (e && e.msg);
-  // a block's spend and the sleep refill happen once a day, whichever device records them
-  const onceKey = (e) => (e && /\bused \d+ \(|^Slept /.test(e.msg || "") ? e.msg : null);
+  // a block's spend, the sleep refill and the steps boost happen once a day, whichever device records them
+  const onceKey = (e) => (e && /\bused \d+ \(|^Slept |\(Oura\)$/.test(e.msg || "") ? e.msg : null);
 
   function mergeLog(o, n) {
     const out = [], seen = new Set(), once = new Set();
