@@ -21,6 +21,11 @@
   up mid-block, and XP for keeping the day. Health blocks (sleep, practice,
   body, fuel) score double: the One System map says defend them.
 
+  Skills (ticket 16, 2026-10-08): a Skills section and "Train a skill" in Your move.
+  Skill cards, content offers (one-line summary + ideas) and wiki pages come from
+  Junyan's private life wiki via still-api /quest/skills, /quest/content, /quest/wiki;
+  the insight agent writes them. Videos play inside the app (youtube-nocookie).
+
   URL switches for testing:
     ?dry=1                     never POST (no /ops, no /tasks/done writes)
     ?at=2026-09-28T11:35       run a virtual clock from that moment (implies the
@@ -301,6 +306,29 @@
   .summary div { background:rgba(255,255,255,.1); border-radius:14px; padding:12px 8px; text-align:center; }
   .summary b { display:block; font-size:22px; }
   .summary span { font-size:11px; color:var(--ink-soft); }
+  /* skills (ticket 16) */
+  .side small, .sug small, .idea small { display:block; font-size:12px; color:var(--ink-soft); margin-top:2px; line-height:1.35; }
+  .side.offer { cursor:default; align-items:flex-start; }
+  .side .oline, .sheet .oneline { display:block; font-size:14px; color:var(--ink); margin-top:4px; line-height:1.35; }
+  .sheet .oneline { font-size:16px; font-weight:500; margin-top:8px; }
+  .sug { border-top:1px solid rgba(255,255,255,.08); padding:12px 0 2px; }
+  .sug .actions { margin-top:8px; }
+  .idea { display:flex; flex-direction:column; gap:8px; border-top:1px solid rgba(255,255,255,.08); padding:12px 0; }
+  .idea .btn { flex:none; align-self:flex-start; padding:10px 14px; }
+  .player { position:relative; width:100%; aspect-ratio:16/9; margin-top:12px; border-radius:14px; overflow:hidden; background:#000; }
+  .player iframe, .player #ytBox { position:absolute; inset:0; width:100%; height:100%; border:0; }
+  .endcard { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; text-align:center; padding:16px;
+    background:linear-gradient(180deg, #2b3160, #191d3c); font-size:15px; line-height:1.4; }
+  .skchips { display:flex; flex-wrap:wrap; gap:8px; margin:4px 0 18px; }
+  .skchip { padding:9px 12px; border-radius:20px; background:var(--glass); border:1px solid var(--glass-border); font-size:14px; }
+  .skchip b { color:var(--gold); margin-left:2px; }
+  .skchip.sug { border-style:dashed; color:var(--ink-soft); }
+  textarea.cline { resize:none; line-height:1.35; }
+  .endcard[hidden] { display:none; }
+  .wlink { background:none; color:var(--gold); text-decoration:underline; padding:0; font:inherit; }
+  .wiki p.wli { margin-top:4px; }
+  .wiki a { color:var(--gold); }
+  a.btn { text-decoration:none; text-align:center; }
 </style>
 <link rel="stylesheet" href="bag.css">
 <script src="bag.js"></script>
@@ -327,6 +355,9 @@
   <div id="nextLine"></div>
   <div id="questQuick" style="margin:10px 0 4px"></div>
   <div id="habits"></div>
+
+  <h2><span>Skills</span><button class="add-btn" id="skillsBtn">Open</button></h2>
+  <div id="skillsRow"></div>
 
   <h2><span>Today's mountain <span id="trailMeta" style="font-weight:400;color:var(--ink-faint)"></span></span><button class="add-btn" id="addBtn">＋ Add</button></h2>
   <div id="mtn"></div>
@@ -494,6 +525,7 @@
         // the insight agent answered: drop those "Research this" requests
         const left = (G.research || []).filter(r => !INSIGHTS[r.key]);
         if (left.length !== (G.research || []).length) { G.research = left; saveG(); } }).catch(() => {});
+      pullSkills().then(() => { if (!$("sheet").classList.contains("open")) render(); }).catch(() => {});
       lastPull = new Date(); pullErr = null;
     } catch (e) { pullErr = String(e.message || e); }
     render();
@@ -1562,6 +1594,280 @@
   $("bagBtn").onclick = openBag;
   if (hasBag()) { try { Bag.mount(document.createElement("div"), BAG_CTX); Bag.mountQuick($("questQuick")); } catch (e) { console.warn("bag", e); } }
 
+  /* ---------- skills (ticket 16, 2026-10-08) ----------
+     A skill is a name, what he is working on, and content for it (no levels, d140).
+     The life wiki on his Mac is the source; the insight agent copies skill cards,
+     content offers (one-line summary + ideas) and pages to still-api. Quest writes
+     back what he does; the agent folds it into the wiki on its next run. */
+  let SKILLS = [], CONTENT = [], WIKI = [];
+  async function pullSkills(){
+    if (!questKey()) return;
+    const [s, c, w] = await Promise.all([qfetch("/quest/skills"), qfetch("/quest/content"), qfetch("/quest/wiki")]);
+    SKILLS = s.skills || []; CONTENT = c.items || []; WIKI = (w.pages || []).map(p => p.path);
+  }
+  const skillOf = id => SKILLS.find(s => s.id === id);
+  const KIND_IC = { video:"▶", article:"📄", podcast:"🎧" };
+  async function skillOp(body){
+    if (DRY) return null;
+    return qfetch("/quest/skills", { method:"POST", body:JSON.stringify(body) });
+  }
+  async function contentOp(it, body){
+    if (DRY) return;
+    try { await qfetch(`/quest/content/${encodeURIComponent(it.id)}/state`, { method:"POST", body:JSON.stringify(body) }); } catch {}
+  }
+  function setState(it, state, line){
+    it.state = state; it.stateAt = now().toISOString();
+    if (line) it.note = line;
+    contentOp(it, { state, ...(line ? { line } : {}) });
+  }
+  // what fits a free window: unwatched, for an active skill or for something coming up, short enough
+  function offersFor(min){
+    const t = +now(), skip = (G.day.skillSkip = G.day.skillSkip || []);
+    const soon = it => it.forAt && Date.parse(it.forAt) > t && Date.parse(it.forAt) - t < 36 * 3600000;
+    return CONTENT.filter(it => ["new", "later"].includes(it.state || "new") && !skip.includes(it.id) && it.mins <= min
+        && ((skillOf(it.skill) || {}).status === "active" || soon(it)))
+      .sort((a, b) => (soon(b) - soon(a)) || ((a.forAt || "9") < (b.forAt || "9") ? -1 : 1)
+        || ((a.state === "later") - (b.state === "later")) || (Date.parse(b.added || 0) - Date.parse(a.added || 0)));
+  }
+  function trainHtml(cur, t){
+    if (!questKey()) return "";
+    const left = Math.floor((cur.e - t) / 60000), bed = blocks().find(b => isSleep(b) && b.s > t);
+    if (bed && bed.s - t < 60 * 60000) return "";                     // nothing in the last hour before bed
+    const act = SKILLS.filter(s => s.status === "active"), sug = SKILLS.filter(s => s.status === "suggested");
+    const it = left >= 13 ? offersFor(left - 10)[0] : null;
+    let h = `<div class="eyebrow" style="margin-top:14px">Train a skill</div>`;
+    if (it) {
+      const sk = skillOf(it.skill);
+      h += `<div class="side-list"><div class="side offer"><span class="pr">${KIND_IC[it.kind] || "▶"}</span><span class="nm">
+        <b>${esc(it.title)}</b> <span style="color:var(--ink-faint)">· ${it.mins} min</span>
+        <span class="oline">${esc(it.line)}</span>
+        <small>${esc(sk ? sk.name : it.skill)}${it.forTitle ? ` · for ${esc(it.forTitle)}` : ""}${it.why ? ` · ${esc(it.why)}` : ""}</small></span></div></div>
+        <div class="actions"><button class="btn primary" id="tWatch">${it.kind === "video" ? "▶ Watch" : it.kind === "podcast" ? "🎧 Listen" : "📄 Read"}</button>
+        <button class="btn" id="tNext" data-id="${esc(it.id)}">Another</button><button class="btn ghost" id="tNot" data-id="${esc(it.id)}">Not now</button></div>`;
+      trainHtml.it = it;
+    } else if (act.length) {
+      h += `<div class="side-list"><button class="side" id="tSkills"><span class="pr">🎯</span><span class="nm">${left < 13 ? "Too short for a video. Open your skills" : "Nothing new that fits. See your skills"}</span></button></div>`;
+    } else {
+      h += `<div class="side-list"><button class="side" id="tSkills"><span class="pr">🎯</span><span class="nm">${sug.length ? `${sug.length} skills suggested from your days. Pick yours` : "Add a skill to train"}</span></button></div>`;
+    }
+    return h;
+  }
+  // the Skills section on the main screen: what he is training, and how much is new for each
+  function skillsRowHtml(){
+    if (!questKey()) return `<div class="skchips"><button class="skchip" data-sk="">Pair this device to see your skills</button></div>`;
+    const act = SKILLS.filter(s => s.status === "active"), sug = SKILLS.filter(s => s.status === "suggested");
+    const fresh = s => CONTENT.filter(it => it.skill === s.id && (it.state || "new") === "new").length;
+    return `<div class="skchips">${act.map(s => `<button class="skchip" data-sk="${esc(s.id)}">🎯 ${esc(s.name)}${fresh(s) ? ` <b>${fresh(s)}</b>` : ""}</button>`).join("")}
+      ${sug.length ? `<button class="skchip sug" data-sk="">${sug.length} suggested from your days</button>` : ""}
+      ${!act.length && !sug.length ? `<button class="skchip" data-sk="">＋ Add a skill</button>` : ""}</div>`;
+  }
+  function wireTrain(){
+    const on = (id, f) => { const el = $(id); if (el) el.onclick = f; };
+    on("tWatch", () => openContent(trainHtml.it));
+    on("tNext", e => { G.day.skillSkip = [...(G.day.skillSkip || []), e.currentTarget.dataset.id]; saveG(); render(); });
+    on("tNot", e => { const it = CONTENT.find(x => x.id === e.currentTarget.dataset.id); if (it) setState(it, "later");
+      G.day.skillSkip = [...(G.day.skillSkip || []), e.currentTarget.dataset.id]; saveG(); render(); });
+    on("tSkills", () => openSkills());
+  }
+
+  function openSkills(){
+    const act = SKILLS.filter(s => s.status === "active"), sug = SKILLS.filter(s => s.status === "suggested");
+    const fresh = s => CONTENT.filter(it => it.skill === s.id && (it.state || "new") === "new").length;
+    const row = s => `<button class="side" data-skill="${esc(s.id)}"><span class="pr">🎯</span><span class="nm"><b>${esc(s.name)}</b>
+      ${s.focus ? `<small>Working on: ${esc(s.focus)}</small>` : ""}</span>${fresh(s) ? `<span class="xp">${fresh(s)} new</span>` : ""}</button>`;
+    openSheet(`<h3>Skills</h3>
+      ${!questKey() ? `<p>Pair this device in ⚙️ to see your skills.</p>` : ""}
+      ${act.length ? `<div class="win-lb">Training</div><div class="side-list">${act.map(row).join("")}</div>`
+        : questKey() ? `<p>A skill is something your days call for. Quest finds content for it and offers it when you have time.</p>` : ""}
+      ${sug.length ? `<div class="win-lb">Suggested from your days</div>${sug.map(s => `<div class="sug">
+        <div><b>${esc(s.name)}</b><small>${esc(s.focus)}</small>${s.from ? `<small style="color:var(--ink-faint)">From: ${esc(s.from)}</small>` : ""}</div>
+        <div class="actions"><button class="btn primary" data-yes="${esc(s.id)}">Train this</button><button class="btn ghost" data-see="${esc(s.id)}">Look first</button><button class="btn ghost" data-no="${esc(s.id)}">Not now</button></div></div>`).join("")}` : ""}
+      ${questKey() ? `<div class="win-lb">Add a skill</div>
+      <input id="skName" placeholder="The skill, e.g. Filming dance" maxlength="60">
+      <input id="skFocus" placeholder="What are you working on? (optional)" maxlength="140">
+      <div class="actions"><button class="btn primary" id="skAdd">＋ Add</button></div>
+      <p id="skMsg" style="font-size:12px">Quest looks for content on the next run (6 AM or 8 PM).</p>` : ""}
+      <div class="actions"><button class="btn ghost" id="skClose">Close</button></div>`, true);
+    $("skClose").onclick = closeSheet;
+    $("sheet").querySelectorAll("[data-skill],[data-see]").forEach(b => b.onclick = () => openSkill(b.dataset.skill || b.dataset.see));
+    const decide = (id, status) => { const s = skillOf(id); if (!s) return;
+      s.status = status; s.editedAt = now().toISOString(); skillOp({ op:"set", id, status }).catch(() => {});
+      log(status === "active" ? `Training: ${s.name}` : `Not now: ${s.name}`); saveG(); openSkills(); };
+    $("sheet").querySelectorAll("[data-yes]").forEach(b => b.onclick = () => decide(b.dataset.yes, "active"));
+    $("sheet").querySelectorAll("[data-no]").forEach(b => b.onclick = () => decide(b.dataset.no, "paused"));
+    if ($("skAdd")) $("skAdd").onclick = async () => {
+      const name = $("skName").value.trim(), focus = $("skFocus").value.trim();
+      if (!name) { $("skName").focus(); return; }
+      try {
+        const r = await skillOp({ op:"add", name, focus });
+        const s = r ? r.skill : { id:name.toLowerCase().replace(/[^a-z0-9]+/g, "-"), name, focus, status:"active" };
+        SKILLS = SKILLS.filter(x => x.id !== s.id).concat(s);
+        log(`Added the skill ${name}`); saveG(); openSkills();
+      } catch (e) { $("skMsg").textContent = "Could not add it: " + e.message; }
+    };
+  }
+
+  function openSkill(id){
+    const s = skillOf(id); if (!s) return openSkills();
+    const items = CONTENT.filter(it => it.skill === id).sort((a, b) => ((a.state === "new") ? 0 : 1) - ((b.state === "new") ? 0 : 1));
+    const stLabel = { watched:"watched", read:"read the line", later:"later", no:"not for me" };
+    openSheet(`<div class="win-hd"><span style="font-size:30px">🎯</span><div><div class="tt">${esc(s.name)}</div>
+        <div class="sb">${s.status === "active" ? "Training" : s.status === "suggested" ? "Suggested from your days" : "Paused"}${s.from ? ` · ${esc(s.from)}` : ""}</div></div></div>
+      ${s.status !== "active" ? `<div class="actions"><button class="btn primary" id="sYes">Train this</button></div>` : ""}
+      <div class="win-lb">Working on</div>
+      <textarea id="sFocus" class="cline" rows="2" maxlength="140" placeholder="What are you working on?">${esc(s.focus)}</textarea>
+      <div class="win-lb">Content</div>
+      ${items.length ? items.map(it => `<button class="wck" data-it="${esc(it.id)}"><span class="bx">${KIND_IC[it.kind] || "▶"}</span>
+        <span><b>${esc(it.title)}</b> <small style="color:var(--ink-faint)">· ${it.mins} min${stLabel[it.state] ? ` · ${stLabel[it.state]}` : ""}</small>
+        <br><small style="color:var(--ink-soft)">${esc(it.line)}</small></span></button>`).join("")
+        : `<p>Nothing yet. ${s.research ? "Asked: it looks on the next run (6 AM or 8 PM)." : ""}</p>`}
+      <div class="actions">${s.research ? "" : `<button class="btn" id="sFind">🔎 Find content for this</button>`}
+        ${WIKI.includes(s.page) ? `<button class="btn" id="sWiki">📖 Wiki page</button>` : ""}</div>
+      <div class="actions"><button class="btn ghost" id="sBack">All skills</button>${s.status === "active" ? `<button class="btn ghost" id="sPause">Pause this skill</button>` : ""}</div>`, true);
+    const set = (patch, msg) => { Object.assign(s, patch, { editedAt:now().toISOString() }); skillOp({ op:"set", id, ...patch }).catch(() => {}); if (msg) { log(msg); saveG(); } };
+    $("sFocus").onchange = e => set({ focus:e.target.value.trim() }, `${s.name}: working on ${e.target.value.trim()}`);
+    if ($("sYes")) $("sYes").onclick = () => { set({ status:"active" }, `Training: ${s.name}`); openSkill(id); };
+    if ($("sPause")) $("sPause").onclick = () => { set({ status:"paused" }, `Paused: ${s.name}`); openSkills(); };
+    if ($("sFind")) $("sFind").onclick = () => { set({ research:true }, `Asked for content: ${s.name}`); openSkill(id); };
+    if ($("sWiki")) $("sWiki").onclick = () => openWikiPage(s.page, () => openSkill(id));
+    $("sBack").onclick = openSkills;
+    $("sheet").querySelectorAll("[data-it]").forEach(b => b.onclick = () => openContent(CONTENT.find(x => x.id === b.dataset.it), () => openSkill(id)));
+  }
+
+  /* the player: YouTube without YouTube (nocookie embed, inline, no autoplay). When it
+     ends, the ideas card covers YouTube's end screen. */
+  let ytReady = null;
+  function loadYT(){
+    if (ytReady) return ytReady;
+    ytReady = new Promise(res => {
+      if (window.YT && YT.Player) return res();
+      window.onYouTubeIframeAPIReady = () => res();
+      const s = document.createElement("script"); s.src = "https://www.youtube.com/iframe_api"; document.head.appendChild(s);
+    });
+    return ytReady;
+  }
+  function openContent(it, back){
+    if (!it) return;
+    const sk = skillOf(it.skill), vid = it.kind !== "article" && it.yt;
+    const late = (() => { const t = now(), c = currentOf(blocks(), t); return c && isSadhana(c) ? "It's your sadhana time. It will be here after."
+      : blocks().some(b => isSleep(b) && b.s > t && b.s - t < 3600000) ? "Bed is close. This keeps for tomorrow too." : ""; })();
+    openSheet(`<div class="eyebrow">${esc(sk ? sk.name : it.skill)}${it.forTitle ? ` · for ${esc(it.forTitle)}` : ""}</div>
+      <h3 style="margin-top:4px">${esc(it.title)}</h3>
+      <p class="oneline">${esc(it.line)}</p>
+      ${late ? `<p style="font-size:12px">${esc(late)}</p>` : ""}
+      ${vid ? `<div class="player"><div id="ytBox"></div><div class="endcard" id="endCard" hidden></div></div>
+        <div class="actions"><button class="btn" id="cSeen">✓ I watched it</button><button class="btn" id="cRead">Read the line only</button></div>`
+        : `<div class="actions"><a class="btn primary" href="${esc(it.url)}" target="_blank" rel="noopener" id="cOpen">${it.kind === "podcast" ? "🎧 Listen" : "📄 Read it"} · ${it.mins} min</a></div>`}
+      <p style="font-size:12px;color:var(--ink-faint)">${esc(it.by || "")}${it.by ? " · " : ""}${it.mins} min${it.why ? ` · ${esc(it.why)}` : ""}</p>
+      <div id="cIdeas"></div>
+      <div class="actions"><button class="btn ghost" id="cNo">Not for me</button>
+        <button class="btn ghost" id="cBack">${back ? "Back" : "Close"}</button></div>`, true);
+    const drawIdeas = (done) => {
+      $("cIdeas").innerHTML = `${it.ideas && it.ideas.length ? `<div class="win-lb">${done ? "Worth trying?" : "Ideas in it"}</div>${it.ideas.map((x, i) => `<div class="idea">
+          <div><b>${esc(x.t)}</b> <small style="color:var(--ink-faint)">· ${x.mins} min</small>${x.why ? `<small>${esc(x.why)}</small>` : ""}</div>
+          ${(it.scheduled || []).some(s => s.idea === x.t) ? `<small style="color:var(--good)">On the schedule ✓</small>`
+            : `<button class="btn" data-idea="${i}">📅 Put it on the schedule</button>`}</div>`).join("")}` : ""}
+        <input id="cLine" class="cline" maxlength="400" placeholder="Your line: what will you take from it? (optional)" value="${esc(it.note || "")}">`;
+      $("cIdeas").querySelectorAll("[data-idea]").forEach(b => b.onclick = () => openScheduleIdea(it, it.ideas[+b.dataset.idea], () => openContent(it, back)));
+      $("cLine").onchange = e => { const v = e.target.value.trim(); if (!v) return; it.note = v; contentOp(it, { line:v }); log(`Note on ${it.title}`); saveG(); };
+    };
+    drawIdeas(false);
+    if (vid) loadYT().then(() => {
+      if (!$("ytBox")) return;
+      new YT.Player("ytBox", { host:"https://www.youtube-nocookie.com", videoId:it.yt, width:"100%", height:"100%",
+        playerVars:{ playsinline:1, rel:0, modestbranding:1, autoplay:0, enablejsapi:1, origin:location.origin },
+        events:{ onStateChange: e => {
+          if (e.data === 1 && !it._started) { it._started = true; log(`Watching: ${it.title}`); saveG(); }
+          if (e.data === 0) finished();
+        } } });
+    });
+    // the end of a video (or "I watched it"): cover YouTube's end screen with the ideas
+    function finished(){
+      if (it.state !== "watched") { setState(it, "watched"); log(`Watched: ${it.title}`); saveG(); }
+      const ec = $("endCard"); if (!ec) return;
+      ec.hidden = false;
+      ec.innerHTML = `<div><b>Done.</b><br>${it.ideas && it.ideas.length ? "Pick an idea below to put on your schedule." : "Anything worth trying? Add a line below."}</div>`;
+      if ($("cSeen")) $("cSeen").parentNode.remove();
+      drawIdeas(true);
+      $("cIdeas").scrollIntoView({ behavior:"smooth", block:"start" });
+    }
+    if ($("cSeen")) $("cSeen").onclick = finished;
+    if ($("cOpen")) $("cOpen").onclick = () => { setState(it, "read"); log(`Opened: ${it.title}`); saveG(); };
+    if ($("cRead")) $("cRead").onclick = () => { setState(it, "read"); log(`Read the line: ${it.title}`); saveG(); drawIdeas(true); };
+    $("cNo").onclick = () => { setState(it, "no"); log(`Not for me: ${it.title}`); saveG(); back ? back() : closeSheet(); render(); };
+    $("cBack").onclick = () => back ? back() : closeSheet();
+  }
+
+  /* an idea goes straight onto the schedule as a specific block (d135): first open
+     window today that fits, else tomorrow's, through the calendar or today's ops */
+  async function freeSlots(ymdStr, mins){
+    const t = +now() + 5 * 60000;
+    const list = ymdStr === gameYmd() ? blocks() : ((await getPlan(ymdStr).catch(() => null)) || { blocks:[] }).blocks
+      .map(b => ({ ...b, s:new Date(b.s), e:new Date(b.e), kind:kindOf(b) }));
+    return list.filter(b => b.kind === "open").map(b => ({ s:new Date(Math.ceil(Math.max(+b.s, t) / 300000) * 300000), e:b.e }))
+      .filter(w => w.e - w.s >= mins * 60000 && +tzParts(w.s, { hour:"numeric", hourCycle:"h23" }).hour >= 7);
+  }
+  async function openScheduleIdea(it, idea, back){
+    const tomorrow = tzYmd(new Date(+new Date(gameYmd() + "T12:00:00Z") + 86400000));
+    let day = gameYmd(), dur = idea.mins;
+    const draw = async () => {
+      const slots = await freeSlots(day, dur), first = slots[0];
+      const start = first ? first.s : new Date(Math.ceil((+now() + 15 * 60000) / 300000) * 300000);
+      const today = day === gameYmd(), canWrite = questKey() && !DRY;
+      openSheet(`<h3>Put it on the schedule</h3>
+        <input id="iT" value="${esc("🎯 " + idea.t)}" maxlength="120">
+        <div class="chips" style="grid-template-columns:1fr 1fr">${[[gameYmd(), "Today"], [tomorrow, "Tomorrow"]].map(([d, l]) =>
+          `<button class="chip ${d === day ? "sel" : ""}" data-day="${d}" style="text-align:center">${l}</button>`).join("")}</div>
+        <div class="row"><label>Start<input id="iS" type="time" value="${toField(start)}"></label>
+          <label>Minutes<input id="iD" type="number" min="5" max="240" step="5" value="${dur}"></label></div>
+        <p style="font-size:12px">${first ? `First open time that fits: ${fmtT(first.s)}.` : "No open time that fits. Pick a start."}
+          ${slots.slice(1, 4).map(w => `<button class="ping-ask" data-at="${w.s.toISOString()}">${fmtT(w.s)}</button>`).join(" ")}</p>
+        ${canWrite ? `<label class="check"><input id="iCal" type="checkbox" checked ${today ? "" : "disabled"}> Add it to Google Calendar (Junyan)</label>` : ""}
+        ${DRY ? `<p style="color:var(--warn)">Test mode: nothing is added.</p>` : !questKey() ? `<p>Pair this device to add it to the calendar.</p>` : ""}
+        <div class="actions"><button class="btn ghost" id="iBack">Back</button><button class="btn primary" id="iGo">Add it</button></div>`);
+      $("sheet").querySelectorAll("[data-day]").forEach(b => b.onclick = () => { day = b.dataset.day; draw(); });
+      $("sheet").querySelectorAll("[data-at]").forEach(b => b.onclick = () => { $("iS").value = toField(new Date(b.dataset.at)); });
+      $("iD").onchange = e => { dur = Math.max(5, Math.min(240, +e.target.value || idea.mins)); };
+      $("iBack").onclick = back;
+      $("iGo").onclick = async () => {
+        const title = $("iT").value.trim() || idea.t;
+        const s = fromField($("iS").value, new Date(day + "T12:00:00Z")), e = new Date(+s + dur * 60000);
+        const cal = !today || ($("iCal") && $("iCal").checked);
+        if (DRY || (!today && !questKey())) { log(`Test: would schedule ${title} at ${fmtT(s)}`); return back(); }
+        closeSheet();
+        if (today) await (cal ? addBlockCal : addBlock)(title, s, e, false);
+        else {   // another day: only the calendar can hold it (today's edit layer is today only)
+          try { await qfetch("/cal/event", { method:"POST", body:JSON.stringify({ s:s.toISOString(), e:e.toISOString(), title }) }); }
+          catch (err) { alert(`Could not add it to the calendar (${err.message}). Nothing was added.`); return back(); }
+          log(`Added ${title} to the calendar: tomorrow ${fmtT(s)}`);
+        }
+        (it.scheduled = it.scheduled || []).push({ title, s:s.toISOString(), e:e.toISOString(), idea:idea.t });
+        contentOp(it, { scheduled:{ title, s:s.toISOString(), e:e.toISOString(), idea:idea.t } });
+        saveG(); back();
+      };
+    };
+    draw();
+  }
+
+  /* a wiki page from the phone copy: headings, bullets, bold, links between pages */
+  async function openWikiPage(path, back){
+    openSheet(`<p>Opening ${esc(path)}…</p>`, true);
+    let pg;
+    try { pg = await qfetch("/quest/wiki/" + path); } catch (e) { openSheet(`<p>Could not open it: ${esc(e.message)}</p><div class="actions"><button class="btn ghost" id="wkB">Back</button></div>`); $("wkB").onclick = back || closeSheet; return; }
+    const inline = s => esc(s).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>")
+      .replace(/\[\[([^\]|#]+)(?:\|([^\]]+))?\]\]/g, (m, p, l) => { const k = p.trim().replace(/\.md$/, ""), label = l || (k.split("/").pop().match(/^\d{4}-\d{2}-\d{2}$/) ? k.split("/").pop() : k.split("/").pop().replace(/-/g, " "));
+        return WIKI.includes(k) ? `<button class="wlink" data-wk="${k}">${label}</button>` : `<span style="color:var(--ink-faint)">${label}</span>`; })
+      .replace(/\[([^\]]+)\]\((https?:[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+    const html = pg.md.split("\n").map(l => /^### /.test(l) ? `<div class="win-lb">${inline(l.slice(4))}</div>`
+      : /^## /.test(l) ? `<div class="win-lb">${inline(l.slice(3))}</div>` : /^# /.test(l) ? `<h3>${inline(l.slice(2))}</h3>`
+      : /^\s*[-*] /.test(l) ? `<p class="wli">• ${inline(l.replace(/^\s*[-*] /, ""))}</p>` : l.trim() ? `<p>${inline(l)}</p>` : "").join("");
+    openSheet(`<div class="wiki">${html}</div><p style="font-size:11px;color:var(--ink-faint)">From the life wiki${pg.updated ? `, updated ${esc(pg.updated)}` : ""}.</p>
+      <div class="actions"><button class="btn ghost" id="wkB">${back ? "Back" : "Close"}</button></div>`, true);
+    $("wkB").onclick = back || closeSheet;
+    $("sheet").querySelectorAll("[data-wk]").forEach(b => b.onclick = () => openWikiPage(b.dataset.wk, () => openWikiPage(path, back)));
+  }
+  $("skillsBtn").onclick = () => { openSkills(); pullSkills().then(() => { if ($("skClose")) openSkills(); }).catch(() => {}); };
+
   /* ---------- pings while the page is open (devices without phone push) ---------- */
   const fired = new Set();
   function ping(id, title, body){
@@ -1839,6 +2145,7 @@
           if (TASKS.length) html += `<div class="eyebrow" style="margin-top:14px">Work</div><div class="side-list">
             ${sideChoices().map(x => `<button class="side" data-side="${x.id}"><span class="pr">${urgent(x) ? "⏰" : (x.priority||"").split(" ")[0] || "▫️"}</span>
             <span class="nm">${esc(x.task)}${x.estimate ? ` <span style="color:var(--ink-faint)">· ${esc(x.estimate)}</span>` : ""}</span></button>`).join("")}</div>`;
+          html += trainHtml(cur, t);
         }
       }
       html += `</div>`;
@@ -1855,6 +2162,9 @@
       else o.edits[cur.key] = { s:cur.s.toISOString(), e, t:cur.t };
     }); });
     on("sDone", finishSide); on("sDrop", dropSide);
+    wireTrain();
+    put("skillsRow", skillsRowHtml());
+    $("skillsRow").querySelectorAll("[data-sk]").forEach(b => b.onclick = () => b.dataset.sk ? openSkill(b.dataset.sk) : openSkills());
     on("bGym", () => openGym(cur));
     on("cFound", () => logCache(cur, "found")); on("cDnf", () => logCache(cur, "dnf"));
     on("cNext", () => { const c = cacheFor(cur); c.st.i++; saveG(); render(); });
