@@ -745,7 +745,8 @@
   boot();
   // keep it live: the now line every minute, events every 2 minutes and on focus
   setInterval(() => { if (!drag && !draft && !editing && S.view !== "month") render(); renderSide(); }, 60000);
-  setInterval(() => { if (!drag && !draft && !editing && !document.hidden) loadEvents(true); }, 120000);
+  // prana and tasks too, so the side panel keeps up with the phone (2026-10-08)
+  setInterval(() => { if (!drag && !draft && !editing && !document.hidden) { loadEvents(true); loadSide(); } }, 120000);
   window.addEventListener("focus", () => { if (!drag && !draft && !editing && questKey()) { loadEvents(true); loadSide(); } });
   let rt; window.addEventListener("resize", () => { clearTimeout(rt); rt = setTimeout(render, 150); });
 })();

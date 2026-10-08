@@ -304,6 +304,7 @@
 </style>
 <link rel="stylesheet" href="bag.css">
 <script src="bag.js"></script>
+<script src="quest-merge.js"></script>
 </head>
 <body>
 <div id="app">
@@ -405,27 +406,37 @@
   function freshDay(){ return { date:dayKey(), since:now().toISOString(), prana:null, pl:[], caches:{}, missed:{}, xp:0, checks:{}, closes:{}, zaps:[], zap:null, side:null, log:[] }; }
   if (!G.day) G.day = freshDay();   // a stale day is rolled over once the plan says which day it is
   /* XP lives on this device AND on the server (still-api quest:state), so it
-     survives a cleared browser and is the same on phone and Mac. Newest wins. */
+     survives a cleared browser and is the same on phone and Mac. The two copies
+     are merged, not newest-wins (quest-merge.js, 2026-10-08): check-ins, habits
+     and log lines from either device survive. */
   let syncTimer = null, syncErr = null;
+  // fold a server copy in; true when this device holds something the server lacks
+  function adopt(srv){
+    if (!srv || typeof srv.xp !== "number") return true;
+    const m = QuestMerge.mergeQuest(G, srv);
+    if (!QuestMerge.same(m, G) || m.ts !== G.ts) {
+      G = m;
+      try { localStorage.setItem(GKEY, JSON.stringify(G)); } catch {}
+      if (hasBag()) setTimeout(() => { try { Bag.render(); } catch {} }, 0);
+    }
+    return !QuestMerge.same(m, srv);
+  }
+  const pushG = (keepalive) => { clearTimeout(syncTimer); syncTimer = null;
+    return qfetch("/quest/state", { method:"POST", body:JSON.stringify(G), keepalive:!!keepalive })
+      .then(r => { syncErr = null; adopt(r && r.state); }).catch(e => { syncErr = e.message; }); };
   const saveG = () => {
     G.ts = Date.now();
     try { localStorage.setItem(GKEY, JSON.stringify(G)); } catch {}
     if (!questKey() || DRY) return;
     clearTimeout(syncTimer);
-    syncTimer = setTimeout(() => qfetch("/quest/state", { method:"POST", body:JSON.stringify(G) })
-      .then(() => { syncErr = null; }).catch(e => { syncErr = e.message; }), 1500);
+    syncTimer = setTimeout(pushG, 1500);
   };
   async function pullState(){
     if (!questKey()) return;
     try {
       const srv = await qfetch("/quest/state");
       syncErr = null;
-      if (srv && typeof srv.xp === "number" && (srv.ts || 0) > (G.ts || 0)) {
-        G = { ...G, ...srv };
-        if (hasBag()) setTimeout(() => { try { Bag.render(); } catch {} }, 0);
-        if (!G.day || G.day.date !== dayKey()) rollDay();
-        try { localStorage.setItem(GKEY, JSON.stringify(G)); } catch {}
-      } else if ((G.ts || 0) > (srv.ts || 0)) saveG();   // this device is newer: push it up
+      if (adopt(srv) && !DRY) saveG();   // this device has news: push it up (the server merges too)
     } catch (e) { syncErr = e.message; }
   }
 
@@ -1886,7 +1897,33 @@
   /* tick every second; render() only touches the DOM when markup changed */
   setInterval(() => { tick(); if (!$("sheet").classList.contains("open")) render(); }, 1000);
   setInterval(pullAll, 2 * 60 * 1000);
-  document.addEventListener("visibilitychange", () => { if (!document.hidden) pullAll(); });
+  /* A Home Screen app wakes with the page it had in memory, sometimes from
+     before the last update, so the phone and the Mac ran different versions
+     (2026-10-08). On wake: send any unsaved change, reload if GitHub Pages has
+     a newer page, then pull. */
+  async function checkFresh(){
+    if ($("sheet").classList.contains("open")) return false;
+    try {
+      const r = await fetch(location.pathname, { method:"HEAD", cache:"no-store" });
+      const lm = Date.parse(r.headers.get("last-modified") || ""), mine = Date.parse(document.lastModified);
+      if (!(lm - mine > 5000) || sessionStorage.getItem("quest-reloaded") === String(lm)) return false;
+      sessionStorage.setItem("quest-reloaded", String(lm));
+      if (syncTimer) await pushG();
+      location.reload();
+      return true;
+    } catch { return false; }
+  }
+  let lastWake = 0;
+  async function wake(){
+    if (Date.now() - lastWake < 5000) return;
+    lastWake = Date.now();
+    if (!(await checkFresh())) pullAll();
+  }
+  document.addEventListener("visibilitychange", () => { if (document.hidden) { if (syncTimer) pushG(true); } else wake(); });
+  addEventListener("pageshow", e => { if (e.persisted) wake(); });
+  addEventListener("focus", wake);
+  addEventListener("pagehide", () => { if (syncTimer) pushG(true); });
+  checkFresh();
   pullAll();
 })();
 </script>
