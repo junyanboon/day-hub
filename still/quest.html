@@ -1745,9 +1745,9 @@
       <div class="actions" style="flex-wrap:wrap">${RECOVER.map(([n, m]) => `<button class="btn" data-now="${n}|${m}">${n} · ${m} min</button>`).join("")}
       <button class="btn ghost" id="bLowOk">I'm OK</button></div></div>`;
     // no Oura yet: ask how long he slept, once each morning
-    if (!bh && PLAN && !z && !G.day.slept && hourNow >= 4 && hourNow < 13) bh = `<div class="card brief"><div class="eyebrow">Good morning</div>
+    if (PLAN && !z && !G.day.slept && hourNow >= 4 && hourNow < 13) bh = `<div class="card brief"><div class="eyebrow">Good morning</div>
       <div class="q">How long did you sleep? Sleep refills your prana (you're at ${Math.round(prana())}%).</div>
-      <div class="actions" style="flex-wrap:wrap">${[5, 6, 7, 8, 9].map(h => `<button class="btn" data-slept="${h}">${h} h</button>`).join("")}</div></div>`;
+      <div class="actions" style="flex-wrap:wrap">${[5, 6, 7, 8, 9].map(h => `<button class="btn" data-slept="${h}">${h} h</button>`).join("")}</div></div>` + bh;
     put("brief", bh);
     $("brief").querySelectorAll("[data-slept]").forEach(bn => bn.onclick = () => refillSleep(+bn.dataset.slept * 7, `Slept ${bn.dataset.slept} h`));
     put("habits", PLAN ? `<div class="eyebrow" style="margin-top:6px">Healthy habits · level ${lvl()}</div><div class="habits">${HABITS.map(([id, label, , max]) => {
