@@ -365,6 +365,9 @@
   .skchip.sug { border-style:dashed; color:var(--ink-soft); }
   textarea.cline { resize:none; line-height:1.35; }
   .endcard[hidden] { display:none; }
+  .knowcard { margin-top:14px; padding:14px 14px 10px; border-radius:16px; background:rgba(255,212,121,.12); border:1px solid rgba(255,212,121,.35); }
+  .knowcard p { color:var(--ink); margin-top:8px; font-size:15px; }
+  .knowcard p span { color:var(--ink-soft); font-size:13px; }
   .wlink { background:none; color:var(--gold); text-decoration:underline; padding:0; font:inherit; }
   .wiki p.wli { margin-top:4px; }
   .wiki a { color:var(--gold); }
@@ -1397,21 +1400,26 @@
   function openWork(b){
     const k = gk(b), st = G.day.checks[k], closed = !!G.day.closes[k], t = now();
     const I0 = INSIGHTS[k] || { items:[], links:[] };
-    // the insight agent sends prep items, mindset lines (kind "mind"), how-to links and hype media (kind "hype")
-    const I = { items:I0.items.filter(x => x.kind !== "mind"), mind:I0.items.filter(x => x.kind === "mind"),
+    // the insight agent sends what to know (kind "know"), things to pack (kind "pack", or older plain
+    // prep items), mindset lines (kind "mind"), how-to links and hype media (kind "hype"). d145: a card
+    // of what he needs to know and a packing list come first.
+    const I = { items:I0.items.filter(x => x.kind !== "mind" && x.kind !== "know"), mind:I0.items.filter(x => x.kind === "mind"),
+      know:I0.items.filter(x => x.kind === "know"), packing:I0.items.some(x => x.kind === "pack"),
       links:(I0.links || []).filter(x => x.kind !== "hype"), hype:(I0.links || []).filter(x => x.kind === "hype") };
     const linkRow = l => `<a class="wck" href="${esc(l.url)}" target="_blank" rel="noopener"><span class="bx">▶</span><span>${esc(l.title)}${l.note ? `<br><small style="color:var(--ink-faint)">${esc(l.note)}</small>` : ""}</span></a>`;
     const W = ((G.day.work = G.day.work || {})[k] = G.day.work[k] || { tick:{}, goal:"" });
     const n = I.items.length, done = I.items.filter((_, i) => W.tick[i]).length;
     openSheet(`${winHead(b)}
+      ${I.know.length ? `<div class="knowcard"><div class="win-lb" style="margin-top:0">What to know</div>${I.know.map(x =>
+        `<p><b>${esc(x.t)}</b>${x.why ? `<br><span>${esc(x.why)}</span>` : ""}</p>`).join("")}</div>` : ""}
+      <div class="win-lb">${I.packing ? "Pack" : "Prep"} ${n ? `${done}/${n}` : ""}</div>
+      ${n ? I.items.map((x, i) => `<button class="wck${W.tick[i] ? " on" : ""}" data-tick="${i}"><span class="bx">${W.tick[i] ? "✓" : ""}</span><span>${esc(x.t)}${x.why ? `<br><small style="color:var(--ink-faint)">${esc(x.why)}</small>` : ""}</span></button>`).join("")
+        : `<p>No prep list yet. The insight agent looks at what's coming at 6 AM and 8 PM.</p>
+           ${(G.research || []).some(r => r.key === k) ? `<p>Asked. It researches this on its next run.</p>` : `<div class="actions"><button class="btn" id="wAsk">🔎 Research this</button></div>`}`}
       ${I.hype.length ? `<div class="win-lb">Get excited</div>${I.hype.map(linkRow).join("")}` : ""}
       ${I.mind.length ? `<div class="win-lb">Get your head in it</div>${I.mind.map(x => `<p style="margin-top:8px">${esc(x.t)}</p>`).join("")}` : ""}
       <div class="win-lb">What closes this</div>
       <input id="wGoal" class="cline" placeholder="The one outcome that means this is done" maxlength="120" value="${esc(W.goal)}">
-      <div class="win-lb">Prep ${n ? `${done}/${n}` : ""}</div>
-      ${n ? I.items.map((x, i) => `<button class="wck${W.tick[i] ? " on" : ""}" data-tick="${i}"><span class="bx">${W.tick[i] ? "✓" : ""}</span><span>${esc(x.t)}${x.why ? `<br><small style="color:var(--ink-faint)">${esc(x.why)}</small>` : ""}</span></button>`).join("")
-        : `<p>No prep list yet. The insight agent looks at what's coming at 6 AM and 8 PM.</p>
-           ${(G.research || []).some(r => r.key === k) ? `<p>Asked. It researches this on its next run.</p>` : `<div class="actions"><button class="btn" id="wAsk">🔎 Research this</button></div>`}`}
       ${I.links.length ? `<div class="win-lb">Learn</div>${I.links.map(linkRow).join("")}` : ""}
       <div class="actions">${!st && (b.s - t < 30 * 60000) ? `<button class="btn primary" id="wIn">${startLabel(b)}</button>` : ""}
         ${(st === "in" || st === "late") && !closed ? `<button class="btn primary" id="wDone">Done</button>` : ""}</div>
