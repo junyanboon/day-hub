@@ -444,7 +444,11 @@
   // fold a server copy in; true when this device holds something the server lacks
   function adopt(srv){
     if (!srv || typeof srv.xp !== "number") return true;
-    const m = QuestMerge.mergeQuest(G, srv);
+    /* A device that has never synced (just paired) played its own separate game:
+       take the server's instead of folding those numbers in (2026-10-08). */
+    const first = store.get("quest-synced") !== store.get("quest-key");
+    store.set("quest-synced", store.get("quest-key"));
+    const m = first ? { ...srv } : QuestMerge.mergeQuest(G, srv);
     if (!QuestMerge.same(m, G) || m.ts !== G.ts) {
       G = m;
       try { localStorage.setItem(GKEY, JSON.stringify(G)); } catch {}
