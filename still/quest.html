@@ -425,7 +425,21 @@
   .mo-sunrow { display:flex; gap:18px; margin:14px 0 10px; font-size:15px; }
   .mo-wxrow { display:flex; gap:10px; align-items:center; padding:9px 0; border-top:1px solid rgba(255,255,255,.15); font-size:14px; }
   .mo-wxrow span:first-child { width:70px; opacity:.8; flex:none; } .mo-wxrow span:nth-child(2) { flex:1; min-width:0; } .mo-wxrow b { flex:none; }
-  .mo-sched { margin-top:14px; display:flex; flex-direction:column; gap:8px; }
+  .mo-sched { margin-top:14px; display:flex; flex-direction:column; gap:8px; pointer-events:auto; }   /* taps in the list never turn the page */
+  .mo-item { border-radius:16px; background:rgba(255,255,255,.14); overflow:hidden; }
+  .mo-item .mo-row { background:none; }
+  .mo-item.open { background:rgba(30,20,60,.55); }
+  .mo-det { padding:0 14px 14px; }
+  .mo-det-time { font-size:13px; opacity:.8; }
+  .mo-det-lb { font-size:11px; letter-spacing:.14em; text-transform:uppercase; opacity:.75; margin:14px 0 4px; }
+  .mo-det-quote { font-family:Georgia, serif; font-style:italic; font-size:16px; line-height:1.4; margin-top:10px; padding-left:10px; border-left:3px solid #ffb37a; }
+  .mo-det-k { padding:6px 0; border-top:1px solid rgba(255,255,255,.1); font-size:14px; line-height:1.35; }
+  .mo-det-k span { display:block; font-size:13px; opacity:.75; margin-top:2px; }
+  .mo-ck { display:flex; gap:10px; align-items:center; width:100%; text-align:left; padding:9px 0; border-top:1px solid rgba(255,255,255,.1); font-size:14px; color:#fff; background:none; }
+  .mo-ck .bx { width:20px; height:20px; border-radius:6px; border:2px solid rgba(255,255,255,.55); flex:none; display:flex; align-items:center; justify-content:center; font-size:12px; }
+  .mo-ck.on .bx { background:#ffd479; border-color:#ffd479; color:#3b2a6b; }
+  .mo-det-btn { margin-top:12px; padding:10px 14px; border-radius:14px; background:rgba(255,255,255,.9); color:#3b2a6b; font-weight:700; font-size:14px; }
+  .mo-det-none { font-size:13px; opacity:.8; margin-top:10px; }
   .mo-row { display:flex; align-items:center; gap:10px; width:100%; padding:10px 12px; border-radius:16px; background:rgba(255,255,255,.14); color:#fff; text-align:left; }
   .mo-row-t { width:66px; flex:none; font-size:13px; opacity:.85; } .mo-row-n { flex:1; min-width:0; font-size:15px; } .mo-row-go { flex:none; opacity:.7; font-size:18px; }
 </style>
@@ -1951,8 +1965,7 @@
   function moSlides(d){
     const s = [];
     s.push({ pal:["#ffb37a", "#c2557a", "#3b2a6b"], hills:true, html:`<div class="mo-kicker">${esc(d.greet)}, Junyan</div><div class="mo-place">${esc(d.place)}</div>
-      <div class="mo-date">${esc(d.date)}</div><div class="mo-ring"><b>${d.prana}%</b><span>prana</span></div>
-      <p class="mo-soft">Tap the right side to go on, the left to go back.</p>` });
+      <div class="mo-date">${esc(d.date)}</div><div class="mo-ring"><b>${d.prana}%</b><span>prana</span></div>` });
     // weather
     const W = WEATHER;
     let wx;
@@ -1973,9 +1986,10 @@
     }
     s.push({ pal:["#bfe6ff", "#4f8fc9", "#24306a"], html:`<div class="mo-kicker">The weather today</div>${wx}` });
     // the schedule: every activity, each one opens its own window
-    s.push({ pal:["#ffe1b0", "#c9786a", "#3a2c63"], html:`<div class="mo-kicker">Your day</div><div class="mo-big">${d.sched.length ? "Tap anything to open it" : "Nothing fixed today"}</div>
-      <div class="mo-sched">${d.sched.map(b => `<button class="mo-row" data-open="${esc(b.key)}"><span class="mo-row-t">${fmtT(b.s)}</span>${badge(b, 30)}
-        <span class="mo-row-n">${esc(moName(b))}</span><span class="mo-row-go">›</span></button>`).join("")}</div>${moLeave(d)}` });
+    s.push({ pal:["#ffe1b0", "#c9786a", "#3a2c63"], html:`<div class="mo-kicker">Your day</div><div class="mo-big">${d.sched.length ? "Your schedule" : "Nothing fixed today"}</div>
+      <div class="mo-sched">${d.sched.map(b => { const open = moOpen.has(b.key);
+        return `<div class="mo-item${open ? " open" : ""}"><button class="mo-row" data-fold="${esc(b.key)}"><span class="mo-row-t">${fmtT(b.s)}</span>${badge(b, 30)}
+        <span class="mo-row-n">${esc(moName(b))}</span><span class="mo-row-go">${open ? "⌃" : "⌄"}</span></button>${open ? moDetail(b) : ""}</div>`; }).join("")}</div>${moLeave(d)}` });
     const pal = [["#ffd39a", "#e0785a", "#5b2d5e"], ["#9fe3d0", "#3f8fa0", "#22305e"], ["#ffc2d1", "#b8579a", "#2f2a66"], ["#ffe08a", "#d98a3a", "#4a2f4f"]];
     d.moments.forEach((m, i) => {
       const h = wxAt(m.b.s);
@@ -1983,12 +1997,39 @@
         <div class="mo-b-icon">${badge(m.b, 64, true)}</div><div class="mo-big">${esc(moName(m.b))}</div>
         ${m.mind[0] ? `<blockquote class="mo-quote">${esc(m.mind[0])}</blockquote>` : ""}
         ${m.pack.length ? `<div class="mo-kicker" style="margin-top:18px">Bring</div><div class="mo-pack">${m.pack.slice(0, 4).map(x => `<span>${esc(x)}</span>`).join("")}</div>` : ""}
-        <button class="mo-more-btn" data-open="${esc(m.b.key)}">Everything for this ›</button>` });
+        <div class="mo-sched">${moOpen.has(m.b.key) ? `<div class="mo-item open">${moDetail(m.b)}</div>` : ""}
+          <button class="mo-more-btn" data-fold="${esc(m.b.key)}">${moOpen.has(m.b.key) ? "Show less ⌃" : "Everything for this ⌄"}</button></div>` });
     });
     s.push({ pal:["#fff1c9", "#f0a35e", "#7b3f61"], html:`<div class="mo-kicker">Before you go</div><div class="mo-big">Practices for today</div>
       <p class="mo-soft" style="margin-top:6px">Tap one when it's done. Each fills your prana.</p>${moPractices()}
       <button class="mo-go" data-mo="begin">Let's go</button>` });
     return s;
+  }
+
+  // one activity, opened in place: a meal's plate, an event's what-to-know and packing list
+  const moOpen = new Set();
+  function moDetail(b){
+    const k = gk(b), mins = Math.round((b.e - b.s) / 60000);
+    let h = `<div class="mo-det-time">${fmtT(b.s)} to ${fmtT(b.e)} · ${fmtHM(mins)}</div>`;
+    if (isMeal(b)) {
+      const M = ((G.day.meals = G.day.meals || {})[k] = G.day.meals[k] || { plate:{}, phone:false });
+      h += `<div class="mo-det-lb">On the plate</div>${PLATE.map(([id, txt]) => `<button class="mo-ck${M.plate[id] ? " on" : ""}" data-plate="${id}" data-k="${esc(b.key)}"><span class="bx">${M.plate[id] ? "✓" : ""}</span>${txt}</button>`).join("")}
+        <button class="mo-ck${M.phone ? " on" : ""}" data-phone="${esc(b.key)}"><span class="bx">${M.phone ? "✓" : ""}</span>Phone face down until I'm done</button>
+        <button class="mo-det-btn" data-bp="1">🥗 Blueprint meal${habitGain("blueprint") ? ` +${habitGain("blueprint")}` : " (done)"}</button>`;
+    } else {
+      const I0 = INSIGHTS[k] || { items:[], links:[] };
+      const know = I0.items.filter(x => x.kind === "know"), mind = I0.items.filter(x => x.kind === "mind");
+      const items = I0.items.filter(x => x.kind !== "mind" && x.kind !== "know");   // same order as the full window's ticks
+      const W = ((G.day.work = G.day.work || {})[k] = G.day.work[k] || { tick:{}, goal:"" });
+      if (mind[0]) h += `<div class="mo-det-quote">${esc(mind[0].t)}</div>`;
+      if (know.length) h += `<div class="mo-det-lb">What to know</div>${know.map(x => `<div class="mo-det-k"><b>${esc(x.t)}</b>${x.why ? `<span>${esc(x.why)}</span>` : ""}</div>`).join("")}`;
+      if (items.length) h += `<div class="mo-det-lb">${items.some(x => x.kind === "pack") ? "Pack" : "Prep"} ${items.filter((_, i) => W.tick[i]).length}/${items.length}</div>
+        ${items.map((x, i) => `<button class="mo-ck${W.tick[i] ? " on" : ""}" data-tick="${i}" data-k="${esc(b.key)}"><span class="bx">${W.tick[i] ? "✓" : ""}</span>${esc(x.t)}</button>`).join("")}`;
+      if (!know.length && !items.length && !mind.length) h += (G.research || []).some(r => r.key === k)
+        ? `<p class="mo-det-none">Asked. The insight agent preps it on its next run.</p>`
+        : `<button class="mo-det-btn" data-ask="${esc(b.key)}">🔎 Prep this for me</button>`;
+    }
+    return `<div class="mo-det">${h}</div>`;
   }
 
   let moSlide = 0;
@@ -2009,6 +2050,22 @@
         <div class="mo-b-c">${S.html}</div></div></div>
       <button class="mo-x" data-mo="close" aria-label="Close">✕</button>`;
     el.querySelectorAll("[data-habit]").forEach(b => b.onclick = e => { e.stopPropagation(); logHabit(b.dataset.habit, true); saveG(); openMorning(); });
+    const blkOf = key => blocks().find(x => x.key === key);
+    el.querySelectorAll("[data-fold]").forEach(b => b.onclick = e => { e.stopPropagation();
+      const k = b.dataset.fold; moOpen.has(k) ? moOpen.delete(k) : moOpen.add(k); keepScroll(); });
+    el.querySelectorAll("[data-plate]").forEach(b => b.onclick = e => { e.stopPropagation();
+      const id = b.dataset.plate, blk = blkOf(b.dataset.k); if (!blk) return;
+      const M = G.day.meals[gk(blk)]; M.plate[id] = !M.plate[id]; saveG(); keepScroll(); });
+    el.querySelectorAll("[data-phone]").forEach(b => b.onclick = e => { e.stopPropagation();
+      const blk = blkOf(b.dataset.phone); if (!blk) return; const M = G.day.meals[gk(blk)]; M.phone = !M.phone; saveG(); keepScroll(); });
+    el.querySelectorAll("[data-bp]").forEach(b => b.onclick = e => { e.stopPropagation(); logHabit("blueprint", true); saveG(); keepScroll(); });
+    el.querySelectorAll("[data-tick]").forEach(b => b.onclick = e => { e.stopPropagation();
+      const i = b.dataset.tick, blk = blkOf(b.dataset.k); if (!blk) return;
+      const W = G.day.work[gk(blk)]; W.tick[i] = !W.tick[i]; saveG(); keepScroll(); });
+    el.querySelectorAll("[data-ask]").forEach(b => b.onclick = e => { e.stopPropagation();
+      const blk = blkOf(b.dataset.ask); if (!blk) return; (G.research = G.research || []).push({ key:gk(blk), title:blk.t, s:blk.s.toISOString() }); saveG(); keepScroll(); });
+    // redraw without losing the place in a long list
+    function keepScroll(){ const sc = el.querySelector(".mo-slide"), y = sc ? sc.scrollTop : 0; openMorning(); const s2 = $("morning").querySelector(".mo-slide"); if (s2) { s2.style.animation = "none"; s2.scrollTop = y; } }
     el.querySelectorAll("[data-open]").forEach(b => b.onclick = e => {
       e.stopPropagation();
       const blk = blocks().find(x => x.key === b.dataset.open); if (!blk) return;
