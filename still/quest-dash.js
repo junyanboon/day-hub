@@ -84,8 +84,8 @@
       /* the quick slots grow and shrink with their widget, so they always fit without scrolling (2026-10-09) */
       body.dash .w-quick { display:flex; flex-direction:column; overflow:hidden; padding-bottom:8px; }
       body.dash .w-quick > #questQuick { flex:1; min-height:0; margin:0 !important; }
-      body.dash .w-quick .bag-qbar { height:100%; padding:6px; }
-      body.dash .w-quick .bag-qbar .bag-sock { flex:0 0 auto; height:100%; width:auto; aspect-ratio:1; max-height:120px; }
+      body.dash .w-quick .bag-qbar { height:100%; max-height:70px; padding:6px; }
+      body.dash .w-quick .bag-qbar .bag-sock { flex:0 0 auto; height:100%; width:auto; aspect-ratio:1; max-height:56px; }
       .dash-reset { position:fixed; left:14px; bottom:14px; z-index:50; background:var(--glass); border:1px solid var(--glass-border);
         color:var(--ink-soft); font-size:12px; padding:7px 12px; border-radius:999px; backdrop-filter:blur(10px); opacity:.35; transition:opacity .2s; }
       .dash-reset:hover { opacity:1; }
