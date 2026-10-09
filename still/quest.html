@@ -440,6 +440,8 @@
   .mo-ck.on .bx { background:#ffd479; border-color:#ffd479; color:#3b2a6b; }
   .mo-det-btn { margin-top:12px; padding:10px 14px; border-radius:14px; background:rgba(255,255,255,.9); color:#3b2a6b; font-weight:700; font-size:14px; }
   .mo-det-none { font-size:13px; opacity:.8; margin-top:10px; }
+  .card.soon { border-color:rgba(255,212,121,.45); }
+  .soon-det .mo-det { padding:0; }
   .mo-row { display:flex; align-items:center; gap:10px; width:100%; padding:10px 12px; border-radius:16px; background:rgba(255,255,255,.14); color:#fff; text-align:left; }
   .mo-row-t { width:66px; flex:none; font-size:13px; opacity:.85; } .mo-row-n { flex:1; min-width:0; font-size:15px; } .mo-row-go { flex:none; opacity:.7; font-size:18px; }
 </style>
@@ -1199,6 +1201,17 @@
     if (G.day.onRun >= 3) { G.day.onRun = 0; giveItem("buffer", "Three on-time starts in a row."); }
     render();
   }
+  // d148: blocks start on their own (no tap). Same effects as a check-in, quietly, once per block.
+  function autoStart(list){
+    if (!list.length) return;
+    G.day.started = G.day.started || {};
+    list.forEach(b => {
+      G.day.checks[gk(b)] = "in"; G.day.started[gk(b)] = b.s.toISOString();
+      if (isSadhana(b)) logHabit("shambhavi", true);
+      if (isRecovery(b)) logHabit("kriya", true);
+    });
+    saveG();
+  }
   // effort is counted once, for the time a started block really ran
   function spend(b){
     const k = gk(b); G.day.spent = G.day.spent || {};
@@ -1443,24 +1456,16 @@
       ${PLATE.map(([id, txt]) => `<button class="wck${M.plate[id] ? " on" : ""}" data-plate="${id}"><span class="bx">${M.plate[id] ? "✓" : ""}</span>${txt}</button>`).join("")}
       <div class="win-lb">Eat with attention</div>
       <button class="wck${M.phone ? " on" : ""}" id="mPhone"><span class="bx">${M.phone ? "✓" : ""}</span>Phone face down until I'm done</button>
-      <div class="actions">${!st && (running || b.s - t < 30 * 60000) ? `<button class="btn primary" id="mIn">${startLabel(b)}</button>` : ""}
-        ${started && !closed ? `<button class="btn primary" id="mDone">Done eating</button>` : ""}
-        ${closed ? `<span class="quest-time">Closed. ${M.plate.protein && M.plate.veg && M.plate.water ? "Full plate." : ""}</span>` : ""}</div>
       <div class="actions"><button class="btn" id="mBp">🥗 Blueprint meal${habitGain("blueprint") ? ` +${habitGain("blueprint")}` : " (done)"}</button></div>
-      <div class="actions"><button class="btn ghost" id="mEdit">Change time or name</button>${!st ? `<button class="btn ghost" id="mSkip">Not today</button>` : ""}</div>`, true);
+      <div class="actions"><button class="btn ghost" id="mEdit">Change time or name</button></div>`, true);
     $("sheet").querySelectorAll("[data-plate]").forEach(bn => bn.onclick = () => {
       M.plate[bn.dataset.plate] = !M.plate[bn.dataset.plate];
       saveG();
       openMeal(b);
     });
     $("mPhone").onclick = () => { M.phone = !M.phone; saveG(); openMeal(b); };
-    if ($("mIn")) $("mIn").onclick = () => { checkIn(b); openMeal(blocks().find(x => gk(x) === k) || b); };
-    if ($("mDone")) $("mDone").onclick = () => {
-      closeOut(b, "done"); closeSheet();
-    };
     $("mEdit").onclick = () => openEdit(b);
     $("mBp").onclick = () => { logHabit("blueprint"); openMeal(b); };
-    if ($("mSkip")) $("mSkip").onclick = () => { skip(b); closeSheet(); };
   }
 
   // Sadhana (d86): Shambhavi with a 21-minute timer that starts with the tap
@@ -1475,18 +1480,15 @@
       <p>${empty ? "Empty stomach: a good time to practice." : `Last food ended ${fmtT(lastFood)}, ${fmtHM(Math.round((t - lastFood) / 60000))} ago. Isha asks for an empty stomach; do it anyway, lightly.`}</p>
       <div class="count"><div><div class="big">${endAt && endAt > t ? `<span data-until="${endAt.toISOString()}"></span>` : endAt ? "Complete" : `${SHAMBHAVI_MIN} min`}</div>
         <div class="sub">${endAt && endAt > t ? "left in Shambhavi" : endAt ? "Shambhavi done" : "Shambhavi Mahamudra Kriya"}</div></div></div>
-      <div class="actions">${!S.at && st !== "skip" ? `<button class="btn primary" id="sStart">🪷 Start Shambhavi</button>` : ""}
-        ${S.at && !closed ? `<button class="btn primary" id="sDone">Done</button>` : ""}</div>
-      <div class="actions"><button class="btn ghost" id="sEdit">Change time or name</button>${!st ? `<button class="btn ghost" id="sSkip">Not today</button>` : ""}</div>`);
+      <div class="actions">${!S.at ? `<button class="btn primary" id="sStart">🪷 Start the ${SHAMBHAVI_MIN} min timer</button>` : ""}</div>
+      <div class="actions"><button class="btn ghost" id="sEdit">Change time or name</button></div>`);
     clearTimeout(sadTimer);
     if (endAt && endAt > t && !closed) sadTimer = setTimeout(() => {
       banner("🪷", "SHAMBHAVI", "21 minutes. Sit a moment longer."); if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
       if ($("sheet").classList.contains("open")) openSadhana(b);
     }, endAt - t);
     if ($("sStart")) $("sStart").onclick = () => { S.at = now().toISOString(); if (!st) checkIn(b); else saveG(); openSadhana(blocks().find(x => gk(x) === k) || b); };
-    if ($("sDone")) $("sDone").onclick = () => { closeOut(b, "done"); closeSheet(); };
     $("sEdit").onclick = () => openEdit(b);
-    if ($("sSkip")) $("sSkip").onclick = () => { skip(b); closeSheet(); };
   }
 
   // Work (green): a prep checklist and how-to links the insight agent researched,
@@ -1515,9 +1517,7 @@
       <div class="win-lb">What closes this</div>
       <input id="wGoal" class="cline" placeholder="The one outcome that means this is done" maxlength="120" value="${esc(W.goal)}">
       ${I.links.length ? `<div class="win-lb">Learn</div>${I.links.map(linkRow).join("")}` : ""}
-      <div class="actions">${!st && (b.s - t < 30 * 60000) ? `<button class="btn primary" id="wIn">${startLabel(b)}</button>` : ""}
-        ${(st === "in" || st === "late") && !closed ? `<button class="btn primary" id="wDone">Done</button>` : ""}</div>
-      <div class="actions"><button class="btn ghost" id="wEdit">Change time or name</button>${!st ? `<button class="btn ghost" id="wSkip">Not today</button>` : ""}</div>`, true);
+      <div class="actions"><button class="btn ghost" id="wEdit">Change time or name</button></div>`, true);
     $("wGoal").onchange = e => { W.goal = e.target.value.trim(); saveG(); };
     $("sheet").querySelectorAll("[data-tick]").forEach(bn => bn.onclick = () => {
       W.tick[bn.dataset.tick] = !W.tick[bn.dataset.tick];
@@ -1525,11 +1525,8 @@
       saveG();
       openWork(b);
     });
-    if ($("wIn")) $("wIn").onclick = () => { checkIn(b); openWork(blocks().find(x => gk(x) === k) || b); };
     if ($("wAsk")) $("wAsk").onclick = () => { (G.research = G.research || []).push({ key:k, title:b.t, s:b.s.toISOString() }); saveG(); openWork(b); };
-    if ($("wDone")) $("wDone").onclick = () => { closeOut(b, "done"); closeSheet(); };
     $("wEdit").onclick = () => openEdit(b);
-    if ($("wSkip")) $("wSkip").onclick = () => { skip(b); closeSheet(); };
   }
 
   function openEdit(b){
@@ -2008,7 +2005,7 @@
 
   // one activity, opened in place: a meal's plate, an event's what-to-know and packing list
   const moOpen = new Set();
-  function moDetail(b){
+  function moDetail(b, packFirst){
     const k = gk(b), mins = Math.round((b.e - b.s) / 60000);
     let h = `<div class="mo-det-time">${fmtT(b.s)} to ${fmtT(b.e)} · ${fmtHM(mins)}</div>`;
     if (isMeal(b)) {
@@ -2022,14 +2019,43 @@
       const items = I0.items.filter(x => x.kind !== "mind" && x.kind !== "know");   // same order as the full window's ticks
       const W = ((G.day.work = G.day.work || {})[k] = G.day.work[k] || { tick:{}, goal:"" });
       if (mind[0]) h += `<div class="mo-det-quote">${esc(mind[0].t)}</div>`;
-      if (know.length) h += `<div class="mo-det-lb">What to know</div>${know.map(x => `<div class="mo-det-k"><b>${esc(x.t)}</b>${x.why ? `<span>${esc(x.why)}</span>` : ""}</div>`).join("")}`;
+      const knowH = know.length ? `<div class="mo-det-lb">What to know</div>${know.map(x => `<div class="mo-det-k"><b>${esc(x.t)}</b>${x.why ? `<span>${esc(x.why)}</span>` : ""}</div>`).join("")}` : "";
+      if (!packFirst) h += knowH;
       if (items.length) h += `<div class="mo-det-lb">${items.some(x => x.kind === "pack") ? "Pack" : "Prep"} ${items.filter((_, i) => W.tick[i]).length}/${items.length}</div>
         ${items.map((x, i) => `<button class="mo-ck${W.tick[i] ? " on" : ""}" data-tick="${i}" data-k="${esc(b.key)}"><span class="bx">${W.tick[i] ? "✓" : ""}</span>${esc(x.t)}</button>`).join("")}`;
+      if (packFirst) h += knowH;   // about to go: what to bring comes first
       if (!know.length && !items.length && !mind.length) h += (G.research || []).some(r => r.key === k)
         ? `<p class="mo-det-none">Asked. The insight agent preps it on its next run.</p>`
         : `<button class="mo-det-btn" data-ask="${esc(b.key)}">🔎 Prep this for me</button>`;
     }
     return `<div class="mo-det">${h}</div>`;
+  }
+
+  function soonHtml(b, t){
+    const mins = Math.round((b.s - t) / 60000), go = ["travel", "major"].includes(groupOf(b));
+    const h = wxAt(b.s);
+    return `<div class="card soon"><div class="eyebrow">Coming up · in ${fmtHM(mins)}${h ? ` · ${(WX[h.code] || [""])[0]} ${h.temp}°` : ""}</div>
+      <div class="quest-title">${badge(b, 34)}<span>${esc(moName(b))}</span></div>
+      ${go && mins > 30 ? `<div class="quest-time">Leave by <b>${fmtT(new Date(+b.s - 30 * 60000))}</b></div>` : ""}
+      <div class="mo-sched soon-det">${moDetail(b, true)}</div>
+      <div class="actions"><button class="btn ghost" data-soonfull="1">Open the full window</button></div></div>`;
+  }
+  // checklists and folds inside a detail block (the morning's schedule and the coming-up card)
+  function bindDetail(root, redraw){
+    const blkOf = key => blocks().find(x => x.key === key);
+    root.querySelectorAll("[data-fold]").forEach(b => b.onclick = e => { e.stopPropagation();
+      const k = b.dataset.fold; moOpen.has(k) ? moOpen.delete(k) : moOpen.add(k); redraw(); });
+    root.querySelectorAll("[data-plate]").forEach(b => b.onclick = e => { e.stopPropagation();
+      const id = b.dataset.plate, blk = blkOf(b.dataset.k); if (!blk) return;
+      const M = G.day.meals[gk(blk)]; M.plate[id] = !M.plate[id]; saveG(); redraw(); });
+    root.querySelectorAll("[data-phone]").forEach(b => b.onclick = e => { e.stopPropagation();
+      const blk = blkOf(b.dataset.phone); if (!blk) return; const M = G.day.meals[gk(blk)]; M.phone = !M.phone; saveG(); redraw(); });
+    root.querySelectorAll("[data-bp]").forEach(b => b.onclick = e => { e.stopPropagation(); logHabit("blueprint", true); saveG(); redraw(); });
+    root.querySelectorAll("[data-tick]").forEach(b => b.onclick = e => { e.stopPropagation();
+      const i = b.dataset.tick, blk = blkOf(b.dataset.k); if (!blk) return;
+      const W = G.day.work[gk(blk)]; W.tick[i] = !W.tick[i]; saveG(); redraw(); });
+    root.querySelectorAll("[data-ask]").forEach(b => b.onclick = e => { e.stopPropagation();
+      const blk = blkOf(b.dataset.ask); if (!blk) return; (G.research = G.research || []).push({ key:gk(blk), title:blk.t, s:blk.s.toISOString() }); saveG(); redraw(); });
   }
 
   let moSlide = 0;
@@ -2050,20 +2076,7 @@
         <div class="mo-b-c">${S.html}</div></div></div>
       <button class="mo-x" data-mo="close" aria-label="Close">✕</button>`;
     el.querySelectorAll("[data-habit]").forEach(b => b.onclick = e => { e.stopPropagation(); logHabit(b.dataset.habit, true); saveG(); openMorning(); });
-    const blkOf = key => blocks().find(x => x.key === key);
-    el.querySelectorAll("[data-fold]").forEach(b => b.onclick = e => { e.stopPropagation();
-      const k = b.dataset.fold; moOpen.has(k) ? moOpen.delete(k) : moOpen.add(k); keepScroll(); });
-    el.querySelectorAll("[data-plate]").forEach(b => b.onclick = e => { e.stopPropagation();
-      const id = b.dataset.plate, blk = blkOf(b.dataset.k); if (!blk) return;
-      const M = G.day.meals[gk(blk)]; M.plate[id] = !M.plate[id]; saveG(); keepScroll(); });
-    el.querySelectorAll("[data-phone]").forEach(b => b.onclick = e => { e.stopPropagation();
-      const blk = blkOf(b.dataset.phone); if (!blk) return; const M = G.day.meals[gk(blk)]; M.phone = !M.phone; saveG(); keepScroll(); });
-    el.querySelectorAll("[data-bp]").forEach(b => b.onclick = e => { e.stopPropagation(); logHabit("blueprint", true); saveG(); keepScroll(); });
-    el.querySelectorAll("[data-tick]").forEach(b => b.onclick = e => { e.stopPropagation();
-      const i = b.dataset.tick, blk = blkOf(b.dataset.k); if (!blk) return;
-      const W = G.day.work[gk(blk)]; W.tick[i] = !W.tick[i]; saveG(); keepScroll(); });
-    el.querySelectorAll("[data-ask]").forEach(b => b.onclick = e => { e.stopPropagation();
-      const blk = blkOf(b.dataset.ask); if (!blk) return; (G.research = G.research || []).push({ key:gk(blk), title:blk.t, s:blk.s.toISOString() }); saveG(); keepScroll(); });
+    bindDetail(el, keepScroll);
     // redraw without losing the place in a long list
     function keepScroll(){ const sc = el.querySelector(".mo-slide"), y = sc ? sc.scrollTop : 0; openMorning(); const s2 = $("morning").querySelector(".mo-slide"); if (s2) { s2.style.animation = "none"; s2.scrollTop = y; } }
     el.querySelectorAll("[data-open]").forEach(b => b.onclick = e => {
@@ -2376,8 +2389,7 @@
       if (!needsCheck(b)) return;
       const toStart = (b.s - t) / 60000, toEnd = (b.e - t) / 60000;
       if (toStart <= 5 && toStart > 4) ping("pre|" + b.key, `In 5 min: ${b.t}`, `Starts ${fmtT(b.s)}. Wrap up what you're on.`);
-      if (toStart <= 0 && toStart > -1) ping("go|" + b.key, `Now: ${shortName(b)}`, `Tap Start within ${onTimeMin(b)} min for full prana.`);
-      if (toEnd <= 5 && toEnd > 4 && G.day.checks[gk(b)]) ping("end|" + b.key, `5 min left: ${b.t}`, `Start closing it out.`);
+      if (toStart <= 0 && toStart > -1) ping("go|" + b.key, `Now: ${shortName(b)}`, `Until ${fmtT(b.e)}.`);
     });
   }
 
@@ -2494,8 +2506,7 @@
     const did = b => ["in","late"].includes(G.day.checks[gk(b)]);
     const sad = all.filter(isSadhana), bod = all.filter(b => isGym(b) || b.kind === "body"), timed = all.filter(b => needsCheck(b) && b.kind !== "open" && b.s <= t);
     $("o2Txt").innerHTML = `<span class="${sad.some(did) ? "ok" : ""}">Sadhana ${sad.some(did) ? "✓" : sad.length ? "·" : "none planned"}</span>` +
-      `<span class="${bod.some(did) ? "ok" : ""}">Body ${bod.some(did) ? "✓" : "·"}</span>` +
-      `<span>On time ${timed.filter(b => G.day.checks[gk(b)] === "in").length}/${timed.length}</span>`;
+      `<span class="${bod.some(did) ? "ok" : ""}">Body ${bod.some(did) ? "✓" : "·"}</span>`;
     const sk = streak();
     $("comboN").textContent = sk || "·";
     $("comboL").textContent = "days 70+";
@@ -2510,24 +2521,17 @@
     // one fixed colour, the night navy (Junyan, 2026-09-28): no mode changes
     document.documentElement.className = "night";
 
-    // loose ends: the latest ended block that was started but never closed
-    const loose = all.filter(b => b.e <= t && G.day.checks[gk(b)] && G.day.checks[gk(b)] !== "skip" && !G.day.closes[gk(b)]).pop();
-    // a block that ended with no tap since prana began: ask; 3 hr unanswered counts as missed
+    // d148 (2026-10-09): no check-ins. A block on the calendar counts as happening from its start;
+    // Change course is how the day changes. Effort is counted when a block ends.
     const since = new Date(G.day.pranaSince || G.day.since);
-    const untapped = all.filter(b => needsCheck(b) && b.kind !== "open" && b.e <= t && b.e > since && !G.day.checks[gk(b)] && !G.day.missed[gk(b)]);
-    untapped.filter(b => t - b.e > 3 * 3600000).forEach(b => settleMissed(b, false, true));
-    const ask = untapped.filter(b => t - b.e <= 3 * 3600000).pop();
+    autoStart(all.filter(b => needsCheck(b) && b.s <= t && b.e > since && !G.day.checks[gk(b)]));
     all.filter(b => b.e <= t && ["in", "late"].includes(G.day.checks[gk(b)]) && !(G.day.spent || {})[gk(b)]).forEach(spend);
-    put("loose", z ? "" : loose ? `<div class="card loose"><div class="eyebrow">Loose end</div>
-      <div class="q">Did “${esc(shortName(loose))}” actually close?</div>
-      <div class="actions"><button class="btn primary" data-close="done">Yes, done</button>
-      <button class="btn" data-close="carried">Carry forward</button></div></div>`
-      : ask ? `<div class="card loose"><div class="eyebrow">No tap</div>
-      <div class="q">Did ${esc(shortName(ask))} happen? (${fmtT(ask.s)})</div>
-      <div class="actions"><button class="btn primary" data-miss="yes">Yes, forgot to tap</button>
-      <button class="btn" data-miss="no">No, it didn't</button></div></div>` : "");
-    $("loose").querySelectorAll("[data-close]").forEach(bn => bn.onclick = () => closeOut(loose, bn.dataset.close));
-    $("loose").querySelectorAll("[data-miss]").forEach(bn => bn.onclick = () => settleMissed(ask, bn.dataset.miss === "yes"));
+    // coming up: the next real thing, with its prep, so he is ready before it starts
+    const soon = z ? null : all.find(b => b.s > t && needsCheck(b) && !isMeal(b) && !isSleep(b) && !isSadhana(b)
+      && b.s - t < (INSIGHTS[gk(b)] ? 3 : 1.5) * 3600000);
+    put("loose", soon ? soonHtml(soon, t) : "");
+    if (soon) { bindDetail($("loose"), () => { $("loose")._h = ""; render(); });
+      $("loose").querySelectorAll("[data-soonfull]").forEach(bn => bn.onclick = () => openStop(soon)); }
 
     // d82: the morning brief, until he taps "Got it"; d77: a Shambhavi slot when none is planned
     const slot = PLAN && !z ? sadhanaSlot(all) : null;
@@ -2610,19 +2614,6 @@
         <div class="count"><svg class="ring" viewBox="0 0 74 74"><circle class="bg" cx="37" cy="37" r="30"/>
           <circle class="fg" cx="37" cy="37" r="30" stroke-dasharray="${C}" data-ring-s="${cur.s.toISOString()}" data-ring-e="${cur.e.toISOString()}"/></svg>
           <div><div class="big" data-until="${cur.e.toISOString()}"></div><div class="sub">left in this block</div></div></div>`;
-      if (needsCheck(cur) && !st) {
-        const lateBy = Math.floor((t - cur.s) / 60000);
-        const grace = onTimeMin(cur), nudge = lateBy >= 10 && lateBy > grace && cur.kind !== "open";
-        html += nudge ? `<div class="quest-time" style="margin-top:12px">It started ${lateBy} min ago. Start, push or drop?</div>
-          <div class="actions"><button class="btn primary" id="bIn">${startLabel(cur)}</button>
-          <button class="btn" id="bPush">Start in 15 min</button><button class="btn ghost" id="bSkip">Drop it</button></div>`
-          : `<div class="actions"><button class="btn primary" id="bIn">${startLabel(cur)}</button>
-          <button class="btn ghost" id="bSkip">Not today</button></div>
-          <div class="quest-time" style="margin-top:8px">${lateBy <= grace ? `Tap when you actually start. Full prana for the next ${grace - lateBy} min.` : `Tap when you start. It began ${lateBy} min ago, still worth some.`}</div>`;
-      } else if (st && st !== "skip") {
-        html += `<div class="actions"><button class="btn" id="bMore">Need more time</button>
-          <button class="btn primary" id="bDone">Done early</button></div>`;
-      }
       if (isGym(cur)) html += `<div class="actions"><button class="btn primary" id="bGym">🏋️ Open the gym log</button></div>`;
       if (st === "in" || st === "late") html += cacheCard(cur);
       if (cur.kind === "open") {
@@ -2649,15 +2640,6 @@
     }
     put("main", html);
     const on = (id, f) => { const el = $(id); if (el) el.onclick = f; };
-    on("bIn", () => checkIn(cur)); on("bSkip", () => skip(cur));
-    on("bMore", () => openExtend(cur));
-    on("bPush", () => { const S = new Date(Math.ceil((+now() + 15 * 60000) / 300000) * 300000), E = new Date(+S + (cur.e - cur.s));
-      log(`Pushed ${shortName(cur)} to ${fmtT(S)}`); writeOps(o => setBlock(o, cur, S, E, cur.t)); });
-    on("bDone", () => { closeOut(cur, "done"); writeOps(o => {
-      const e = now().toISOString();
-      if (cur.extra) { const a = o.adds.find(x => x.key === cur.key); if (a) a.e = e; }
-      else o.edits[cur.key] = { s:cur.s.toISOString(), e, t:cur.t };
-    }); });
     on("sDone", finishSide); on("sDrop", dropSide);
     wireTrain();
     put("skillsRow", skillsRowHtml());
