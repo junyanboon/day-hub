@@ -393,9 +393,13 @@
   .mo-soft { font-size:15px; opacity:.85; margin-top:12px; line-height:1.4; }
   .mo-tip { font-size:14px; margin-top:8px; padding:8px 12px; border-radius:12px; background:rgba(0,0,0,.2); line-height:1.35; }
   .mo-leave { margin-top:16px; padding:10px 14px; border-radius:14px; background:rgba(255,255,255,.12); font-size:14px; }
-  .mo-words { display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; }
-  .mo-word { padding:9px 14px; border-radius:20px; background:rgba(255,255,255,.14); border:1px solid rgba(255,255,255,.25); color:#fff; font-size:14px; }
-  .mo-word.on { background:#fff; color:#3b2a6b; font-weight:600; }
+  .mo-prac { display:flex; flex-direction:column; gap:8px; margin-top:8px; }
+  .mo-pr { display:flex; align-items:center; gap:12px; width:100%; padding:10px 12px; border-radius:16px; background:rgba(0,0,0,.22); color:#fff; text-align:left; }
+  .mo-pr.done { background:rgba(255,255,255,.9); color:#3b2a6b; }
+  .mo-pr[disabled] { opacity:1; }
+  .mo-pr-i { font-size:24px; flex:none; } .mo-pr-t { flex:1; min-width:0; } .mo-pr-t b { display:block; font-size:15px; }
+  .mo-pr-t small { display:block; font-size:12px; opacity:.8; line-height:1.3; margin-top:1px; } .mo-pr-g { flex:none; font-size:13px; font-weight:700; color:#ffd479; }
+  .mo-pr.done .mo-pr-g { color:#2f8f5b; }
   .mo-go { display:block; width:100%; margin:24px 0 0; padding:16px; border-radius:18px; background:#fff; color:#3b2a6b; font-size:17px; font-weight:700; }
   .mo-more-btn { margin-top:22px; padding:12px 16px; border-radius:16px; background:rgba(255,255,255,.92); color:#3b2a6b; font-weight:700; font-size:15px; }
   .mo-hills { width:100%; height:100%; display:block; }
@@ -1861,8 +1865,10 @@
      design from three: "It's kind of like the sadhguru app. I like it."). He needs to know "the
      weather, the schedule (specific things I can click in to for each activity)". Slides: good
      morning, weather, the schedule (each activity opens its window), one slide per prepped moment,
-     then one word for the day. */
-  const MO_WORDS = ["Present", "Playful", "Brave", "Grateful", "Gentle", "Curious"];
+     then today's practices: yogic and Bryan Johnson's (he dropped "one word for today": "I want things
+     to be yogic practices / or bryan johnson practices"). They are the Prana actions habits, logged the same way. */
+  const MO_PRACTICES = [["Yogic", ["shambhavi", "kriya", "nadi", "nsdr"]],
+    ["Bryan Johnson", ["daylight", "salt", "caffeine", "protein", "blueprint", "early", "screens", "bedtime"]]];
   // full names, minus tour-sheet noise ("+ Extras", trailing dots)
   const moName = b => (b.t || "").replace(/\s*\+\s*extras\b/i, "").replace(/\.{2,}$/, "").replace(/^(tour|hike)\s*-\s*/i, (m, w) => w[0].toUpperCase() + w.slice(1).toLowerCase() + ": ").trim();
   function morningData(){
@@ -1885,7 +1891,12 @@
       <path d="M0 ${h * .62} C80 ${h * .45} 150 ${h * .58} 220 ${h * .5} S350 ${h * .4} 400 ${h * .52} V${h} H0Z" fill="#f4a76b" opacity=".55"/>
       <path d="M0 ${h * .75} C70 ${h * .62} 160 ${h * .78} 250 ${h * .66} S360 ${h * .62} 400 ${h * .7} V${h} H0Z" fill="#d9744f" opacity=".75"/>
       <path d="M0 ${h * .88} C90 ${h * .78} 200 ${h * .92} 300 ${h * .82} S380 ${h * .8} 400 ${h * .84} V${h} H0Z" fill="#7a3b52"/></svg>`;
-  const moWords = () => `<div class="mo-words">${MO_WORDS.map(w => `<button class="mo-word${G.day.intent === w ? " on" : ""}" data-word="${w}">${w}</button>`).join("")}</div>`;
+  const moPractices = () => MO_PRACTICES.map(([group, ids]) => `<div class="mo-kicker" style="margin-top:18px">${group}</div><div class="mo-prac">${ids.map(id => {
+      const h = HABITS.find(x => x[0] === id); if (!h) return "";
+      const n = (G.day.habits || {})[id] || 0, g = habitGain(id), auto = h[6] === "auto";
+      return `<button class="mo-pr${n ? " done" : ""}"${auto ? " disabled" : ` data-habit="${id}"`}><span class="mo-pr-i">${h[4]}</span>
+        <span class="mo-pr-t"><b>${esc(h[5])}</b><small>${esc(h[1].replace(/\s*\(.*\)$/, ""))}</small></span>
+        <span class="mo-pr-g">${n ? "✓" : auto ? "auto" : g ? `+${g}` : ""}</span></button>`; }).join("")}</div>`).join("");
   const moLeave = d => d.go ? `<div class="mo-leave">🧭 Leave by <b>${fmtT(new Date(+d.go.s - 30 * 60000))}</b> for ${esc(moName(d.go))}</div>` : "";
 
   /* weather: Open-Meteo (free, no key). Where: the phone's location when he allows it (he is
@@ -1974,8 +1985,8 @@
         ${m.pack.length ? `<div class="mo-kicker" style="margin-top:18px">Bring</div><div class="mo-pack">${m.pack.slice(0, 4).map(x => `<span>${esc(x)}</span>`).join("")}</div>` : ""}
         <button class="mo-more-btn" data-open="${esc(m.b.key)}">Everything for this ›</button>` });
     });
-    s.push({ pal:["#fff1c9", "#f0a35e", "#7b3f61"], html:`<div class="mo-kicker">Before you go</div><div class="mo-big">Choose one word for today</div>${moWords()}
-      ${G.day.intent ? `<p class="mo-soft">Carry <b>${esc(G.day.intent)}</b> into everything.</p>` : ""}
+    s.push({ pal:["#fff1c9", "#f0a35e", "#7b3f61"], html:`<div class="mo-kicker">Before you go</div><div class="mo-big">Practices for today</div>
+      <p class="mo-soft" style="margin-top:6px">Tap one when it's done. Each fills your prana.</p>${moPractices()}
       <button class="mo-go" data-mo="begin">Let's go</button>` });
     return s;
   }
@@ -1997,7 +2008,7 @@
         <button class="mo-tap l" data-mo="prev" aria-label="Back"></button><button class="mo-tap r" data-mo="next" aria-label="Next"></button>
         <div class="mo-b-c">${S.html}</div></div></div>
       <button class="mo-x" data-mo="close" aria-label="Close">✕</button>`;
-    el.querySelectorAll("[data-word]").forEach(b => b.onclick = e => { e.stopPropagation(); G.day.intent = b.dataset.word; log(`Word for today: ${b.dataset.word}`); saveG(); openMorning(); });
+    el.querySelectorAll("[data-habit]").forEach(b => b.onclick = e => { e.stopPropagation(); logHabit(b.dataset.habit, true); saveG(); openMorning(); });
     el.querySelectorAll("[data-open]").forEach(b => b.onclick = e => {
       e.stopPropagation();
       const blk = blocks().find(x => x.key === b.dataset.open); if (!blk) return;
@@ -2007,7 +2018,7 @@
       e.stopPropagation();
       const a = b.dataset.mo;
       if (a === "close") return closeMorning();
-      if (a === "begin") { G.day.briefDone = true; log(G.day.intent ? `Began the day: ${G.day.intent}` : "Began the day"); saveG(); closeMorning(); return render(); }
+      if (a === "begin") { G.day.briefDone = true; log("Began the day"); saveG(); closeMorning(); return render(); }
       if (a === "next") { if (moSlide < slides.length - 1) { moSlide++; openMorning(); } return; }
       if (a === "prev") { if (moSlide > 0) { moSlide--; openMorning(); } }
     });
