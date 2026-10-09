@@ -804,7 +804,7 @@
   const RECOVER = [["Isha Kriya", 12], ["Upa Yoga", 20], ["NSDR", 20]];
   const isRecovery = b => /isha kriya|upa yoga|nsdr|yoga nidra|\bnap\b|recover/i.test(b.t);
   function energy(b){                                  // { rate: spent per hour while it runs }
-    if (isSadhana(b) || isRecovery(b) || isMeal(b) || isSleep(b) || b.kind === "open" || b.kind === "break") return { rate:0 };
+    if (isSadhana(b) || isRecovery(b) || isMeal(b) || isSleep(b) || b.kind === "open" || b.kind === "break" || /^rest\b/i.test(b.t)) return { rate:0 };
     if (isGym(b) || b.kind === "body" || b.kind === "dance") return { rate:6 };
     const g = groupOf(b);
     // sitting on a bus or plane costs less than work; a tour is fun but still effort (d129)
@@ -826,7 +826,6 @@
      (2026-10-09): no coffee, nap (Oura has it), sugar or Mind items; neem and turmeric
      added; Dr Ellie split AM and PM; Blueprint meal = Super Veggie or Nutty Pudding. */
   const HABITS = [
-    ["daylight", "10 min outdoor light in the first hour awake, no sunglasses", 4, 1, "🌅", "10 min sun", "", "Morning"],
     ["water", "Water, one 250 ml cup", 0.6, 12, "💧", "250 ml water", "flat", "Morning"],
     ["protein", "30 g protein at breakfast", 3, 1, "🍳", "30 g protein AM", "", "Morning"],
     ["supps", "Morning supplements taken", 1, 1, "💊", "Supplements", "", "Morning"],
@@ -851,7 +850,6 @@
     ["ferment", "Fermented food: 100 g yogurt, kefir or sauerkraut", 2, 1, "🥛", "100 g fermented food", "", "Food"],
     ["xylitol", "Xylitol, 1 g (one mint or gum) after eating or drinking; Dr Ellie: 6 to 10 g a day", 0.6, 10, "🍬", "Xylitol 1 g", "flat", "Food"],
     ["lamp", "Light an oil lamp (natural oil, like sesame or ghee) before sleep", 2, 1, "🪔", "Oil lamp", "", "Evening"],
-    ["screens", "Screens off 60 min before bed", 5, 1, "📵", "No screens 60'", "", "Evening"],
     ["mouth", "Dr Ellie's mouthcare routine at night, the whole routine in one tap", 2, 1, "🦷", "Dr Ellie PM", "", "Evening"],
     ["early", "Last meal 3+ hr before bed (counts itself from the calendar, paid next morning)", 5, 1, "🍽️", "Last meal 3 hr", "auto", "Evening"],
     ["bedtime", "Asleep before 11 PM, read from your Oura ring (paid the next morning)", 5, 1, "🌙", "Asleep by 11", "auto", "Evening"],
@@ -988,7 +986,6 @@
   /* One plain sentence on why each action is there, shown in a small box on hover,
      or a long press on the phone (Junyan, 2026-10-09). */
   const WHY = {
-    daylight:"Morning light sets your body clock, so you feel awake now and sleepy on time tonight.",
     water:"Even a little dehydration makes you tired and foggy.",
     protein:"Protein at breakfast keeps your energy and hunger steady until lunch.",
     supps:"They fill the gaps your food might miss.",
@@ -1011,7 +1008,6 @@
     seeds:"Flax and chia add omega-3 fats and fibre.",
     ferment:"Fermented foods feed the good bacteria in your gut.",
     xylitol:"Xylitol after eating starves the bacteria that cause cavities.",
-    screens:"No screens before bed helps you fall asleep sooner and sleep deeper.",
     mouth:"Dr Ellie's routine protects your teeth and gums overnight, when the mouth is driest.",
     early:"Going to bed on an empty stomach gives deeper, more restful sleep.",
     bedtime:"Sleeping by 11 matches your body clock, so you wake up with more energy.",
@@ -1061,10 +1057,10 @@
      prana brings the recovery practices up, water rises when he is behind pace
      (12 cups from 6:30 AM to 9:30 PM), and a window about to close gets a nudge. */
   const WHEN = {
-    daylight:[5,10], water:[6,21.5], protein:[6,11], supps:[6,11], neem:[5,10], mouthAm:[5,11],
+    water:[6,21.5], protein:[6,11], supps:[6,11], neem:[5,10], mouthAm:[5,11],
     shambhavi:[5,10], kriya:[6,21], nadi:[6,21], upa:[6,21], barefoot:[6,19], lamp:[20,24], surya:[5,9.5], angam:[5,9.5], bhuta:[5,21], blueprint:[7,15], legumes:[11,21], veg:[11,21],
     greens:[11,21], evoo:[7,21], nuts:[7,21], berries:[7,21], seeds:[7,21], ferment:[7,21], xylitol:[7,22],
-    screens:[20.5,23], mouth:[20,24],
+    mouth:[20,24],
   };
   const FOOD = new Set(["protein", "blueprint", "legumes", "veg", "greens", "evoo", "nuts", "berries", "seeds", "ferment"]);
   function suggestions(n = 3){
@@ -1303,15 +1299,43 @@
     saveG();
   }
   // effort is counted once, for the time a started block really ran
+  const spanTxt = (from, to) => `${fmtHM(Math.round(Math.max(0, to - from) / 60000))}, ${fmtT(from)} to ${fmtT(to)}`;
+  const costOf = (r, from, to) => Math.round(r * Math.max(0, (to - from) / 3600000) * spendMult());
   function spend(b){
     const k = gk(b); G.day.spent = G.day.spent || {};
     if (G.day.spent[k]) return;
-    const r = energy(b).rate; G.day.spent[k] = true;
-    if (!r) return saveG();
+    const r = energy(b).rate;
     const from = new Date((G.day.started || {})[k] || b.s), to = new Date(Math.min(+now(), +b.e));
-    const hrs = Math.max(0, (to - from) / 3600000);
-    const d = Math.round(r * hrs * spendMult());
-    if (d) addPrana(-d, `${shortName(b)} used ${d} (${fmtHM(Math.round(hrs * 60))})`, ""); else saveG();
+    const d = r ? costOf(r, from, to) : 0;
+    // what was counted, so a later change to the block (or to the rates) can be recounted
+    G.day.spent[k] = { bs:b.s.toISOString(), be:b.e.toISOString(), from:from.toISOString(), to:to.toISOString(), r, d };
+    if (d) addPrana(-d, `${shortName(b)} used ${d} (${spanTxt(from, to)})`, ""); else saveG();
+  }
+  /* The schedule changes during the day (Junyan, 2026-10-09: "the schedule changed
+     through the day so the log needs to reflect that"). A finished block whose times
+     moved on the calendar, or whose cost per hour changed, is counted again from its
+     new times, and the log says so: "Sandboarding recounted, used 12 (...was 6)".
+     Blocks counted before this existed (spent = true) are recounted once from the log. */
+  function respend(b){
+    const k = gk(b), rec = (G.day.spent || {})[k], r = energy(b).rate;
+    if (!rec) return;
+    const bs = b.s.toISOString(), be = b.e.toISOString();
+    let old, from, to;
+    if (rec === true) {
+      const hit = (G.day.log || []).find(e => (e.msg || "").startsWith(shortName(b) + " used "));
+      old = hit ? -(+hit.xp || 0) : 0;
+      from = new Date((G.day.started || {})[k] || b.s); to = b.e;
+      if (from < b.s || from > b.e) from = b.s;
+    } else {
+      if (rec.bs === bs && rec.be === be && rec.r === r) return;
+      old = +rec.d || 0;
+      from = rec.bs === bs ? new Date(rec.from) : b.s;
+      to = rec.be === be ? new Date(rec.to) : b.e;
+    }
+    const d = r ? costOf(r, from, to) : 0;
+    G.day.spent[k] = { bs, be, from:from.toISOString(), to:to.toISOString(), r, d };
+    if (d !== old) addPrana(old - d, `${shortName(b)} recounted, used ${d} (${spanTxt(from, to)}, was ${old})`, d > old ? "schedule changed" : "given back");
+    else saveG();
   }
   function skip(b){
     G.day.checks[gk(b)] = "skip"; G.day.closes[gk(b)] = "skipped";
@@ -1987,7 +2011,7 @@
      then today's practices: yogic and Bryan Johnson's (he dropped "one word for today": "I want things
      to be yogic practices / or bryan johnson practices"). They are the Prana actions habits, logged the same way. */
   const MO_PRACTICES = [["Yogic", ["shambhavi", "surya", "kriya", "nadi"]],
-    ["Bryan Johnson", ["daylight", "salt", "caffeine", "protein", "blueprint", "early", "screens", "bedtime"]]];
+    ["Bryan Johnson", ["protein", "blueprint", "early", "bedtime"]]];
   // full names, minus tour-sheet noise ("+ Extras", trailing dots)
   const moName = b => (b.t || "").replace(/\s*\+\s*extras\b/i, "").replace(/\.{2,}$/, "").replace(/^(tour|hike)\s*-\s*/i, (m, w) => w[0].toUpperCase() + w.slice(1).toLowerCase() + ": ").trim();
   function morningData(){
@@ -2634,6 +2658,7 @@
     const since = new Date(G.day.pranaSince || G.day.since);
     autoStart(all.filter(b => needsCheck(b) && b.s <= t && b.e > since && !G.day.checks[gk(b)]));
     all.filter(b => b.e <= t && ["in", "late"].includes(G.day.checks[gk(b)]) && !(G.day.spent || {})[gk(b)]).forEach(spend);
+    all.filter(b => b.e <= t && ["in", "late"].includes(G.day.checks[gk(b)]) && (G.day.spent || {})[gk(b)]).forEach(respend);
     // coming up: the next real thing, with its prep, so he is ready before it starts
     const soon = z ? null : all.find(b => b.s > t && needsCheck(b) && !isMeal(b) && !isSleep(b) && !isSadhana(b)
       && b.s - t < (INSIGHTS[gk(b)] ? 3 : 1.5) * 3600000);
