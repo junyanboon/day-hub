@@ -26,7 +26,7 @@
   ];
   const DEFAULT = {
     hud: { x: 0, y: 0, w: 12, h: 2 },
-    now: { x: 0, y: 2, w: 4, h: 8 }, quick: { x: 0, y: 10, w: 4, h: 2 }, log: { x: 0, y: 12, w: 4, h: 4 },
+    now: { x: 0, y: 2, w: 4, h: 8 }, quick: { x: 0, y: 10, w: 4, h: 3 }, log: { x: 0, y: 13, w: 4, h: 3 },
     mtn: { x: 4, y: 2, w: 5, h: 8 }, skills: { x: 4, y: 10, w: 5, h: 6 },
     habits: { x: 9, y: 2, w: 3, h: 14 },
   };
@@ -81,6 +81,11 @@
       body.dash .w-now .card:first-of-type, body.dash .w-now > div > .card:first-child { margin-top:4px; }
       body.dash .grid-stack-placeholder > .placeholder-content { background:rgba(255,255,255,.08); border:1px dashed rgba(255,255,255,.35); border-radius:18px; }
       body.dash .ui-resizable-handle { opacity:0; transition:opacity .2s; } body.dash .grid-stack-item:hover .ui-resizable-handle { opacity:.6; }
+      /* the quick slots grow and shrink with their widget, so they always fit without scrolling (2026-10-09) */
+      body.dash .w-quick { display:flex; flex-direction:column; overflow:hidden; padding-bottom:8px; }
+      body.dash .w-quick > #questQuick { flex:1; min-height:0; margin:0 !important; }
+      body.dash .w-quick .bag-qbar { height:100%; padding:6px; }
+      body.dash .w-quick .bag-qbar .bag-sock { flex:0 0 auto; height:100%; width:auto; aspect-ratio:1; max-height:120px; }
       .dash-reset { position:fixed; left:14px; bottom:14px; z-index:50; background:var(--glass); border:1px solid var(--glass-border);
         color:var(--ink-soft); font-size:12px; padding:7px 12px; border-radius:999px; backdrop-filter:blur(10px); opacity:.35; transition:opacity .2s; }
       .dash-reset:hover { opacity:1; }
