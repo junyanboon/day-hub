@@ -854,7 +854,6 @@
     ["berries", "100 g berries", 2, 1, "🫐", "100 g berries", "", "Food"],
     ["seeds", "1 tbsp ground flax or chia", 1, 1, "🌱", "1 tbsp flax/chia", "", "Food"],
     ["ferment", "Fermented food: 100 g yogurt, kefir or sauerkraut", 2, 1, "🥛", "100 g fermented food", "", "Food"],
-    ["pause", "Wait two minutes before the first bite of a meal", 0.6, 3, "⏳", "2 min before eating", "flat", "Food"],
     ["xylitol", "Xylitol, 1 g (one mint or gum) after eating or drinking; Dr Ellie: 6 to 10 g a day", 0.6, 10, "🍬", "Xylitol 1 g", "flat", "Food"],
     ["lamp", "Light an oil lamp (natural oil, like sesame or ghee) before sleep", 2, 1, "🪔", "Oil lamp", "", "Evening"],
     ["screens", "Screens off 60 min before bed", 5, 1, "📵", "No screens 60'", "", "Evening"],
@@ -1022,7 +1021,6 @@
     early:"Going to bed on an empty stomach gives deeper, more restful sleep.",
     bedtime:"Sleeping by 11 matches your body clock, so you wake up with more energy.",
     barefoot:"Bare feet on natural ground keep you in touch with the earth, which Sadhguru says supports health and inner wellbeing.",
-    pause:"Two minutes of waiting turns eating from a compulsion into a conscious choice.",
     lamp:"Sadhguru recommends a lamp lit with natural oil before sleep to cleanse the space and ward off airborne infections.",
   };
   let whyTip = null, whyHeld = false;
@@ -1069,11 +1067,11 @@
      (12 cups from 6:30 AM to 9:30 PM), and a window about to close gets a nudge. */
   const WHEN = {
     daylight:[5,10], water:[6,21.5], protein:[6,11], supps:[6,11], neem:[5,10], mouthAm:[5,11],
-    shambhavi:[5,10], kriya:[6,21], nadi:[6,21], upa:[6,21], barefoot:[6,19], pause:[6,22], lamp:[20,24], surya:[5,9.5], angam:[5,9.5], bhuta:[5,21], blueprint:[7,15], legumes:[11,21], veg:[11,21],
+    shambhavi:[5,10], kriya:[6,21], nadi:[6,21], upa:[6,21], barefoot:[6,19], lamp:[20,24], surya:[5,9.5], angam:[5,9.5], bhuta:[5,21], blueprint:[7,15], legumes:[11,21], veg:[11,21],
     greens:[11,21], evoo:[7,21], nuts:[7,21], berries:[7,21], seeds:[7,21], ferment:[7,21], xylitol:[7,22],
     screens:[20.5,23], mouth:[20,24],
   };
-  const FOOD = new Set(["pause", "protein", "blueprint", "legumes", "veg", "greens", "evoo", "nuts", "berries", "seeds", "ferment"]);
+  const FOOD = new Set(["protein", "blueprint", "legumes", "veg", "greens", "evoo", "nuts", "berries", "seeds", "ferment"]);
   function suggestions(n = 3){
     const t = now(), all = blocks(), p = tzParts(t, { hour:"numeric", minute:"numeric", hourCycle:"h23" }), h = +p.hour + +p.minute / 60;
     const meal = all.find(b => isMeal(b) && +b.s - 20 * 60000 <= +t && +t <= +b.e + 40 * 60000);
@@ -1085,7 +1083,6 @@
       if (w[1] - h < 1.5) sc += 4;                                     // its window closes soon
       if (FOOD.has(id)) sc += meal ? 9 : -4;
       if (id === "xylitol") sc += afterMeal ? 12 : -5;
-      if (id === "pause" && meal) sc += 6;                               // first thing at a meal
       if (id === "barefoot" && nearNewMoon(t)) sc += 8;                  // Sadhguru: most important around the new moon
       if (id === "water") { const due = Math.floor((h - 6.5) / 1.25) + 1; sc += (due - (G.day.habits.water || 0)) * 3; }
       if (["kriya", "nadi", "upa", "bhuta"].includes(id) && prana() < 45) sc += 8;
@@ -1605,6 +1602,7 @@
       <div class="win-lb">On the plate</div>
       ${PLATE.map(([id, txt]) => `<button class="wck${M.plate[id] ? " on" : ""}" data-plate="${id}"><span class="bx">${M.plate[id] ? "✓" : ""}</span>${txt}</button>`).join("")}
       <div class="win-lb">Eat with attention</div>
+      <p>⏳ Sit with the food and wait two minutes before the first bite, so you eat by choice, not by compulsion (Sadhguru).</p>
       <button class="wck${M.phone ? " on" : ""}" id="mPhone"><span class="bx">${M.phone ? "✓" : ""}</span>Phone face down until I'm done</button>
       <div class="actions"><button class="btn" id="mBp">🥗 Super Veggie or Nutty Pudding${habitGain("blueprint") ? ` +${habitGain("blueprint")}` : " (done)"}</button></div>
       <div class="actions"><button class="btn ghost" id="mEdit">Change time or name</button></div>`, true);
