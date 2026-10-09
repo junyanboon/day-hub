@@ -2931,12 +2931,7 @@
       bh = `<button class="mo-open" id="bMorning"><span class="mo-open-art">${moHills(90)}</span>
         <span class="mo-open-t"><b>☀️ Open your morning</b><small>${esc(placeNow())}${n ? ` · ${n} moment${n > 1 ? "s" : ""} today` : ""}</small></span><span class="pa-go">›</span></button>`;
     }
-    // running low: offer recovery, at most once every 2 hours
-    const low = PLAN && !z && prana() < 40 && (!G.day.lowAt || +t - +new Date(G.day.lowAt) > 2 * 3600000) && !(cur && isRecovery(cur));
-    if (!bh && low) bh = `<div class="card brief"><div class="eyebrow">Running low · ${Math.round(prana())}%</div>
-      <div class="q">You've given a lot today. Want to refill before what's next?</div>
-      <div class="actions" style="flex-wrap:wrap">${RECOVER.map(([n, m]) => `<button class="btn" data-now="${n}|${m}">${n} · ${m} min</button>`).join("")}
-      <button class="btn ghost" id="bLowOk">I'm OK</button></div></div>`;
+    // "Running low" card dropped (Junyan, 2026-10-09: "cute but it's not necessary")
     // no Oura yet: ask how long he slept, once each morning
     if (PLAN && !z && !G.day.slept && hourNow >= 4 && hourNow < 13) bh = `<div class="card brief"><div class="eyebrow">Good morning</div>
       <div class="q">How long did you sleep? Sleep refills your prana (you're at ${Math.round(prana())}%).</div>
@@ -2955,9 +2950,7 @@
     if (nightNow && !G.day.nightShown && !$("sheet").classList.contains("open") && !$("calx") && !$("night")) { G.day.nightShown = true; saveG(); openNight(); }
     put("habits", PLAN ? (nightNow ? `<button class="pa-all nt-open" data-night>🌙 Day's end<span>tomorrow, deathbed, reflection ›</span></button>` : "") + stepsHTML() + suggestHTML() : ""); bindHabits($("habits"));
     $("habits").querySelectorAll("[data-night]").forEach(bn => bn.onclick = openNight);
-    $("brief").querySelectorAll("[data-now]").forEach(bn => bn.onclick = () => { G.day.lowAt = now().toISOString(); const [n, m] = bn.dataset.now.split("|"); startNow(n, +m); });
-    if (low && !G.day.lotusGiven) { G.day.lotusGiven = true; giveItem("lotus", "Your energy is low today."); }
-    if ($("bLowOk")) $("bLowOk").onclick = () => { G.day.lowAt = now().toISOString(); saveG(); render(); };
+    if (PLAN && !z && prana() < 40 && !G.day.lotusGiven) { G.day.lotusGiven = true; giveItem("lotus", "Your energy is low today."); }
     if ($("bMorning")) $("bMorning").onclick = () => openMorning();
     // a ?morning=1 link opens the morning straight away, any time of day
     if ((qs.get("morning") || qs.get("brief")) && PLAN && !openMorning.auto) { openMorning.auto = true; setTimeout(() => openMorning(), 600); }
