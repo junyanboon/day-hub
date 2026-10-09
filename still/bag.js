@@ -64,7 +64,21 @@
       done: 'This block is now recovery.',
       choices: ['Isha Kriya', 'Upa Yoga', 'NSDR'] }
   };
-  const RARITY = { common: 'Common', rare: 'Rare', sacred: 'Sacred' };
+  const RARITY = { common: 'Common', rare: 'Rare', sacred: 'Sacred', keep: 'Keepsake' };
+  /* Keepsakes (2026-10-09, keeps.js): one object per amazing moment, from still-api
+     /quest/keeps. Ids are "k:<id>". They live on their own shelf (never in the 16-slot
+     grid), can sit in the quick slots, are never used up and are not counted. */
+  let KEEPS = {}, keepsLoaded = false;
+  const isKeep = (id) => typeof id === 'string' && id.slice(0, 2) === 'k:';
+  function itemOf(id) {
+    if (ITEMS[id]) return ITEMS[id];
+    const k = KEEPS[id]; if (!k) return null;
+    const when = window.Keeps ? window.Keeps.fmtDay(k.date) : k.date;
+    return { id, name: k.name, rarity: 'keep', flavour: k.flavour || '', keep: k,
+      does: 'Plays its own song while its poem appears, line by line. Never used up.',
+      found: when + (k.place ? ' · ' + k.place : '') + (k.title ? ' · ' + k.title : '') };
+  }
+  const countOf = (b, id) => (isKeep(id) ? (KEEPS[id] ? 1 : 0) : b.counts[id] || 0);
   const GRID = 16, QUICK = 3;
   const BREATH_SECS = 180, FOCUS_MIN = 50;
 
@@ -100,6 +114,7 @@
       for (let i = 0; i < arr.length; i++) {
         const id = arr[i];
         if (id == null) { arr[i] = null; continue; }
+        if (isKeep(id)) { if (arr === b.slots || placed[id] || (keepsLoaded && !KEEPS[id])) arr[i] = null; else placed[id] = true; continue; }
         if (!ITEMS[id] || !(b.counts[id] > 0) || placed[id]) arr[i] = null; else placed[id] = true;
       }
     };
@@ -405,6 +420,7 @@ ${eye(47)}${eye(73)}
 
   function art(id, cls) {
     const u = 'bq' + (++uid) + '_';
+    if (isKeep(id)) return `<svg class="bag-art kp-art${cls ? ' ' + cls : ''}" viewBox="0 0 120 120" aria-hidden="true" focusable="false">${KEEPS[id] && window.Keeps ? window.Keeps.art(KEEPS[id], u) : ''}</svg>`;
     return `<svg class="bag-art ba-${id}${cls ? ' ' + cls : ''}" viewBox="0 0 120 120" aria-hidden="true" focusable="false">${ART[id](u)}</svg>`;
   }
   const SPARK_POS = [[16, 20, 0], [80, 14, .9], [74, 76, 1.7], [20, 72, 2.4], [50, 8, 1.2], [88, 46, .4], [8, 46, 2.0], [46, 88, 2.8], [30, 34, 3.1], [66, 30, 1.5]];
@@ -416,11 +432,11 @@ ${eye(47)}${eye(73)}
 
   /* ---------------- rendering ---------------- */
   function sockHTML(b, loc, key) {
-    const id = getLoc(b, loc), it = id && ITEMS[id], n = it ? b.counts[id] : 0;
+    const id = getLoc(b, loc), it = id && itemOf(id), n = it ? countOf(b, id) : 0;
     if (!it) return `<div class="bag-sock" data-bag-loc="${loc}" aria-label="Empty slot">${key ? `<span class="bag-key">${key}</span>` : ''}</div>`;
     return `<div class="bag-sock has r-${it.rarity}" data-bag-loc="${loc}" role="button" tabindex="0" aria-label="${esc(it.name)}${n > 1 ? ', ' + n : ''}">
       <span class="bag-glow"></span><i class="bag-rim"><b></b></i>${key ? `<span class="bag-key">${key}</span>` : ''}
-      ${art(id)}${it.rarity === 'sacred' ? sparks(4) : ''}${n > 1 ? `<span class="bag-n">${n}</span>` : ''}${b.seen[id] ? '' : '<span class="bag-new"></span>'}</div>`;
+      ${art(id)}${it.rarity === 'sacred' || it.rarity === 'keep' ? sparks(isKeep(id) ? 2 : 4) : ''}${n > 1 ? `<span class="bag-n">${n}</span>` : ''}${b.seen[id] ? '' : '<span class="bag-new"></span>'}</div>`;
   }
   function timerChip(b) {
     if (!b.timer || !(b.timer.end > Date.now())) return '';
@@ -434,8 +450,17 @@ ${eye(47)}${eye(73)}
       <div class="bag-grid">${b.slots.map((_, i) => sockHTML(b, 's:' + i)).join('')}</div>
       <div class="bag-qhead"><span class="bag-qlabel">Quick bar</span>${timerChip(b)}</div>
       <div class="bag-quick">${b.quick.map((_, i) => sockHTML(b, 'q:' + i, i + 1)).join('')}</div>
+      <div class="bag-qhead"><span class="bag-qlabel">Keepsakes</span></div>
+      <div class="bag-shelf">${shelfHTML()}</div>
       <div class="bag-hint">Tap an item to look closer. Hold it to move it.</div>
     </div>`;
+  }
+  function shelfHTML() {
+    const list = Object.keys(KEEPS).sort((x, y) => KEEPS[y].date.localeCompare(KEEPS[x].date));
+    if (!list.length) return `<div class="bag-shelf-empty">${keepsLoaded ? 'Your first keepsake comes from an amazing day. Mark one at Day\'s end.' : 'Loading your keepsakes…'}</div>`;
+    return list.map((id) => { const k = KEEPS[id];
+      return `<div class="bag-sock has r-keep" data-bag-keep="${esc(id)}" role="button" tabindex="0" aria-label="${esc(k.name)}">
+        <span class="bag-glow"></span><i class="bag-rim"><b></b></i>${art(id)}<span class="bag-shelf-when">${esc(window.Keeps ? window.Keeps.fmtDay(k.date).replace(/^\w+, /, '') : k.date)}</span></div>`; }).join('');
   }
   function quickHTML(b) {
     return `<div class="bag-qbar">${b.quick.map((_, i) => sockHTML(b, 'q:' + i, i + 1)).join('')}${timerChip(b)}</div>`;
@@ -499,7 +524,8 @@ ${eye(47)}${eye(73)}
   function onDown(e) {
     if (e.button > 0) return;
     const s = e.target.closest('.bag-sock'); if (!s) return;
-    const loc = s.dataset.bagLoc, id = getLoc(bag(), loc);
+    const loc = s.dataset.bagLoc; if (!loc) return;   // shelf keepsakes open on tap, they are not dragged
+    const id = getLoc(bag(), loc);
     if (!id) return;
     endDrag();
     drag = { loc, id, sock: s, x0: e.clientX, y0: e.clientY, x: e.clientX, y: e.clientY, mouse: e.pointerType === 'mouse', picked: false, over: null, maxMove: 0 };
@@ -526,7 +552,7 @@ ${eye(47)}${eye(73)}
     drag.picked = true;
     const r = drag.sock.getBoundingClientRect();
     const size = Math.max(64, Math.min(84, r.width));
-    const it = ITEMS[drag.id];
+    const it = itemOf(drag.id);
     const g = document.createElement('div');
     g.className = 'bag-ghost r-' + it.rarity;
     g.style.width = g.style.height = size + 'px';
@@ -560,6 +586,9 @@ ${eye(47)}${eye(73)}
     if (tLoc && tLoc !== d.loc) {
       const b = bag(), other = getLoc(b, tLoc);
       setLoc(b, tLoc, d.id); setLoc(b, d.loc, other);
+      // a keepsake never lands in the bag grid: it goes back to its shelf
+      if (tLoc[0] === 's' && isKeep(d.id)) setLoc(b, tLoc, null);
+      if (d.loc[0] === 's' && isKeep(other)) setLoc(b, d.loc, null);
       logEv(b, { ev: 'move', id: d.id, from: d.loc, to: tLoc });
       save();
       endDrag(); render(); landAt(tLoc); if (other) landAt(d.loc);
@@ -592,6 +621,7 @@ ${eye(47)}${eye(73)}
     if (Date.now() - lastDragEnd < 450) return;
     if (e.target.closest('[data-bag-timer]')) { openBell(); return; }
     const s = e.target.closest('.bag-sock'); if (!s) return;
+    if (s.dataset.bagKeep) { openItem(s.dataset.bagKeep); return; }
     const id = getLoc(bag(), s.dataset.bagLoc);
     if (id) openItem(id);
     else if (s.closest('.bag-qroot') && typeof ctx.openBag === 'function') ctx.openBag();
@@ -599,16 +629,16 @@ ${eye(47)}${eye(73)}
   function onKey(e) {
     if (e.key !== 'Enter' && e.key !== ' ') return;
     const s = e.target.closest('.bag-sock'); if (!s) return;
-    const id = getLoc(bag(), s.dataset.bagLoc);
+    const id = s.dataset.bagKeep || getLoc(bag(), s.dataset.bagLoc);
     if (id) { e.preventDefault(); openItem(id); }
   }
 
   /* ---------------- detail card ---------------- */
   function openItem(id) {
-    const it = ITEMS[id]; if (!it) return;
+    const it = itemOf(id); if (!it) return;
     ensureLayer(); bindGlobals();
     closeSheet(true);
-    const b = bag(), n = b.counts[id] || 0;
+    const b = bag(), n = countOf(b, id);
     if (n > 0 && !b.seen[id]) { b.seen[id] = true; save(); render(); }
     const sc = document.createElement('div'); sc.className = 'bag-scrim';
     const sh = document.createElement('div');
@@ -620,9 +650,9 @@ ${eye(47)}${eye(73)}
       <div class="bag-hero r-${it.rarity}"><span class="bag-hero-glow"></span>${it.rarity === 'sacred' ? sparks(10) : ''}
         <div class="bag-hero-float">${art(id, 'bag-hero-art')}</div></div>
       <div class="bag-dname">${esc(it.name)}</div>
-      <div class="bag-dmeta"><span class="bag-tag r-${it.rarity}">${RARITY[it.rarity]}</span><span class="bag-count">${n > 0 ? 'You have ' + n : 'None in your bag'}</span></div>
+      <div class="bag-dmeta"><span class="bag-tag r-${it.rarity}">${RARITY[it.rarity]}</span><span class="bag-count">${isKeep(id) ? (locOf(b, id) ? 'In your quick slots' : 'On your shelf') : n > 0 ? 'You have ' + n : 'None in your bag'}</span></div>
       <p class="bag-flav">${esc(it.flavour)}</p>
-      <div class="bag-lines"><div><b>What it does</b><span>${esc(it.does)}</span></div><div><b>Found</b><span>${esc(it.found)}</span></div></div>
+      <div class="bag-lines"><div><b>What it does</b><span>${esc(it.does)}</span></div><div><b>${isKeep(id) ? 'From' : 'Found'}</b><span>${esc(it.found)}</span></div></div>
       <div class="bag-acts"></div>`;
     layer.appendChild(sc); layer.appendChild(sh);
     sheet = { el: sh, scrim: sc, id };
@@ -634,10 +664,13 @@ ${eye(47)}${eye(73)}
   }
   function setActs(mode) {
     if (!sheet) return;
-    const it = ITEMS[sheet.id], b = bag(), n = b.counts[it.id] || 0, loc = locOf(b, it.id);
+    const it = itemOf(sheet.id), b = bag(), n = countOf(b, it.id), loc = locOf(b, it.id);
     const dis = n > 0 ? '' : ' disabled';
     let h = '';
-    if (mode === 'main') {
+    if (mode === 'main' && isKeep(it.id)) {
+      h = `<button class="bag-use" data-act="use">▶ Relive it</button>
+        <div class="bag-row"><button class="bag-btn bag-wide" data-act="move">${loc ? 'Back to the shelf' : 'Put in a quick slot'}</button></div>`;
+    } else if (mode === 'main') {
       const running = it.id === 'bell' && b.timer && b.timer.end > Date.now();
       h = `<button class="bag-use" data-act="use"${running ? '' : dis}>${running ? 'Show the running timer' : 'Use'}</button>
         <div class="bag-row"><button class="bag-btn" data-act="move"${dis}>${loc && loc[0] === 'q' ? 'Move to bag' : 'Move to quick bar'}</button>
@@ -674,7 +707,20 @@ ${eye(47)}${eye(73)}
     else setTimeout(() => { s.el.remove(); s.scrim.remove(); }, 320);
   }
   function moveToggle(id) {
-    const b = bag(), loc = locOf(b, id); if (!loc) return;
+    const b = bag(), loc = locOf(b, id);
+    if (isKeep(id)) {
+      if (loc) { setLoc(b, loc, null); logEv(b, { ev: 'move', id, from: loc, to: 'shelf' }); save(); closeSheet(); render(); return; }
+      let i = b.quick.indexOf(null); if (i < 0) i = QUICK - 1;
+      const to = 'q:' + i, other = getLoc(b, to);
+      if (other && !isKeep(other)) {
+        const j = b.slots.indexOf(null);
+        if (j < 0) { toast({ head: 'Bag', body: 'The bag grid is full, so the item in that quick slot has nowhere to go. Drop or use something first.', kind: 'info' }); return; }
+        setLoc(b, 's:' + j, other);
+      }
+      setLoc(b, to, id); logEv(b, { ev: 'move', id, from: 'shelf', to });
+      save(); closeSheet(); render(); landAt(to); return;
+    }
+    if (!loc) return;
     let to;
     if (loc[0] === 'q') {
       const i = b.slots.indexOf(null);
@@ -695,14 +741,20 @@ ${eye(47)}${eye(73)}
     delete b.counts[id];
     logEv(b, { ev: 'drop', id, n });
     save(); closeSheet(); render();
-    toast({ id, head: 'Dropped', body: `${ITEMS[id].name} left your bag.`, kind: 'info' });
+    toast({ id, head: 'Dropped', body: `${itemOf(id).name} left your bag.`, kind: 'info' });
   }
 
   /* ---------------- using items ---------------- */
   async function use(id, opts) {
-    const it = ITEMS[id]; if (!it) return;
+    const it = itemOf(id); if (!it) return;
     opts = opts || {};
     const b = bag();
+    if (isKeep(id)) {   // relive it: its tune and poem. Never used up.
+      closeSheet(); logEv(b, { ev: 'relive', id }); save();
+      if (window.Keeps) window.Keeps.relive(KEEPS[id]);
+      const fn = ctx.actions && ctx.actions.relive; if (fn) { try { fn(it); } catch (_) {} }
+      return;
+    }
     if (id === 'bell' && b.timer && b.timer.end > Date.now()) { closeSheet(); openBell(); return; }
     if (!(b.counts[id] > 0)) { toast({ id, head: it.name, body: 'None in your bag right now.', kind: 'info' }); return; }
     if (it.choices && !opts.choice) { if (sheet && sheet.id === id) setActs('choose'); else { openItem(id); setActs('choose'); } return; }
@@ -748,7 +800,7 @@ ${eye(47)}${eye(73)}
     ensureLayer();
     const host = layer.querySelector('.bag-toasts');
     const t = document.createElement('div');
-    const it = o.id && ITEMS[o.id];
+    const it = o.id && itemOf(o.id);
     t.className = 'bag-toast bag-toast-' + (o.kind || 'info') + (it ? ' r-' + it.rarity : '');
     t.innerHTML = (it ? `<span class="bag-toast-art r-${it.rarity}">${art(o.id)}</span>` : '') +
       `<span class="bag-toast-tx"><span class="bag-toast-h">${esc(o.head || '')}</span><span class="bag-toast-b">${esc(o.body || '')}</span></span>`;
@@ -958,6 +1010,24 @@ ${eye(47)}${eye(73)}
     } catch (_) {}
   }
 
-  const api = { ITEMS, mount, mountQuick, render, give, openItem, use, close: () => { closeSheet(); closeOverlay(); }, art: (id) => (ITEMS[id] ? art(id) : '') };
+  /* the keepsakes from still-api; new ones go into an empty quick slot and are announced once */
+  function setKeeps(list, fresh) {
+    KEEPS = {};
+    for (const k of list || []) if (k && k.id) KEEPS['k:' + k.id] = k;
+    keepsLoaded = true;
+    const b = bag();
+    fresh = (fresh || []).filter((id) => KEEPS[id]).sort((x, y) => KEEPS[y].date.localeCompare(KEEPS[x].date));
+    const many = fresh.length > 2;
+    for (const id of fresh) {
+      const i = b.quick.indexOf(null);
+      if (i >= 0 && !locOf(b, id)) { b.quick[i] = id; logEv(b, { ev: 'give', id, n: 1, why: 'keepsake' }); }
+      delete b.seen[id];
+      if (!many) toast({ id, head: 'New keepsake: ' + KEEPS[id].name, body: 'Tap it to relive ' + (KEEPS[id].title || 'the day') + '.', kind: 'found', ms: 7000 });
+    }
+    if (many) toast({ id: fresh[0], head: fresh.length + ' new keepsakes', body: 'One for each amazing day. The newest are in your quick slots; the rest are on the shelf in your bag.', kind: 'found', ms: 9000 });
+    if (fresh && fresh.length) save();
+    render();
+  }
+  const api = { ITEMS, mount, mountQuick, render, give, openItem, use, setKeeps, close: () => { closeSheet(); closeOverlay(); }, art: (id) => (itemOf(id) ? art(id) : '') };
   window.Bag = api;
 })();

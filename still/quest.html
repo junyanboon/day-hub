@@ -449,10 +449,11 @@
   .mo-row-t { width:66px; flex:none; font-size:13px; opacity:.85; } .mo-row-n { flex:1; min-width:0; font-size:15px; } .mo-row-go { flex:none; opacity:.7; font-size:18px; }
 </style>
 <link rel="stylesheet" href="bag.css">
-<script src="bag.js"></script>
-<script src="quest-merge.js"></script>
+<script src="keeps.js?v=20261009k"></script>
+<script src="bag.js?v=20261009k"></script>
+<script src="quest-merge.js?v=20261009k"></script>
 <script src="quest-fx.js"></script>
-<script src="quest-night.js"></script>
+<script src="quest-night.js?v=20261009k"></script>
 </head>
 <body>
 <div id="app">
@@ -652,6 +653,7 @@
         const left = (G.research || []).filter(r => !INSIGHTS[r.key]);
         if (left.length !== (G.research || []).length) { G.research = left; saveG(); } }).catch(() => {});
       pullSkills().then(() => { if (!$("sheet").classList.contains("open")) render(); }).catch(() => {});
+      pullKeeps();
       lastPull = new Date(); pullErr = null;
       setTimeout(openPending, 0);
     } catch (e) { pullErr = String(e.message || e); }
@@ -956,6 +958,25 @@
      Opens by itself once the day's last item ends (not sleep, not open time), and
      a 🌙 button reopens it. quest-night.js draws it; no prana is given there. */
   const lastItemEnd = all => { const r = all.filter(b => !isSleep(b) && b.kind !== "open" && b.kind !== "break"); return r.length ? Math.max(...r.map(b => +b.e)) : null; };
+  /* keepsakes (keeps.js, still-api /quest/keeps): new ones are announced once per device */
+  let KEEP = { items:[], wants:[] };
+  async function pullKeeps(){
+    if (!questKey() || !hasBag()) return;
+    try {
+      KEEP = await qfetch("/quest/keeps");
+      let seen = []; try { seen = JSON.parse(localStorage.getItem("quest-keeps-seen") || "[]"); } catch {}
+      const fresh = (KEEP.items || []).map(k => "k:" + k.id).filter(id => !seen.includes(id));
+      Bag.setKeeps(KEEP.items || [], fresh);   // first, so a stale cached bag.js never marks them seen
+      try { localStorage.setItem("quest-keeps-seen", JSON.stringify(seen.concat(fresh))); } catch {}
+    } catch {}
+  }
+  // the blocks of a day worth keeping: effort first (the big outings), then the rest he did
+  function keepCandidates(all){
+    const did = all.filter(b => ["in", "late"].includes(G.day.checks[gk(b)]) && !isSleep(b) && !isMeal(b) && b.kind !== "open" && b.kind !== "break" && !/^rest\b|laundry|shower|check.?in|check.?out/i.test(b.t));
+    const made = new Set((KEEP.items || []).map(k => k.key)), want = new Set((KEEP.wants || []).map(w => w.key));
+    return did.sort((a, b) => energy(b).rate - energy(a).rate || a.s - b.s).slice(0, 6)
+      .map(b => ({ key:gk(b), title:b.t, name:moName(b), time:`${fmtT(b.s)} to ${fmtT(b.e)}`, state:made.has(gk(b)) ? "made" : want.has(gk(b)) ? "asked" : "", s:b.s, e:b.e }));
+  }
   async function openNight(){
     if (!window.QuestNight || !G.day) return;
     const all = blocks(), t = now();
@@ -985,6 +1006,12 @@
       onDeathbed: () => { G.day.deathbed = now().toISOString(); log("Sat as if on my deathbed"); },
       onNote: (text, prompt) => { (G.night = G.night || {})[G.day.date] = { note:text, prompt, at:now().toISOString() }; saveG(); },
       onBirth: v => { G.birth = v; saveG(); },
+      keeps: keepCandidates(all),
+      onKeep: async c => {
+        await qfetch("/quest/keeps", { method:"POST", body:JSON.stringify({ op:"want", want:{ key:c.key, date:gameYmd(), title:c.title, place:placeNow(),
+          s:c.s.toISOString(), e:c.e.toISOString() } }) });
+        (KEEP.wants = KEEP.wants || []).push({ key:c.key }); log(`Keepsake asked for: ${c.name}`);
+      },
     });
   }
 
@@ -1997,6 +2024,7 @@
         return `Wind-down started. Phone on the charger, lights low${sl ? `. Bed at ${fmtT(sl.s)}` : ""}.`; },
       lotus: async (item, o = {}) => { const r = RECOVER.find(x => x[0] === o.choice) || RECOVER[0]; startNow(r[0], r[1]); return `${r[0]} for ${r[1]} min. It's on your plan now.`; },
       bell: async (item, o = {}) => `Focus until ${fmtT(new Date(o.endsAt || +now() + 50 * 60000))}.`,
+      relive: item => log(`Relived: ${item.name}`),
     },
   };
   function openShiftMenu(n){

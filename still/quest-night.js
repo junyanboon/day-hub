@@ -69,6 +69,11 @@
           ${d.tomorrow.items.length ? `<ul class="nt-sched">${d.tomorrow.items.map((x) => `<li><span>${esc(x.time)}</span>${esc(x.name)}</li>`).join("")}</ul>`
             : `<div class="nt-hint">${esc(d.tomorrow.note || "Nothing on the calendar yet.")}</div>`}
         </section>
+        ${d.keeps && d.keeps.length ? `<section><h3>Keep a memory</h3>
+          <div class="nt-hint" style="margin-bottom:8px">Tap what was amazing today. Overnight it becomes a keepsake in your bag, with its own poem and song.</div>
+          <div class="nt-keeps">${d.keeps.map((c, i) => `<button class="nt-keep${c.state ? " on" : ""}" data-keep="${i}"${c.state ? " disabled" : ""}>
+            <span>${c.state === "made" ? "🎁" : c.state === "asked" ? "✨" : "☆"}</span><span><b>${esc(c.name)}</b><small>${esc(c.time)}${c.state === "made" ? " · in your bag" : c.state === "asked" ? " · being made" : ""}</small></span></button>`).join("")}</div>
+        </section>` : ""}
         <section>
           <button class="nt-tile${d.deathbedDone ? " done" : ""}" id="ntBed"><span class="nt-ti">🕯️</span><span>
             <b>Sit as if on your deathbed</b><small>Sit on your bed. One minute left to live. Look back on your day: was it worthwhile?</small></span>
@@ -87,6 +92,11 @@
         </section>
       </div>`;
       el.querySelector("#ntX").onclick = close;
+      el.querySelectorAll("[data-keep]").forEach((bn) => bn.onclick = async () => {
+        const c = d.keeps[+bn.dataset.keep]; bn.disabled = true;
+        try { await d.onKeep(c); c.state = "asked"; } catch (e) { bn.disabled = false; bn.querySelector("small").textContent = "Could not save it. Try again."; return; }
+        draw();
+      });
       el.querySelector("#ntBed").onclick = () => { if (!d.deathbedDone) { d.deathbedDone = true; d.onDeathbed(); draw(); } };
       el.querySelector("#ntNext").onclick = () => { ex = (ex + 1) % EXERCISES.length; draw(); };
       el.querySelector("#ntSave").onclick = () => { d.note = el.querySelector("#ntNote").value.trim(); d.onNote(d.note, EXERCISES[ex]); el.querySelector("#ntSave").textContent = "Kept ✓"; };
@@ -129,6 +139,12 @@
     .nt-bars { display:flex; align-items:flex-end; gap:2px; height:70px; margin-top:10px; }
     .nt-bars i { flex:1; border-radius:2px 2px 0 0; min-width:3px; max-width:14px; }
     .nt-life { width:100%; max-width:330px; display:block; margin:10px auto 0; }
+    .nt-keeps { display:flex; flex-direction:column; gap:8px; }
+    .nt-keep { display:flex; gap:12px; align-items:center; text-align:left; padding:12px 14px; border-radius:14px; background:var(--glass);
+      border:1px solid var(--glass-border); color:var(--ink); font:inherit; cursor:pointer; }
+    .nt-keep > span:first-child { font-size:20px; width:24px; text-align:center; }
+    .nt-keep b { display:block; font-size:14px; } .nt-keep small { display:block; font-size:12px; color:var(--ink-soft); margin-top:2px; }
+    .nt-keep.on { border-color:rgba(240,166,192,.6); background:linear-gradient(135deg, rgba(240,166,192,.16), rgba(255,255,255,.04)); cursor:default; }
     .nt-birth { display:flex; flex-direction:column; gap:8px; margin-top:12px; } .nt-birth label { font-size:13px; color:var(--ink-soft); }`;
   document.head.appendChild(css);
   root.QuestNight = { open };
