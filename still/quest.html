@@ -473,7 +473,6 @@
   <div id="loose"></div>
   <div id="main"></div>
   <div id="nextLine"></div>
-  <div id="questQuick" style="margin:10px 0 4px"></div>
   <div id="habits"></div>
 
   <h2><span>Skills</span><button class="add-btn" id="skillsBtn">Open</button></h2>
@@ -2010,7 +2009,7 @@
     Bag.mount($("bagView"), BAG_CTX);
   }
   $("bagBtn").onclick = openBag;
-  if (hasBag()) { try { Bag.mount(document.createElement("div"), BAG_CTX); Bag.mountQuick($("questQuick")); } catch (e) { console.warn("bag", e); } }
+  if (hasBag()) { try { Bag.mount(document.createElement("div"), BAG_CTX); } catch (e) { console.warn("bag", e); } }
 
   /* ---------- the morning (2026-10-09, d147) ----------
      One button opens a full-screen morning you tap through like stories (Junyan picked the Story

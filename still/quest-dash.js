@@ -21,12 +21,11 @@
   const KNOWN = [
     { id: "hud", title: "", pick: [".hud", ".status"] },
     { id: "now", title: "Right now", pick: ["#brief", "#loose", "#main", "#nextLine"] },
-    { id: "quick", title: "Quick slots", pick: ["#questQuick"] },
     { id: "habits", title: "", pick: ["#habits"] },
   ];
   const DEFAULT = {
     hud: { x: 0, y: 0, w: 12, h: 2 },
-    now: { x: 0, y: 2, w: 4, h: 8 }, quick: { x: 0, y: 10, w: 4, h: 2 }, log: { x: 0, y: 12, w: 4, h: 4 },
+    now: { x: 0, y: 2, w: 4, h: 10 }, log: { x: 0, y: 12, w: 4, h: 4 },
     mtn: { x: 4, y: 2, w: 5, h: 8 }, skills: { x: 4, y: 10, w: 5, h: 6 },
     habits: { x: 9, y: 2, w: 3, h: 14 },
   };
