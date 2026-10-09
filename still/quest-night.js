@@ -127,7 +127,7 @@
       padding:9px; color:var(--ink); font:inherit; color-scheme:dark; }
     .nt-row { display:flex; gap:8px; margin-top:8px; }
     .nt-bars { display:flex; align-items:flex-end; gap:2px; height:70px; margin-top:10px; }
-    .nt-bars i { flex:1; border-radius:2px 2px 0 0; min-width:3px; }
+    .nt-bars i { flex:1; border-radius:2px 2px 0 0; min-width:3px; max-width:14px; }
     .nt-life { width:100%; max-width:330px; display:block; margin:10px auto 0; }
     .nt-birth { display:flex; flex-direction:column; gap:8px; margin-top:12px; } .nt-birth label { font-size:13px; color:var(--ink-soft); }`;
   document.head.appendChild(css);
