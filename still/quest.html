@@ -642,6 +642,7 @@
       await Promise.all([pullOps(), pullTasks().catch(() => {}), pullState()]);
       seedFromOura();
       pullSteps();
+      pullBedtime();
       if (questKey()) qfetch("/quest/insights").then(j => { INSIGHTS = j || {};
         // the insight agent answered: drop those "Research this" requests
         const left = (G.research || []).filter(r => !INSIGHTS[r.key]);
@@ -846,7 +847,7 @@
     ["screens", "Screens off 60 min before bed", 5, 1, "📵", "No screens 60'", "", "Evening"],
     ["mouth", "Dr Ellie's mouthcare routine, the whole routine in one tap (morning and night)", 2, 2, "🦷", "Dr Ellie mouth", "flat", "Evening"],
     ["early", "Last meal 3+ hr before bed (counts itself from the calendar, paid next morning)", 5, 1, "🍽️", "Last meal 3 hr", "auto", "Evening"],
-    ["bedtime", "In bed within 30 min of the planned time (counts itself from the sleep check-in, paid next morning)", 4, 1, "🛏️", "Bed on time", "auto", "Evening"],
+    ["bedtime", "Asleep before 11 PM, read from your Oura ring (paid the next morning)", 5, 1, "🌙", "Asleep by 11", "auto", "Evening"],
   ];
   const DIM = [1, .7, .5, .35, .25, .2];
   const lvl = () => (G.pr && G.pr.level) || 1;
@@ -920,6 +921,26 @@
       `<i class="sq-bar"><b style="width:${pct}%"></b></i></span></div>`;
   }
 
+  /* ---------- Asleep by 11 PM (Junyan, 2026-10-09: bio clock 10:30 PM to 6:30 AM) ----------
+     Oura files a night under the day he woke up, so this morning's game day
+     holds last night. Asleep between 6 PM and 11 PM pays the prana once. Reads
+     still-api /bedtime (public like /sleep). */
+  let BED = null;
+  const BED_BY = "23:00";
+  async function pullBedtime(){
+    if (!G.day) return;
+    try {
+      const r = await fetch(API + "/bedtime", { cache:"no-store" }); if (!r.ok) return;
+      const n = ((await r.json()).nights || []).find(x => x.day === gameYmd());
+      BED = n || null;
+      if (n && n.asleep >= "18:00" && n.asleep <= BED_BY && !(G.day.habits || {}).bedtime && !DRY) {
+        const g = habitGain("bedtime");
+        G.day.habits.bedtime = 1;
+        addPrana(g, `Asleep at ${n.asleep} (Oura)`, "asleep by 11");
+      }
+    } catch {}
+  }
+
   /* ---------- Prana actions: the habit tiles ---------- */
   function habitsHTML(){
     const tile = ([id, full, , max, icon, short, flag]) => {
@@ -927,7 +948,7 @@
       const cls = ["htile", !auto && !g ? "full" : "", auto ? "auto" : "", earned || (auto && n) ? "earned" : "", id === "water" ? "water" : ""].filter(Boolean).join(" ");
       const cnt = id === "water" ? `<span class="hc">${n ? `${n * 250} ml` : ""}</span>` : max > 1 && n ? `<span class="hc">${n}/${max}</span>` : n ? `<span class="hc">✓</span>` : "";
       const fill = max > 1 && n ? `<i class="glass" style="height:${Math.round(n / max * 100)}%"></i>` : "";
-      const tg = auto ? (n ? "✓ last night" : earned ? "✓ tonight" : "auto") : g ? `+${g}` : "";
+      const tg = id === "bedtime" && BED ? `${n ? "✓" : "✗"} ${BED.asleep}` : auto ? (n ? "✓ last night" : earned ? "✓ tonight" : "auto") : g ? `+${g}` : "";
       return `<button class="${cls}" data-habit="${id}" title="${esc(full)}">${fill}<span class="hi">${icon}</span><span class="hl">${esc(short)}</span>${cnt}<b>${tg}</b></button>`;
     };
     const hDone = HABITS.filter(h => (G.day.habits[h[0]] || 0) > 0).length;
@@ -950,7 +971,7 @@
   const HCOL = { Morning:"#ffd479", Practice:"#c9a7ff", Food:"#8fe3b0", Move:"#7fd0ff", Mind:"#ffb3c7", Evening:"#a7b4ff" };
   function tapHabit(bn){
     const id = bn.dataset.habit, h = HABITS.find(x => x[0] === id), fx = window.QuestFx; if (!h) return;
-    if (h[6] === "auto") { if (fx) fx.nope(bn); floatXp(0, "This one counts itself from your calendar, paid next morning"); return; }
+    if (h[6] === "auto") { if (fx) fx.nope(bn); floatXp(0, h[0] === "bedtime" ? "Your Oura ring checks this one each morning" : "This one counts itself from your calendar, paid next morning"); return; }
     const g = habitGain(id);
     if (!g) { if (fx) fx.nope(bn); else floatXp(0, `${h[5]}: full for today`); return; }
     const rect = bn.getBoundingClientRect();
@@ -979,6 +1000,7 @@
     G.day.prana = carry; G.day.carry = carry; G.day.pl = [[now().toISOString(), carry]];
     // last night's auto habits (last meal 3 hr before bed, bed on time) pay out now
     for (const id of Object.keys((prev && prev.earn) || {})) {
+      if (id === "bedtime") continue;   // Oura says when he fell asleep now (pullBedtime)
       const g = habitGain(id); if (!g) continue;
       G.day.habits = G.day.habits || {}; G.day.habits[id] = 1;
       addPrana(g, `${HABITS.find(x => x[0] === id)[1].replace(/ \(.*$/, "")} (last night)`, "last night");
@@ -2457,7 +2479,6 @@
     if (slp && t >= slp.s) {
       const was = G.day.earn || {}, e2 = { ...was };
       if (lastMealBefore(slp.s, all) && emptyStomach(slp.s, all)) e2.early = 1; else delete e2.early;
-      if (G.day.checks[gk(slp)] === "in") e2.bedtime = 1;
       if (JSON.stringify(e2) !== JSON.stringify(was)) { G.day.earn = e2; saveG(); }
     }
     // the phone shows one button that opens them; the desktop dashboard shows the tiles (2026-10-08)
