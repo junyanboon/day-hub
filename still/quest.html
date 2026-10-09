@@ -155,7 +155,7 @@
 
   .actions { display:flex; gap:8px; margin-top:16px; flex-wrap:wrap; }
   .btn { flex:1; min-width:0; padding:13px 10px; border-radius:14px; background:rgba(255,255,255,.2);
-    font-size:15px; font-weight:600; white-space:nowrap; }
+    font-size:15px; font-weight:600; white-space:normal; line-height:1.2; overflow-wrap:anywhere; }   /* wrap, never cut words off (2026-10-09) */
   .btn.primary { background:#fff; color:#3b3670; }
   .btn.ghost { background:transparent; border:1px solid var(--glass-border); color:var(--ink-soft); font-weight:500; }
   .btn:active { transform:scale(.97); }
@@ -372,6 +372,78 @@
   .wiki p.wli { margin-top:4px; }
   .wiki a { color:var(--gold); }
   a.btn { text-decoration:none; text-align:center; }
+  /* the morning (PROTOTYPE 2026-10-09: three designs) */
+  .mo-open { position:relative; overflow:hidden; width:100%; display:flex; align-items:center; gap:12px; margin:0 0 12px; padding:18px 16px;
+    border-radius:20px; text-align:left; background:linear-gradient(135deg, #ffb37a 0%, #c2557a 55%, #3b2a6b 100%); color:#fff; box-shadow:0 8px 24px rgba(0,0,0,.25); }
+  .mo-open-art { position:absolute; inset:auto 0 0 0; height:60%; opacity:.45; pointer-events:none; }
+  .mo-open-art svg { width:100%; height:100%; display:block; }
+  .mo-open-t { position:relative; flex:1; min-width:0; } .mo-open-t b { display:block; font-size:18px; }
+  .mo-open-t small { display:block; font-size:13px; opacity:.85; margin-top:2px; white-space:normal; }
+  .mo-open .pa-go { position:relative; }
+  #morning { position:fixed; inset:0; z-index:150; display:none; overflow-y:auto; -webkit-overflow-scrolling:touch; background:#1d1838; color:#fff; }
+  #morning.open { display:block; animation:moPop .45s ease; }
+  @keyframes moPop { from { transform:scale(1.04); } to { transform:none; } }
+  @keyframes moIn { from { opacity:0; transform:scale(1.03); } to { opacity:1; transform:none; } }
+  .mo-x { position:fixed; top:calc(env(safe-area-inset-top) + 12px); right:14px; z-index:3; width:36px; height:36px; border-radius:50%; background:rgba(0,0,0,.3); color:#fff; font-size:16px; }
+  .mo-switch { position:fixed; left:50%; transform:translateX(-50%); bottom:calc(env(safe-area-inset-bottom) + 12px); z-index:4; display:flex; align-items:center; gap:6px;
+    background:#fff; color:#222; border-radius:30px; padding:4px; box-shadow:0 6px 20px rgba(0,0,0,.35); font-size:13px; font-weight:600; white-space:nowrap; }
+  .mo-switch button { width:34px; height:34px; border-radius:50%; background:#eee; color:#222; font-size:18px; }
+  .mo-switch span { padding:0 6px; }
+  .mo-kicker { font-size:11px; letter-spacing:.16em; text-transform:uppercase; opacity:.8; }
+  .mo-place { font-family:Georgia, "Times New Roman", serif; font-size:40px; line-height:1.05; margin-top:6px; }
+  .mo-date { font-size:15px; opacity:.85; margin-top:6px; }
+  .mo-big { font-family:Georgia, "Times New Roman", serif; font-size:28px; line-height:1.15; margin-top:6px; }
+  .mo-quote { font-family:Georgia, "Times New Roman", serif; font-style:italic; font-size:19px; line-height:1.4; margin:16px 0 0; padding-left:14px; border-left:3px solid #ffb37a; opacity:.95; }
+  .mo-soft { font-size:15px; opacity:.85; margin-top:12px; line-height:1.4; }
+  .mo-leave { margin-top:16px; padding:10px 14px; border-radius:14px; background:rgba(255,255,255,.12); font-size:14px; }
+  .mo-words { display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; }
+  .mo-word { padding:9px 14px; border-radius:20px; background:rgba(255,255,255,.14); border:1px solid rgba(255,255,255,.25); color:#fff; font-size:14px; }
+  .mo-word.on { background:#fff; color:#3b2a6b; font-weight:600; }
+  .mo-go { display:block; width:100%; margin:24px 0 0; padding:16px; border-radius:18px; background:#fff; color:#3b2a6b; font-size:17px; font-weight:700; }
+  .mo-hills { width:100%; height:100%; display:block; }
+  .mo-sun { fill:#ffe3a3; animation:moSun 3s ease-out both; }
+  @keyframes moSun { from { transform:translateY(40px); } to { transform:none; } }
+  /* A: sunrise poster */
+  .mo-a-sky { position:relative; height:46vh; min-height:280px; background:linear-gradient(180deg, #3b2a6b 0%, #c2557a 55%, #ffb37a 100%); }
+  .mo-a-sky .mo-hills { position:absolute; inset:auto 0 0 0; height:60%; }
+  .mo-a-head { position:absolute; left:22px; right:22px; top:calc(env(safe-area-inset-top) + 56px); }
+  .mo-a-body { padding:22px 22px calc(env(safe-area-inset-bottom) + 90px); background:#7a3b52; background:linear-gradient(180deg, #7a3b52 0%, #2b2050 40%, #1d1838 100%); }
+  .mo-a-moments { display:flex; flex-direction:column; gap:10px; margin-top:20px; }
+  .mo-chip { display:flex; align-items:center; gap:12px; padding:10px 12px; border-radius:16px; background:rgba(255,255,255,.08); }
+  .mo-chip b { display:block; font-size:13px; opacity:.8; } .mo-chip span { font-size:16px; }
+  /* B: story */
+  .mo-b { position:fixed; inset:0; }
+  .mo-bars { position:absolute; z-index:3; top:calc(env(safe-area-inset-top) + 8px); left:12px; right:60px; display:flex; gap:4px; }
+  .mo-bars i { flex:1; height:3px; border-radius:2px; background:rgba(255,255,255,.3); }
+  .mo-bars i.done, .mo-bars i.on { background:#fff; }
+  .mo-slide { position:absolute; inset:0; background:linear-gradient(180deg, var(--g3) 0%, var(--g2) 60%, var(--g1) 100%); animation:moPop .35s ease; overflow:hidden; }
+  .mo-slide > .mo-hills { position:absolute; inset:auto 0 0 0; height:42%; }
+  .mo-b-c { position:relative; z-index:2; padding:calc(env(safe-area-inset-top) + 64px) 26px 120px; }
+  .mo-b-icon { margin:18px 0 6px; }
+  .mo-ring { width:110px; height:110px; border-radius:50%; border:3px solid rgba(255,255,255,.8); display:flex; flex-direction:column; align-items:center; justify-content:center; margin-top:26px; }
+  .mo-ring b { font-size:30px; } .mo-ring span { font-size:12px; opacity:.8; }
+  .mo-pack { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
+  .mo-pack span { padding:6px 10px; border-radius:12px; background:rgba(0,0,0,.2); font-size:13px; }
+  .mo-tap { position:absolute; top:70px; bottom:70px; width:35%; z-index:1; background:transparent; }
+  .mo-tap.l { left:0; } .mo-tap.r { right:0; width:65%; }
+  .mo-b .mo-b-c button, .mo-b .mo-words { position:relative; z-index:3; }
+  /* C: trail map */
+  .mo-c { padding:calc(env(safe-area-inset-top) + 60px) 0 calc(env(safe-area-inset-bottom) + 90px);
+    background:radial-gradient(120% 60% at 50% 0%, #c2557a 0%, #3b2a6b 45%, #1d1838 100%); min-height:100%; }
+  .mo-c-head { padding:0 22px; }
+  .mo-c-map { position:relative; margin-top:10px; }
+  .mo-c-map > svg { position:absolute; inset:0; width:100%; height:100%; }
+  .mo-trail { fill:none; stroke:#ffd479; stroke-width:4; stroke-dasharray:2 12; stroke-linecap:round; opacity:.8; }
+  .mo-node { position:absolute; display:flex; align-items:flex-start; gap:10px; width:62%; text-align:left; color:#fff; background:none; }
+  .mo-node.l { left:calc(27.5% - 26px); } .mo-node.r { left:calc(72.5% - 26px); flex-direction:row; }
+  .mo-node.r { left:auto; right:calc(27.5% - 26px); flex-direction:row-reverse; text-align:right; }
+  .mo-dot { flex:none; width:52px; height:52px; border-radius:50%; background:#2b2050; border:2px solid #ffd479; display:flex; align-items:center; justify-content:center; font-size:24px;
+    box-shadow:0 0 18px rgba(255,212,121,.45); }
+  .mo-lbl { padding-top:4px; min-width:0; } .mo-lbl small { display:block; font-size:12px; opacity:.75; } .mo-lbl b { display:block; font-size:16px; }
+  .mo-lbl em { display:block; font-style:normal; font-size:13px; opacity:.8; margin-top:2px; }
+  .mo-more { display:none; font-size:13px; line-height:1.4; margin-top:6px; padding:8px 10px; border-radius:12px; background:#2b2050; border:1px solid rgba(255,212,121,.35); }
+  .mo-node.open .mo-more { display:block; } .mo-node.open { z-index:2; }
+  .mo-c-foot { padding:0 22px; }
 </style>
 <link rel="stylesheet" href="bag.css">
 <script src="bag.js"></script>
@@ -716,7 +788,7 @@
   const placeNow = () => (PLAN && PLAN.where && PLAN.where.place) || "Home";
   const peakName = () => PEAKS[placeNow()] || `${placeNow()} Ridge`;
   const isSadhana = b => b.kind === "practice" || /shambhavi|sadhana|kriya/i.test(b.t);
-  const isSleep = b => b.kind === "rest" && /sleep|\bbed\b/i.test(b.t);
+  const isSleep = b => b.kind === "rest" && /sleep(?!er)|\bbed\b/i.test(b.t);   // not "Sleeper Train"
   const isMeal = b => b.kind === "fuel";
   // what a block is worth in prana: [on time, late, "not today", missed]
   /* Prana is an energy reading (d102, NVC: no rewards, no punishment). Sadhana,
@@ -1782,6 +1854,138 @@
   $("bagBtn").onclick = openBag;
   if (hasBag()) { try { Bag.mount(document.createElement("div"), BAG_CTX); Bag.mountQuick($("questQuick")); } catch (e) { console.warn("bag", e); } }
 
+  /* ---------- the morning (PROTOTYPE, 2026-10-09) ----------
+     Junyan: the old text brief "is not useful", its buttons overflowed; "make it so that it will
+     open up to something beautiful and inspiring when I click a button. Show me three prototypes."
+     One button opens a full-screen morning. Three designs, flipped with the bar at the bottom
+     (or ?brief=A|B|C). PROTOTYPE: once he picks one, the other two and the switcher go. */
+  const MO_VARIANTS = [["A", "Sunrise poster"], ["B", "Story"], ["C", "Trail map"]];
+  const MO_WORDS = ["Present", "Playful", "Brave", "Grateful", "Gentle", "Curious"];
+  const moVariant = () => { const v = (qs.get("brief") || store.get("quest-brief") || "A").toUpperCase(); return MO_VARIANTS.some(x => x[0] === v) ? v : "A"; };
+  function morningData(){
+    const t = now(), all = blocks();
+    const moments = all.filter(b => b.e > t && !["open", "break"].includes(b.kind) && !isSleep(b) && !isMeal(b) && !isSadhana(b)).slice(0, 4).map(b => {
+      const I = INSIGHTS[gk(b)] || { items:[], links:[] };
+      return { b, mind:I.items.filter(x => x.kind === "mind").map(x => x.t), know:I.items.filter(x => x.kind === "know"),
+        pack:I.items.filter(x => x.kind === "pack" || !x.kind).map(x => x.t), hype:(I.links || []).filter(l => l.kind === "hype") };
+    });
+    const go = moments.find(m => ["travel", "major"].includes(groupOf(m.b)));
+    const p = tzParts(t, { weekday:"long", month:"long", day:"numeric" });
+    const hour = +tzParts(t, { hour:"numeric", hourCycle:"h23" }).hour;
+    return { t, moments, go: go && go.b, place:placeNow(), date:`${p.weekday}, ${p.month} ${p.day}`, hour,
+      greet: hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening",
+      prana:Math.round(prana()), sleep:all.find(b => isSleep(b) && b.s > t), skill:offersFor(30)[0] || null };
+  }
+  // full names, minus tour-sheet noise ("+ Extras", trailing dots)
+  const moName = b => (b.t || "").replace(/\s*\+\s*extras\b/i, "").replace(/\.{2,}$/, "").replace(/^(tour|hike)\s*-\s*/i, (m, w) => w[0].toUpperCase() + w.slice(1).toLowerCase() + ": ").trim();
+  // the headline: the moments the insight agent prepped (the real adventures) before chores
+  const moTitle = d => { const top = [...d.moments].sort((a, b) => (b.mind.length > 0) - (a.mind.length > 0)).slice(0, 2).sort((a, b) => a.b.s - b.b.s);
+    return top.length ? top.map(m => moName(m.b)).join(" & ") : "An open day"; };
+  const moLine = d => (d.moments.find(m => m.mind.length) || { mind:[] }).mind[0] || "Arrive fully in each thing you do today.";
+  // layered hills and a rising sun, warm for the desert
+  const moHills = (h = 220) => `<svg class="mo-hills" viewBox="0 0 400 ${h}" preserveAspectRatio="none" aria-hidden="true">
+      <circle class="mo-sun" cx="290" cy="${h * .4}" r="34"/>
+      <path d="M0 ${h * .62} C80 ${h * .45} 150 ${h * .58} 220 ${h * .5} S350 ${h * .4} 400 ${h * .52} V${h} H0Z" fill="#f4a76b" opacity=".55"/>
+      <path d="M0 ${h * .75} C70 ${h * .62} 160 ${h * .78} 250 ${h * .66} S360 ${h * .62} 400 ${h * .7} V${h} H0Z" fill="#d9744f" opacity=".75"/>
+      <path d="M0 ${h * .88} C90 ${h * .78} 200 ${h * .92} 300 ${h * .82} S380 ${h * .8} 400 ${h * .84} V${h} H0Z" fill="#7a3b52"/></svg>`;
+  const moWords = () => `<div class="mo-words">${MO_WORDS.map(w => `<button class="mo-word${G.day.intent === w ? " on" : ""}" data-word="${w}">${w}</button>`).join("")}</div>`;
+  const moLeave = d => d.go ? `<div class="mo-leave">🧭 Leave by <b>${fmtT(new Date(+d.go.s - 30 * 60000))}</b> for ${esc(shortName(d.go))}</div>` : "";
+
+  function moA(d){   // one tall poster: sunrise art, the day's title, one line to carry, the moments, a word
+    return `<div class="mo-a">
+      <div class="mo-a-sky">${moHills(240)}
+        <div class="mo-a-head"><div class="mo-kicker">${esc(d.greet)}, Junyan</div><div class="mo-place">${esc(d.place)}</div><div class="mo-date">${esc(d.date)}</div></div></div>
+      <div class="mo-a-body">
+        <div class="mo-kicker">Today's adventure</div>
+        <div class="mo-big">${esc(moTitle(d))}</div>
+        <blockquote class="mo-quote">${esc(moLine(d))}</blockquote>
+        <div class="mo-a-moments">${d.moments.map(m => `<div class="mo-chip">${badge(m.b, 30)}<div><b>${fmtT(m.b.s)}</b><span>${esc(moName(m.b))}</span></div></div>`).join("")}</div>
+        ${moLeave(d)}
+        <div class="mo-kicker" style="margin-top:22px">One word for today</div>${moWords()}
+        <button class="mo-go" data-mo="begin">Begin the day</button>
+      </div></div>`;
+  }
+  function moBSlides(d){
+    const s = [`<div class="mo-slide" style="--g1:#ffb37a;--g2:#c2557a;--g3:#3b2a6b">${moHills(260)}
+      <div class="mo-b-c"><div class="mo-kicker">${esc(d.greet)}</div><div class="mo-place">${esc(d.place)}</div><div class="mo-date">${esc(d.date)}</div>
+      <div class="mo-ring"><b>${d.prana}%</b><span>prana</span></div>
+      <p class="mo-soft">${d.moments.length ? `${d.moments.length} moment${d.moments.length > 1 ? "s" : ""} today. Tap to see them.` : "A free day. Tap to begin."}</p></div></div>`];
+    const pal = [["#ffd39a", "#e0785a", "#5b2d5e"], ["#9fe3d0", "#3f8fa0", "#22305e"], ["#ffc2d1", "#b8579a", "#2f2a66"], ["#ffe08a", "#d98a3a", "#4a2f4f"]];
+    d.moments.forEach((m, i) => { const [g1, g2, g3] = pal[i % pal.length];
+      s.push(`<div class="mo-slide" style="--g1:${g1};--g2:${g2};--g3:${g3}"><div class="mo-b-c">
+        <div class="mo-kicker">${fmtT(m.b.s)} · moment ${i + 1} of ${d.moments.length}</div>
+        <div class="mo-b-icon">${badge(m.b, 64, true)}</div>
+        <div class="mo-big">${esc(moName(m.b))}</div>
+        ${m.mind[0] ? `<blockquote class="mo-quote">${esc(m.mind[0])}</blockquote>` : ""}
+        ${m.pack.length ? `<div class="mo-kicker" style="margin-top:18px">Bring</div><div class="mo-pack">${m.pack.slice(0, 4).map(x => `<span>${esc(x)}</span>`).join("")}</div>` : ""}
+        ${d.go === m.b ? moLeave(d) : ""}</div></div>`); });
+    s.push(`<div class="mo-slide" style="--g1:#fff1c9;--g2:#f0a35e;--g3:#7b3f61"><div class="mo-b-c">
+      <div class="mo-kicker">Before you go</div><div class="mo-big">Choose one word for today</div>${moWords()}
+      ${G.day.intent ? `<p class="mo-soft">Carry <b>${esc(G.day.intent)}</b> into everything.</p>` : ""}
+      <button class="mo-go" data-mo="begin">Let's go</button></div></div>`);
+    return s;
+  }
+  function moC(d){   // the day as a winding trail: sunrise at the top, camp at the bottom
+    const pts = [{ ic:"🌅", t:"Sunrise", s:d.greet + ". You are in " + d.place + ".", time:"" }]
+      .concat(d.moments.map(m => ({ m, time:fmtT(m.b.s), t:moName(m.b) })))
+      .concat([{ ic:"🌙", t:"Camp", s:d.sleep ? `Sleep at ${fmtT(d.sleep.s)}` : "Rest when the day is done.", time:d.sleep ? fmtT(d.sleep.s) : "" }]);
+    const step = 150, H = pts.length * step + 40;
+    const xs = pts.map((_, i) => i % 2 ? 290 : 110);
+    let path = `M${xs[0]} 70`;
+    for (let i = 1; i < pts.length; i++) { const y0 = 70 + (i - 1) * step, y1 = 70 + i * step; path += ` C${xs[i - 1]} ${y0 + 80} ${xs[i]} ${y1 - 80} ${xs[i]} ${y1}`; }
+    return `<div class="mo-c">
+      <div class="mo-c-head"><div class="mo-kicker">Today's quest · ${esc(d.date)}</div><div class="mo-big">${esc(moTitle(d))}</div>
+        <div class="mo-soft">${esc(d.place)} · prana ${d.prana}%</div></div>
+      <div class="mo-c-map" style="height:${H}px"><svg viewBox="0 0 400 ${H}" preserveAspectRatio="none" aria-hidden="true">
+        <path d="${path}" class="mo-trail"/></svg>
+        ${pts.map((p, i) => `<button class="mo-node ${i % 2 ? "r" : "l"}" style="top:${70 + i * step - 26}px" data-node="${i}">
+          <span class="mo-dot">${p.m ? badge(p.m.b, 34, true) : p.ic}</span>
+          <span class="mo-lbl"><small>${esc(p.time)}</small><b>${esc(p.t)}</b>${p.s ? `<em>${esc(p.s)}</em>` : ""}
+          ${p.m ? `<span class="mo-more">${p.m.mind[0] ? `“${esc(p.m.mind[0])}”` : ""}${p.m.pack.length ? `<br>Bring: ${esc(p.m.pack.slice(0, 3).join(", "))}` : ""}</span>` : ""}</span></button>`).join("")}
+      </div>
+      <div class="mo-c-foot"><div class="mo-kicker">One word for today</div>${moWords()}<button class="mo-go" data-mo="begin">Start the climb</button></div></div>`;
+  }
+
+  let moSlide = 0;
+  function openMorning(v){
+    v = v || moVariant();
+    // the agent's lines may still be on their way: open now, redraw when they land
+    if (!Object.keys(INSIGHTS).length && questKey() && !openMorning.asked) { openMorning.asked = true;
+      qfetch("/quest/insights").then(j => { INSIGHTS = j || {}; const el = $("morning"); if (el && el.className === "open") openMorning(el.dataset.v); }).catch(() => {}); }
+    const d = morningData();
+    let el = $("morning");
+    if (!el) { el = document.createElement("div"); el.id = "morning"; document.body.appendChild(el); }
+    let inner;
+    if (v === "B") {
+      const slides = moBSlides(d); moSlide = Math.min(moSlide, slides.length - 1);
+      inner = `<div class="mo-b"><div class="mo-bars">${slides.map((_, i) => `<i class="${i < moSlide ? "done" : i === moSlide ? "on" : ""}"></i>`).join("")}</div>
+        ${slides[moSlide]}<button class="mo-tap l" data-mo="prev" aria-label="Back"></button><button class="mo-tap r" data-mo="next" aria-label="Next"></button></div>`;
+    } else inner = v === "C" ? moC(d) : moA(d);
+    const vi = MO_VARIANTS.findIndex(x => x[0] === v), name = MO_VARIANTS[vi][1];
+    el.className = "open";
+    el.innerHTML = `${inner}<button class="mo-x" data-mo="close" aria-label="Close">✕</button>
+      <div class="mo-switch"><button data-mo="vprev">‹</button><span>${v} · ${name}</span><button data-mo="vnext">›</button></div>`;
+    el.dataset.v = v;
+    el.querySelectorAll("[data-word]").forEach(b => b.onclick = e => { e.stopPropagation(); G.day.intent = b.dataset.word; log(`Word for today: ${b.dataset.word}`); saveG(); openMorning(v); });
+    el.querySelectorAll("[data-node]").forEach(b => b.onclick = () => b.classList.toggle("open"));
+    el.querySelectorAll("[data-mo]").forEach(b => b.onclick = e => {
+      e.stopPropagation();
+      const a = b.dataset.mo, n = MO_VARIANTS.length;
+      if (a === "close") return closeMorning();
+      if (a === "begin") { G.day.briefDone = true; log(G.day.intent ? `Began the day: ${G.day.intent}` : "Began the day"); saveG(); closeMorning(); return render(); }
+      if (a === "next") { if (moSlide < moBSlides(d).length - 1) moSlide++; return openMorning(v); }
+      if (a === "prev") { if (moSlide > 0) moSlide--; return openMorning(v); }
+      const nv = MO_VARIANTS[(vi + (a === "vnext" ? 1 : n - 1)) % n][0];
+      store.set("quest-brief", nv); moSlide = 0; el.scrollTop = 0; openMorning(nv);
+    });
+  }
+  function closeMorning(){ const el = $("morning"); if (el) el.className = ""; moSlide = 0; }
+  document.addEventListener("keydown", e => {
+    const el = $("morning"); if (!el || el.className !== "open" || /input|textarea/i.test(document.activeElement.tagName)) return;
+    if (e.key === "Escape") return closeMorning();
+    if (e.key === "ArrowRight" || e.key === "ArrowLeft") { const b = el.querySelector(`.mo-switch [data-mo="${e.key === "ArrowRight" ? "vnext" : "vprev"}"]`); if (b) b.click(); }
+  });
+
   /* ---------- skills (ticket 16, 2026-10-08) ----------
      A skill is a name, what he is working on, and content for it (no levels, d140).
      The life wiki on his Mac is the source; the insight agent copies skill cards,
@@ -2229,19 +2433,12 @@
     const hourNow = +tzParts(t, { hour:"numeric", hourCycle:"h23" }).hour;
     const ahead = all.filter(b => b.e > t && b.kind !== "open" && b.kind !== "break");
     let bh = "";
-    if (PLAN && !z && !G.day.briefDone && (hourNow < 13 || hourNow < 4)) {
-      const sad = all.find(isSadhana), big = ahead.filter(b => !isMeal(b) && !isSleep(b) && !isSadhana(b)).slice(0, 3);
-      const go = ahead.find(b => ["travel", "major"].includes(groupOf(b)));
-      const warns = all.filter(isMeal).map(b => mealWarn(b, all)).filter(Boolean);
-      bh = `<div class="card brief"><div class="eyebrow">Morning brief · ${esc(placeNow())}</div><ul>
-        <li><b>Sadhana:</b> ${sad ? `${esc(shortName(sad))} at ${fmtT(sad.s)}` : slot ? `nothing planned. Best slot ${fmtT(slot)}` : "nothing planned, and no 3 hr food gap left today"}</li>
-        ${big.map(b => `<li>${fmtT(b.s)} <b>${esc(shortName(b))}</b></li>`).join("")}
-        ${go ? `<li><b>Leave by ${fmtT(new Date(+go.s - 30 * 60000))}</b> for ${esc(shortName(go))}</li>` : ""}
-        ${warns.map(w => `<li class="warnline">${esc(w)}</li>`).join("")}</ul>
-        <div class="actions">${!sad && slot ? `<button class="btn primary" id="bSad">Add Shambhavi at ${fmtT(slot)}</button>` : ""}<button class="btn${!sad && slot ? "" : " primary"}" id="bBrief">Got it</button></div></div>`;
-    } else if (slot) {
-      bh = `<div class="card brief"><div class="eyebrow">Sadhana</div><div class="q">No Shambhavi planned today. Best slot: <b>${fmtT(slot)}</b> (3 hr after food)</div>
-        <div class="actions"><button class="btn primary" id="bSad">Add it</button></div></div>`;
+    // the morning (2026-10-09): one button that opens a full-screen morning. Shambhavi is offered in
+    // Prana actions only (Junyan: "drop the add shambhavi altogether").
+    if (PLAN && !z && !G.day.briefDone && hourNow >= 4 && hourNow < 13) {
+      const n = all.filter(b => b.e > t && !["open", "break"].includes(b.kind) && !isSleep(b) && !isMeal(b) && !isSadhana(b)).length;
+      bh = `<button class="mo-open" id="bMorning"><span class="mo-open-art">${moHills(90)}</span>
+        <span class="mo-open-t"><b>☀️ Open your morning</b><small>${esc(placeNow())}${n ? ` · ${n} moment${n > 1 ? "s" : ""} today` : ""}</small></span><span class="pa-go">›</span></button>`;
     }
     // running low: offer recovery, at most once every 2 hours
     const low = PLAN && !z && prana() < 40 && (!G.day.lowAt || +t - +new Date(G.day.lowAt) > 2 * 3600000) && !(cur && isRecovery(cur));
@@ -2273,8 +2470,9 @@
     $("brief").querySelectorAll("[data-now]").forEach(bn => bn.onclick = () => { G.day.lowAt = now().toISOString(); const [n, m] = bn.dataset.now.split("|"); startNow(n, +m); });
     if (low && !G.day.lotusGiven) { G.day.lotusGiven = true; giveItem("lotus", "Your energy is low today."); }
     if ($("bLowOk")) $("bLowOk").onclick = () => { G.day.lowAt = now().toISOString(); saveG(); render(); };
-    if ($("bBrief")) $("bBrief").onclick = () => { G.day.briefDone = true; saveG(); render(); };
-    if ($("bSad")) $("bSad").onclick = () => addSadhana(slot);
+    if ($("bMorning")) $("bMorning").onclick = () => openMorning();
+    // PROTOTYPE: a ?brief= link opens the morning straight away, any time of day, to compare the designs
+    if (qs.get("brief") && PLAN && !openMorning.auto) { openMorning.auto = true; setTimeout(() => openMorning(), 600); }
 
     // main card
     let html = "";
