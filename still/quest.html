@@ -1226,15 +1226,10 @@
       else if (last.filter(e => e.p <= 25).length >= 4 && G.pr.level > 1) { G.pr.level--; G.pr.changedAt = now().toISOString(); setTimeout(() => banner("🌱", `LEVEL ${G.pr.level}`, "It got heavy, so it's gentler now."), 800); }
     }
     G.day = freshDay();
-    G.day.prana = carry; G.day.carry = carry; G.day.pl = [[now().toISOString(), carry]];
+    G.day.prana = 0; G.day.carry = carry; G.day.pl = [[now().toISOString(), 0]];   // prana is built fresh each day
     const bc = prev && prev.body != null ? Math.round(prev.body) : 60;   // until Oura sets it from the sleep score
     G.day.body = bc; G.day.bl = [[now().toISOString(), bc]];
-    // d203: what lowers prana from yesterday: no sadhana at all, eating within 3 hours of bed
-    if (prev && prev.date) {
-      const SAD = ["shambhavi", "kriya", "upa", "surya", "angam", "bhuta", "nadi"];
-      if (!SAD.some(id => ((prev.habits || {})[id] || 0) > 0)) addPrana(-8, "No sadhana yesterday", "no sadhana");
-      if ((prev.earn || {}).late) addPrana(-5, "Ate within 3 hours of bed (last night)", "late food");
-    }
+    // (a day with no sadhana simply leaves prana at 0; late food is counted the same evening)
     // last night's auto habits (last meal 3 hr before bed, bed on time) pay out now
     for (const id of Object.keys((prev && prev.earn) || {})) {
       if (id === "bedtime" || id === "late") continue;   // Oura says when he fell asleep now (pullBedtime)
@@ -1257,9 +1252,11 @@
   /* Two meters (Junyan, 2026-10-09, d200 to d204: "Bryan johnson is about the body and sadhguru
      is about the prana"). Prana is the pitch of his energy: Sadhguru's practices raise it; eating
      within 3 hours of bed, a skipped sadhana and a heavy meal lower it. The goal is to keep it high.
+     Prana starts at 0 each morning and is built up through sadhana (Junyan, 2026-10-09: "Prana starts at 0
+     and we need to build it up.. through sadhana so it works the opposite of the body").
      Body is how rested the body is: it starts each morning at the Oura sleep score, Bryan Johnson's
      health actions fill it, effort (the blocks) uses it. Log lines for Body carry m:"b". */
-  function prana(){ return G.day.prana ?? 60; }
+  function prana(){ return G.day.prana ?? 0; }
   function body(){ return G.day.body ?? 60; }
   function addEnergy(m, d, msg, label, noFloat, extra){
     d = Math.round(d);
@@ -2915,7 +2912,7 @@
     const d = G.day;
     d.caches = d.caches || {}; d.missed = d.missed || {};
     G.pr = G.pr || { level:1, ends:[], changedAt:null };
-    if (d.prana == null) { const c = G.pr.ends.length ? G.pr.ends[G.pr.ends.length - 1].p : 60; d.prana = c; d.carry = c; d.pranaSince = now().toISOString(); d.pl = [[now().toISOString(), c]]; }
+    if (d.prana == null) { d.prana = 0; d.pranaSince = now().toISOString(); d.pl = [[now().toISOString(), 0]]; }
     d.habits = d.habits || {};
     if (d.body == null) { d.body = 60; d.bl = [[now().toISOString(), 60]]; }
     if (!d.pranaSince) d.pranaSince = d.since || now().toISOString();
@@ -2992,6 +2989,7 @@
       const was = G.day.earn || {}, e2 = { ...was };
       if (lastMealBefore(slp.s, all) && emptyStomach(slp.s, all)) e2.early = 1; else delete e2.early;
       if (lastMealBefore(slp.s, all) && !emptyStomach(slp.s, all)) e2.late = 1; else delete e2.late;   // d203
+      if (e2.late && !G.day.lateHit) { G.day.lateHit = true; addPrana(-5, "Ate within 3 hours of bed", "late food", false, { k:"late:" + G.day.date }); }
       if (JSON.stringify(e2) !== JSON.stringify(was)) { G.day.earn = e2; saveG(); }
     }
     // phone and desktop alike: the steps card, three picks for right now, then the full list one tap away (2026-10-09)
