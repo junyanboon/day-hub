@@ -57,6 +57,30 @@
   html.mode-health{ background-image: linear-gradient(180deg, #6fb98f 0%, #4f8f86 50%, #4a5f8a 100%); background-color:#4a5f8a; }
   html.mode-zap   { background-image: linear-gradient(180deg, #9a7fd4 0%, #6d5aa8 50%, #3f3a78 100%); background-color:#3f3a78; }
   html.night      { background-image: linear-gradient(180deg, #2b3160 0%, #232850 50%, #191d3c 100%); background-color:#191d3c; }
+  /* d208 (2026-10-09): a sky that follows his day (dawn, day, dusk, night), with dunes while he is in a desert place.
+     It replaces the fixed night navy of 2026-09-28. */
+  #sky { position:fixed; inset:0; z-index:-1; pointer-events:none; overflow:hidden; transition:background 4s ease;
+    background:linear-gradient(180deg, #0b0f2c 0%, #1a1f4a 60%, #2a2453 100%); }
+  html.sky-dawn #sky { background:linear-gradient(180deg, #1a1f52 0%, #3e3373 42%, #a5607a 78%, #e7a06a 100%); }
+  html.sky-day  #sky { background:linear-gradient(180deg, #14336a 0%, #23548d 50%, #3f76a6 100%); }
+  html.sky-dusk #sky { background:linear-gradient(180deg, #1e1848 0%, #4e3372 44%, #b8615a 80%, #eb9a55 100%); }
+  .sky-stars { position:absolute; inset:0 0 35% 0; opacity:1; transition:opacity 4s; }
+  .sky-stars i { position:absolute; width:2px; height:2px; border-radius:50%; background:#fff; animation:skyTw 4s ease-in-out infinite; }
+  @keyframes skyTw { 50% { opacity:.25; } }
+  html.sky-dawn .sky-stars, html.sky-dusk .sky-stars { opacity:.3; } html.sky-day .sky-stars { opacity:0; }
+  .sky-orb { position:absolute; width:120px; height:120px; border-radius:50%; left:calc(var(--orbx, .7) * 100%); top:calc(var(--orby, .2) * 100%);
+    transform:translate(-50%, -50%); transition:left 60s linear, top 60s linear, background 4s;
+    background:radial-gradient(circle, #f4f1ff 0 16%, rgba(220,215,255,.35) 18%, transparent 62%); }
+  html.sky-day .sky-orb, html.sky-dawn .sky-orb, html.sky-dusk .sky-orb { background:radial-gradient(circle, #fff6d8 0 14%, rgba(255,200,110,.45) 18%, transparent 64%); }
+  .sky-dunes { position:absolute; left:0; right:0; bottom:0; width:100%; height:24vh; display:none; }
+  html.desert .sky-dunes { display:block; }
+  .sky-dunes .d1 { fill:var(--dune1, #1d1a3e); } .sky-dunes .d2 { fill:var(--dune2, #16132f); } .sky-dunes .d3 { fill:var(--dune3, #0f0d24); }
+  html.sky-dawn { --dune1:#6a4660; --dune2:#4c3150; --dune3:#33223f; }
+  html.sky-day  { --dune1:#9c7446; --dune2:#7d5a37; --dune3:#5e432b; }
+  html.sky-dusk { --dune1:#7a4250; --dune2:#5a2f45; --dune3:#3c2036; }
+  /* d207: the pixel font on headings and numbers, to match the sprites */
+  h2, .eyebrow, .hgl, .win-lb, .quest-title, .summary b, .count .big, .hud-title b, #altTxt, #bodyTxt, .htile b, .combo .n, .combo .l,
+  .pa-all, .side-quest b, .sq b, .mo-open-t b { font-family:"Pixelify Sans", ui-sans-serif, system-ui; letter-spacing:.02em; }
   body { background:transparent; color:var(--ink);
     font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
     -webkit-font-smoothing:antialiased; }
@@ -87,7 +111,7 @@
   .bg-body .bg-glow { opacity:calc(.06 + .7 * var(--b)); transform:scale(calc(1 + .12 * var(--b))); }
   .bg-seat { animation:bgBreath 6s ease-in-out infinite; transform-origin:50% 95%; }
   .bg-stand { filter:saturate(calc(.3 + .7 * var(--b))) brightness(calc(.62 + .38 * var(--b))); transition:filter 1.2s; }
-  .bg-fill { -webkit-mask:url(sprites/stand.webp) 50% 100% / contain no-repeat; mask:url(sprites/stand.webp) 50% 100% / contain no-repeat;
+  .bg-fill { -webkit-mask:var(--mask, url(sprites/stand.webp)) 50% 100% / contain no-repeat; mask:var(--mask, url(sprites/stand.webp)) 50% 100% / contain no-repeat;
     background:linear-gradient(0deg, rgba(95,211,196,.42) calc(var(--b) * 100%), transparent calc(var(--b) * 100% + 1px)); mix-blend-mode:screen; }
   .bg-lab { position:relative; text-align:center; padding:4px 0 10px; line-height:1.1; }
   .bg-n { font-family:"Pixelify Sans", ui-sans-serif, system-ui; font-size:26px; font-weight:700; }
@@ -107,6 +131,7 @@
   .bar { height:8px; border-radius:6px; background:rgba(0,0,0,.2); margin-top:6px; overflow:hidden; }
   .bar > i { display:block; height:100%; width:0; background:linear-gradient(90deg, var(--gold), #fff0c4);
     border-radius:6px; transition:width .8s cubic-bezier(.2,.8,.2,1); }
+  .hi-img { width:30px; height:30px; object-fit:contain; image-rendering:auto; }
   .htile b.mb { color:#5fd3c4; } .htile b.mp { color:var(--gold); }
   .hkey { font-size:11.5px; color:var(--ink-faint); margin:2px 0 8px; } .hkey .mb { color:#5fd3c4; } .hkey .mp { color:var(--gold); }
   .hud-body { margin-top:6px; font-size:11.5px; } .bar-body { height:5px; margin-top:4px; }
@@ -115,6 +140,8 @@
   .o2row { gap:10px; white-space:nowrap; overflow:hidden; } .o2row .ok { color:#8fe3b0; }
   .float.down { color:#ff9c9c; } .log div span.xp.neg { color:#ff9c9c; }
   .pline { width:100%; height:80px; margin-top:10px; } .pline path { fill:none; stroke:var(--gold); stroke-width:2.5; stroke-linejoin:round; }
+  .pline path.pl-b { stroke:#5fd3c4; stroke-width:2; opacity:.9; }
+  .pl-key { display:flex; gap:14px; font-size:12px; margin-top:4px; } .pl-key .pl-p { color:var(--gold); } .pl-key .pl-b { color:#5fd3c4; }
   .pline .p70 { stroke:rgba(255,255,255,.25); stroke-dasharray:4 4; }
   .brief li { margin:4px 0; } .brief ul { margin:8px 0 0; padding-left:18px; color:var(--ink-soft); font-size:14px; }
   /* habit tiles: small, many, fun to tap (quest-fx.js does the bursts and sound) */
@@ -530,9 +557,12 @@
 <script src="bag.js?v=20261009k"></script>
 <script src="quest-merge.js?v=20261009b"></script>
 <script src="quest-fx.js?v=20261009b"></script>
-<script src="quest-night.js?v=20261009b"></script>
+<script src="quest-night.js?v=20261010a"></script>
 </head>
 <body>
+<div id="sky" aria-hidden="true"><div class="sky-stars"></div><div class="sky-orb"></div>
+  <svg class="sky-dunes" viewBox="0 0 1200 220" preserveAspectRatio="none"><path class="d1" d="M0 120 Q160 60 330 105 T700 90 T1200 70 V220 H0 Z"/>
+  <path class="d2" d="M0 170 Q220 110 470 150 T900 135 T1200 125 V220 H0 Z"/><path class="d3" d="M0 205 Q300 165 620 195 T1200 180 V220 H0 Z"/></svg></div>
 <div id="app">
   <div class="hud">
     <div class="avatar" id="avatar"><img src="sprites/head.webp" alt=""></div>
@@ -1162,13 +1192,16 @@
   ["pointerup", "pointercancel", "scroll"].forEach(ev => document.addEventListener(ev, () => clearTimeout(pressT), true));
   // a long press shows the reason and does not count the action
   document.addEventListener("click", e => { if (whyHeld) { whyHeld = false; e.stopPropagation(); e.preventDefault(); setTimeout(hideWhy, 2500); } }, true);
+  // d206: his pixel icons replace the emoji as they arrive (still/sprites/icons/<id>.webp); add the id here
+  const ICONS = new Set([]);
+  const hIcon = (id, icon) => ICONS.has(id) ? `<img class="hi-img" src="sprites/icons/${id}.webp" alt="">` : icon;
   function habitTile([id, full, , max, icon, short, flag]){
     const n = G.day.habits[id] || 0, g = habitGain(id), auto = flag === "auto", earned = auto && (G.day.earn || {})[id];
     const cls = ["htile", !auto && !g ? "full" : "", auto ? "auto" : "", earned || (auto && n) ? "earned" : "", id === "water" ? "water" : ""].filter(Boolean).join(" ");
     const cnt = id === "xylitol" ? `<span class="hc">${n ? `${n} g${n < 6 ? " / 6" : ""}` : ""}</span>` : id === "water" ? `<span class="hc">${n ? `${n * 250} ml` : ""}</span>` : max > 1 && n ? `<span class="hc">${n}/${max}</span>` : n ? `<span class="hc">✓</span>` : "";
     const fill = max > 1 && n ? `<i class="glass" style="height:${Math.round(n / max * 100)}%"></i>` : "";
     const tg = id === "bedtime" && BED ? `${n ? "✓" : "✗"} ${BED.asleep}` : auto ? (n ? "✓ last night" : earned ? "✓ tonight" : "auto") : g ? (g > 0 ? `+${g}` : `${g}`) : "";
-    return `<button class="${cls}" data-habit="${id}" data-why="${esc(WHY[id] || full)}">${fill}<span class="hi">${icon}</span><span class="hl">${esc(short)}</span>${cnt}<b class="${meterOf(id) === "b" ? "mb" : "mp"}">${tg}</b></button>`;
+    return `<button class="${cls}" data-habit="${id}" data-why="${esc(WHY[id] || full)}">${fill}<span class="hi">${hIcon(id, icon)}</span><span class="hl">${esc(short)}</span>${cnt}<b class="${meterOf(id) === "b" ? "mb" : "mp"}">${tg}</b></button>`;
   }
   function habitsHTML(){
     const tile = habitTile;
@@ -1339,16 +1372,18 @@
       }
     } catch {}
   }
-  // the day's prana as a step line, with the 70% mark (d74)
+  // the day as two step lines (d205): prana in gold, body in teal, with the 70% mark (d74)
   function pranaLine(){
-    const pts = (G.day.pl || []).map(([a, v]) => [+new Date(a), v]);
-    if (!pts.length) pts.push([+now(), prana()]);
-    const t0 = pts[0][0], t1 = Math.max(+now(), pts[pts.length - 1][0] + 60000), W = 300, H = 70;
+    const series = [[G.day.pl || [], prana(), "pl-p"], [G.day.bl || [], body(), "pl-b"]]
+      .map(([raw, cur, cls]) => { const pts = raw.map(([a, v]) => [+new Date(a), v]); if (!pts.length) pts.push([+now(), cur]); return [pts, cls]; });
+    const all = series.flatMap(([pts]) => pts.map(x => x[0]));
+    const t0 = Math.min(...all), t1 = Math.max(+now(), Math.max(...all) + 60000), W = 300, H = 70;
     const X = x => Math.round((x - t0) / (t1 - t0) * W), Y = v => Math.round(H - v / 100 * H);
-    let d = `M0,${Y(pts[0][1])}`;
-    pts.forEach(([x, v], i) => { if (i) d += ` L${X(x)},${Y(pts[i - 1][1])} L${X(x)},${Y(v)}`; });
-    d += ` L${W},${Y(pts[pts.length - 1][1])}`;
-    return `<svg viewBox="0 -4 ${W} ${H + 8}" class="pline" aria-label="Prana through the day"><line x1="0" x2="${W}" y1="${Y(70)}" y2="${Y(70)}" class="p70"/><path d="${d}"/></svg>`;
+    const path = pts => { let d = `M0,${Y(pts[0][1])}`; pts.forEach(([x, v], i) => { if (i) d += ` L${X(x)},${Y(pts[i - 1][1])} L${X(x)},${Y(v)}`; });
+      return d + ` L${W},${Y(pts[pts.length - 1][1])}`; };
+    return `<svg viewBox="0 -4 ${W} ${H + 8}" class="pline" aria-label="Prana and body through the day"><line x1="0" x2="${W}" y1="${Y(70)}" y2="${Y(70)}" class="p70"/>
+      ${series.map(([pts, cls]) => `<path class="${cls}" d="${path(pts)}"/>`).join("")}</svg>
+      <div class="pl-key"><span class="pl-p">● Prana ${Math.round(prana())}%</span><span class="pl-b">● Body ${Math.round(body())}%</span></div>`;
   }
   // d77: no sadhana on the calendar? find 30 min with nothing fixed and no food in the 3 hr before
   function sadhanaSlot(all){
@@ -2954,10 +2989,25 @@
     if (!d.pranaSince) d.pranaSince = d.since || now().toISOString();
     if (G.mode !== "prana") { G.mode = "prana"; delete G.summits; delete G.ropes; delete G.souvenirs; }
   }
+  function skyNow(t){
+    const p = tzParts(t, { hour:"numeric", minute:"numeric", hourCycle:"h23" }), h = +p.hour + +p.minute / 60;
+    const phase = h >= 5 && h < 7.5 ? "dawn" : h >= 7.5 && h < 17 ? "day" : h >= 17 && h < 19.5 ? "dusk" : "night";
+    const desert = /^Africa\/(Cairo|Khartoum|Tripoli|Algiers)|^Asia\/(Dubai|Riyadh|Muscat|Qatar)/.test(TZ()) || /desert|sahara|aswan|luxor|hurghada|giza|stell?a|siwa|dahab/i.test(placeNow());
+    const cls = `sky-${phase}${desert ? " desert" : ""}`;
+    if (document.documentElement.className !== cls) document.documentElement.className = cls;
+    const sky = $("sky");
+    if (sky && !sky.dataset.stars) { sky.dataset.stars = 1;
+      sky.querySelector(".sky-stars").innerHTML = Array.from({ length:70 }, (_, i) => `<i style="left:${(i * 53.7) % 100}%;top:${(i * 31.3) % 100}%;opacity:${.3 + (i % 5) * .15};animation-delay:${(i % 7) * .6}s"></i>`).join(""); }
+    // the sun or moon arcs across the sky through its part of the day
+    const f = phase === "night" ? ((h >= 19.5 ? h - 19.5 : h + 4.5) / 9.5) : (h - 5) / 14.5;
+    if (sky) { sky.style.setProperty("--orbx", (.12 + .76 * Math.min(1, Math.max(0, f))).toFixed(3)); sky.style.setProperty("--orby", (.42 - .32 * Math.sin(Math.PI * Math.min(1, Math.max(0, f)))).toFixed(3)); }
+  }
   /* the Prana and Body stage: built once, then only its numbers and pose change */
   const PRANA_WORD = p => p < 10 ? "Build it with sadhana" : p < 35 ? "Stirring" : p < 60 ? "Rising" : p < 85 ? "Bright" : "Radiant";
   const BODY_WORD = b => b < 25 ? "Rest restores it" : b < 50 ? "Tired" : b < 75 ? "Steady" : "Fresh";
   let beingKey = "";
+  // poses Junyan makes later (d210): add the name here once sprites/<name>.webp and <name>-glow.webp exist
+  const POSES = new Set([]);   // "lie" (sleep), "walk" (hikes and tours), "eat" (meals)
   function drawBeing(P, B){
     const el = $("being"); if (!el) return;
     if (!el.firstChild) {
@@ -2966,9 +3016,20 @@
           <div class="bg-lab"><div class="bg-k">Prana</div><div class="bg-n" id="bgP"></div><span class="bg-h" id="bgPh"></span></div></div>
         <div class="bg-col bg-body"><div class="bg-fig"><img class="bg-glow" src="sprites/stand-glow.webp" alt=""><img class="bg-stand" src="sprites/stand.webp" alt="You, standing"><div class="bg-fill"></div></div>
           <div class="bg-lab"><div class="bg-k">Body</div><div class="bg-n" id="bgB"></div><span class="bg-h" id="bgBh"></span></div></div></div>`;
+      el.querySelector(".bg-body").onclick = () => { if (!(G.unlocks || {}).robe) return; G.outfit = G.outfit === "plain" ? "robe" : "plain"; saveG(); beingKey = ""; render(); };
     }
-    const k = P + "|" + B; if (k === beingKey) return; beingKey = k;
+    // d209: the purple robe, unlocked after 7 days ending at 70% or more; tap the standing figure to switch
+    if (streak() >= 7 && !(G.unlocks || {}).robe) { (G.unlocks = G.unlocks || {}).robe = gameYmd(); G.outfit = "robe"; saveG();
+      setTimeout(() => banner("✨", "ROBE UNLOCKED", "Seven days at 70% or more. The purple robe is yours."), 600); }
+    const outfit = (G.unlocks || {}).robe && G.outfit !== "plain" ? "robe" : "stand";
+    // d210: a pose for what he is doing now, once his sprites for it exist (POSES)
+    const cur = currentOf(blocks(), now()), act = cur ? (isSleep(cur) ? "lie" : isMeal(cur) ? "eat" : /hike|walk|trek|climb|tour/i.test(cur.t) ? "walk" : "") : "";
+    const bodyImg = POSES.has(act) ? act : outfit;
+    const k = P + "|" + B + "|" + bodyImg; if (k === beingKey) return; beingKey = k;
     const st = el.firstChild;
+    const bi = st.querySelector(".bg-stand");
+    if (!bi.src.endsWith(`${bodyImg}.webp`)) { bi.src = `sprites/${bodyImg}.webp`; st.querySelector(".bg-body .bg-glow").src = `sprites/${bodyImg}-glow.webp`;
+      st.querySelector(".bg-fill").style.setProperty("--mask", `url(sprites/${bodyImg}.webp)`); }
     st.style.setProperty("--p", (P / 100).toFixed(2)); st.style.setProperty("--b", (B / 100).toFixed(2));
     document.documentElement.style.setProperty("--p", (P / 100).toFixed(2));
     $("bgP").textContent = `${P}%`; $("bgB").textContent = `${B}%`;
@@ -3010,8 +3071,8 @@
 
     // mode
     const z = G.day.zap;
-    // one fixed colour, the night navy (Junyan, 2026-09-28): no mode changes
-    document.documentElement.className = "night";
+    // the sky follows the hour where he is (d208), with dunes in a desert place
+    skyNow(t);
 
     // d148 (2026-10-09): no check-ins. A block on the calendar counts as happening from its start;
     // Change course is how the day changes. Effort is counted when a block ends.
@@ -3078,7 +3139,7 @@
       if (!nxt) {
         const P2 = Math.round(prana()), sk2 = streak();
         html = `<div class="card"><div class="eyebrow">Day card · ${esc(placeNow())}</div>
-          <div class="quest-title"><span class="em">${P2 >= 70 ? "🌕" : P2 >= 40 ? "🌗" : "🌑"}</span><span>Prana ${P2}%</span></div>
+          <div class="quest-title"><span class="em">${P2 >= 70 ? "🌕" : P2 >= 40 ? "🌗" : "🌑"}</span><span>Your day so far</span></div>
           ${pranaLine()}
           <div class="summary"><div><b>${all.filter(isSadhana).some(b => ["in","late"].includes(G.day.checks[gk(b)])) ? "✓" : "·"}</b><span>sadhana</span></div>
           <div><b>${health.filter(b => ["in","late"].includes(G.day.checks[gk(b)])).length}/${health.length}</b><span>fires lit</span></div>

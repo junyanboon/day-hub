@@ -127,6 +127,7 @@
     .nt-top .btn { flex:none; padding:8px 16px; }
     .nt-body { overflow:auto; padding:0 16px calc(env(safe-area-inset-bottom) + 30px); max-width:560px; width:100%; margin:0 auto; }
     .nt section { margin-top:22px; }
+    .nt h3, .nt-stats b, .nt-ahead b, .nt-feel b, .nt-top b { font-family:"Pixelify Sans", ui-sans-serif, system-ui; }
     .nt h3 { font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--ink-soft); margin:0 0 10px; font-weight:600; }
     .nt-stats { display:grid; grid-template-columns:repeat(5, 1fr); gap:6px; }
     .nt-stats div { background:var(--glass); border-radius:14px; padding:10px 6px; text-align:center; }
