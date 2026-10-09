@@ -454,6 +454,7 @@
 <script src="bag.js"></script>
 <script src="quest-merge.js"></script>
 <script src="quest-fx.js"></script>
+<script src="quest-night.js"></script>
 </head>
 <body>
 <div id="app">
@@ -835,9 +836,12 @@
     ["neem", "Neem and turmeric, every morning", 3, 1, "🌿", "Neem + turmeric", "", "Morning"],
     ["mouthAm", "Dr Ellie's mouthcare routine in the morning, the whole routine in one tap", 2, 1, "🦷", "Dr Ellie AM", "", "Morning"],
     ["shambhavi", "Shambhavi Mahamudra (counts itself from the sadhana check-in)", 18, 1, "🧘", "Shambhavi", "", "Practice"],
-    ["kriya", "Isha Kriya or Upa Yoga", 8, 2, "🌀", "Kriya / Upa Yoga", "", "Practice"],
+    ["kriya", "Isha Kriya", 8, 1, "🌀", "Isha Kriya", "", "Practice"],
+    ["upa", "Upa Yoga", 5, 1, "🙆", "Upa Yoga", "", "Practice"],
+    ["surya", "Surya Kriya", 10, 1, "☀️", "Surya Kriya", "", "Practice"],
+    ["angam", "Angamardana", 8, 1, "💪", "Angamardana", "", "Practice"],
+    ["bhuta", "Bhuta Shuddhi", 6, 1, "🔥", "Bhuta Shuddhi", "", "Practice"],
     ["nadi", "Nadi Shuddhi, 5 min", 3, 2, "🌬️", "Nadi Shuddhi 5'", "", "Practice"],
-    ["nsdr", "NSDR or Yoga Nidra, 10 to 20 min", 5, 1, "😌", "NSDR 10-20'", "", "Practice"],
     ["blueprint", "Blueprint meal: Super Veggie or Nutty Pudding", 6, 2, "🥗", "Veggie / Pudding", "", "Food"],
     ["legumes", "150 g cooked beans or lentils", 3, 1, "🫘", "150 g lentils", "", "Food"],
     ["veg", "250 g vegetables (about 2 big handfuls)", 3, 2, "🥦", "250 g veg", "", "Food"],
@@ -846,8 +850,8 @@
     ["nuts", "30 g nuts (walnuts, almonds, macadamia)", 2, 1, "🥜", "30 g nuts", "", "Food"],
     ["berries", "100 g berries", 2, 1, "🫐", "100 g berries", "", "Food"],
     ["seeds", "1 tbsp ground flax or chia", 1, 1, "🌱", "1 tbsp flax/chia", "", "Food"],
-    ["ferment", "Fermented food: 100 g yogurt, kefir or sauerkraut", 2, 1, "🥛", "100 g ferment", "", "Food"],
-    ["xylitol", "Xylitol mint or gum after eating or drinking (Dr Ellie: about 5 a day, 6 to 10 g)", 0.6, 5, "🍬", "Xylitol", "flat", "Food"],
+    ["ferment", "Fermented food: 100 g yogurt, kefir or sauerkraut", 2, 1, "🥛", "100 g fermented food", "", "Food"],
+    ["xylitol", "Xylitol, 1 g (one mint or gum) after eating or drinking; Dr Ellie: 6 to 10 g a day", 0.6, 10, "🍬", "Xylitol 1 g", "flat", "Food"],
     ["screens", "Screens off 60 min before bed", 5, 1, "📵", "No screens 60'", "", "Evening"],
     ["mouth", "Dr Ellie's mouthcare routine at night, the whole routine in one tap", 2, 1, "🦷", "Dr Ellie PM", "", "Evening"],
     ["early", "Last meal 3+ hr before bed (counts itself from the calendar, paid next morning)", 5, 1, "🍽️", "Last meal 3 hr", "auto", "Evening"],
@@ -945,11 +949,47 @@
     } catch {}
   }
 
+  /* ---------- Day's end: the bedtime screen (Junyan, 2026-10-09, d180) ----------
+     Opens by itself once the day's last item ends (not sleep, not open time), and
+     a 🌙 button reopens it. quest-night.js draws it; no prana is given there. */
+  const lastItemEnd = all => { const r = all.filter(b => !isSleep(b) && b.kind !== "open" && b.kind !== "break"); return r.length ? Math.max(...r.map(b => +b.e)) : null; };
+  async function openNight(){
+    if (!window.QuestNight || !G.day) return;
+    const all = blocks(), t = now();
+    const health = all.filter(b => b.e <= t && isHealth(b));
+    const lit = health.filter(b => ["in", "late"].includes(G.day.checks[gk(b)])).length;
+    const hDone = HABITS.filter(h => (G.day.habits[h[0]] || 0) > 0).length;
+    const done = all.filter(b => G.day.closes[gk(b)] === "done" || ["in", "late"].includes(G.day.checks[gk(b)])).map(b => `✓ ${shortName(b)}`)
+      .concat(all.filter(b => G.day.checks[gk(b)] === "skip").map(b => `· ${shortName(b)}, didn't happen`));
+    const next = new Date(Date.parse(gameYmd() + "T12:00:00Z") + 86400000).toISOString().slice(0, 10);
+    let items = [], note = "";
+    try {
+      const p = await getPlan(next);
+      items = p.blocks.filter(b => b.type !== "break" && !/^open space|^rest$/i.test(b.t))
+        .map(b => ({ time: fmtT(new Date(b.s)), name: shortName(b) }));
+    } catch { note = "Could not read tomorrow's calendar."; }
+    const days = {};
+    for (const [k, v] of Object.entries(G.days || {})) if (v && typeof v.prana === "number") { const d = new Date(k); if (!isNaN(d)) days[ymd(d)] = Math.round(v.prana); }
+    days[gameYmd()] = Math.round(prana());
+    const night = (G.night || {})[G.day.date] || {};
+    QuestNight.open({
+      today: { stats: [[`${Math.round(prana())}%`, "prana"], [`${lit}/${health.length}`, "fires lit"], [`${hDone}`, "actions"], [STEPS != null ? STEPS.toLocaleString() : "·", "steps"]],
+        line: pranaLine(), done: done.slice(0, 12) },
+      tomorrow: { label: new Date(next + "T12:00:00Z").toLocaleDateString("en-US", { timeZone:"UTC", weekday:"long", month:"short", day:"numeric" }), items, note },
+      days, birth: G.birth || null, note: night.note || "",
+      exerciseIndex: Math.floor(Date.parse(gameYmd() + "T12:00:00Z") / 86400000),
+      deathbedDone: !!G.day.deathbed,
+      onDeathbed: () => { G.day.deathbed = now().toISOString(); log("Sat as if on my deathbed"); },
+      onNote: (text, prompt) => { (G.night = G.night || {})[G.day.date] = { note:text, prompt, at:now().toISOString() }; saveG(); },
+      onBirth: v => { G.birth = v; saveG(); },
+    });
+  }
+
   /* ---------- Prana actions: the habit tiles ---------- */
   function habitTile([id, full, , max, icon, short, flag]){
     const n = G.day.habits[id] || 0, g = habitGain(id), auto = flag === "auto", earned = auto && (G.day.earn || {})[id];
     const cls = ["htile", !auto && !g ? "full" : "", auto ? "auto" : "", earned || (auto && n) ? "earned" : "", id === "water" ? "water" : ""].filter(Boolean).join(" ");
-    const cnt = id === "water" ? `<span class="hc">${n ? `${n * 250} ml` : ""}</span>` : max > 1 && n ? `<span class="hc">${n}/${max}</span>` : n ? `<span class="hc">✓</span>` : "";
+    const cnt = id === "xylitol" ? `<span class="hc">${n ? `${n} g${n < 6 ? " / 6" : ""}` : ""}</span>` : id === "water" ? `<span class="hc">${n ? `${n * 250} ml` : ""}</span>` : max > 1 && n ? `<span class="hc">${n}/${max}</span>` : n ? `<span class="hc">✓</span>` : "";
     const fill = max > 1 && n ? `<i class="glass" style="height:${Math.round(n / max * 100)}%"></i>` : "";
     const tg = id === "bedtime" && BED ? `${n ? "✓" : "✗"} ${BED.asleep}` : auto ? (n ? "✓ last night" : earned ? "✓ tonight" : "auto") : g ? `+${g}` : "";
     return `<button class="${cls}" data-habit="${id}" title="${esc(full)}">${fill}<span class="hi">${icon}</span><span class="hl">${esc(short)}</span>${cnt}<b>${tg}</b></button>`;
@@ -968,7 +1008,7 @@
      (12 cups from 6:30 AM to 9:30 PM), and a window about to close gets a nudge. */
   const WHEN = {
     daylight:[5,10], water:[6,21.5], salt:[5,10], protein:[6,11], supps:[6,11], neem:[5,10], mouthAm:[5,11],
-    shambhavi:[5,10], kriya:[6,21], nadi:[6,21], nsdr:[12,18], blueprint:[7,15], legumes:[11,21], veg:[11,21],
+    shambhavi:[5,10], kriya:[6,21], nadi:[6,21], upa:[6,21], surya:[5,9.5], angam:[5,9.5], bhuta:[5,21], blueprint:[7,15], legumes:[11,21], veg:[11,21],
     greens:[11,21], evoo:[7,21], nuts:[7,21], berries:[7,21], seeds:[7,21], ferment:[7,21], xylitol:[7,22],
     screens:[20.5,23], mouth:[20,24],
   };
@@ -985,7 +1025,7 @@
       if (FOOD.has(id)) sc += meal ? 9 : -4;
       if (id === "xylitol") sc += afterMeal ? 12 : -5;
       if (id === "water") { const due = Math.floor((h - 6.5) / 1.25) + 1; sc += (due - (G.day.habits.water || 0)) * 3; }
-      if (["kriya", "nadi", "nsdr"].includes(id) && prana() < 45) sc += 8;
+      if (["kriya", "nadi", "upa", "bhuta"].includes(id) && prana() < 45) sc += 8;
       out.push([sc, HABITS[k]]);
     });
     return out.sort((a, b) => b[0] - a[0]).slice(0, n).map(x => x[1]);
@@ -1940,7 +1980,7 @@
      morning, weather, the schedule (each activity opens its window), one slide per prepped moment,
      then today's practices: yogic and Bryan Johnson's (he dropped "one word for today": "I want things
      to be yogic practices / or bryan johnson practices"). They are the Prana actions habits, logged the same way. */
-  const MO_PRACTICES = [["Yogic", ["shambhavi", "kriya", "nadi", "nsdr"]],
+  const MO_PRACTICES = [["Yogic", ["shambhavi", "surya", "kriya", "nadi"]],
     ["Bryan Johnson", ["daylight", "salt", "caffeine", "protein", "blueprint", "early", "screens", "bedtime"]]];
   // full names, minus tour-sheet noise ("+ Extras", trailing dots)
   const moName = b => (b.t || "").replace(/\s*\+\s*extras\b/i, "").replace(/\.{2,}$/, "").replace(/^(tour|hike)\s*-\s*/i, (m, w) => w[0].toUpperCase() + w.slice(1).toLowerCase() + ": ").trim();
@@ -2627,7 +2667,10 @@
       if (JSON.stringify(e2) !== JSON.stringify(was)) { G.day.earn = e2; saveG(); }
     }
     // phone and desktop alike: the steps card, three picks for right now, then the full list one tap away (2026-10-09)
-    put("habits", PLAN ? stepsHTML() + suggestHTML() : ""); bindHabits($("habits"));
+    const endAt = lastItemEnd(all), nightNow = PLAN && endAt && +t >= endAt;
+    if (nightNow && !G.day.nightShown && !$("sheet").classList.contains("open") && !$("calx") && !$("night")) { G.day.nightShown = true; saveG(); openNight(); }
+    put("habits", PLAN ? (nightNow ? `<button class="pa-all nt-open" data-night>🌙 Day's end<span>tomorrow, deathbed, reflection ›</span></button>` : "") + stepsHTML() + suggestHTML() : ""); bindHabits($("habits"));
+    $("habits").querySelectorAll("[data-night]").forEach(bn => bn.onclick = openNight);
     $("brief").querySelectorAll("[data-now]").forEach(bn => bn.onclick = () => { G.day.lowAt = now().toISOString(); const [n, m] = bn.dataset.now.split("|"); startNow(n, +m); });
     if (low && !G.day.lotusGiven) { G.day.lotusGiven = true; giveItem("lotus", "Your energy is low today."); }
     if ($("bLowOk")) $("bLowOk").onclick = () => { G.day.lowAt = now().toISOString(); saveG(); render(); };
