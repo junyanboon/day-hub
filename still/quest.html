@@ -112,6 +112,11 @@
   .sq-t small { display:block; font-weight:400; font-size:12px; color:var(--ink-soft); margin-top:2px; }
   .sq-bar { display:block; height:6px; border-radius:4px; background:rgba(0,0,0,.25); margin-top:7px; overflow:hidden; }
   .sq-bar b { display:block; height:100%; width:0; background:linear-gradient(90deg, #7fd0ff, #8fe3b0); border-radius:4px; transition:width .8s cubic-bezier(.2,.8,.2,1); }
+  .hgrid.sugg { grid-template-columns:repeat(3, 1fr); }
+  .hgrid.sugg .htile { min-height:76px; }
+  .pa-all { width:100%; display:flex; justify-content:space-between; align-items:center; margin-top:8px; padding:11px 14px; border-radius:14px;
+    background:var(--glass); border:1px solid var(--glass-border); font-weight:600; font-size:14px; }
+  .pa-all span { color:var(--ink-soft); font-weight:400; font-size:12px; }
   .pa-btn { width:100%; display:flex; align-items:center; gap:12px; margin-top:12px; padding:14px 16px; border-radius:18px;
     background:linear-gradient(135deg, rgba(255,212,121,.22), rgba(143,227,176,.14)); border:1px solid rgba(255,212,121,.45); text-align:left; }
   .pa-btn:active { transform:scale(.98); }
@@ -941,21 +946,62 @@
   }
 
   /* ---------- Prana actions: the habit tiles ---------- */
+  function habitTile([id, full, , max, icon, short, flag]){
+    const n = G.day.habits[id] || 0, g = habitGain(id), auto = flag === "auto", earned = auto && (G.day.earn || {})[id];
+    const cls = ["htile", !auto && !g ? "full" : "", auto ? "auto" : "", earned || (auto && n) ? "earned" : "", id === "water" ? "water" : ""].filter(Boolean).join(" ");
+    const cnt = id === "water" ? `<span class="hc">${n ? `${n * 250} ml` : ""}</span>` : max > 1 && n ? `<span class="hc">${n}/${max}</span>` : n ? `<span class="hc">✓</span>` : "";
+    const fill = max > 1 && n ? `<i class="glass" style="height:${Math.round(n / max * 100)}%"></i>` : "";
+    const tg = id === "bedtime" && BED ? `${n ? "✓" : "✗"} ${BED.asleep}` : auto ? (n ? "✓ last night" : earned ? "✓ tonight" : "auto") : g ? `+${g}` : "";
+    return `<button class="${cls}" data-habit="${id}" title="${esc(full)}">${fill}<span class="hi">${icon}</span><span class="hl">${esc(short)}</span>${cnt}<b>${tg}</b></button>`;
+  }
   function habitsHTML(){
-    const tile = ([id, full, , max, icon, short, flag]) => {
-      const n = G.day.habits[id] || 0, g = habitGain(id), auto = flag === "auto", earned = auto && (G.day.earn || {})[id];
-      const cls = ["htile", !auto && !g ? "full" : "", auto ? "auto" : "", earned || (auto && n) ? "earned" : "", id === "water" ? "water" : ""].filter(Boolean).join(" ");
-      const cnt = id === "water" ? `<span class="hc">${n ? `${n * 250} ml` : ""}</span>` : max > 1 && n ? `<span class="hc">${n}/${max}</span>` : n ? `<span class="hc">✓</span>` : "";
-      const fill = max > 1 && n ? `<i class="glass" style="height:${Math.round(n / max * 100)}%"></i>` : "";
-      const tg = id === "bedtime" && BED ? `${n ? "✓" : "✗"} ${BED.asleep}` : auto ? (n ? "✓ last night" : earned ? "✓ tonight" : "auto") : g ? `+${g}` : "";
-      return `<button class="${cls}" data-habit="${id}" title="${esc(full)}">${fill}<span class="hi">${icon}</span><span class="hl">${esc(short)}</span>${cnt}<b>${tg}</b></button>`;
-    };
+    const tile = habitTile;
     const hDone = HABITS.filter(h => (G.day.habits[h[0]] || 0) > 0).length;
     return `<div class="hhead"><span class="eyebrow">Prana actions · level ${lvl()} · ${hDone}/${HABITS.length}</span>` +
       `<button class="hsnd" data-hsnd aria-label="Tap sounds">${window.QuestFx && QuestFx.soundOn() ? "🔊" : "🔇"}</button></div>` +
       ["Morning", "Practice", "Food", "Evening"].map(gr => `<div class="hgrp"><div class="hgl">${gr}</div><div class="hgrid">${HABITS.filter(h => h[7] === gr).map(tile).join("")}</div></div>`).join("");
   }
+  /* Three picks for right now (Junyan, 2026-10-09: "only suggestions for this exact
+     moment, 3 suggestions; the rest behind an All Actions button"). Each action has
+     the hours it fits; around a meal the food ones lead and xylitol follows it, low
+     prana brings the recovery practices up, water rises when he is behind pace
+     (12 cups from 6:30 AM to 9:30 PM), and a window about to close gets a nudge. */
+  const WHEN = {
+    daylight:[5,10], water:[6,21.5], salt:[5,10], protein:[6,11], supps:[6,11], neem:[5,10], mouthAm:[5,11],
+    shambhavi:[5,10], kriya:[6,21], nadi:[6,21], nsdr:[12,18], blueprint:[7,15], legumes:[11,21], veg:[11,21],
+    greens:[11,21], evoo:[7,21], nuts:[7,21], berries:[7,21], seeds:[7,21], ferment:[7,21], xylitol:[7,22],
+    screens:[20.5,23], mouth:[20,24],
+  };
+  const FOOD = new Set(["protein", "blueprint", "legumes", "veg", "greens", "evoo", "nuts", "berries", "seeds", "ferment"]);
+  function suggestions(n = 3){
+    const t = now(), all = blocks(), p = tzParts(t, { hour:"numeric", minute:"numeric", hourCycle:"h23" }), h = +p.hour + +p.minute / 60;
+    const meal = all.find(b => isMeal(b) && +b.s - 20 * 60000 <= +t && +t <= +b.e + 40 * 60000);
+    const afterMeal = all.some(b => isMeal(b) && +b.e <= +t && +t - +b.e <= 45 * 60000);
+    const out = [];
+    HABITS.forEach(([id, , , max, , , flag], k) => {
+      const w = WHEN[id]; if (!w || flag === "auto" || !habitGain(id) || h < w[0] || h > w[1]) return;
+      let sc = 10 + habitGain(id) / 3 - k * 0.01;
+      if (w[1] - h < 1.5) sc += 4;                                     // its window closes soon
+      if (FOOD.has(id)) sc += meal ? 9 : -4;
+      if (id === "xylitol") sc += afterMeal ? 12 : -5;
+      if (id === "water") { const due = Math.floor((h - 6.5) / 1.25) + 1; sc += (due - (G.day.habits.water || 0)) * 3; }
+      if (["kriya", "nadi", "nsdr"].includes(id) && prana() < 45) sc += 8;
+      out.push([sc, HABITS[k]]);
+    });
+    return out.sort((a, b) => b[0] - a[0]).slice(0, n).map(x => x[1]);
+  }
+  let SUGG = null;   // keep the same three on screen until one is tapped or the hour turns
+  function suggestHTML(){
+    const key = `${G.day.date}|${tzParts(now(), { hour:"numeric", hourCycle:"h23" }).hour}|${JSON.stringify(G.day.habits)}`;
+    if (!SUGG || SUGG.key !== key) SUGG = { key, list: suggestions() };
+    const hDone = HABITS.filter(h => (G.day.habits[h[0]] || 0) > 0).length;
+    return `<div class="hhead"><span class="eyebrow">Prana actions · right now</span>` +
+      `<button class="hsnd" data-hsnd aria-label="Tap sounds">${window.QuestFx && QuestFx.soundOn() ? "🔊" : "🔇"}</button></div>` +
+      (SUGG.list.length ? `<div class="hgrid sugg">${SUGG.list.map(habitTile).join("")}</div>` : `<div class="hint" style="margin:8px 2px">Nothing pressing right now.</div>`) +
+      `<button class="pa-all" data-all>All prana actions<span>${hDone}/${HABITS.length} done ›</span></button>`;
+  }
   function bindHabits(root){
+    root.querySelectorAll("[data-all]").forEach(bn => bn.onclick = openActions);
     root.querySelectorAll("[data-habit]").forEach(bn => bn.onclick = () => tapHabit(bn));
     root.querySelectorAll("[data-hsnd]").forEach(bn => bn.onclick = () => { QuestFx.setSound(!QuestFx.soundOn()); refreshActions(); render(); });
   }
@@ -2580,13 +2626,8 @@
       if (lastMealBefore(slp.s, all) && emptyStomach(slp.s, all)) e2.early = 1; else delete e2.early;
       if (JSON.stringify(e2) !== JSON.stringify(was)) { G.day.earn = e2; saveG(); }
     }
-    // the phone shows one button that opens them; the desktop dashboard shows the tiles (2026-10-08)
-    const hDone = HABITS.filter(h => (G.day.habits[h[0]] || 0) > 0).length;
-    if (document.body.classList.contains("dash")) { put("habits", PLAN ? stepsHTML() + habitsHTML() : ""); bindHabits($("habits")); }
-    else {
-      put("habits", PLAN ? stepsHTML() + `<button class="pa-btn" id="paBtn"><span class="pa-i">✨</span><span class="pa-t">Prana actions<small>${hDone ? `${hDone} done today · ` : ""}things that fill you up</small></span><span class="pa-go">›</span></button>` : "");
-      if ($("paBtn")) $("paBtn").onclick = openActions;
-    }
+    // phone and desktop alike: the steps card, three picks for right now, then the full list one tap away (2026-10-09)
+    put("habits", PLAN ? stepsHTML() + suggestHTML() : ""); bindHabits($("habits"));
     $("brief").querySelectorAll("[data-now]").forEach(bn => bn.onclick = () => { G.day.lowAt = now().toISOString(); const [n, m] = bn.dataset.now.split("|"); startNow(n, +m); });
     if (low && !G.day.lotusGiven) { G.day.lotusGiven = true; giveItem("lotus", "Your energy is low today."); }
     if ($("bLowOk")) $("bLowOk").onclick = () => { G.day.lowAt = now().toISOString(); saveG(); render(); };
