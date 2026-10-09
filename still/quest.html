@@ -803,12 +803,18 @@
      missed block costs nothing: the app asks what he needs instead. */
   const RECOVER = [["Isha Kriya", 12], ["Upa Yoga", 20], ["NSDR", 20]];
   const isRecovery = b => /isha kriya|upa yoga|nsdr|yoga nidra|\bnap\b|recover/i.test(b.t);
+  /* What effort costs an hour (Junyan, 2026-10-09, d187 to d189: "Hike should consume a
+     lot more than 4 prana ... Sandboarding 4 hrs takes way more than 6"). Five kinds:
+     very hard 10, hard 7, focused 5, light 2, free 0. Level 1 has no discount. */
+  const VERY_HARD = /hike|trek|climb|sandboard|surf|\bdiv(e|ing)\b|kitesurf|kayak|rafting|desert|quad|mountain/i;
+  const HARD = /swim|cycl|\bbike\b|walk|\btour\b|excursion|safari|snorkel|party|festival|wedding|concert|competition|performance|congress|gala/i;
+  const FOCUSED = /\bdrive\b|driving/i;
   function energy(b){                                  // { rate: spent per hour while it runs }
     if (isSadhana(b) || isRecovery(b) || isMeal(b) || isSleep(b) || b.kind === "open" || b.kind === "break" || /^rest\b/i.test(b.t)) return { rate:0 };
-    if (isGym(b) || b.kind === "body" || b.kind === "dance") return { rate:6 };
-    const g = groupOf(b);
-    // sitting on a bus or plane costs less than work; a tour is fun but still effort (d129)
-    return { rate: g === "work" ? 5 : g === "major" ? 4 : g === "travel" ? 2 : 3 };
+    if (VERY_HARD.test(b.t)) return { rate:10 };
+    if (isGym(b) || b.kind === "body" || b.kind === "dance" || HARD.test(b.t) || groupOf(b) === "major") return { rate:7 };
+    if (groupOf(b) === "work" || FOCUSED.test(b.t)) return { rate:5 };
+    return { rate:2 };                                 // bus, plane, boat, laundry, shopping, shower
   }
   /* ---------- Prana v2 (Junyan, 2026-10-08, d129) ----------
      It carries over: today starts where yesterday ended, plus what sleep gave
@@ -857,7 +863,7 @@
   const DIM = [1, .7, .5, .35, .25, .2];
   const lvl = () => (G.pr && G.pr.level) || 1;
   const gainMult = () => 1.5 - (lvl() - 1) * 0.1;      // level 1: x1.5 ... level 10: x0.6
-  const spendMult = () => 0.8 + (lvl() - 1) * 0.06;    // level 1: x0.8 ... level 10: x1.34
+  const spendMult = () => 1 + (lvl() - 1) * 0.06;      // level 1: x1 (d189) ... level 10: x1.54
   function habitGain(id){
     const h = HABITS.find(x => x[0] === id); if (!h) return 0;
     const n = (G.day.habits || {})[id] || 0;
@@ -1155,12 +1161,12 @@
   const onTimeMin = b => isSleep(b) ? 30 : ON_TIME_MIN;   // bedtime counts within 30 min (Blueprint: same time nightly)
   const SIDE_P = 5;
   const prana = () => G.day.prana ?? 60;
-  function addPrana(d, msg, label, noFloat){
+  function addPrana(d, msg, label, noFloat, extra){
     d = Math.round(d);
     G.day.prana = Math.max(0, Math.min(100, prana() + d));
     (G.day.pl = G.day.pl || []).push([now().toISOString(), G.day.prana]);
     (G.days = G.days || {})[G.day.date] = { place:placeNow(), prana:G.day.prana, level:lvl() };
-    log(msg, d); if (d && !noFloat) floatXp(d, label || "");
+    log(msg, d, extra); if (d && !noFloat) floatXp(d, label || "");
     saveG();
   }
   function award(d, msg, opts = {}){ addPrana(d, msg, opts.label); }
@@ -1226,8 +1232,10 @@
     return `Ends ${fmtT(b.e)}, ${isSleep(nx) ? "bed" : shortName(nx)} at ${fmtT(nx.s)}: only ${fmtHM(Math.round((nx.s - b.e) / 60000))} to digest. Aim for 3 hr.`;
   }
 
-  function log(msg, xp = 0){
-    G.day.log.unshift({ at:now().toISOString(), msg, xp });
+  // extra: { at, k, re } for spend lines: stamped at the block's end, keyed to the block (quest-merge.js)
+  function log(msg, xp = 0, extra){
+    G.day.log.unshift({ at:now().toISOString(), msg, xp, ...(extra || {}) });
+    if (extra && extra.at) G.day.log.sort((x, y) => Date.parse(y.at) - Date.parse(x.at));
     G.day.log = G.day.log.slice(0, 80);
     saveG();
   }
@@ -1300,16 +1308,16 @@
   }
   // effort is counted once, for the time a started block really ran
   const spanTxt = (from, to) => `${fmtHM(Math.round(Math.max(0, to - from) / 60000))}, ${fmtT(from)} to ${fmtT(to)}`;
-  const costOf = (r, from, to) => Math.round(r * Math.max(0, (to - from) / 3600000) * spendMult());
+  const costOf = (r, from, to) => Math.round(r * Math.max(0, (to - from) / 3600000));
   function spend(b){
     const k = gk(b); G.day.spent = G.day.spent || {};
     if (G.day.spent[k]) return;
-    const r = energy(b).rate;
+    const r = energy(b).rate * spendMult();
     const from = new Date((G.day.started || {})[k] || b.s), to = new Date(Math.min(+now(), +b.e));
     const d = r ? costOf(r, from, to) : 0;
     // what was counted, so a later change to the block (or to the rates) can be recounted
     G.day.spent[k] = { bs:b.s.toISOString(), be:b.e.toISOString(), from:from.toISOString(), to:to.toISOString(), r, d };
-    if (d) addPrana(-d, `${shortName(b)} used ${d} (${spanTxt(from, to)})`, ""); else saveG();
+    if (d) addPrana(-d, `${shortName(b)} used ${d} (${spanTxt(from, to)})`, "", false, { at:to.toISOString(), k }); else saveG();
   }
   /* The schedule changes during the day (Junyan, 2026-10-09: "the schedule changed
      through the day so the log needs to reflect that"). A finished block whose times
@@ -1317,7 +1325,7 @@
      new times, and the log says so: "Sandboarding recounted, used 12 (...was 6)".
      Blocks counted before this existed (spent = true) are recounted once from the log. */
   function respend(b){
-    const k = gk(b), rec = (G.day.spent || {})[k], r = energy(b).rate;
+    const k = gk(b), rec = (G.day.spent || {})[k], r = energy(b).rate * spendMult();
     if (!rec) return;
     const bs = b.s.toISOString(), be = b.e.toISOString();
     let old, from, to;
@@ -1334,7 +1342,8 @@
     }
     const d = r ? costOf(r, from, to) : 0;
     G.day.spent[k] = { bs, be, from:from.toISOString(), to:to.toISOString(), r, d };
-    if (d !== old) addPrana(old - d, `${shortName(b)} recounted, used ${d} (${spanTxt(from, to)}, was ${old})`, d > old ? "schedule changed" : "given back");
+    if (d !== old) addPrana(old - d, `${shortName(b)} recounted, used ${d} (${spanTxt(from, to)}, was ${old})`, d > old ? "schedule changed" : "given back",
+      false, { at:to.toISOString(), k, re:`${old}>${d}` });
     else saveG();
   }
   function skip(b){
@@ -2646,7 +2655,7 @@
     const where = PLAN && PLAN.where && PLAN.where.place;
     $("statusL").innerHTML = pullErr ? `<span class="dry">Offline: ${esc(pullErr)}</span>`
       : PLAN ? `<span class="place">📍 ${esc(where || "Home")}</span> ${fmtT(t)} local` : "Loading your day…";
-    $("statusR").innerHTML = [DRY ? `<span class="dry">dry run</span>` : "", AT ? `<span class="dry">clock ${fmtT(t)}</span>` : ""].filter(Boolean).join(" · ");
+    $("statusR").innerHTML = [DRY ? `<a class="dry" href="${location.pathname}">Test mode: nothing is saved. Tap for the real game</a>` : "", AT ? `<span class="dry">clock ${fmtT(t)}</span>` : ""].filter(Boolean).join(" · ");
 
     // mode
     const z = G.day.zap;

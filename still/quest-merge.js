@@ -17,14 +17,20 @@
   const ms = (s) => { const t = Date.parse(s); return isNaN(t) ? 0 : t; };
   const LOG_MAX = 80, BAG_LOG_MAX = 60;
   const evKey = (e) => (e && e.at) + "|" + (e && e.msg);
-  // a block's spend, the sleep refill and the steps boost happen once a day, whichever device records them
-  const onceKey = (e) => (e && /\bused \d+ \(|^Slept |\(Oura\)$/.test(e.msg || "") ? e.msg : null);
+  // a block's spend, the sleep refill and the steps boost happen once a day, whichever device records them.
+  // Spend lines carry the block's key (k), so two devices that counted the same block with
+  // different times or wording still count once (2026-10-09); a recount carries re = "old>new".
+  const onceKey = (e) => {
+    if (!e) return null;
+    if (e.k) return e.re ? "re:" + e.k + ":" + e.re : "used:" + e.k;
+    return /\bused \d+ \(|^Slept |\(Oura\)$/.test(e.msg || "") ? e.msg : null;
+  };
 
   function mergeLog(o, n) {
     const out = [], seen = new Set(), once = new Set();
     let extra = 0;
     const nl = arr(n.log), floor = nl.length >= LOG_MAX ? Math.min(...nl.map((e) => ms(e.at))) : 0;
-    for (const e of nl) { const k = evKey(e); if (seen.has(k)) continue; seen.add(k); out.push(e); if (onceKey(e)) once.add(onceKey(e)); }
+    for (const e of nl) { const k = evKey(e), ok = onceKey(e); if (seen.has(k) || (ok && once.has(ok))) continue; seen.add(k); out.push(e); if (ok) once.add(ok); }
     for (const e of arr(o.log)) {
       const k = evKey(e), ok = onceKey(e);
       if (seen.has(k) || (ok && once.has(ok)) || ms(e.at) < floor) continue;
