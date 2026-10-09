@@ -114,6 +114,9 @@
   .sq-bar b { display:block; height:100%; width:0; background:linear-gradient(90deg, #7fd0ff, #8fe3b0); border-radius:4px; transition:width .8s cubic-bezier(.2,.8,.2,1); }
   .hgrid.sugg { grid-template-columns:repeat(3, 1fr); }
   .hgrid.sugg .htile { min-height:76px; }
+  .why-tip { position:fixed; z-index:300; display:none; padding:9px 11px; border-radius:12px; background:#0f1230; border:1px solid var(--glass-border);
+    color:var(--ink); font-size:12.5px; line-height:1.35; box-shadow:0 10px 30px rgba(0,0,0,.45); pointer-events:none; }
+  .htile { -webkit-touch-callout:none; }
   .pa-all { width:100%; display:flex; justify-content:space-between; align-items:center; margin-top:8px; padding:11px 14px; border-radius:14px;
     background:var(--glass); border:1px solid var(--glass-border); font-weight:600; font-size:14px; }
   .pa-all span { color:var(--ink-soft); font-weight:400; font-size:12px; }
@@ -830,7 +833,6 @@
   const HABITS = [
     ["daylight", "10 min outdoor light in the first hour awake, no sunglasses", 4, 1, "🌅", "10 min sun", "", "Morning"],
     ["water", "Water, one 250 ml cup", 0.6, 12, "💧", "250 ml water", "flat", "Morning"],
-    ["salt", "Electrolytes or a pinch of salt in the first water", 2, 1, "🧂", "Electrolytes", "", "Morning"],
     ["protein", "30 g protein at breakfast", 3, 1, "🍳", "30 g protein AM", "", "Morning"],
     ["supps", "Morning supplements taken", 1, 1, "💊", "Supplements", "", "Morning"],
     ["neem", "Neem and turmeric, every morning", 3, 1, "🌿", "Neem + turmeric", "", "Morning"],
@@ -986,13 +988,66 @@
   }
 
   /* ---------- Prana actions: the habit tiles ---------- */
+  /* One plain sentence on why each action is there, shown in a small box on hover,
+     or a long press on the phone (Junyan, 2026-10-09). */
+  const WHY = {
+    daylight:"Morning light sets your body clock, so you feel awake now and sleepy on time tonight.",
+    water:"Even a little dehydration makes you tired and foggy.",
+    protein:"Protein at breakfast keeps your energy and hunger steady until lunch.",
+    supps:"They fill the gaps your food might miss.",
+    neem:"Sadhguru recommends neem and turmeric each morning to cleanse the system and support immunity.",
+    mouthAm:"Dr Ellie's routine protects your teeth and gums, and a healthy mouth supports a healthy body.",
+    shambhavi:"Your core daily practice: it settles the mind and builds steady energy for the whole day.",
+    kriya:"A short guided practice that calms you and restores your energy.",
+    upa:"Simple movements that loosen the joints and wake up the body's energy.",
+    surya:"A full practice that builds strength and vitality, best on an empty stomach in the morning.",
+    angam:"Builds strength and fitness using only your own body, no equipment.",
+    bhuta:"A cleansing practice Sadhguru teaches to bring the body into balance.",
+    nadi:"Alternate-nostril breathing that balances and calms you in a few minutes.",
+    blueprint:"Bryan Johnson's core meals, packed with what your body needs to run well.",
+    legumes:"Beans and lentils give slow, steady energy and plenty of fibre.",
+    veg:"Vegetables feed your body and your gut with vitamins and fibre.",
+    greens:"Leafy greens are among the most nutrient-packed foods there are.",
+    evoo:"Olive oil's healthy fats calm inflammation and protect your heart.",
+    nuts:"A handful of nuts gives lasting energy and healthy fats.",
+    berries:"Berries are full of antioxidants that protect your cells.",
+    seeds:"Flax and chia add omega-3 fats and fibre.",
+    ferment:"Fermented foods feed the good bacteria in your gut.",
+    xylitol:"Xylitol after eating starves the bacteria that cause cavities.",
+    screens:"No screens before bed helps you fall asleep sooner and sleep deeper.",
+    mouth:"Dr Ellie's routine protects your teeth and gums overnight, when the mouth is driest.",
+    early:"Going to bed on an empty stomach gives deeper, more restful sleep.",
+    bedtime:"Sleeping by 11 matches your body clock, so you wake up with more energy.",
+  };
+  let whyTip = null, whyHeld = false;
+  function showWhy(el){
+    const w = el && el.dataset.why; if (!w) return;
+    if (!whyTip) { whyTip = document.createElement("div"); whyTip.className = "why-tip"; document.body.appendChild(whyTip); }
+    whyTip.textContent = w; whyTip.style.display = "block";
+    const r = el.getBoundingClientRect(), tw = Math.min(240, innerWidth - 16);
+    whyTip.style.width = tw + "px";
+    whyTip.style.left = Math.max(8, Math.min(innerWidth - tw - 8, r.left + r.width / 2 - tw / 2)) + "px";
+    const h = whyTip.offsetHeight;
+    whyTip.style.top = (r.top - h - 8 > 8 ? r.top - h - 8 : r.bottom + 8) + "px";
+  }
+  const hideWhy = () => { if (whyTip) whyTip.style.display = "none"; };
+  document.addEventListener("mouseover", e => { const t = e.target.closest && e.target.closest("[data-why]"); t ? showWhy(t) : hideWhy(); });
+  let pressT = null;
+  document.addEventListener("pointerdown", e => {
+    const t = e.target.closest && e.target.closest("[data-why]"); hideWhy();
+    if (!t || e.pointerType === "mouse") return;
+    pressT = setTimeout(() => { whyHeld = true; showWhy(t); }, 450);
+  });
+  ["pointerup", "pointercancel", "scroll"].forEach(ev => document.addEventListener(ev, () => clearTimeout(pressT), true));
+  // a long press shows the reason and does not count the action
+  document.addEventListener("click", e => { if (whyHeld) { whyHeld = false; e.stopPropagation(); e.preventDefault(); setTimeout(hideWhy, 2500); } }, true);
   function habitTile([id, full, , max, icon, short, flag]){
     const n = G.day.habits[id] || 0, g = habitGain(id), auto = flag === "auto", earned = auto && (G.day.earn || {})[id];
     const cls = ["htile", !auto && !g ? "full" : "", auto ? "auto" : "", earned || (auto && n) ? "earned" : "", id === "water" ? "water" : ""].filter(Boolean).join(" ");
     const cnt = id === "xylitol" ? `<span class="hc">${n ? `${n} g${n < 6 ? " / 6" : ""}` : ""}</span>` : id === "water" ? `<span class="hc">${n ? `${n * 250} ml` : ""}</span>` : max > 1 && n ? `<span class="hc">${n}/${max}</span>` : n ? `<span class="hc">✓</span>` : "";
     const fill = max > 1 && n ? `<i class="glass" style="height:${Math.round(n / max * 100)}%"></i>` : "";
     const tg = id === "bedtime" && BED ? `${n ? "✓" : "✗"} ${BED.asleep}` : auto ? (n ? "✓ last night" : earned ? "✓ tonight" : "auto") : g ? `+${g}` : "";
-    return `<button class="${cls}" data-habit="${id}" title="${esc(full)}">${fill}<span class="hi">${icon}</span><span class="hl">${esc(short)}</span>${cnt}<b>${tg}</b></button>`;
+    return `<button class="${cls}" data-habit="${id}" data-why="${esc(WHY[id] || full)}">${fill}<span class="hi">${icon}</span><span class="hl">${esc(short)}</span>${cnt}<b>${tg}</b></button>`;
   }
   function habitsHTML(){
     const tile = habitTile;
@@ -1007,7 +1062,7 @@
      prana brings the recovery practices up, water rises when he is behind pace
      (12 cups from 6:30 AM to 9:30 PM), and a window about to close gets a nudge. */
   const WHEN = {
-    daylight:[5,10], water:[6,21.5], salt:[5,10], protein:[6,11], supps:[6,11], neem:[5,10], mouthAm:[5,11],
+    daylight:[5,10], water:[6,21.5], protein:[6,11], supps:[6,11], neem:[5,10], mouthAm:[5,11],
     shambhavi:[5,10], kriya:[6,21], nadi:[6,21], upa:[6,21], surya:[5,9.5], angam:[5,9.5], bhuta:[5,21], blueprint:[7,15], legumes:[11,21], veg:[11,21],
     greens:[11,21], evoo:[7,21], nuts:[7,21], berries:[7,21], seeds:[7,21], ferment:[7,21], xylitol:[7,22],
     screens:[20.5,23], mouth:[20,24],
