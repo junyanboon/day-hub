@@ -649,6 +649,7 @@
         if (left.length !== (G.research || []).length) { G.research = left; saveG(); } }).catch(() => {});
       pullSkills().then(() => { if (!$("sheet").classList.contains("open")) render(); }).catch(() => {});
       lastPull = new Date(); pullErr = null;
+      setTimeout(openPending, 0);
     } catch (e) { pullErr = String(e.message || e); }
     render();
   }
@@ -1776,6 +1777,23 @@
   const b64u = s => { s = s.replace(/-/g, "+").replace(/_/g, "/"); s += "=".repeat((4 - s.length % 4) % 4);
     return Uint8Array.from(atob(s), c => c.charCodeAt(0)); };
   if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
+  /* a tapped phone ping opens that block's window straight away (2026-10-09): the ping carries
+     ?open=<block key>; an already-open Quest gets the same key from the service worker */
+  let OPEN_KEY = qs.get("open");
+  if (OPEN_KEY) history.replaceState(null, "", location.pathname + location.search.replace(/([?&])open=[^&]*&?/, "$1").replace(/[?&]$/, ""));
+  async function openPending(){
+    if (!OPEN_KEY || !PLAN) return;
+    const key = OPEN_KEY; OPEN_KEY = null;
+    // the window shows the agent's prep, so wait for it if it has not landed yet
+    if (!INSIGHTS[key] && questKey()) { try { INSIGHTS = (await qfetch("/quest/insights")) || INSIGHTS; } catch {} }
+    const b = blocks().find(x => gk(x) === key || x.key === key);
+    if (!b) return;
+    const m = $("morning"); if (m) m.className = "";
+    openStop(b);
+  }
+  if ("serviceWorker" in navigator) navigator.serviceWorker.addEventListener("message", e => {
+    if (e.data && e.data.type === "open" && e.data.key) { OPEN_KEY = e.data.key; openPending(); }
+  });
 
   async function enablePush(){
     if (!questKey()) throw new Error("Pair this device first.");

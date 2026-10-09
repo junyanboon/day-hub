@@ -15,9 +15,14 @@ self.addEventListener("push", (e) => {
 
 self.addEventListener("notificationclick", (e) => {
   e.notification.close();
-  const url = new URL(e.notification.data?.url || "quest.html", self.registration.scope).href;
+  const url = new URL(e.notification.data?.url || "quest.html", self.registration.scope);
+  const key = url.searchParams.get("open");   // the block whose window should open (2026-10-09)
+  const page = url.href.split("?")[0];
   e.waitUntil(self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((wins) => {
-    for (const w of wins) if (w.url.startsWith(url) && "focus" in w) return w.focus();
-    return self.clients.openWindow(url);
+    for (const w of wins) if (w.url.startsWith(page) && "focus" in w) {
+      if (key) w.postMessage({ type: "open", key });
+      return w.focus();
+    }
+    return self.clients.openWindow(url.href);
   }));
 });
