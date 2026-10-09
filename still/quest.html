@@ -220,11 +220,6 @@
   .o2bar { flex:1; height:5px; border-radius:4px; background:rgba(0,0,0,.25); overflow:hidden; }
   .o2bar i { display:block; height:100%; width:80%; background:#7fd8ff; border-radius:4px; transition:width .6s; }
   .o2bar i.mid { background:#ffd479; } .o2bar i.thin { background:#ff9c9c; }
-  .cache { margin-top:14px; padding:12px; border-radius:14px; background:rgba(127,216,255,.1); border:1px dashed rgba(127,216,255,.45); }
-  .cache .ck { font:600 11px ui-monospace, Menlo, monospace; color:#7fd8ff; letter-spacing:.04em; }
-  .cache .ct { font-weight:700; font-size:16px; margin-top:4px; }
-  .cache .cx { font-size:14px; color:var(--ink-soft); margin-top:4px; line-height:1.4; }
-  .cache .cdone { margin-top:8px; font-size:13.5px; color:var(--good); }
   .cline { width:100%; margin-top:10px; padding:11px 12px; border-radius:12px; border:1px solid var(--glass-border); background:rgba(0,0,0,.2); color:var(--ink); font:inherit; font-size:15px; }
   .season { display:grid; gap:4px; margin-top:6px; font-size:13px; }
   .season div { display:grid; grid-template-columns:1fr 1.3fr auto; gap:8px; color:var(--ink-soft); }
@@ -1254,58 +1249,6 @@
     if (navigator.vibrate) navigator.vibrate([40,60,40]);
   }
 
-  /* ---------- field caches: a real-world challenge on each block ----------
-     Geocaching vocabulary on purpose: type, D/T, Found it, Did not find (still
-     logged, still worth a little prana). */
-  const CTYPE = { trad:"📦 Traditional", multi:"🔢 Multi-stage", myst:"❓ Mystery", earth:"🌍 EarthCache", night:"🌙 Night cache" };
-  const CACHE_LIB = {
-    gym: [["multi",2,2,"Heaviest iron","Stage 1: find the heaviest dumbbell in the gym and log its weight. Stage 2: carry it 20 steps and put it back."],
-          ["myst",3,2,"Plate puzzle","Add up every plate on the most loaded bar in the room. Log the total in kg and in lbs."],
-          ["trad",1,1,"Best window","Find the gym's best window and log one thing you can see from it."]],
-    fuel: [["trad",1,1,"New protein","Find a protein you have not eaten yet this trip and put it on your plate."],
-           ["earth",2,1,"Grown here","Find one thing on the table grown near {place}. Ask where it comes from and log the place."],
-           ["myst",2,1,"Menu word","Find one word in the local language on a menu or sign. Learn what it means and log it."]],
-    dinner: [["trad",2,1,"Staff favourite","Ask a staff member their favourite local dish and log the name."],
-             ["myst",2,1,"Menu word","Find one word in the local language on the menu. Learn what it means and log it."]],
-    open: [["trad",2,2,"High point","Find the highest spot you can reach on foot within 10 minutes. Log the view in one line."],
-           ["earth",1,1,"Three sounds","Stand still for one minute anywhere outside. Log three sounds you can name."],
-           ["trad",2,2,"Sea colour","Find something for sale in {place} that is the colour of the sea. Log what it was."],
-           ["multi",2,3,"Oldest thing","Stage 1: find the oldest-looking thing within a short walk. Stage 2: find out how old it really is."]],
-    travel: [["earth",3,3,"Stone bands","At the first stop, pick up a stone and name its colour bands. What made them? Put it back after."],
-             ["multi",3,4,"Track reader","Stage 1: count the stops on the way. Stage 2: at the last one, find a track and guess who made it."],
-             ["trad",2,2,"Road sign","Find a sign with a place name you have never heard of. Log it."]],
-    rest: [["night",3,1,"Summer Triangle","After dark, find Vega, Deneb and Altair high in the west. A DNF is a fine log."],
-           ["night",1,1,"Five breaths","Lights off. Count five slow breaths before sleep. Log how you feel in two words."]],
-    practice: [["trad",1,1,"Sit spot","Practise facing a window. Log the first thing you see when you open your eyes."]],
-    call: [["trad",1,2,"Walk and talk","Take the call standing or walking. Log roughly how far you went."]],
-    dance: [["multi",3,3,"Borrowed move","Stage 1: learn one move from someone new. Stage 2: teach it back to Caney. Log the move."]],
-    fixed: [["trad",1,1,"Never seen","Find one thing here you have never seen before. Log it."]],
-  };
-  function cacheFor(b){
-    const lib = isGym(b) ? CACHE_LIB.gym : /dinner/i.test(b.t) ? CACHE_LIB.dinner
-      : /tour|quad|safari|hike/i.test(b.t) ? CACHE_LIB.travel : CACHE_LIB[b.kind] || CACHE_LIB.fixed;
-    const st = (G.day.caches[gk(b)] = G.day.caches[gk(b)] || { i:(b.s.getHours() + b.t.length) % lib.length, state:null, line:"" });
-    const [t, D, T, title, text] = lib[st.i % lib.length];
-    return { st, lib, t, D, T, title, text:text.replace("{place}", placeNow()) };
-  }
-  function cacheCard(b){
-    const c = cacheFor(b), done = c.st.state === "found" || c.st.state === "dnf";
-    return `<div class="cache"><div class="ck">${CTYPE[c.t]} · D${c.D} / T${c.T}</div>
-      <div class="ct">${esc(c.title)}</div><div class="cx">${esc(c.text)}</div>
-      ${done ? `<div class="cdone">${c.st.state === "found" ? "✓ Found it" : "Did not find, logged"}${c.st.line ? `: “${esc(c.st.line)}”` : ""}</div>`
-        : `<input id="cLine" class="cline" placeholder="Logbook line (optional)" maxlength="120" value="${esc(c.st.line)}">
-           <div class="actions"><button class="btn primary" id="cFound">Found it</button><button class="btn" id="cDnf">Did not find</button>
-           ${c.lib.length > 1 ? `<button class="btn ghost" id="cNext">Another</button>` : ""}</div>`}</div>`;
-  }
-  function logCache(b, state){
-    const c = cacheFor(b), line = ($("cLine") && $("cLine").value.trim()) || "";
-    c.st.state = state; c.st.line = line;
-    if (state === "found") {
-      log(`Found “${c.title}”${line ? `: ${line}` : ""}`); floatXp(0, "cache found");
-      if (!(G.souvenirs = G.souvenirs || {})[placeNow()]) { G.souvenirs[placeNow()] = G.day.date; setTimeout(() => banner("🏅", "SOUVENIR", `First find in ${placeNow()}`), 1200); }
-    } else log(`Did not find “${c.title}”${line ? `: ${line}` : ""}`, "DNF logged");
-    saveG(); render();
-  }
   /* ---------- the day's loop ---------- */
   // latest-starting block containing now wins (same rule as Stillness)
   function currentOf(all, t){ let hit = null; all.forEach(b => { if (t >= b.s && t < b.e) hit = b; }); return hit; }
@@ -2778,7 +2721,6 @@
           <circle class="fg" cx="37" cy="37" r="30" stroke-dasharray="${C}" data-ring-s="${cur.s.toISOString()}" data-ring-e="${cur.e.toISOString()}"/></svg>
           <div><div class="big" data-until="${cur.e.toISOString()}"></div><div class="sub">left in this block</div></div></div>`;
       if (isGym(cur)) html += `<div class="actions"><button class="btn primary" id="bGym">🏋️ Open the gym log</button></div>`;
-      if (st === "in" || st === "late") html += cacheCard(cur);
       if (cur.kind === "open") {
         // "There's no such thing as free time" (Junyan, 2026-10-06): recover, catch up, or work
         const sd = G.day.side, P0 = prana();
@@ -2808,9 +2750,6 @@
     put("skillsRow", skillsRowHtml());
     $("skillsRow").querySelectorAll("[data-sk]").forEach(b => b.onclick = () => b.dataset.sk ? openSkill(b.dataset.sk) : openSkills());
     on("bGym", () => openGym(cur));
-    on("cFound", () => logCache(cur, "found")); on("cDnf", () => logCache(cur, "dnf"));
-    on("cNext", () => { const c = cacheFor(cur); c.st.i++; saveG(); render(); });
-    if ($("cLine")) $("cLine").oninput = e => { cacheFor(cur).st.line = e.target.value; };
     $("main").querySelectorAll("[data-side]").forEach(bn => bn.onclick = () => takeSide(bn.dataset.side));
     $("main").querySelectorAll("[data-now]").forEach(bn => bn.onclick = () => { const [n, m] = bn.dataset.now.split("|"); startNow(n, +m); });
     const qt = $("main").querySelector(".quest-title"), tb = cur || nxt;
