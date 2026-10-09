@@ -818,20 +818,22 @@
      calendar and check-ins (evening ones pay out the next morning). Ids that existed
      before keep their meaning except water, now 250 ml. No movement here: training,
      cardio, cold and walks take energy, and their calendar blocks spend it (Junyan,
-     2026-10-08: "training doesn't increase my prana"). */
+     2026-10-08: "training doesn't increase my prana"). Trimmed to what he does
+     (2026-10-09): no coffee, nap (Oura has it), sugar or Mind items; neem and turmeric
+     added; Dr Ellie split AM and PM; Blueprint meal = Super Veggie or Nutty Pudding. */
   const HABITS = [
     ["daylight", "10 min outdoor light in the first hour awake, no sunglasses", 4, 1, "🌅", "10 min sun", "", "Morning"],
     ["water", "Water, one 250 ml cup", 0.6, 12, "💧", "250 ml water", "flat", "Morning"],
     ["salt", "Electrolytes or a pinch of salt in the first water", 2, 1, "🧂", "Electrolytes", "", "Morning"],
     ["protein", "30 g protein at breakfast", 3, 1, "🍳", "30 g protein AM", "", "Morning"],
     ["supps", "Morning supplements taken", 1, 1, "💊", "Supplements", "", "Morning"],
-    ["caffeine", "First caffeine 90+ min after waking, none after noon", 3, 1, "☕", "Coffee 90 min+", "", "Morning"],
+    ["neem", "Neem and turmeric, every morning", 3, 1, "🌿", "Neem + turmeric", "", "Morning"],
+    ["mouthAm", "Dr Ellie's mouthcare routine in the morning, the whole routine in one tap", 2, 1, "🦷", "Dr Ellie AM", "", "Morning"],
     ["shambhavi", "Shambhavi Mahamudra (counts itself from the sadhana check-in)", 18, 1, "🧘", "Shambhavi", "", "Practice"],
     ["kriya", "Isha Kriya or Upa Yoga", 8, 2, "🌀", "Kriya / Upa Yoga", "", "Practice"],
     ["nadi", "Nadi Shuddhi, 5 min", 3, 2, "🌬️", "Nadi Shuddhi 5'", "", "Practice"],
     ["nsdr", "NSDR or Yoga Nidra, 10 to 20 min", 5, 1, "😌", "NSDR 10-20'", "", "Practice"],
-    ["nap", "Nap of 20 min or less, before 3 PM", 4, 1, "💤", "Nap ≤ 20'", "", "Practice"],
-    ["blueprint", "Blueprint meal", 6, 3, "🥗", "Blueprint meal", "", "Food"],
+    ["blueprint", "Blueprint meal: Super Veggie or Nutty Pudding", 6, 2, "🥗", "Veggie / Pudding", "", "Food"],
     ["legumes", "150 g cooked beans or lentils", 3, 1, "🫘", "150 g lentils", "", "Food"],
     ["veg", "250 g vegetables (about 2 big handfuls)", 3, 2, "🥦", "250 g veg", "", "Food"],
     ["greens", "50 g leafy greens (a big handful)", 2, 1, "🥬", "50 g greens", "", "Food"],
@@ -840,13 +842,8 @@
     ["berries", "100 g berries", 2, 1, "🫐", "100 g berries", "", "Food"],
     ["seeds", "1 tbsp ground flax or chia", 1, 1, "🌱", "1 tbsp flax/chia", "", "Food"],
     ["ferment", "Fermented food: 100 g yogurt, kefir or sauerkraut", 2, 1, "🥛", "100 g ferment", "", "Food"],
-    ["nosugar", "No added sugar or sweet drinks today", 3, 1, "🚫", "No added sugar", "", "Food"],
-    ["nature", "15 min outside among trees, water or sky", 2, 1, "🌳", "Nature 15'", "", "Mind"],
-    ["people", "15 min real talk with someone you love", 3, 1, "💬", "Real talk 15'", "", "Mind"],
-    ["read", "20 pages of a book", 2, 1, "📖", "20 pages", "", "Mind"],
-    ["grat", "Write 3 things you are grateful for", 2, 1, "✍️", "3 thank-yous", "", "Mind"],
     ["screens", "Screens off 60 min before bed", 5, 1, "📵", "No screens 60'", "", "Evening"],
-    ["mouth", "Dr Ellie's mouthcare routine, the whole routine in one tap (morning and night)", 2, 2, "🦷", "Dr Ellie mouth", "flat", "Evening"],
+    ["mouth", "Dr Ellie's mouthcare routine at night, the whole routine in one tap", 2, 1, "🦷", "Dr Ellie PM", "", "Evening"],
     ["early", "Last meal 3+ hr before bed (counts itself from the calendar, paid next morning)", 5, 1, "🍽️", "Last meal 3 hr", "auto", "Evening"],
     ["bedtime", "Asleep before 11 PM, read from your Oura ring (paid the next morning)", 5, 1, "🌙", "Asleep by 11", "auto", "Evening"],
   ];
@@ -955,7 +952,7 @@
     const hDone = HABITS.filter(h => (G.day.habits[h[0]] || 0) > 0).length;
     return `<div class="hhead"><span class="eyebrow">Prana actions · level ${lvl()} · ${hDone}/${HABITS.length}</span>` +
       `<button class="hsnd" data-hsnd aria-label="Tap sounds">${window.QuestFx && QuestFx.soundOn() ? "🔊" : "🔇"}</button></div>` +
-      ["Morning", "Practice", "Food", "Mind", "Evening"].map(gr => `<div class="hgrp"><div class="hgl">${gr}</div><div class="hgrid">${HABITS.filter(h => h[7] === gr).map(tile).join("")}</div></div>`).join("");
+      ["Morning", "Practice", "Food", "Evening"].map(gr => `<div class="hgrp"><div class="hgl">${gr}</div><div class="hgrid">${HABITS.filter(h => h[7] === gr).map(tile).join("")}</div></div>`).join("");
   }
   function bindHabits(root){
     root.querySelectorAll("[data-habit]").forEach(bn => bn.onclick = () => tapHabit(bn));
@@ -1457,7 +1454,7 @@
       ${PLATE.map(([id, txt]) => `<button class="wck${M.plate[id] ? " on" : ""}" data-plate="${id}"><span class="bx">${M.plate[id] ? "✓" : ""}</span>${txt}</button>`).join("")}
       <div class="win-lb">Eat with attention</div>
       <button class="wck${M.phone ? " on" : ""}" id="mPhone"><span class="bx">${M.phone ? "✓" : ""}</span>Phone face down until I'm done</button>
-      <div class="actions"><button class="btn" id="mBp">🥗 Blueprint meal${habitGain("blueprint") ? ` +${habitGain("blueprint")}` : " (done)"}</button></div>
+      <div class="actions"><button class="btn" id="mBp">🥗 Super Veggie or Nutty Pudding${habitGain("blueprint") ? ` +${habitGain("blueprint")}` : " (done)"}</button></div>
       <div class="actions"><button class="btn ghost" id="mEdit">Change time or name</button></div>`, true);
     $("sheet").querySelectorAll("[data-plate]").forEach(bn => bn.onclick = () => {
       M.plate[bn.dataset.plate] = !M.plate[bn.dataset.plate];
@@ -2030,7 +2027,7 @@
       const M = ((G.day.meals = G.day.meals || {})[k] = G.day.meals[k] || { plate:{}, phone:false });
       h += `<div class="mo-det-lb">On the plate</div>${PLATE.map(([id, txt]) => `<button class="mo-ck${M.plate[id] ? " on" : ""}" data-plate="${id}" data-k="${esc(b.key)}"><span class="bx">${M.plate[id] ? "✓" : ""}</span>${txt}</button>`).join("")}
         <button class="mo-ck${M.phone ? " on" : ""}" data-phone="${esc(b.key)}"><span class="bx">${M.phone ? "✓" : ""}</span>Phone face down until I'm done</button>
-        <button class="mo-det-btn" data-bp="1">🥗 Blueprint meal${habitGain("blueprint") ? ` +${habitGain("blueprint")}` : " (done)"}</button>`;
+        <button class="mo-det-btn" data-bp="1">🥗 Super Veggie or Nutty Pudding${habitGain("blueprint") ? ` +${habitGain("blueprint")}` : " (done)"}</button>`;
     } else {
       const I0 = INSIGHTS[k] || { items:[], links:[] };
       const know = I0.items.filter(x => x.kind === "know"), mind = I0.items.filter(x => x.kind === "mind");
