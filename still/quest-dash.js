@@ -20,13 +20,15 @@
   // known parts of the page, by the ids quest.html draws into
   const KNOWN = [
     { id: "hud", title: "", pick: [".hud", ".status"] },
+    { id: "being", title: "", pick: ["#being"] },
     { id: "now", title: "Right now", pick: ["#brief", "#loose", "#main", "#nextLine"] },
     { id: "quick", title: "Quick slots", pick: ["#questQuick"] },
     { id: "habits", title: "", pick: ["#habits"] },
   ];
   const DEFAULT = {
     hud: { x: 0, y: 0, w: 12, h: 2 },
-    now: { x: 0, y: 2, w: 4, h: 8 }, quick: { x: 0, y: 10, w: 4, h: 3 }, log: { x: 0, y: 13, w: 4, h: 3 },
+    being: { x: 0, y: 2, w: 4, h: 6 },
+    now: { x: 0, y: 8, w: 4, h: 5 }, quick: { x: 0, y: 13, w: 4, h: 3 }, log: { x: 0, y: 16, w: 4, h: 4 },
     mtn: { x: 4, y: 2, w: 5, h: 8 }, skills: { x: 4, y: 10, w: 5, h: 6 },
     habits: { x: 9, y: 2, w: 3, h: 14 },
   };
@@ -86,6 +88,8 @@
       body.dash .w-quick > #questQuick { flex:1; min-height:0; margin:0 !important; }
       body.dash .w-quick .bag-qbar { height:100%; max-height:70px; padding:6px; }
       body.dash .w-quick .bag-qbar .bag-sock { flex:0 0 auto; height:100%; width:auto; aspect-ratio:1; max-height:56px; }
+      body.dash .w-being { padding:6px; overflow:hidden; } body.dash .w-being > #being { height:100%; margin:0; }
+      body.dash .w-being .bg-stage { height:100%; border:0; }
       .dash-reset { position:fixed; left:14px; bottom:14px; z-index:50; background:var(--glass); border:1px solid var(--glass-border);
         color:var(--ink-soft); font-size:12px; padding:7px 12px; border-radius:999px; backdrop-filter:blur(10px); opacity:.35; transition:opacity .2s; }
       .dash-reset:hover { opacity:1; }

@@ -67,7 +67,40 @@
   /* ---------- HUD ---------- */
   .hud { display:flex; align-items:center; gap:12px; }
   .avatar { width:46px; height:46px; border-radius:50%; background:var(--glass-2);
-    border:1px solid var(--glass-border); display:grid; place-items:center; font-size:24px; flex:none; }
+    border:1px solid var(--glass-border); display:grid; place-items:center; font-size:24px; flex:none; overflow:hidden;
+    box-shadow:0 0 calc(4px + 18px * var(--p, 0)) rgba(255,196,110, calc(.15 + .7 * var(--p, 0))); }
+  .avatar img { width:100%; height:100%; object-fit:cover; }
+  /* Prana and Body, drawn with Junyan's sprites (2026-10-09): the seated meditator is Prana, its aura grows
+     with it and the hands open from 60%; the standing figure is Body, teal fills it from the feet, paler when tired */
+  #being { margin:12px 0 16px; }
+  .bg-stage { position:relative; display:grid; grid-template-columns:1fr 1fr; height:250px; border-radius:22px; overflow:hidden;
+    border:1px solid var(--glass-border);
+    background:radial-gradient(55% 65% at 25% 62%, rgba(255,184,92, calc(.04 + .3 * var(--p))), transparent 72%),
+      radial-gradient(55% 65% at 75% 62%, rgba(95,211,196, calc(.04 + .2 * var(--b))), transparent 72%),
+      linear-gradient(180deg, #0b0e28, #161a3f 70%, #1d1f47); }
+  .bg-stage::after { content:""; position:absolute; left:6%; right:6%; bottom:52px; height:1px; background:linear-gradient(90deg, transparent, rgba(255,255,255,.12), transparent); }
+  .bg-col { position:relative; display:flex; flex-direction:column; align-items:center; justify-content:flex-end; min-width:0; }
+  .bg-fig { position:relative; flex:1; min-height:0; width:100%; margin-top:8px; }
+  .bg-fig img, .bg-fill { position:absolute; inset:0; width:100%; height:100%; object-fit:contain; object-position:50% 100%; }
+  .bg-glow { -webkit-mask:radial-gradient(closest-side, #000 72%, transparent); mask:radial-gradient(closest-side, #000 72%, transparent); mix-blend-mode:screen; opacity:calc(.08 + .92 * var(--p)); transform:scale(calc(1 + .22 * var(--p))); transform-origin:50% 80%;
+    animation:bgPulse 5s ease-in-out infinite; transition:opacity 1.2s, transform 1.2s; }
+  .bg-body .bg-glow { opacity:calc(.06 + .7 * var(--b)); transform:scale(calc(1 + .12 * var(--b))); }
+  .bg-seat { animation:bgBreath 6s ease-in-out infinite; transform-origin:50% 95%; }
+  .bg-stand { filter:saturate(calc(.3 + .7 * var(--b))) brightness(calc(.62 + .38 * var(--b))); transition:filter 1.2s; }
+  .bg-fill { -webkit-mask:url(sprites/stand.webp) 50% 100% / contain no-repeat; mask:url(sprites/stand.webp) 50% 100% / contain no-repeat;
+    background:linear-gradient(0deg, rgba(95,211,196,.42) calc(var(--b) * 100%), transparent calc(var(--b) * 100% + 1px)); mix-blend-mode:screen; }
+  .bg-lab { position:relative; text-align:center; padding:4px 0 10px; line-height:1.1; }
+  .bg-n { font-family:"Pixelify Sans", ui-sans-serif, system-ui; font-size:26px; font-weight:700; }
+  .bg-k { font-family:"Pixelify Sans", ui-sans-serif, system-ui; font-size:12px; letter-spacing:.14em; text-transform:uppercase; opacity:.85; }
+  .bg-h { display:block; font-size:11px; color:var(--ink-soft); margin-top:3px; }
+  .bg-prana .bg-n, .bg-prana .bg-k { color:#ffd479; text-shadow:0 0 calc(4px + 14px * var(--p)) rgba(255,196,110,.6); }
+  .bg-body .bg-n, .bg-body .bg-k { color:#7fe3d4; }
+  .bg-motes { position:absolute; inset:0; pointer-events:none; overflow:hidden; }
+  .bg-motes i { position:absolute; bottom:60px; width:3px; height:3px; border-radius:50%; background:#ffe3a6; opacity:0; animation:bgRise linear infinite; }
+  @keyframes bgPulse { 50% { filter:brightness(1.25); } }
+  @keyframes bgBreath { 50% { transform:scale(1.015); } }
+  @keyframes bgRise { 0% { transform:translateY(0); opacity:0 } 20% { opacity:.9 } 100% { transform:translateY(-170px); opacity:0 } }
+  @media (prefers-reduced-motion: reduce) { .bg-stage * { animation:none !important; } }
   .hud-mid { flex:1; min-width:0; }
   .hud-title { font-size:13px; color:var(--ink-soft); display:flex; justify-content:space-between; }
   .hud-title b { color:var(--ink); font-weight:600; }
@@ -491,6 +524,8 @@
   .mo-row-t { width:66px; flex:none; font-size:13px; opacity:.85; } .mo-row-n { flex:1; min-width:0; font-size:15px; } .mo-row-go { flex:none; opacity:.7; font-size:18px; }
 </style>
 <link rel="stylesheet" href="bag.css">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@500;700&display=swap">
 <script src="keeps.js?v=20261009k"></script>
 <script src="bag.js?v=20261009k"></script>
 <script src="quest-merge.js?v=20261009b"></script>
@@ -500,7 +535,7 @@
 <body>
 <div id="app">
   <div class="hud">
-    <div class="avatar" id="avatar">🧗</div>
+    <div class="avatar" id="avatar"><img src="sprites/head.webp" alt=""></div>
     <div class="hud-mid">
       <div class="hud-title"><span><b id="peakName">Prana</b></span><span id="altTxt">60%</span></div>
       <div class="bar"><i id="xpBar"></i></div>
@@ -513,6 +548,7 @@
     <button class="gear" id="gear" aria-label="Settings">⚙️</button>
   </div>
   <div class="status"><span id="statusL">Loading your day…</span><span id="statusR"></span></div>
+  <div id="being"></div>
 
   <div id="brief"></div>
   <div id="loose"></div>
@@ -2918,6 +2954,31 @@
     if (!d.pranaSince) d.pranaSince = d.since || now().toISOString();
     if (G.mode !== "prana") { G.mode = "prana"; delete G.summits; delete G.ropes; delete G.souvenirs; }
   }
+  /* the Prana and Body stage: built once, then only its numbers and pose change */
+  const PRANA_WORD = p => p < 10 ? "Build it with sadhana" : p < 35 ? "Stirring" : p < 60 ? "Rising" : p < 85 ? "Bright" : "Radiant";
+  const BODY_WORD = b => b < 25 ? "Rest restores it" : b < 50 ? "Tired" : b < 75 ? "Steady" : "Fresh";
+  let beingKey = "";
+  function drawBeing(P, B){
+    const el = $("being"); if (!el) return;
+    if (!el.firstChild) {
+      el.innerHTML = `<div class="bg-stage"><div class="bg-motes"></div>
+        <div class="bg-col bg-prana"><div class="bg-fig"><img class="bg-glow" src="sprites/seat-glow.webp" alt=""><img class="bg-seat" id="bgSeat" src="sprites/seat.webp" alt="You, seated in meditation"></div>
+          <div class="bg-lab"><div class="bg-k">Prana</div><div class="bg-n" id="bgP"></div><span class="bg-h" id="bgPh"></span></div></div>
+        <div class="bg-col bg-body"><div class="bg-fig"><img class="bg-glow" src="sprites/stand-glow.webp" alt=""><img class="bg-stand" src="sprites/stand.webp" alt="You, standing"><div class="bg-fill"></div></div>
+          <div class="bg-lab"><div class="bg-k">Body</div><div class="bg-n" id="bgB"></div><span class="bg-h" id="bgBh"></span></div></div></div>`;
+    }
+    const k = P + "|" + B; if (k === beingKey) return; beingKey = k;
+    const st = el.firstChild;
+    st.style.setProperty("--p", (P / 100).toFixed(2)); st.style.setProperty("--b", (B / 100).toFixed(2));
+    document.documentElement.style.setProperty("--p", (P / 100).toFixed(2));
+    $("bgP").textContent = `${P}%`; $("bgB").textContent = `${B}%`;
+    $("bgPh").textContent = PRANA_WORD(P); $("bgBh").textContent = BODY_WORD(B);
+    const pose = P >= 60 ? "palms" : "seat";
+    if (!$("bgSeat").src.endsWith(`${pose}.webp`)) { $("bgSeat").src = `sprites/${pose}.webp`; st.querySelector(".bg-prana .bg-glow").src = `sprites/${pose}-glow.webp`; }
+    // motes of light rise around the meditator, more as prana builds
+    const n = Math.round(P / 8), mo = st.querySelector(".bg-motes");
+    if (mo.children.length !== n) mo.innerHTML = Array.from({ length:n }, (_, i) => `<i style="left:${12 + (i * 37) % 32}%;animation-duration:${4 + (i % 4)}s;animation-delay:${(i * .9) % 5}s"></i>`).join("");
+  }
   function render(){
     if (PLAN && G.day.date !== dayKey()) rollDay();
     ensureDay();
@@ -2930,6 +2991,7 @@
     $("altTxt").textContent = `${P}%`;
     $("xpBar").style.width = `${P}%`;
     $("xpBar").className = P < 40 ? "low" : P < 70 ? "mid" : "";
+    drawBeing(P, Math.round(body()));
     const Bd = Math.round(body());
     $("bodyTxt").textContent = `${Bd}%`; $("bodyBar").style.width = `${Bd}%`;
     // today's three pillars: sadhana, body, on time
@@ -3139,6 +3201,6 @@
   pullAll();
 })();
 </script>
-<script src="quest-dash.js?v=20261009r"></script>
+<script src="quest-dash.js?v=20261009s"></script>
 </body>
 </html>
