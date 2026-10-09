@@ -7,6 +7,7 @@
    - habit counts, XP: the higher number;
    - prana: the newer copy's number plus the log changes only the older copy saw
      (a block's spend and the sleep refill count once even if both devices did them);
+   - body (2026-10-09, d201): the same as prana, from the log lines marked m:"b";
    - a later game day beats an earlier one; anything else: the newer copy (ts).
    The SAME file runs in the page (still/quest-merge.js) and on the server
    (still-api/src/quest-merge.js). Edit one, copy it to the other. */
@@ -28,17 +29,18 @@
 
   function mergeLog(o, n) {
     const out = [], seen = new Set(), once = new Set();
-    let extra = 0;
+    let extra = 0, extraB = 0;
     const nl = arr(n.log), floor = nl.length >= LOG_MAX ? Math.min(...nl.map((e) => ms(e.at))) : 0;
     for (const e of nl) { const k = evKey(e), ok = onceKey(e); if (seen.has(k) || (ok && once.has(ok))) continue; seen.add(k); out.push(e); if (ok) once.add(ok); }
     for (const e of arr(o.log)) {
       const k = evKey(e), ok = onceKey(e);
       if (seen.has(k) || (ok && once.has(ok)) || ms(e.at) < floor) continue;
       seen.add(k); if (ok) once.add(ok);
-      out.push(e); extra += +e.xp || 0;   // the newer copy never saw this change
+      out.push(e);   // the newer copy never saw this change
+      if (e.m === "b") extraB += +e.xp || 0; else extra += +e.xp || 0;
     }
     out.sort((a, b) => ms(b.at) - ms(a.at));
-    return { log: out.slice(0, LOG_MAX), extra };
+    return { log: out.slice(0, LOG_MAX), extra, extraB };
   }
 
   function mergeDay(o, n) {
@@ -61,10 +63,17 @@
       for (const x of [...arr(o.zaps), ...arr(n.zaps)]) if (x) z.set(x.s, x);
       out.zaps = [...z.values()].sort((a, b) => ms(a.s) - ms(b.s));
     }
-    const { log, extra } = mergeLog(o, n);
+    const { log, extra, extraB } = mergeLog(o, n);
     out.log = log;
     if (typeof n.prana === "number" && extra) out.prana = Math.max(0, Math.min(100, Math.round(n.prana + extra)));
     else if (typeof n.prana !== "number" && typeof o.prana === "number") out.prana = o.prana;
+    if (typeof n.body === "number" && extraB) out.body = Math.max(0, Math.min(100, Math.round(n.body + extraB)));
+    else if (typeof n.body !== "number" && typeof o.body === "number") out.body = o.body;
+    if (o.bl || n.bl) {
+      const p = new Map();
+      for (const x of [...arr(o.bl), ...arr(n.bl)]) if (Array.isArray(x)) p.set(x[0], x);
+      out.bl = [...p.values()].sort((a, b) => ms(a[0]) - ms(b[0]));
+    }
     if (o.pl || n.pl) {
       const p = new Map();
       for (const x of [...arr(o.pl), ...arr(n.pl)]) if (Array.isArray(x)) p.set(x[0], x);

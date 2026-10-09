@@ -105,7 +105,7 @@
       for (let i = 0; i < sparks; i++)
         particle(x, y, "", { color: o.full ? "#ffd479" : (o.color || "#8fe3b0"), speed: o.full ? 110 : 80, lift: 20, fall: 40, scale: 1, dur: 700 });
     }
-    if (o.gain) tag(x, rect.top - 6, `+${o.gain}`, "gain");
+    if (o.gain) tag(x, rect.top - 6, o.gain > 0 ? `+${o.gain}` : `${o.gain}`, "gain");
     if (combo >= 3) tag(x, rect.top - 30, `Combo x${combo}`, "combo");
     if (o.full) tag(x, rect.bottom + 4, "Full for today ✨", "full");
     play(combo - 1, o.full);

@@ -74,6 +74,10 @@
   .bar { height:8px; border-radius:6px; background:rgba(0,0,0,.2); margin-top:6px; overflow:hidden; }
   .bar > i { display:block; height:100%; width:0; background:linear-gradient(90deg, var(--gold), #fff0c4);
     border-radius:6px; transition:width .8s cubic-bezier(.2,.8,.2,1); }
+  .htile b.mb { color:#5fd3c4; } .htile b.mp { color:var(--gold); }
+  .hkey { font-size:11.5px; color:var(--ink-faint); margin:2px 0 8px; } .hkey .mb { color:#5fd3c4; } .hkey .mp { color:var(--gold); }
+  .hud-body { margin-top:6px; font-size:11.5px; } .bar-body { height:5px; margin-top:4px; }
+  .bar-body > i { background:linear-gradient(90deg, #5fd3c4, #b8f3e9) !important; }
   .bar > i.mid { background:linear-gradient(90deg, #ffb36b, #ffd479); } .bar > i.low { background:linear-gradient(90deg, #ff7f7f, #ffb0a0); }
   .o2row { gap:10px; white-space:nowrap; overflow:hidden; } .o2row .ok { color:#8fe3b0; }
   .float.down { color:#ff9c9c; } .log div span.xp.neg { color:#ff9c9c; }
@@ -489,9 +493,9 @@
 <link rel="stylesheet" href="bag.css">
 <script src="keeps.js?v=20261009k"></script>
 <script src="bag.js?v=20261009k"></script>
-<script src="quest-merge.js?v=20261009k"></script>
-<script src="quest-fx.js"></script>
-<script src="quest-night.js?v=20261009p"></script>
+<script src="quest-merge.js?v=20261009b"></script>
+<script src="quest-fx.js?v=20261009b"></script>
+<script src="quest-night.js?v=20261009b"></script>
 </head>
 <body>
 <div id="app">
@@ -500,6 +504,8 @@
     <div class="hud-mid">
       <div class="hud-title"><span><b id="peakName">Prana</b></span><span id="altTxt">60%</span></div>
       <div class="bar"><i id="xpBar"></i></div>
+      <div class="hud-title hud-body"><span>Body</span><span id="bodyTxt"></span></div>
+      <div class="bar bar-body"><i id="bodyBar"></i></div>
       <div class="o2row" id="o2Txt"></div>
     </div>
     <div class="combo" id="combo"><div class="n" id="comboN">·</div><div class="l" id="comboL">days 70+</div></div>
@@ -894,6 +900,7 @@
     ["berries", "100 g berries", 2, 1, "🫐", "100 g berries", "", "Food"],
     ["seeds", "1 tbsp ground flax or chia", 1, 1, "🌱", "1 tbsp flax/chia", "", "Food"],
     ["ferment", "Fermented food: 100 g yogurt, kefir or sauerkraut", 2, 1, "🥛", "100 g fermented food", "", "Food"],
+    ["heavy", "Heavy meal: tap it honestly when you ate too much or too heavy (lowers prana)", 5, 1, "🥘", "Heavy meal", "neg", "Food"],
     ["xylitol", "Xylitol, 1 g (one mint or gum) after eating or drinking; Dr Ellie: 6 to 10 g a day", 0.6, 10, "🍬", "Xylitol 1 g", "flat", "Food"],
     ["lamp", "Light an oil lamp (natural oil, like sesame or ghee) before sleep", 2, 1, "🪔", "Oil lamp", "", "Evening"],
     ["mouth", "Dr Ellie's mouthcare routine at night, the whole routine in one tap", 2, 1, "🦷", "Dr Ellie PM", "", "Evening"],
@@ -907,10 +914,9 @@
   function habitGain(id){
     const h = HABITS.find(x => x[0] === id); if (!h) return 0;
     const n = (G.day.habits || {})[id] || 0;
-    // d196/d197 (2026-10-09): prana is an honest energy reading, so health actions fill half;
-    // sadhana and the yogic practices (group "Practice") still fill in full
-    const half = h[7] === "Practice" ? 1 : 0.5;
-    return n >= h[3] ? 0 : Math.max(1, Math.round(h[2] * half * (h[6] === "flat" ? 1 : (DIM[n] ?? .2)) * gainMult()));
+    if (h[6] === "neg") return n >= h[3] ? 0 : -h[2];   // a heavy meal lowers prana, the same each time
+    // full value again (d202): the two meters keep tiredness out of prana
+    return n >= h[3] ? 0 : Math.max(1, Math.round(h[2] * (h[6] === "flat" ? 1 : (DIM[n] ?? .2)) * gainMult()));
   }
   function logHabit(id, quiet){
     const h = HABITS.find(x => x[0] === id); if (!h) return;
@@ -918,7 +924,7 @@
     const g = habitGain(id);
     if (!g) { if (!quiet) floatXp(0, `${h[1]}: done for today`); return; }
     G.day.habits[id] = (G.day.habits[id] || 0) + 1;
-    addPrana(g, h[1], h[1].toLowerCase());
+    addHabit(id, g, h[1], h[1].toLowerCase());
     if (!quiet) render();
   }
   /* ---------- Change course: the calendar, full screen, to change the day now ----------
@@ -960,7 +966,7 @@
       STEPS = d ? d.steps : 0;
       if (STEPS >= STEP_GOAL && !G.day.stepsDone && !DRY) {
         G.day.stepsDone = true;
-        addPrana(stepGain(), "8,000 steps (Oura)", "8,000 steps");
+        addBody(stepGain(), "8,000 steps (Oura)", "8,000 steps");
         render();
         const el = document.querySelector(".sq");
         if (el && window.QuestFx) QuestFx.tap(el.getBoundingClientRect(), { icon:"👟", gain:stepGain(), full:true });
@@ -990,7 +996,7 @@
       if (n && n.asleep >= "18:00" && n.asleep <= BED_BY && !(G.day.habits || {}).bedtime && !DRY) {
         const g = habitGain("bedtime");
         G.day.habits.bedtime = 1;
-        addPrana(g, `Asleep at ${n.asleep} (Oura)`, "asleep by 11");
+        addBody(g, `Asleep at ${n.asleep} (Oura)`, "asleep by 11");
       }
     } catch {}
   }
@@ -1035,7 +1041,7 @@
       // d199: what tomorrow's plan will cost against what he will likely have after a usual night
       const tb = p.blocks.map(b => ({ ...b, s:new Date(b.s), e:new Date(b.e) })).map(b => ({ ...b, kind:kindOf(b) }));
       const costs = tb.map(b => ({ name:moName(b), d:Math.round(energy(b).rate * spendMult() * Math.max(0, (b.e - b.s) / 3600000)) })).filter(x => x.d > 0);
-      const use = costs.reduce((a, x) => a + x.d, 0), start = Math.min(100, Math.round(prana()) + 45), end = start - use;
+      const use = costs.reduce((a, x) => a + x.d, 0), start = 75, end = start - use;   // body starts at the sleep score; 75 is a usual night
       ahead = { use, start, end, top:costs.sort((a, b) => b.d - a.d).slice(0, 3),
         verdict: end >= 40 ? "Room to spare." : end >= 15 ? "Tight. Rest where you can, and keep the evening light." : "More than you will likely have. Something may need to move." };
     } catch { note = "Could not read tomorrow's calendar."; }
@@ -1044,12 +1050,12 @@
     days[gameYmd()] = Math.round(prana());
     const night = (G.night || {})[G.day.date] || {};
     QuestNight.open({
-      today: { stats: [[`${Math.round(prana())}%`, "prana"], [`${lit}/${health.length}`, "fires lit"], [`${hDone}`, "actions"], [STEPS != null ? STEPS.toLocaleString() : "·", "steps"]],
+      today: { stats: [[`${Math.round(prana())}%`, "prana"], [`${Math.round(body())}%`, "body"], [`${lit}/${health.length}`, "fires lit"], [`${hDone}`, "actions"], [STEPS != null ? STEPS.toLocaleString() : "·", "steps"]],
         line: pranaLine(), done: done.slice(0, 12) },
       tomorrow: { label: new Date(next + "T12:00:00Z").toLocaleDateString("en-US", { timeZone:"UTC", weekday:"long", month:"short", day:"numeric" }), items, note, ahead },
-      prana: Math.round(prana()), feel: night.feel || null,
-      onFeel: n => { const o = (G.night = G.night || {})[G.day.date] || {}; G.night[G.day.date] = { ...o, feel:n, feelPrana:Math.round(prana()), feelAt:now().toISOString() };
-        log(`Feeling ${n} of 5 at day's end (prana ${Math.round(prana())}%)`); },
+      prana: Math.round(body()), feel: night.feel || null,
+      onFeel: n => { const o = (G.night = G.night || {})[G.day.date] || {}; G.night[G.day.date] = { ...o, feel:n, feelBody:Math.round(body()), feelPrana:Math.round(prana()), feelAt:now().toISOString() };
+        log(`Feeling ${n} of 5 at day's end (body ${Math.round(body())}%)`); },
       days, birth: G.birth || null, note: night.note || "",
       exerciseIndex: Math.floor(Date.parse(gameYmd() + "T12:00:00Z") / 86400000),
       deathbedDone: !!G.day.deathbed,
@@ -1090,6 +1096,7 @@
     berries:"Berries are full of antioxidants that protect your cells.",
     seeds:"Flax and chia add omega-3 fats and fibre.",
     ferment:"Fermented foods feed the good bacteria in your gut.",
+    heavy:"A heavy meal makes the system dull for hours and pulls your energy down; tap it when it happens, no guilt.",
     xylitol:"Xylitol after eating starves the bacteria that cause cavities.",
     mouth:"Dr Ellie's routine protects your teeth and gums overnight, when the mouth is driest.",
     early:"Going to bed on an empty stomach gives deeper, more restful sleep.",
@@ -1124,14 +1131,15 @@
     const cls = ["htile", !auto && !g ? "full" : "", auto ? "auto" : "", earned || (auto && n) ? "earned" : "", id === "water" ? "water" : ""].filter(Boolean).join(" ");
     const cnt = id === "xylitol" ? `<span class="hc">${n ? `${n} g${n < 6 ? " / 6" : ""}` : ""}</span>` : id === "water" ? `<span class="hc">${n ? `${n * 250} ml` : ""}</span>` : max > 1 && n ? `<span class="hc">${n}/${max}</span>` : n ? `<span class="hc">✓</span>` : "";
     const fill = max > 1 && n ? `<i class="glass" style="height:${Math.round(n / max * 100)}%"></i>` : "";
-    const tg = id === "bedtime" && BED ? `${n ? "✓" : "✗"} ${BED.asleep}` : auto ? (n ? "✓ last night" : earned ? "✓ tonight" : "auto") : g ? `+${g}` : "";
-    return `<button class="${cls}" data-habit="${id}" data-why="${esc(WHY[id] || full)}">${fill}<span class="hi">${icon}</span><span class="hl">${esc(short)}</span>${cnt}<b>${tg}</b></button>`;
+    const tg = id === "bedtime" && BED ? `${n ? "✓" : "✗"} ${BED.asleep}` : auto ? (n ? "✓ last night" : earned ? "✓ tonight" : "auto") : g ? (g > 0 ? `+${g}` : `${g}`) : "";
+    return `<button class="${cls}" data-habit="${id}" data-why="${esc(WHY[id] || full)}">${fill}<span class="hi">${icon}</span><span class="hl">${esc(short)}</span>${cnt}<b class="${meterOf(id) === "b" ? "mb" : "mp"}">${tg}</b></button>`;
   }
   function habitsHTML(){
     const tile = habitTile;
-    const hDone = HABITS.filter(h => (G.day.habits[h[0]] || 0) > 0).length;
-    return `<div class="hhead"><span class="eyebrow">Prana actions · level ${lvl()} · ${hDone}/${HABITS.length}</span>` +
+    const hDone = HABITS.filter(h => h[6] !== "neg" && (G.day.habits[h[0]] || 0) > 0).length;
+    return `<div class="hhead"><span class="eyebrow">Prana actions · level ${lvl()} · ${hDone}/${HABITS.length - 1}</span>` +
       `<button class="hsnd" data-hsnd aria-label="Tap sounds">${window.QuestFx && QuestFx.soundOn() ? "🔊" : "🔇"}</button></div>` +
+      `<div class="hkey"><b class="mp">gold</b> fills prana (Sadhguru) · <b class="mb">teal</b> fills body (Bryan Johnson)</div>` +
       ["Morning", "Practice", "Food", "Evening"].map(gr => `<div class="hgrp"><div class="hgl">${gr}</div><div class="hgrid">${HABITS.filter(h => h[7] === gr).map(tile).join("")}</div></div>`).join("");
   }
   /* Three picks for right now (Junyan, 2026-10-09: "only suggestions for this exact
@@ -1199,7 +1207,7 @@
     G.day.habits = G.day.habits || {};
     G.day.habits[id] = (G.day.habits[id] || 0) + 1;
     const full = G.day.habits[id] >= h[3];
-    addPrana(g, h[1].replace(/ \(.*$/, ""), h[5], !!fx);
+    addHabit(id, g, h[1].replace(/ \(.*$/, ""), h[5], !!fx);
     if (fx) fx.tap(rect, { icon:h[4], gain:g, full, water:id === "water", color:HCOL[h[7]] });
     render(); refreshActions();
     if (fx) fx.pop((actionsOpen() ? $("paBody") : $("habits")).querySelector(`[data-habit="${id}"]`));
@@ -1219,33 +1227,58 @@
     }
     G.day = freshDay();
     G.day.prana = carry; G.day.carry = carry; G.day.pl = [[now().toISOString(), carry]];
+    const bc = prev && prev.body != null ? Math.round(prev.body) : 60;   // until Oura sets it from the sleep score
+    G.day.body = bc; G.day.bl = [[now().toISOString(), bc]];
+    // d203: what lowers prana from yesterday: no sadhana at all, eating within 3 hours of bed
+    if (prev && prev.date) {
+      const SAD = ["shambhavi", "kriya", "upa", "surya", "angam", "bhuta", "nadi"];
+      if (!SAD.some(id => ((prev.habits || {})[id] || 0) > 0)) addPrana(-8, "No sadhana yesterday", "no sadhana");
+      if ((prev.earn || {}).late) addPrana(-5, "Ate within 3 hours of bed (last night)", "late food");
+    }
     // last night's auto habits (last meal 3 hr before bed, bed on time) pay out now
     for (const id of Object.keys((prev && prev.earn) || {})) {
-      if (id === "bedtime") continue;   // Oura says when he fell asleep now (pullBedtime)
+      if (id === "bedtime" || id === "late") continue;   // Oura says when he fell asleep now (pullBedtime)
       const g = habitGain(id); if (!g) continue;
       G.day.habits = G.day.habits || {}; G.day.habits[id] = 1;
-      addPrana(g, `${HABITS.find(x => x[0] === id)[1].replace(/ \(.*$/, "")} (last night)`, "last night");
+      addHabit(id, g, `${HABITS.find(x => x[0] === id)[1].replace(/ \(.*$/, "")} (last night)`, "last night");
     }
     saveG();
   }
-  function refillSleep(points, why){
+  // sleep sets the body for the day: the Oura sleep score, or hours slept x 10 (d201)
+  function refillSleep(level, why){
     if (G.day.slept) return;
     G.day.slept = true;
-    addPrana(points, why, "sleep");
+    addBody(Math.max(0, Math.min(100, level)) - body(), why, "sleep");
     render();
   }
-  const energyTag = b => { if (isSadhana(b)) return `fills +${habitGain("shambhavi")}`; const r = energy(b).rate; return r ? `uses about ${Math.round(r * spendMult())} an hour` : ""; };
+  const energyTag = b => { if (isSadhana(b)) return `fills +${habitGain("shambhavi")}`; const r = energy(b).rate; return r ? `uses about ${Math.round(r * spendMult())} body an hour` : ""; };
   const onTimeMin = b => isSleep(b) ? 30 : ON_TIME_MIN;   // bedtime counts within 30 min (Blueprint: same time nightly)
   const SIDE_P = 5;
-  const prana = () => G.day.prana ?? 60;
-  function addPrana(d, msg, label, noFloat, extra){
+  /* Two meters (Junyan, 2026-10-09, d200 to d204: "Bryan johnson is about the body and sadhguru
+     is about the prana"). Prana is the pitch of his energy: Sadhguru's practices raise it; eating
+     within 3 hours of bed, a skipped sadhana and a heavy meal lower it. The goal is to keep it high.
+     Body is how rested the body is: it starts each morning at the Oura sleep score, Bryan Johnson's
+     health actions fill it, effort (the blocks) uses it. Log lines for Body carry m:"b". */
+  function prana(){ return G.day.prana ?? 60; }
+  function body(){ return G.day.body ?? 60; }
+  function addEnergy(m, d, msg, label, noFloat, extra){
     d = Math.round(d);
-    G.day.prana = Math.max(0, Math.min(100, prana() + d));
-    (G.day.pl = G.day.pl || []).push([now().toISOString(), G.day.prana]);
-    (G.days = G.days || {})[G.day.date] = { place:placeNow(), prana:G.day.prana, level:lvl() };
-    log(msg, d, extra); if (d && !noFloat) floatXp(d, label || "");
+    if (m === "b") {
+      G.day.body = Math.max(0, Math.min(100, body() + d));
+      (G.day.bl = G.day.bl || []).push([now().toISOString(), G.day.body]);
+    } else {
+      G.day.prana = Math.max(0, Math.min(100, prana() + d));
+      (G.day.pl = G.day.pl || []).push([now().toISOString(), G.day.prana]);
+    }
+    (G.days = G.days || {})[G.day.date] = { place:placeNow(), prana:G.day.prana, body:G.day.body, level:lvl() };
+    log(msg, d, m === "b" ? { ...(extra || {}), m:"b" } : extra); if (d && !noFloat) floatXp(d, (label || "") + (m === "b" ? " · body" : ""));
     saveG();
   }
+  function addPrana(d, msg, label, noFloat, extra){ addEnergy("p", d, msg, label, noFloat, extra); }
+  function addBody(d, msg, label, noFloat, extra){ addEnergy("b", d, msg, label, noFloat, extra); }
+  // which meter a Prana action fills: Sadhguru's (practices, neem, the lamp) fill Prana, Bryan Johnson's fill Body
+  function meterOf(id){ const h = HABITS.find(x => x[0] === id); return h && (h[7] === "Practice" || ["neem", "lamp", "heavy"].includes(id)) ? "p" : "b"; }
+  function addHabit(id, d, msg, label, noFloat){ addEnergy(meterOf(id), d, msg, label, noFloat); }
   function award(d, msg, opts = {}){ addPrana(d, msg, opts.label); }
   // 3 hours with no food before practice or bed: Isha asks for an empty
   // stomach, Blueprint finishes eating well before sleep (d77, d78)
@@ -1269,7 +1302,7 @@
       const r = await fetch(API + "/sleep", { cache:"no-store" }); if (!r.ok) return;
       const j = await r.json();
       if (j.day === gameYmd() && typeof j.score === "number") {
-        refillSleep(Math.round(j.score * 0.6), `Slept ${j.score} (Oura)`);
+        refillSleep(j.score, `Slept ${j.score} (Oura)`);
       }
     } catch {}
   }
@@ -1394,7 +1427,7 @@
     const d = r ? costOf(r, from, to) : 0;
     // what was counted, so a later change to the block (or to the rates) can be recounted
     G.day.spent[k] = { bs:b.s.toISOString(), be:b.e.toISOString(), from:from.toISOString(), to:to.toISOString(), r, d };
-    if (d) addPrana(-d, `${shortName(b)} used ${d} (${spanTxt(from, to)})`, "", false, { at:to.toISOString(), k }); else saveG();
+    if (d) addBody(-d, `${shortName(b)} used ${d} (${spanTxt(from, to)})`, "", false, { at:to.toISOString(), k }); else saveG();
   }
   /* The schedule changes during the day (Junyan, 2026-10-09: "the schedule changed
      through the day so the log needs to reflect that"). A finished block whose times
@@ -1419,7 +1452,7 @@
     }
     const d = r ? costOf(r, from, to) : 0;
     G.day.spent[k] = { bs, be, from:from.toISOString(), to:to.toISOString(), r, d };
-    if (d !== old) addPrana(old - d, `${shortName(b)} recounted, used ${d} (${spanTxt(from, to)}, was ${old})`, d > old ? "schedule changed" : "given back",
+    if (d !== old) addBody(old - d, `${shortName(b)} recounted, used ${d} (${spanTxt(from, to)}, was ${old})`, d > old ? "schedule changed" : "given back",
       false, { at:to.toISOString(), k, re:`${old}>${d}` });
     else saveG();
   }
@@ -2884,6 +2917,7 @@
     G.pr = G.pr || { level:1, ends:[], changedAt:null };
     if (d.prana == null) { const c = G.pr.ends.length ? G.pr.ends[G.pr.ends.length - 1].p : 60; d.prana = c; d.carry = c; d.pranaSince = now().toISOString(); d.pl = [[now().toISOString(), c]]; }
     d.habits = d.habits || {};
+    if (d.body == null) { d.body = 60; d.bl = [[now().toISOString(), 60]]; }
     if (!d.pranaSince) d.pranaSince = d.since || now().toISOString();
     if (G.mode !== "prana") { G.mode = "prana"; delete G.summits; delete G.ropes; delete G.souvenirs; }
   }
@@ -2899,11 +2933,13 @@
     $("altTxt").textContent = `${P}%`;
     $("xpBar").style.width = `${P}%`;
     $("xpBar").className = P < 40 ? "low" : P < 70 ? "mid" : "";
+    const Bd = Math.round(body());
+    $("bodyTxt").textContent = `${Bd}%`; $("bodyBar").style.width = `${Bd}%`;
     // today's three pillars: sadhana, body, on time
     const did = b => ["in","late"].includes(G.day.checks[gk(b)]);
     const sad = all.filter(isSadhana), bod = all.filter(b => isGym(b) || b.kind === "body"), timed = all.filter(b => needsCheck(b) && b.kind !== "open" && b.s <= t);
     $("o2Txt").innerHTML = `<span class="${sad.some(did) ? "ok" : ""}">Sadhana ${sad.some(did) ? "✓" : sad.length ? "·" : "none planned"}</span>` +
-      `<span class="${bod.some(did) ? "ok" : ""}">Body ${bod.some(did) ? "✓" : "·"}</span>`;
+      `<span class="${bod.some(did) ? "ok" : ""}">Training ${bod.some(did) ? "✓" : "·"}</span>`;
     const sk = streak();
     $("comboN").textContent = sk || "·";
     $("comboL").textContent = "days 70+";
@@ -2946,15 +2982,16 @@
     // "Running low" card dropped (Junyan, 2026-10-09: "cute but it's not necessary")
     // no Oura yet: ask how long he slept, once each morning
     if (PLAN && !z && !G.day.slept && hourNow >= 4 && hourNow < 13) bh = `<div class="card brief"><div class="eyebrow">Good morning</div>
-      <div class="q">How long did you sleep? Sleep refills your prana (you're at ${Math.round(prana())}%).</div>
+      <div class="q">How long did you sleep? Sleep sets your body for the day.</div>
       <div class="actions" style="flex-wrap:wrap">${[5, 6, 7, 8, 9].map(h => `<button class="btn" data-slept="${h}">${h} h</button>`).join("")}</div></div>` + bh;
     put("brief", bh);
-    $("brief").querySelectorAll("[data-slept]").forEach(bn => bn.onclick = () => refillSleep(+bn.dataset.slept * 7, `Slept ${bn.dataset.slept} h`));
+    $("brief").querySelectorAll("[data-slept]").forEach(bn => bn.onclick = () => refillSleep(+bn.dataset.slept * 10, `Slept ${bn.dataset.slept} h`));
     // auto habits for tonight (paid next morning): last meal 3 hr before bed, bed on time
     const slp = all.find(isSleep);
     if (slp && t >= slp.s) {
       const was = G.day.earn || {}, e2 = { ...was };
       if (lastMealBefore(slp.s, all) && emptyStomach(slp.s, all)) e2.early = 1; else delete e2.early;
+      if (lastMealBefore(slp.s, all) && !emptyStomach(slp.s, all)) e2.late = 1; else delete e2.late;   // d203
       if (JSON.stringify(e2) !== JSON.stringify(was)) { G.day.earn = e2; saveG(); }
     }
     // phone and desktop alike: the steps card, three picks for right now, then the full list one tap away (2026-10-09)
@@ -2962,7 +2999,7 @@
     if (nightNow && !G.day.nightShown && !$("sheet").classList.contains("open") && !$("calx") && !$("night")) { G.day.nightShown = true; saveG(); openNight(); }
     put("habits", PLAN ? (nightNow ? `<button class="pa-all nt-open" data-night>🌙 Day's end<span>tomorrow, deathbed, reflection ›</span></button>` : "") + stepsHTML() + suggestHTML() : ""); bindHabits($("habits"));
     $("habits").querySelectorAll("[data-night]").forEach(bn => bn.onclick = openNight);
-    if (PLAN && !z && prana() < 40 && !G.day.lotusGiven) { G.day.lotusGiven = true; giveItem("lotus", "Your energy is low today."); }
+    if (PLAN && !z && body() < 40 && !G.day.lotusGiven) { G.day.lotusGiven = true; giveItem("lotus", "Your energy is low today."); }
     if ($("bMorning")) $("bMorning").onclick = () => openMorning();
     // a ?morning=1 link opens the morning straight away, any time of day
     if ((qs.get("morning") || qs.get("brief")) && PLAN && !openMorning.auto) { openMorning.auto = true; setTimeout(() => openMorning(), 600); }
@@ -3062,7 +3099,7 @@
     $("trailMeta").textContent = `${fires.filter(st => st.lit).length} / ${fires.length} fires lit`;
 
     // log
-    $("dayXp").textContent = `prana ${Math.round(prana())}%`;
+    $("dayXp").textContent = `prana ${Math.round(prana())}% · body ${Math.round(body())}%`;
     put("log", G.day.log.length ? G.day.log.map(e =>
       `<div><span>${fmtT(new Date(e.at))}</span><span>${esc(e.msg)}</span>${e.xp ? `<span class="xp${e.xp < 0 ? " neg" : ""}">${e.xp > 0 ? "+" : "−"}${Math.abs(e.xp)}</span>` : ""}</div>`).join("")
       : `<div><span></span><span>Nothing yet. Check in to your first quest.</span></div>`);

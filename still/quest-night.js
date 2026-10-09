@@ -69,7 +69,7 @@
         </section>
         <section><h3>How tired do you feel?</h3>
           <div class="nt-feel">${FEEL.map(([n, l]) => `<button data-feel="${n}" class="${d.feel === n ? "on" : ""}"><b>${n}</b><small>${l}</small></button>`).join("")}</div>
-          ${d.feel ? `<div class="nt-hint" style="margin-top:8px">Prana says ${d.prana}%. You said ${esc(FEEL[d.feel - 1][1].toLowerCase())}, which is more like ${FEEL_PCT[d.feel - 1]}%.${Math.abs(d.prana - FEEL_PCT[d.feel - 1]) <= 15 ? " Close enough: the game is reading you well." : " Noted: this is how the game learns where it is off."}</div>` : ""}
+          ${d.feel ? `<div class="nt-hint" style="margin-top:8px">Your body reads ${d.prana}%. You said ${esc(FEEL[d.feel - 1][1].toLowerCase())}, which is more like ${FEEL_PCT[d.feel - 1]}%.${Math.abs(d.prana - FEEL_PCT[d.feel - 1]) <= 15 ? " Close enough: the game is reading you well." : " Noted: this is how the game learns where it is off."}</div>` : ""}
         </section>
         <section><h3>Tomorrow · ${esc(d.tomorrow.label)}</h3>
           ${d.tomorrow.ahead ? `<div class="nt-ahead"><div><b>${d.tomorrow.ahead.use}</b><span>it will use</span></div><div><b>${d.tomorrow.ahead.start}%</b><span>you'll likely start</span></div><div><b>${Math.max(0, d.tomorrow.ahead.end)}%</b><span>you'd end near</span></div></div>
@@ -128,7 +128,7 @@
     .nt-body { overflow:auto; padding:0 16px calc(env(safe-area-inset-bottom) + 30px); max-width:560px; width:100%; margin:0 auto; }
     .nt section { margin-top:22px; }
     .nt h3 { font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--ink-soft); margin:0 0 10px; font-weight:600; }
-    .nt-stats { display:grid; grid-template-columns:repeat(4, 1fr); gap:8px; }
+    .nt-stats { display:grid; grid-template-columns:repeat(5, 1fr); gap:6px; }
     .nt-stats div { background:var(--glass); border-radius:14px; padding:10px 6px; text-align:center; }
     .nt-stats b { display:block; font-size:20px; } .nt-stats span { font-size:11px; color:var(--ink-soft); }
     .nt-list, .nt-sched { list-style:none; padding:0; margin:10px 0 0; font-size:14px; }
