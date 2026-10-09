@@ -843,6 +843,7 @@
     ["surya", "Surya Kriya", 10, 1, "☀️", "Surya Kriya", "", "Practice"],
     ["angam", "Angamardana", 8, 1, "💪", "Angamardana", "", "Practice"],
     ["bhuta", "Bhuta Shuddhi", 6, 1, "🔥", "Bhuta Shuddhi", "", "Practice"],
+    ["barefoot", "Walk barefoot on natural ground (soil, grass or sand), daily, any length; most important around the new moon", 3, 1, "🦶", "Barefoot walk", "", "Practice"],
     ["nadi", "Nadi Shuddhi, 5 min", 3, 2, "🌬️", "Nadi Shuddhi 5'", "", "Practice"],
     ["blueprint", "Blueprint meal: Super Veggie or Nutty Pudding", 6, 2, "🥗", "Veggie / Pudding", "", "Food"],
     ["legumes", "150 g cooked beans or lentils", 3, 1, "🫘", "150 g lentils", "", "Food"],
@@ -853,7 +854,9 @@
     ["berries", "100 g berries", 2, 1, "🫐", "100 g berries", "", "Food"],
     ["seeds", "1 tbsp ground flax or chia", 1, 1, "🌱", "1 tbsp flax/chia", "", "Food"],
     ["ferment", "Fermented food: 100 g yogurt, kefir or sauerkraut", 2, 1, "🥛", "100 g fermented food", "", "Food"],
+    ["pause", "Wait two minutes before the first bite of a meal", 0.6, 3, "⏳", "2 min before eating", "flat", "Food"],
     ["xylitol", "Xylitol, 1 g (one mint or gum) after eating or drinking; Dr Ellie: 6 to 10 g a day", 0.6, 10, "🍬", "Xylitol 1 g", "flat", "Food"],
+    ["lamp", "Light an oil lamp (natural oil, like sesame or ghee) before sleep", 2, 1, "🪔", "Oil lamp", "", "Evening"],
     ["screens", "Screens off 60 min before bed", 5, 1, "📵", "No screens 60'", "", "Evening"],
     ["mouth", "Dr Ellie's mouthcare routine at night, the whole routine in one tap", 2, 1, "🦷", "Dr Ellie PM", "", "Evening"],
     ["early", "Last meal 3+ hr before bed (counts itself from the calendar, paid next morning)", 5, 1, "🍽️", "Last meal 3 hr", "auto", "Evening"],
@@ -1018,6 +1021,9 @@
     mouth:"Dr Ellie's routine protects your teeth and gums overnight, when the mouth is driest.",
     early:"Going to bed on an empty stomach gives deeper, more restful sleep.",
     bedtime:"Sleeping by 11 matches your body clock, so you wake up with more energy.",
+    barefoot:"Bare feet on natural ground keep you in touch with the earth, which Sadhguru says supports health and inner wellbeing.",
+    pause:"Two minutes of waiting turns eating from a compulsion into a conscious choice.",
+    lamp:"Sadhguru recommends a lamp lit with natural oil before sleep to cleanse the space and ward off airborne infections.",
   };
   let whyTip = null, whyHeld = false;
   function showWhy(el){
@@ -1063,11 +1069,11 @@
      (12 cups from 6:30 AM to 9:30 PM), and a window about to close gets a nudge. */
   const WHEN = {
     daylight:[5,10], water:[6,21.5], protein:[6,11], supps:[6,11], neem:[5,10], mouthAm:[5,11],
-    shambhavi:[5,10], kriya:[6,21], nadi:[6,21], upa:[6,21], surya:[5,9.5], angam:[5,9.5], bhuta:[5,21], blueprint:[7,15], legumes:[11,21], veg:[11,21],
+    shambhavi:[5,10], kriya:[6,21], nadi:[6,21], upa:[6,21], barefoot:[6,19], pause:[6,22], lamp:[20,24], surya:[5,9.5], angam:[5,9.5], bhuta:[5,21], blueprint:[7,15], legumes:[11,21], veg:[11,21],
     greens:[11,21], evoo:[7,21], nuts:[7,21], berries:[7,21], seeds:[7,21], ferment:[7,21], xylitol:[7,22],
     screens:[20.5,23], mouth:[20,24],
   };
-  const FOOD = new Set(["protein", "blueprint", "legumes", "veg", "greens", "evoo", "nuts", "berries", "seeds", "ferment"]);
+  const FOOD = new Set(["pause", "protein", "blueprint", "legumes", "veg", "greens", "evoo", "nuts", "berries", "seeds", "ferment"]);
   function suggestions(n = 3){
     const t = now(), all = blocks(), p = tzParts(t, { hour:"numeric", minute:"numeric", hourCycle:"h23" }), h = +p.hour + +p.minute / 60;
     const meal = all.find(b => isMeal(b) && +b.s - 20 * 60000 <= +t && +t <= +b.e + 40 * 60000);
@@ -1079,12 +1085,16 @@
       if (w[1] - h < 1.5) sc += 4;                                     // its window closes soon
       if (FOOD.has(id)) sc += meal ? 9 : -4;
       if (id === "xylitol") sc += afterMeal ? 12 : -5;
+      if (id === "pause" && meal) sc += 6;                               // first thing at a meal
+      if (id === "barefoot" && nearNewMoon(t)) sc += 8;                  // Sadhguru: most important around the new moon
       if (id === "water") { const due = Math.floor((h - 6.5) / 1.25) + 1; sc += (due - (G.day.habits.water || 0)) * 3; }
       if (["kriya", "nadi", "upa", "bhuta"].includes(id) && prana() < 45) sc += 8;
       out.push([sc, HABITS[k]]);
     });
     return out.sort((a, b) => b[0] - a[0]).slice(0, n).map(x => x[1]);
   }
+  // days from a known new moon (2000-01-06 18:14 UTC), synodic month 29.53 days
+  const nearNewMoon = t => { const a = (((+t - Date.UTC(2000, 0, 6, 18, 14)) / 86400000) % 29.530588 + 29.530588) % 29.530588; return a < 1.5 || a > 28; };
   let SUGG = null;   // keep the same three on screen until one is tapped or the hour turns
   function suggestHTML(){
     const key = `${G.day.date}|${tzParts(now(), { hour:"numeric", hourCycle:"h23" }).hour}|${JSON.stringify(G.day.habits)}`;
