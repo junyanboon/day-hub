@@ -21,6 +21,8 @@
     "Everything you are carrying right now: worries, grudges, plans. Which of it would you take to your last breath? Put the rest down tonight.",
     "Count what is left: about {summers} more summers. What deserves them?",
   ];
+  // d198: one tap at day's end, how tired he feels, against the game's number
+  const FEEL = [[1, "Wiped out"], [2, "Tired"], [3, "Okay"], [4, "Good"], [5, "Full of energy"]], FEEL_PCT = [10, 30, 50, 70, 90];
   const colour = (p) => p == null ? null : p >= 70 ? "#8fe3b0" : p >= 45 ? "#ffd479" : p >= 25 ? "#ffb36b" : "#ff9c9c";
 
   function lifeGrid(birth, days, now) {
@@ -65,7 +67,13 @@
           ${d.today.line || ""}
           ${d.today.done.length ? `<ul class="nt-list">${d.today.done.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}
         </section>
+        <section><h3>How tired do you feel?</h3>
+          <div class="nt-feel">${FEEL.map(([n, l]) => `<button data-feel="${n}" class="${d.feel === n ? "on" : ""}"><b>${n}</b><small>${l}</small></button>`).join("")}</div>
+          ${d.feel ? `<div class="nt-hint" style="margin-top:8px">Prana says ${d.prana}%. You said ${esc(FEEL[d.feel - 1][1].toLowerCase())}, which is more like ${FEEL_PCT[d.feel - 1]}%.${Math.abs(d.prana - FEEL_PCT[d.feel - 1]) <= 15 ? " Close enough: the game is reading you well." : " Noted: this is how the game learns where it is off."}</div>` : ""}
+        </section>
         <section><h3>Tomorrow · ${esc(d.tomorrow.label)}</h3>
+          ${d.tomorrow.ahead ? `<div class="nt-ahead"><div><b>${d.tomorrow.ahead.use}</b><span>it will use</span></div><div><b>${d.tomorrow.ahead.start}%</b><span>you'll likely start</span></div><div><b>${Math.max(0, d.tomorrow.ahead.end)}%</b><span>you'd end near</span></div></div>
+            <div class="nt-hint" style="margin:6px 0 8px">${esc(d.tomorrow.ahead.verdict)}${d.tomorrow.ahead.top.length ? " Heaviest: " + d.tomorrow.ahead.top.map((x) => `${esc(x.name)} ${x.d}`).join(", ") + "." : ""} Start assumes a usual night's sleep.</div>` : ""}
           ${d.tomorrow.items.length ? `<ul class="nt-sched">${d.tomorrow.items.map((x) => `<li><span>${esc(x.time)}</span>${esc(x.name)}</li>`).join("")}</ul>`
             : `<div class="nt-hint">${esc(d.tomorrow.note || "Nothing on the calendar yet.")}</div>`}
         </section>
@@ -92,6 +100,7 @@
         </section>
       </div>`;
       el.querySelector("#ntX").onclick = close;
+      el.querySelectorAll("[data-feel]").forEach((bn) => bn.onclick = () => { d.feel = +bn.dataset.feel; d.onFeel(d.feel); draw(); });
       el.querySelectorAll("[data-keep]").forEach((bn) => bn.onclick = async () => {
         const c = d.keeps[+bn.dataset.keep]; bn.disabled = true;
         try { await d.onKeep(c); c.state = "asked"; } catch (e) { bn.disabled = false; bn.querySelector("small").textContent = "Could not save it. Try again."; return; }
@@ -139,6 +148,13 @@
     .nt-bars { display:flex; align-items:flex-end; gap:2px; height:70px; margin-top:10px; }
     .nt-bars i { flex:1; border-radius:2px 2px 0 0; min-width:3px; max-width:14px; }
     .nt-life { width:100%; max-width:330px; display:block; margin:10px auto 0; }
+    .nt-feel { display:grid; grid-template-columns:repeat(5, 1fr); gap:6px; }
+    .nt-feel button { background:var(--glass); border:1px solid var(--glass-border); border-radius:12px; padding:8px 2px; color:var(--ink); font:inherit; cursor:pointer; }
+    .nt-feel button b { display:block; font-size:18px; } .nt-feel button small { display:block; font-size:10.5px; color:var(--ink-soft); margin-top:2px; }
+    .nt-feel button.on { border-color:#ffd479; background:rgba(255,212,121,.16); }
+    .nt-ahead { display:grid; grid-template-columns:repeat(3, 1fr); gap:8px; }
+    .nt-ahead div { background:var(--glass); border-radius:14px; padding:10px 6px; text-align:center; }
+    .nt-ahead b { display:block; font-size:20px; } .nt-ahead span { font-size:11px; color:var(--ink-soft); }
     .nt-keeps { display:flex; flex-direction:column; gap:8px; }
     .nt-keep { display:flex; gap:12px; align-items:center; text-align:left; padding:12px 14px; border-radius:14px; background:var(--glass);
       border:1px solid var(--glass-border); color:var(--ink); font:inherit; cursor:pointer; }

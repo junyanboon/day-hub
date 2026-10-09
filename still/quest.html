@@ -491,7 +491,7 @@
 <script src="bag.js?v=20261009k"></script>
 <script src="quest-merge.js?v=20261009k"></script>
 <script src="quest-fx.js"></script>
-<script src="quest-night.js?v=20261009k"></script>
+<script src="quest-night.js?v=20261009p"></script>
 </head>
 <body>
 <div id="app">
@@ -850,7 +850,7 @@
   const HARD = /swim|cycl|\bbike\b|walk|\btour\b|excursion|safari|snorkel|party|festival|wedding|concert|competition|performance|congress|gala/i;
   const FOCUSED = /\bdrive\b|driving/i;
   function energy(b){                                  // { rate: spent per hour while it runs }
-    if (isSadhana(b) || isRecovery(b) || isMeal(b) || isSleep(b) || b.kind === "open" || b.kind === "break" || /^rest\b/i.test(b.t)) return { rate:0 };
+    if (isSadhana(b) || isRecovery(b) || isMeal(b) || isSleep(b) || b.kind === "open" || b.kind === "break" || /^rest\b|free time/i.test(b.t)) return { rate:0 };
     if (VERY_HARD.test(b.t)) return { rate:10 };
     if (isGym(b) || b.kind === "body" || b.kind === "dance" || HARD.test(b.t) || groupOf(b) === "major") return { rate:7 };
     if (groupOf(b) === "work" || FOCUSED.test(b.t)) return { rate:5 };
@@ -907,7 +907,10 @@
   function habitGain(id){
     const h = HABITS.find(x => x[0] === id); if (!h) return 0;
     const n = (G.day.habits || {})[id] || 0;
-    return n >= h[3] ? 0 : Math.max(1, Math.round(h[2] * (h[6] === "flat" ? 1 : (DIM[n] ?? .2)) * gainMult()));
+    // d196/d197 (2026-10-09): prana is an honest energy reading, so health actions fill half;
+    // sadhana and the yogic practices (group "Practice") still fill in full
+    const half = h[7] === "Practice" ? 1 : 0.5;
+    return n >= h[3] ? 0 : Math.max(1, Math.round(h[2] * half * (h[6] === "flat" ? 1 : (DIM[n] ?? .2)) * gainMult()));
   }
   function logHabit(id, quiet){
     const h = HABITS.find(x => x[0] === id); if (!h) return;
@@ -1024,11 +1027,17 @@
     const done = all.filter(b => G.day.closes[gk(b)] === "done" || ["in", "late"].includes(G.day.checks[gk(b)])).map(b => `✓ ${shortName(b)}`)
       .concat(all.filter(b => G.day.checks[gk(b)] === "skip").map(b => `· ${shortName(b)}, didn't happen`));
     const next = new Date(Date.parse(gameYmd() + "T12:00:00Z") + 86400000).toISOString().slice(0, 10);
-    let items = [], note = "";
+    let items = [], note = "", ahead = null;
     try {
       const p = await getPlan(next);
       items = p.blocks.filter(b => b.type !== "break" && !/^open space|^rest$/i.test(b.t))
         .map(b => ({ time: fmtT(new Date(b.s)), name: shortName(b) }));
+      // d199: what tomorrow's plan will cost against what he will likely have after a usual night
+      const tb = p.blocks.map(b => ({ ...b, s:new Date(b.s), e:new Date(b.e) })).map(b => ({ ...b, kind:kindOf(b) }));
+      const costs = tb.map(b => ({ name:moName(b), d:Math.round(energy(b).rate * spendMult() * Math.max(0, (b.e - b.s) / 3600000)) })).filter(x => x.d > 0);
+      const use = costs.reduce((a, x) => a + x.d, 0), start = Math.min(100, Math.round(prana()) + 45), end = start - use;
+      ahead = { use, start, end, top:costs.sort((a, b) => b.d - a.d).slice(0, 3),
+        verdict: end >= 40 ? "Room to spare." : end >= 15 ? "Tight. Rest where you can, and keep the evening light." : "More than you will likely have. Something may need to move." };
     } catch { note = "Could not read tomorrow's calendar."; }
     const days = {};
     for (const [k, v] of Object.entries(G.days || {})) if (v && typeof v.prana === "number") { const d = new Date(k); if (!isNaN(d)) days[ymd(d)] = Math.round(v.prana); }
@@ -1037,12 +1046,15 @@
     QuestNight.open({
       today: { stats: [[`${Math.round(prana())}%`, "prana"], [`${lit}/${health.length}`, "fires lit"], [`${hDone}`, "actions"], [STEPS != null ? STEPS.toLocaleString() : "·", "steps"]],
         line: pranaLine(), done: done.slice(0, 12) },
-      tomorrow: { label: new Date(next + "T12:00:00Z").toLocaleDateString("en-US", { timeZone:"UTC", weekday:"long", month:"short", day:"numeric" }), items, note },
+      tomorrow: { label: new Date(next + "T12:00:00Z").toLocaleDateString("en-US", { timeZone:"UTC", weekday:"long", month:"short", day:"numeric" }), items, note, ahead },
+      prana: Math.round(prana()), feel: night.feel || null,
+      onFeel: n => { const o = (G.night = G.night || {})[G.day.date] || {}; G.night[G.day.date] = { ...o, feel:n, feelPrana:Math.round(prana()), feelAt:now().toISOString() };
+        log(`Feeling ${n} of 5 at day's end (prana ${Math.round(prana())}%)`); },
       days, birth: G.birth || null, note: night.note || "",
       exerciseIndex: Math.floor(Date.parse(gameYmd() + "T12:00:00Z") / 86400000),
       deathbedDone: !!G.day.deathbed,
       onDeathbed: () => { G.day.deathbed = now().toISOString(); log("Sat as if on my deathbed"); },
-      onNote: (text, prompt) => { (G.night = G.night || {})[G.day.date] = { note:text, prompt, at:now().toISOString() }; saveG(); },
+      onNote: (text, prompt) => { const o = (G.night = G.night || {})[G.day.date] || {}; G.night[G.day.date] = { ...o, note:text, prompt, at:now().toISOString() }; saveG(); },
       onBirth: v => { G.birth = v; saveG(); },
       keeps: keepCandidates(all),
       onKeep: async c => {
