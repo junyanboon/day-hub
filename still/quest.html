@@ -500,6 +500,7 @@
   .mo-open-t { position:relative; flex:1; min-width:0; } .mo-open-t b { display:block; font-size:18px; }
   .mo-open-t small { display:block; font-size:13px; opacity:.85; margin-top:2px; white-space:normal; }
   .mo-open .pa-go { position:relative; }
+  .mo-open.mo-slim { padding:10px 14px; background:rgba(255,255,255,.12); } .mo-slim .mo-open-t b { font-size:15px; }
   #morning { position:fixed; inset:0; z-index:150; display:none; background:#1d1838; color:#fff; }
   #morning.open { display:block; animation:moPop .45s ease; }
   @keyframes moPop { from { transform:scale(1.04); } to { transform:none; } }
@@ -577,6 +578,7 @@
 <script src="nvc-words.js?v=20261010a"></script>
 <script src="quest-fx.js?v=20261009b"></script>
 <script src="quest-night.js?v=20261010a"></script>
+<script src="quest-morning.js?v=20261010c"></script>
 </head>
 <body>
 <div id="sky" aria-hidden="true"><div class="sky-stars"></div><div class="sky-orb"></div>
@@ -2565,13 +2567,8 @@
       <path d="M0 ${h * .62} C80 ${h * .45} 150 ${h * .58} 220 ${h * .5} S350 ${h * .4} 400 ${h * .52} V${h} H0Z" fill="#f4a76b" opacity=".55"/>
       <path d="M0 ${h * .75} C70 ${h * .62} 160 ${h * .78} 250 ${h * .66} S360 ${h * .62} 400 ${h * .7} V${h} H0Z" fill="#d9744f" opacity=".75"/>
       <path d="M0 ${h * .88} C90 ${h * .78} 200 ${h * .92} 300 ${h * .82} S380 ${h * .8} 400 ${h * .84} V${h} H0Z" fill="#7a3b52"/></svg>`;
-  const moPractices = () => MO_PRACTICES.map(([group, ids]) => `<div class="mo-kicker" style="margin-top:18px">${group}</div><div class="mo-prac">${ids.map(id => {
-      const h = HABITS.find(x => x[0] === id); if (!h) return "";
-      const n = (G.day.habits || {})[id] || 0, g = habitGain(id), auto = h[6] === "auto";
-      return `<button class="mo-pr${n ? " done" : ""}"${auto ? " disabled" : ` data-habit="${id}"`}><span class="mo-pr-i">${h[4]}</span>
-        <span class="mo-pr-t"><b>${esc(h[5])}</b><small>${esc(h[1].replace(/\s*\(.*\)$/, ""))}</small></span>
-        <span class="mo-pr-g">${n ? "✓" : auto ? "auto" : g ? `+${g}` : ""}</span></button>`; }).join("")}</div>`).join("");
-  const moLeave = d => d.go ? `<div class="mo-leave">🧭 Leave by <b>${fmtT(new Date(+d.go.s - 30 * 60000))}</b> for ${esc(moName(d.go))}</div>` : "";
+  const moPractices = () => MO_PRACTICES.map(([group, ids]) => [group, ids.map(id => HABITS.find(x => x[0] === id)).filter(Boolean).map(h => ({
+    id:h[0], icon:h[4], label:h[5], small:h[1].replace(/\s*\(.*\)$/, ""), done:!!(G.day.habits || {})[h[0]], auto:h[6] === "auto", gain:habitGain(h[0]) }))]);
 
   /* weather: Open-Meteo (free, no key). Where: the phone's location when he allows it (he is
      there), else the calendar's place looked up by name, else nothing. Cached for 2 hours. */
@@ -2611,7 +2608,7 @@
         `&hourly=temperature_2m,weather_code&timezone=auto&forecast_days=2`)).json();
       WEATHER = { at:Date.now(), where:w, daily:j.daily, hourly:j.hourly, utcOff:j.utc_offset_seconds || 0 };
     } catch { WEATHER = { at:Date.now(), none:true }; }
-    finally { wxBusy = false; const el = $("morning"); if (el && el.className === "open") openMorning(); }
+    finally { wxBusy = false; if (window.QuestMorning) QuestMorning.redraw(); }
   }
   // the hourly reading closest to a moment's start
   function wxAt(date){
@@ -2622,48 +2619,17 @@
   }
   const wxHm = s => { const [h, m] = s.slice(11, 16).split(":").map(Number); return `${h % 12 || 12}:${String(m).padStart(2, "0")} ${h < 12 ? "AM" : "PM"}`; };
 
-  function moSlides(d){
-    const s = [];
-    s.push({ pal:["#ffb37a", "#c2557a", "#3b2a6b"], hills:true, html:`<div class="mo-kicker">${esc(d.greet)}, Junyan</div><div class="mo-place">${esc(d.place)}</div>
-      <div class="mo-date">${esc(d.date)}</div><div class="mo-ring"><b>${d.prana}%</b><span>prana</span></div>` });
-    // weather
+  // the weather in a few lines for the planner's check-in
+  function moWx(){
     const W = WEATHER;
-    let wx;
-    if (!W) wx = `<p class="mo-soft">Checking the sky…</p>`;
-    else if (W.none) wx = `<p class="mo-soft">No weather right now. Allow location for Quest to see it here.</p>`;
-    else {
-      const D = W.daily, [ic, word] = WX[D.weather_code[0]] || ["🌡️", ""], uv = Math.round(D.uv_index_max[0]);
-      const hot = D.temperature_2m_max[0] >= 33, tips = [];
-      if (hot) tips.push("It's a hot one: water with you all day, shade at midday.");
-      if (uv >= 8) tips.push(`UV ${uv} is very high: hat, sunglasses, sunscreen.`);
-      if ((D.precipitation_probability_max[0] || 0) >= 40) tips.push(`${D.precipitation_probability_max[0]}% chance of rain: bring a layer.`);
-      if ((D.wind_speed_10m_max[0] || 0) >= 30) tips.push(`Wind up to ${Math.round(D.wind_speed_10m_max[0])} km/h: sand and dust in open places.`);
-      wx = `<div class="mo-wx-ic">${ic}</div><div class="mo-big">${Math.round(D.temperature_2m_max[0])}° <span class="mo-lo">/ ${Math.round(D.temperature_2m_min[0])}°</span></div>
-        <div class="mo-soft" style="margin-top:4px">${esc(word)}${W.where.name ? ` in ${esc(W.where.name)}` : ""} · UV ${uv}</div>
-        <div class="mo-sunrow"><span>🌅 ${wxHm(D.sunrise[0])}</span><span>🌇 ${wxHm(D.sunset[0])}</span></div>
-        ${d.sched.slice(0, 5).map(b => { const h = wxAt(b.s); return h ? `<div class="mo-wxrow"><span>${fmtT(b.s)}</span><span>${esc(moName(b))}</span><b>${(WX[h.code] || [""])[0]} ${h.temp}°</b></div>` : ""; }).join("")}
-        ${tips.map(x => `<p class="mo-tip">${esc(x)}</p>`).join("")}`;
-    }
-    s.push({ pal:["#bfe6ff", "#4f8fc9", "#24306a"], html:`<div class="mo-kicker">The weather today</div>${wx}` });
-    // the schedule: every activity, each one opens its own window
-    s.push({ pal:["#ffe1b0", "#c9786a", "#3a2c63"], html:`<div class="mo-kicker">Your day</div><div class="mo-big">${d.sched.length ? "Your schedule" : "Nothing fixed today"}</div>
-      <div class="mo-sched">${d.sched.map(b => { const open = moOpen.has(b.key);
-        return `<div class="mo-item${open ? " open" : ""}"><button class="mo-row" data-fold="${esc(b.key)}"><span class="mo-row-t">${fmtT(b.s)}</span>${badge(b, 30)}
-        <span class="mo-row-n">${esc(moName(b))}</span><span class="mo-row-go">${open ? "⌃" : "⌄"}</span></button>${open ? moDetail(b) : ""}</div>`; }).join("")}</div>${moLeave(d)}` });
-    const pal = [["#ffd39a", "#e0785a", "#5b2d5e"], ["#9fe3d0", "#3f8fa0", "#22305e"], ["#ffc2d1", "#b8579a", "#2f2a66"], ["#ffe08a", "#d98a3a", "#4a2f4f"]];
-    d.moments.forEach((m, i) => {
-      const h = wxAt(m.b.s);
-      s.push({ pal:pal[i % pal.length], html:`<div class="mo-kicker">${fmtT(m.b.s)}${h ? ` · ${(WX[h.code] || [""])[0]} ${h.temp}°` : ""}</div>
-        <div class="mo-b-icon">${badge(m.b, 64, true)}</div><div class="mo-big">${esc(moName(m.b))}</div>
-        ${m.mind[0] ? `<blockquote class="mo-quote">${esc(m.mind[0])}</blockquote>` : ""}
-        ${m.pack.length ? `<div class="mo-kicker" style="margin-top:18px">Bring</div><div class="mo-pack">${m.pack.slice(0, 4).map(x => `<span>${esc(x)}</span>`).join("")}</div>` : ""}
-        <div class="mo-sched">${moOpen.has(m.b.key) ? `<div class="mo-item open">${moDetail(m.b)}</div>` : ""}
-          <button class="mo-more-btn" data-fold="${esc(m.b.key)}">${moOpen.has(m.b.key) ? "Show less ⌃" : "Everything for this ⌄"}</button></div>` });
-    });
-    s.push({ pal:["#fff1c9", "#f0a35e", "#7b3f61"], html:`<div class="mo-kicker">Before you go</div><div class="mo-big">Practices for today</div>
-      <p class="mo-soft" style="margin-top:6px">Tap one when it's done. Each fills your prana.</p>${moPractices()}
-      <button class="mo-go" data-mo="begin">Let's go</button>` });
-    return s;
+    if (!W) return { state:"loading" };
+    if (W.none || !W.daily || !W.daily.weather_code) return { state:"none" };   // a failed forecast (503) comes back without days
+    const D = W.daily, [ic, word] = WX[D.weather_code[0]] || ["🌡️", ""], uv = Math.round(D.uv_index_max[0]), tips = [];
+    if (D.temperature_2m_max[0] >= 33) tips.push("It's a hot one: water with you all day, shade at midday.");
+    if (uv >= 8) tips.push(`UV ${uv} is very high: hat, sunglasses, sunscreen.`);
+    if ((D.precipitation_probability_max[0] || 0) >= 40) tips.push(`${D.precipitation_probability_max[0]}% chance of rain: bring a layer.`);
+    if ((D.wind_speed_10m_max[0] || 0) >= 30) tips.push(`Wind up to ${Math.round(D.wind_speed_10m_max[0])} km/h: sand and dust in open places.`);
+    return { state:"ok", ic, word, where:W.where.name || "", uv, hi:Math.round(D.temperature_2m_max[0]), lo:Math.round(D.temperature_2m_min[0]), set:wxHm(D.sunset[0]), tips };
   }
 
   // one activity, opened in place: a meal's plate, an event's what-to-know and packing list
@@ -2721,46 +2687,55 @@
       const blk = blkOf(b.dataset.ask); if (!blk) return; (G.research = G.research || []).push({ key:gk(blk), title:blk.t, s:blk.s.toISOString() }); saveG(); redraw(); });
   }
 
-  let moSlide = 0;
+  /* The morning became a planner (Junyan, 2026-10-10: "we work together to plan out the day and
+     make sure everything makes sense ... including assesing which tasks to do"). quest-morning.js
+     walks him through it; everything it changes is a today-only edit through /ops, the same as
+     the stop windows. This side gathers the day and does the writes. */
+  const blkByKey = key => blocks().find(x => x.key === key);
+  const MO_CTX = {
+    data: () => {
+      const t = now(), all = blocks(), d = morningData();
+      G.day.plan = G.day.plan || {};
+      const est = G.day.plan.est || {};
+      return { now:t, today:tzYmd(t), greet:d.greet, place:d.place, date:d.date, prana:d.prana, body:body(), wx:moWx(), plan:G.day.plan,
+        practiced: all.some(b => isSadhana(b) && ["in", "late"].includes(G.day.checks[gk(b)])) || HABITS.some(h => h[7] === "Practice" && (G.day.habits || {})[h[0]]),
+        items: all.map(b => ({ key:b.key, name:moName(b), s:b.s, e:b.e, kind:b.kind, open:b.kind === "open", brk:b.kind === "break", meal:isMeal(b), sleep:isSleep(b),
+          sadhana:isSadhana(b), flight:/flight|\b[A-Z]{2}\d{2,4}\b/.test(b.t) && b.kind === "travel", extra:!!b.extra, taskId:b.taskId || null,
+          cost:energy(b).rate * spendMult() * Math.max(0, (b.e - b.s) / 3600000), badge:badge(b, 30) })),
+        tasks: TASKS.map(x => est[x.id] ? { ...x, estimate:`${est[x.id]} min` } : x),
+        practices: moPractices() };
+    },
+    fmtT, save: () => saveG(), log: m => { log(m); saveG(); },
+    hour: d => { const p = tzParts(d, { hour:"numeric", minute:"numeric", hourCycle:"h23" }); return (+p.hour % 24) + p.minute / 60; },
+    at: (ref, h, dd) => new Date(+fromField(`${String(Math.floor(h)).padStart(2, "0")}:${String(Math.round((h % 1) * 60)).padStart(2, "0")}`, ref) + (dd || 0) * 86400000),
+    move: (key, min) => { const b = blkByKey(key); if (b) return saveBlock(b, new Date(+b.s + min * 60000), new Date(+b.e + min * 60000), b.t, false); },
+    setTime: (key, s, e) => { const b = blkByKey(key); if (b) return saveBlock(b, s, e, b.t, false); },
+    drop: key => { const b = blkByKey(key); if (b) return dropBlock(b); },
+    add: (t, s, e, extra) => { log(`Planned ${t}: ${fmtT(s)} to ${fmtT(e)}`);
+      return writeOps(o => o.adds.push({ key:"x" + s.getTime(), s:s.toISOString(), e:e.toISOString(), t, type:"task", cal:"you", ...(extra || {}) })); },
+    taskDone: async id => {
+      if (!DRY) { const r = await fetch(API + "/tasks/done", { method:"POST", headers:{ "Content-Type":"application/json" }, body:JSON.stringify({ id, done:true }) });
+        if (!r.ok) { alert("Could not mark it done in Notion: HTTP " + r.status); return; } }
+      const x = TASKS.find(y => y.id === id); TASKS = TASKS.filter(y => y.id !== id); if (x) log(`Done: ${x.task}`); saveG();
+    },
+    habit: id => { logHabit(id, true); saveG(); },
+    detail: key => { const b = blkByKey(key); return b && !b.extra ? moDetail(b) : ""; },
+    bind: (root, redraw) => bindDetail(root, redraw),
+    begin: () => { G.day.briefDone = true; log("Planned the day"); saveG(); },
+    onClose: () => render(),
+  };
   function openMorning(){
+    if (!window.QuestMorning) return;
     // the agent's lines may still be on their way: open now, redraw when they land
     if (!Object.keys(INSIGHTS).length && questKey() && !openMorning.asked) { openMorning.asked = true;
-      qfetch("/quest/insights").then(j => { INSIGHTS = j || {}; const el = $("morning"); if (el && el.className === "open") openMorning(); }).catch(() => {}); }
+      qfetch("/quest/insights").then(j => { INSIGHTS = j || {}; QuestMorning.redraw(); }).catch(() => {}); }
     loadWeather();
-    const d = morningData(), slides = moSlides(d);
-    moSlide = Math.min(moSlide, slides.length - 1);
-    const S = slides[moSlide];
-    let el = $("morning");
-    if (!el) { el = document.createElement("div"); el.id = "morning"; document.body.appendChild(el); }
-    el.className = "open";
-    el.innerHTML = `<div class="mo-b"><div class="mo-bars">${slides.map((_, i) => `<i class="${i < moSlide ? "done" : i === moSlide ? "on" : ""}"></i>`).join("")}</div>
-      <div class="mo-slide" style="--g1:${S.pal[0]};--g2:${S.pal[1]};--g3:${S.pal[2]}">${S.hills ? moHills(260) : ""}
-        <button class="mo-tap l" data-mo="prev" aria-label="Back"></button><button class="mo-tap r" data-mo="next" aria-label="Next"></button>
-        <div class="mo-b-c">${S.html}</div></div></div>
-      <button class="mo-x" data-mo="close" aria-label="Close">✕</button>`;
-    el.querySelectorAll("[data-habit]").forEach(b => b.onclick = e => { e.stopPropagation(); logHabit(b.dataset.habit, true); saveG(); openMorning(); });
-    bindDetail(el, keepScroll);
-    // redraw without losing the place in a long list
-    function keepScroll(){ const sc = el.querySelector(".mo-slide"), y = sc ? sc.scrollTop : 0; openMorning(); const s2 = $("morning").querySelector(".mo-slide"); if (s2) { s2.style.animation = "none"; s2.scrollTop = y; } }
-    el.querySelectorAll("[data-open]").forEach(b => b.onclick = e => {
-      e.stopPropagation();
-      const blk = blocks().find(x => x.key === b.dataset.open); if (!blk) return;
-      el.className = ""; openStop(blk);   // the morning stays where it was; the button reopens it
-    });
-    el.querySelectorAll("[data-mo]").forEach(b => b.onclick = e => {
-      e.stopPropagation();
-      const a = b.dataset.mo;
-      if (a === "close") return closeMorning();
-      if (a === "begin") { G.day.briefDone = true; log("Began the day"); saveG(); closeMorning(); return render(); }
-      if (a === "next") { if (moSlide < slides.length - 1) { moSlide++; openMorning(); } return; }
-      if (a === "prev") { if (moSlide > 0) { moSlide--; openMorning(); } }
-    });
+    QuestMorning.open(MO_CTX);
   }
-  function closeMorning(){ const el = $("morning"); if (el) el.className = ""; moSlide = 0; }
+  function closeMorning(){ if (window.QuestMorning) QuestMorning.close(); }
   document.addEventListener("keydown", e => {
-    const el = $("morning"); if (!el || el.className !== "open" || /input|textarea/i.test(document.activeElement.tagName)) return;
+    if (!window.QuestMorning || !QuestMorning.isOpen() || /input|textarea/i.test(document.activeElement.tagName)) return;
     if (e.key === "Escape") closeMorning();
-    if (e.key === "ArrowRight" || e.key === "ArrowLeft") { const b = el.querySelector(`[data-mo="${e.key === "ArrowRight" ? "next" : "prev"}"]`); if (b) b.click(); }
   });
 
   /* ---------- skills (ticket 16, 2026-10-08) ----------
@@ -3432,10 +3407,13 @@
     let bh = "";
     // the morning (2026-10-09): one button that opens a full-screen morning. Shambhavi is offered in
     // Prana actions only (Junyan: "drop the add shambhavi altogether").
-    if (PLAN && !z && !G.day.briefDone && hourNow >= 4 && hourNow < 13) {
-      const n = all.filter(b => b.e > t && !["open", "break"].includes(b.kind) && !isSleep(b) && !isMeal(b) && !isSadhana(b)).length;
-      bh = `<button class="mo-open" id="bMorning"><span class="mo-open-art">${moHills(90)}</span>
-        <span class="mo-open-t"><b>☀️ Open your morning</b><small>${esc(placeNow())}${n ? ` · ${n} moment${n > 1 ? "s" : ""} today` : ""}</small></span><span class="pa-go">›</span></button>`;
+    // 2026-10-10: the planner opens any time of day until the day's last item ends; once planned, it stays as Replan
+    const dayLeft = !(lastItemEnd(all) && +t >= lastItemEnd(all));
+    if (PLAN && !z && dayLeft && hourNow >= 4 && window.QuestMorning) {
+      const n = QuestMorning.count(MO_CTX);
+      bh = G.day.briefDone ? `<button class="mo-open mo-slim" id="bMorning"><span class="mo-open-t"><b>🗺️ Replan the day</b><small>${n ? `${n} thing${n > 1 ? "s" : ""} to look at` : "Tasks, times, what's left"}</small></span><span class="pa-go">›</span></button>`
+        : `<button class="mo-open" id="bMorning"><span class="mo-open-art">${moHills(90)}</span>
+        <span class="mo-open-t"><b>☀️ Plan your day</b><small>${esc(placeNow())}${n ? ` · ${n} thing${n > 1 ? "s" : ""} to look at` : " · let's go through it"}</small></span><span class="pa-go">›</span></button>`;
     }
     // "Running low" card dropped (Junyan, 2026-10-09: "cute but it's not necessary")
     // no Oura yet: ask how long he slept, once each morning
