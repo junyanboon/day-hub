@@ -58,6 +58,11 @@
     for (const k of ["slept", "ouraTried", "briefDone"]) if (o[k] || n[k]) out[k] = true;
     out.xp = Math.max(+o.xp || 0, +n.xp || 0);
     if (arr(o.sideDone).length > arr(n.sideDone).length) out.sideDone = o.sideDone;
+    if (o.feel || n.feel) {   // feelings check-ins and conflicts (2026-10-10): kept from both, once each
+      const f = new Map();
+      for (const x of [...arr(o.feel), ...arr(n.feel)]) if (x && x.id) f.set(x.id, x);
+      out.feel = [...f.values()].sort((a, b) => ms(a.at) - ms(b.at));
+    }
     if (o.zaps || n.zaps) {
       const z = new Map();
       for (const x of [...arr(o.zaps), ...arr(n.zaps)]) if (x) z.set(x.s, x);
@@ -122,6 +127,12 @@
     if (o.days || n.days) out.days = { ...obj(o.days), ...obj(n.days) };
     if (o.pr || n.pr) out.pr = mergePr(o.pr, n.pr);
     if (o.bag || n.bag) out.bag = mergeBag(o.bag, n.bag);
+    if (o.nvc || n.nvc) {   // the NVC words he has used: the higher count of each
+      const w = {}, nd = {};
+      for (const v of [o.nvc, n.nvc]) { for (const [k, c] of Object.entries(obj(v && v.words))) w[k] = Math.max(w[k] || 0, +c || 0);
+        for (const [k, c] of Object.entries(obj(v && v.needs))) nd[k] = Math.max(nd[k] || 0, +c || 0); }
+      out.nvc = { words: w, needs: nd };
+    }
     out.day = mergeDay(o.day, n.day);
     return out;
   }

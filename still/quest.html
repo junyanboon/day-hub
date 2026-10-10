@@ -384,6 +384,20 @@
   .wck { display:flex; gap:10px; align-items:center; width:100%; text-align:left; padding:11px 2px; border-top:1px solid rgba(255,255,255,.08); font-size:15px; color:var(--ink); background:none; }
   .wck .bx { width:22px; height:22px; border-radius:6px; border:2px solid var(--ink-faint); flex:none; display:flex; align-items:center; justify-content:center; font-size:14px; }
   .wck.on .bx { background:#85B7EB; border-color:#85B7EB; color:#0c3a66; }
+  .nvc-fams, .nvc-words { display:flex; flex-wrap:wrap; gap:6px; margin:6px 0; }
+  .nvc-fam, .nvc-w { padding:7px 11px; border-radius:999px; border:1px solid var(--glass-border); background:var(--glass); color:var(--ink); font-size:14px; }
+  .nvc-fam.open { border-color:var(--gold); }
+  .nvc-fam.on, .nvc-w.on { background:#85B7EB; border-color:#85B7EB; color:#0c3a66; }
+  .nvc-w i { font-style:normal; font-size:10px; margin-left:5px; color:var(--gold); }
+  .nvc-w.on i { color:#0c3a66; }
+  .nvc-w.thought { opacity:.8; font-style:italic; }
+  .nvc-tip { font-size:13px; color:var(--ink-soft); }
+  .nvc-warn { font-size:13px; color:var(--gold); }
+  .nvc-in { width:100%; box-sizing:border-box; padding:10px; border-radius:12px; border:1px solid var(--glass-border); background:rgba(0,0,0,.2); color:var(--ink); font:inherit; font-size:15px; }
+  .nvc-steps { display:flex; flex-wrap:wrap; gap:4px; margin:4px 0 10px; font-size:11px; }
+  .nvc-steps span { padding:3px 7px; border-radius:999px; background:var(--glass); color:var(--ink-faint); }
+  .nvc-steps span.on { background:var(--gold); color:#2a1f00; }
+  .nvc-steps span.done { color:var(--ink-soft); }
   .quest-title { cursor:pointer; }
   .sheet p { font-size:14px; color:var(--ink-soft); margin-top:6px; line-height:1.4; }
   .chips { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:14px; }
@@ -558,7 +572,8 @@
 </style>
 <script src="keeps.js?v=20261009k"></script>
 <script src="bag.js?v=20261009k"></script>
-<script src="quest-merge.js?v=20261010a"></script>
+<script src="quest-merge.js?v=20261010b"></script>
+<script src="nvc-words.js?v=20261010a"></script>
 <script src="quest-fx.js?v=20261009b"></script>
 <script src="quest-night.js?v=20261010a"></script>
 </head>
@@ -767,6 +782,7 @@
         if (left.length !== (G.research || []).length) { G.research = left; saveG(); } }).catch(() => {});
       pullSkills().then(() => { if (!$("sheet").classList.contains("open")) render(); }).catch(() => {});
       pullKeeps();
+      nvSend();
       lastPull = new Date(); pullErr = null;
       setTimeout(openPending, 0);
     } catch (e) { pullErr = String(e.message || e); }
@@ -1248,6 +1264,7 @@
     return `<div class="hhead"><span class="eyebrow">Prana actions · level ${lvl()} · ${hDone}/${TILES.length}</span>` +
       `<button class="hsnd" data-hsnd aria-label="Tap sounds">${window.QuestFx && QuestFx.soundOn() ? "🔊" : "🔇"}</button></div>` +
       `<div class="hkey"><b class="mp">gold</b> fills prana (Sadhguru) · <b class="mb">teal</b> fills body (Bryan Johnson)</div>` +
+      `<div class="hgrp"><div class="hgl">Heart</div><div class="hgrid"><button class="htile" data-nvc="checkin"><span class="hi">🫶</span><span class="hl">How am I?</span><b class="mp">check in</b></button><button class="htile" data-nvc="conflict"><span class="hi">⚡</span><span class="hl">Conflict</span><b class="mp">NVC</b></button></div></div>` +
       ["Morning", "Practice", "Food", "Evening"].map(gr => `<div class="hgrp"><div class="hgl">${gr}</div><div class="hgrid">${gr === "Food" ? `<button class="htile" data-mealq=""><span class="hi">🍽️</span><span class="hl">Rate a meal</span><b class="mp">quiz</b></button>` : ""}${TILES.filter(h => h[7] === gr).map(tile).join("")}</div></div>`).join("");
   }
   /* Three picks for right now (Junyan, 2026-10-09: "only suggestions for this exact
@@ -1291,11 +1308,14 @@
     return `<div class="hhead"><span class="eyebrow">Prana actions · right now</span>` +
       `<button class="hsnd" data-hsnd aria-label="Tap sounds">${window.QuestFx && QuestFx.soundOn() ? "🔊" : "🔇"}</button></div>` +
       (mq ? `<button class="pa-all" style="margin:0 0 10px" data-mealq="${esc(gk(mq))}">🍽️ How was ${esc(shortName(mq))}?<span>Rate it ›</span></button>` : "") +
+      (nvDue() ? `<button class="pa-all" style="margin:0 0 10px" data-nvc="checkin">🫶 How are you, really?<span>Check in ›</span></button>` : "") +
       (SUGG.list.length ? `<div class="hgrid sugg">${SUGG.list.map(habitTile).join("")}</div>` : `<div class="hint" style="margin:8px 2px">Nothing pressing right now.</div>`) +
-      `<button class="pa-all" data-all>All prana actions<span>${hDone}/${TILES.length} done ›</span></button>`;
+      `<button class="pa-all" data-all>All prana actions<span>${hDone}/${TILES.length} done ›</span></button>` +
+      `<div class="actions" style="margin-top:8px"><button class="btn" data-nvc="checkin">🫶 How am I?</button><button class="btn" data-nvc="conflict">⚡ Conflict</button></div>`;
   }
   function bindHabits(root){
     root.querySelectorAll("[data-all]").forEach(bn => bn.onclick = openActions);
+    root.querySelectorAll("[data-nvc]").forEach(bn => bn.onclick = () => bn.dataset.nvc === "conflict" ? openConflict() : openCheckin());
     root.querySelectorAll("[data-mealq]").forEach(bn => bn.onclick = () => openMealQuiz(bn.dataset.mealq ? blocks().find(b => gk(b) === bn.dataset.mealq) : null));
     root.querySelectorAll("[data-habit]").forEach(bn => bn.onclick = () => tapHabit(bn));
     root.querySelectorAll("[data-hsnd]").forEach(bn => bn.onclick = () => { QuestFx.setSound(!QuestFx.soundOn()); refreshActions(); render(); });
@@ -1877,6 +1897,197 @@
       log(`Rated ${name}: ${mqSum(q)}`); saveG();
       closeSheet(); render(); refreshActions();
     };
+  }
+
+  /* ---------- feelings and needs (Junyan, 2026-10-10: "I want it to actually help me with my
+     NVC practice") ----------
+     Two ways in. "How are you, really?" is a check-in (asked twice a day, about 1 PM and 8 PM,
+     and any time from the Heart actions): a feeling word from the CNVC inventory, how strong,
+     the need behind it, an optional line on what happened. "Conflict" walks Rosenberg's four
+     steps on the spot (ground first, then observation, feelings, needs, a guess at theirs, a
+     request) and sends the result to his Giraffe Practice database in Notion. Both read prana
+     and body from the feelings (nvc-words.js has each family's amounts; d12). The words he
+     uses are counted across days, so the app can show his vocabulary growing and offer words
+     he has not used yet. */
+  const NV = window.NVC_WORDS || { families:[], needs:[], thoughts:[] };
+  const NV_FAM = w => NV.families.find(f => f.words.includes(w) || f.name.toLowerCase() === w);
+  const NV_STRONG = [["a little", .5], ["clearly", 1], ["strongly", 1.5]];
+  const nvLabel = w => w.replace(/-/g, " ");
+  const nvVocab = () => (G.nvc = G.nvc || { words:{}, needs:{} });
+  function nvScore(words, strong = 1){
+    const fams = [...new Set(words.map(NV_FAM).filter(Boolean))];
+    const k = (NV_STRONG[strong] || NV_STRONG[1])[1];
+    const p = Math.max(-10, Math.min(10, Math.round(fams.reduce((a, f) => a + f.p, 0) * k)));
+    const b = Math.max(-6, Math.min(6, Math.round(fams.reduce((a, f) => a + f.b, 0) * k)));
+    return { p, b };
+  }
+  // twice a day: about 1 PM and 8 PM, once per window
+  const NV_WINDOWS = [[12.5, 16, "afternoon"], [19.5, 23, "evening"]];
+  function nvDue(){
+    const p = tzParts(now(), { hour:"numeric", minute:"numeric", hourCycle:"h23" }), h = +p.hour + +p.minute / 60;
+    const w = NV_WINDOWS.find(([a, z]) => h >= a && h < z); if (!w) return null;
+    return (G.day.feel || []).some(x => x.kind === "checkin" && x.win === w[2]) ? null : w[2];
+  }
+  // the word picker: met or not met, a family, then the exact word. New words are marked.
+  function nvFeelPicker(sel, side, opts = {}){
+    const V = nvVocab().words, open = opts.open || "";
+    const fams = NV.families.filter(f => side === "met" ? f.met : side === "unmet" ? !f.met : true);
+    const famBtns = fams.map(f => {
+      const n = f.words.filter(w => sel.includes(w)).length;
+      return `<button class="nvc-fam${open === f.name ? " open" : ""}${n ? " on" : ""}" data-fam="${f.name}">${f.icon} ${f.name}${n ? ` · ${n}` : ""}</button>`;
+    }).join("");
+    const f = fams.find(x => x.name === open);
+    const words = f ? `<div class="nvc-words">${f.words.map(w => `<button class="nvc-w${sel.includes(w) ? " on" : ""}" data-w="${w}">${nvLabel(w)}${V[w] ? "" : `<i>new</i>`}</button>`).join("")}</div>
+      <p class="nvc-tip">Pick the exact word. ${f.words.filter(w => !V[w]).length} here you have not used yet.</p>` : "";
+    return `<div class="nvc-fams">${famBtns}</div>${words}`;
+  }
+  function nvNeedPicker(sel, open){
+    const V = nvVocab().needs;
+    const cats = NV.needs.map(c => `<button class="nvc-fam${open === c.name ? " open" : ""}${c.words.some(w => sel.includes(w)) ? " on" : ""}" data-cat="${c.name}">${c.name}</button>`).join("");
+    const c = NV.needs.find(x => x.name === open);
+    return `<div class="nvc-fams">${cats}</div>${c ? `<div class="nvc-words">${c.words.map(w => `<button class="nvc-w${sel.includes(w) ? " on" : ""}" data-n="${w}">${nvLabel(w)}${V[w] ? "" : `<i>new</i>`}</button>`).join("")}</div>` : ""}`;
+  }
+  function nvRemember(feel, needs){
+    const V = nvVocab();
+    feel.forEach(w => V.words[w] = (V.words[w] || 0) + 1);
+    needs.forEach(w => V.needs[w] = (V.needs[w] || 0) + 1);
+  }
+  const nvTotal = () => NV.families.reduce((a, f) => a + f.words.length, 0);
+  const nvList = a => a.map(nvLabel).join(", ").replace(/, ([^,]*)$/, " and $1");
+  function nvApply(entry){
+    const sc = nvScore(entry.feelings, entry.strong);
+    entry.p = sc.p; entry.b = sc.b;
+    (G.day.feel = G.day.feel || []).push(entry);
+    nvRemember(entry.feelings, entry.needs);
+    const what = entry.kind === "conflict" ? "Conflict worked through" : "Check-in";
+    if (sc.p) addPrana(sc.p, `${what}: ${nvList(entry.feelings)}`, "feelings");
+    if (sc.b) addBody(sc.b, `${what}: ${nvList(entry.feelings)}`, "feelings");
+    if (!sc.p && !sc.b) { log(`${what}: ${nvList(entry.feelings)}`); saveG(); }
+  }
+
+  // "How are you, really?"
+  function openCheckin(S = { side:"", feel:[], strong:1, needs:[], note:"", open:"", openN:"", step:0 }){
+    const sc = nvScore(S.feel, S.strong), V = nvVocab(), used = Object.keys(V.words).length;
+    const head = `<h3>🫶 How are you, really?</h3><p class="nvc-tip">Your feeling words so far: ${used} of ${nvTotal()}.</p>`;
+    let body = "";
+    if (S.step === 0) body = `<div class="win-lb">Right now my needs are</div>
+      <div class="actions"><button class="btn${S.side === "met" ? " primary" : ""}" data-side="met">🌞 Met</button><button class="btn${S.side === "unmet" ? " primary" : ""}" data-side="unmet">🌧️ Not met</button><button class="btn${S.side === "both" ? " primary" : ""}" data-side="both">Both</button></div>
+      ${S.side ? `<div class="win-lb">I feel ${S.feel.length ? `<b>${esc(nvList(S.feel))}</b>` : "…"}</div>${nvFeelPicker(S.feel, S.side === "both" ? "" : S.side, { open:S.open })}` : ""}
+      ${S.feel.length ? `<div class="win-lb">How strongly</div><div class="actions">${NV_STRONG.map(([t], i) => `<button class="btn${S.strong === i ? " primary" : ""}" data-strong="${i}">${t}</button>`).join("")}</div>
+        <div class="actions"><button class="btn primary" data-next>Next: the need behind it ›</button></div>` : ""}`;
+    else body = `<div class="win-lb">I feel ${esc(nvList(S.feel))} because I need ${S.needs.length ? `<b>${esc(nvList(S.needs))}</b>` : "…"}</div>
+      ${nvNeedPicker(S.needs, S.openN)}
+      <div class="win-lb">What happened (what a camera would see)</div>
+      <textarea id="nvNote" rows="2" class="nvc-in" placeholder="Optional">${esc(S.note)}</textarea>
+      <div class="actions"><button class="btn ghost" data-back>‹ Back</button><button class="btn primary" id="nvOk" ${S.needs.length ? "" : "disabled"}>Save · ${esc(mqSum(sc))}</button></div>`;
+    openSheet(head + body + `<div class="actions"><button class="btn ghost" id="nvX">Not now</button></div>`, true);
+    const sh = $("sheet"), keep = () => { const n = $("nvNote"); if (n) S.note = n.value; };
+    const again = () => { keep(); const top = sh.scrollTop; openCheckin(S); $("sheet").scrollTop = top; };
+    sh.querySelectorAll("[data-side]").forEach(b => b.onclick = () => { S.side = b.dataset.side; S.open = ""; again(); });
+    sh.querySelectorAll("[data-fam]").forEach(b => b.onclick = () => { S.open = S.open === b.dataset.fam ? "" : b.dataset.fam; again(); });
+    sh.querySelectorAll("[data-w]").forEach(b => b.onclick = () => { const w = b.dataset.w; S.feel = S.feel.includes(w) ? S.feel.filter(x => x !== w) : [...S.feel, w].slice(-3); again(); });
+    sh.querySelectorAll("[data-strong]").forEach(b => b.onclick = () => { S.strong = +b.dataset.strong; again(); });
+    sh.querySelectorAll("[data-cat]").forEach(b => b.onclick = () => { S.openN = S.openN === b.dataset.cat ? "" : b.dataset.cat; again(); });
+    sh.querySelectorAll("[data-n]").forEach(b => b.onclick = () => { const w = b.dataset.n; S.needs = S.needs.includes(w) ? S.needs.filter(x => x !== w) : [...S.needs, w].slice(-2); again(); });
+    const nx = sh.querySelector("[data-next]"); if (nx) nx.onclick = () => { S.step = 1; again(); };
+    const bk = sh.querySelector("[data-back]"); if (bk) bk.onclick = () => { S.step = 0; again(); };
+    $("nvX").onclick = closeSheet;
+    if ($("nvOk")) $("nvOk").onclick = () => {
+      keep();
+      nvApply({ id:"f" + Date.now(), kind:"checkin", at:now().toISOString(), win:nvDue() || "", feelings:S.feel, strong:S.strong, needs:S.needs, observation:S.note.trim() });
+      closeSheet(); render(); refreshActions();
+    };
+  }
+
+  // "Conflict": Rosenberg's four steps on the spot, then into Notion
+  const NV_EVAL = /\b(always|never|you are|you're|should|rude|lazy|selfish|ignored|on purpose|every time|again)\b/i;
+  const NV_DEMAND = /\b(stop|don'?t|never|quit|have to|must)\b/i;
+  const NV_DEMAND_MSG = "Say what you do want, not what to stop. Something they can do now.";
+  const nvEvalMsg = t => `"${(t.match(NV_EVAL) || [""])[0]}" sounds like an evaluation. What exactly did they say or do?`;
+  const NV_STEPS = ["Ground", "What happened", "I feel", "I need", "Their side", "My request", "Say it"];
+  function nvTranslation(S){
+    const o = S.obs.trim().replace(/^when\s+/i, "").replace(/^(?!I\b)\w/, c => c.toLowerCase());
+    const mine = `When ${o || "…"}, I feel ${nvList(S.feel) || "…"} because I need ${nvList(S.needs) || "…"}.${S.req.trim() ? ` ${S.req.trim()}` : ""}`;
+    const theirs = S.tFeel.length || S.tNeeds.length ? `\nAre you feeling ${nvList(S.tFeel) || "…"} because you need ${nvList(S.tNeeds) || "…"}?` : "";
+    return mine + theirs;
+  }
+  function openConflict(S = { step:0, who:"", obs:"", feel:[], needs:[], tFeel:[], tNeeds:[], req:"Would you be willing to ", say:"", open:"", openN:"", strong:1 }){
+    const pills = `<div class="nvc-steps">${NV_STEPS.map((t, i) => `<span class="${i === S.step ? "on" : i < S.step ? "done" : ""}">${t}</span>`).join("")}</div>`;
+    const nav = (next, ok = true) => `<div class="actions">${S.step ? `<button class="btn ghost" data-back>‹ Back</button>` : ""}<button class="btn primary" data-go ${ok ? "" : "disabled"}>${next}</button></div>`;
+    let body = "";
+    if (S.step === 0) body = `<p><b>Breathe first.</b> Don't just do something, stand there. Listen to understand, not to respond.</p>
+      <p>If you are losing control: <i>"I need a moment to step away, is that okay with you?"</i> Twenty minutes is enough.</p>
+      <div class="actions"><button class="btn" id="nvAway">🚶 Step away now</button></div>${nav("I'm calm enough, start ›")}`;
+    if (S.step === 1) { const ev = NV_EVAL.test(S.obs); body = `<div class="win-lb">With</div><input id="nvWho" class="nvc-in" value="${esc(S.who)}" placeholder="Who (optional)">
+      <div class="win-lb">When I saw or heard</div><textarea id="nvObs" rows="3" class="nvc-in" placeholder="Only what a camera would record: the words said, the thing done.">${esc(S.obs)}</textarea>
+      <p class="nvc-warn" id="nvObsW">${ev ? nvEvalMsg(S.obs) : ""}</p>${nav("Next: what I feel ›", !!S.obs.trim())}`; }
+    if (S.step === 2) body = `<div class="win-lb">I feel ${S.feel.length ? `<b>${esc(nvList(S.feel))}</b>` : "…"}</div>${nvFeelPicker(S.feel, "unmet", { open:S.open })}
+      <div class="win-lb">Thinking a word like these? Tap it to find the feeling under it</div>
+      <div class="nvc-words">${NV.thoughts.map(t => `<button class="nvc-w thought" data-t="${t.w}">"${t.w}"</button>`).join("")}</div>
+      ${S.hint ? `<p class="nvc-tip">"${esc(S.hint.w)}" is a thought about them. Underneath it you may feel <b>${esc(nvList(S.hint.feel))}</b>, needing <b>${esc(nvList(S.hint.need))}</b>. Tap the words that fit.</p>
+        <div class="nvc-words">${S.hint.feel.map(w => `<button class="nvc-w${S.feel.includes(w) ? " on" : ""}" data-w="${w}">${nvLabel(w)}</button>`).join("")}</div>` : ""}
+      ${S.feel.length ? `<div class="win-lb">How strongly</div><div class="actions">${NV_STRONG.map(([t], i) => `<button class="btn${S.strong === i ? " primary" : ""}" data-strong="${i}">${t}</button>`).join("")}</div>` : ""}
+      ${nav("Next: what I need ›", S.feel.length > 0)}`;
+    if (S.step === 3) body = `<div class="win-lb">I feel ${esc(nvList(S.feel))} because I need ${S.needs.length ? `<b>${esc(nvList(S.needs))}</b>` : "…"}</div>
+      ${nvNeedPicker(S.needs, S.openN)}${S.hint && S.hint.need.length ? `<p class="nvc-tip">From "${esc(S.hint.w)}": maybe ${esc(nvList(S.hint.need))}.</p><div class="nvc-words">${S.hint.need.map(w => `<button class="nvc-w${S.needs.includes(w) ? " on" : ""}" data-n="${w}">${nvLabel(w)}</button>`).join("")}</div>` : ""}
+      <p class="nvc-tip">A need is never about a person doing something. "I need you to listen" is a request; the need is to be heard.</p>${nav("Next: their side ›", S.needs.length > 0)}`;
+    if (S.step === 4) body = `<p>Giraffe ears: guess what is alive in ${esc(S.who || "them")}. Silent guesses count.</p>
+      <div class="win-lb">They may feel ${S.tFeel.length ? `<b>${esc(nvList(S.tFeel))}</b>` : "…"}</div>${nvFeelPicker(S.tFeel, "", { open:S.tOpen })}
+      <div class="win-lb">Because they need ${S.tNeeds.length ? `<b>${esc(nvList(S.tNeeds))}</b>` : "…"}</div>${nvNeedPicker(S.tNeeds, S.tOpenN).replace(/data-cat=/g, "data-tcat=").replace(/data-n=/g, "data-tn=")}
+      ${nav(S.tFeel.length || S.tNeeds.length ? "Next: my request ›" : "Skip ›")}`;
+    if (S.step === 5) { const dem = NV_DEMAND.test(S.req); body = `<div class="win-lb">My request</div>
+      <textarea id="nvReq" rows="2" class="nvc-in">${esc(S.req)}</textarea>
+      <p class="nvc-warn" id="nvReqW">${dem ? NV_DEMAND_MSG : ""}</p><p class="nvc-tip">Positive, doable, now. If a no would upset you, it is a demand.</p>
+      ${nav("Next: say it ›", S.req.trim().length > 10)}`; }
+    if (S.step === 6) body = `<div class="win-lb">Giraffe translation</div>
+      <textarea id="nvSay" rows="5" class="nvc-in">${esc(S.say || nvTranslation(S))}</textarea>
+      <p class="nvc-tip">Change any word so it sounds like you. Saving puts it in your Giraffe Practice in Notion.</p>
+      <div class="actions"><button class="btn ghost" data-back>‹ Back</button><button class="btn primary" id="nvSave">Save · ${esc(mqSum(nvScore(S.feel, S.strong)))}</button></div>`;
+    openSheet(`<h3>⚡ Conflict</h3>${pills}${body}<div class="actions"><button class="btn ghost" id="nvX">Close</button></div>`, true);
+    const sh = $("sheet");
+    const keep = () => { if ($("nvWho")) S.who = $("nvWho").value; if ($("nvObs")) S.obs = $("nvObs").value; if ($("nvReq")) S.req = $("nvReq").value; if ($("nvSay")) S.say = $("nvSay").value; };
+    const again = () => { keep(); const top = sh.scrollTop; openConflict(S); $("sheet").scrollTop = top; };
+    const tog = (arr, w, max) => arr.includes(w) ? arr.filter(x => x !== w) : [...arr, w].slice(-max);
+    sh.querySelectorAll("[data-fam]").forEach(b => b.onclick = () => { if (S.step === 4) S.tOpen = S.tOpen === b.dataset.fam ? "" : b.dataset.fam; else S.open = S.open === b.dataset.fam ? "" : b.dataset.fam; again(); });
+    sh.querySelectorAll("[data-w]").forEach(b => b.onclick = () => { if (S.step === 4) S.tFeel = tog(S.tFeel, b.dataset.w, 3); else S.feel = tog(S.feel, b.dataset.w, 3); again(); });
+    sh.querySelectorAll("[data-t]").forEach(b => b.onclick = () => { S.hint = NV.thoughts.find(t => t.w === b.dataset.t); again(); });
+    sh.querySelectorAll("[data-strong]").forEach(b => b.onclick = () => { S.strong = +b.dataset.strong; again(); });
+    sh.querySelectorAll("[data-cat]").forEach(b => b.onclick = () => { S.openN = S.openN === b.dataset.cat ? "" : b.dataset.cat; again(); });
+    sh.querySelectorAll("[data-n]").forEach(b => b.onclick = () => { S.needs = tog(S.needs, b.dataset.n, 2); again(); });
+    sh.querySelectorAll("[data-tcat]").forEach(b => b.onclick = () => { S.tOpenN = S.tOpenN === b.dataset.tcat ? "" : b.dataset.tcat; again(); });
+    sh.querySelectorAll("[data-tn]").forEach(b => b.onclick = () => { S.tNeeds = tog(S.tNeeds, b.dataset.tn, 2); again(); });
+    ["nvObs", "nvReq"].forEach(id => { const el = $(id); if (el) el.oninput = () => {
+      keep(); const go = sh.querySelector("[data-go]"); if (go) go.disabled = id === "nvObs" ? !S.obs.trim() : S.req.trim().length <= 10;
+      if (id === "nvObs") $("nvObsW").textContent = NV_EVAL.test(S.obs) ? nvEvalMsg(S.obs) : "";
+      else $("nvReqW").textContent = NV_DEMAND.test(S.req) ? NV_DEMAND_MSG : "";
+    }; });
+    const go = sh.querySelector("[data-go]"); if (go) go.onclick = () => { keep(); S.step++; if (S.step === 6) S.say = ""; again(); };
+    const bk = sh.querySelector("[data-back]"); if (bk) bk.onclick = () => { keep(); S.step--; again(); };
+    if ($("nvAway")) $("nvAway").onclick = () => { log("Stepped away to calm down (Conflict)"); saveG(); closeSheet(); render(); };
+    $("nvX").onclick = closeSheet;
+    if ($("nvSave")) $("nvSave").onclick = () => {
+      keep();
+      const e = { id:"c" + Date.now(), kind:"conflict", at:now().toISOString(), who:S.who.trim(), observation:S.obs.trim(), feelings:S.feel, strong:S.strong,
+        needs:S.needs, theirFeelings:S.tFeel, theirNeeds:S.tNeeds, request:S.req.trim(), translation:(S.say || nvTranslation(S)).trim() };
+      nvApply(e);
+      (G.nvcOut = G.nvcOut || []).push(e); saveG();
+      nvSend();
+      closeSheet(); render(); refreshActions();
+    };
+  }
+  // conflicts go to Notion through still-api; anything that could not go yet waits in G.nvcOut
+  async function nvSend(){
+    if (DRY || !questKey() || !(G.nvcOut || []).length) return;
+    for (const e of [...G.nvcOut]) {
+      try {
+        const r = await qfetch("/quest/nvc", { method:"POST", body:JSON.stringify({ entry:e }) });
+        const done = r.entry && r.entry.notion;
+        G.nvcOut = G.nvcOut.filter(x => x.id !== e.id);
+        if (done) log(`Saved to Giraffe Practice: ${e.observation.slice(0, 40)}`);
+        else log(`Giraffe Practice is waiting on Notion: ${r.entry && r.entry.err || "not uploaded yet"}`);
+        saveG();
+      } catch { break; }   // offline: try again on the next pull
+    }
   }
 
   // Sadhana (d86): Shambhavi with a 21-minute timer that starts with the tap
