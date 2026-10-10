@@ -22,13 +22,12 @@
     { id: "hud", title: "", pick: [".hud", ".status"] },
     { id: "being", title: "", pick: ["#being"] },
     { id: "now", title: "Right now", pick: ["#brief", "#loose", "#main", "#nextLine"] },
-    { id: "quick", title: "Quick slots", pick: ["#questQuick"] },
     { id: "habits", title: "", pick: ["#habits"] },
   ];
   const DEFAULT = {
     hud: { x: 0, y: 0, w: 12, h: 2 },
-    being: { x: 0, y: 2, w: 4, h: 6 },
-    now: { x: 0, y: 8, w: 4, h: 5 }, quick: { x: 0, y: 13, w: 4, h: 3 }, log: { x: 0, y: 16, w: 4, h: 4 },
+    being: { x: 0, y: 2, w: 4, h: 7 },
+    now: { x: 0, y: 9, w: 4, h: 7 }, log: { x: 0, y: 16, w: 4, h: 4 },   // quick slots off (2026-10-10)
     mtn: { x: 4, y: 2, w: 5, h: 8 }, skills: { x: 4, y: 10, w: 5, h: 6 },
     habits: { x: 9, y: 2, w: 3, h: 14 },
   };

@@ -108,11 +108,11 @@
   .bg-fig img, .bg-fill { position:absolute; inset:0; width:100%; height:100%; object-fit:contain; object-position:50% 100%; }
   .bg-glow { -webkit-mask:radial-gradient(closest-side, #000 72%, transparent); mask:radial-gradient(closest-side, #000 72%, transparent); mix-blend-mode:screen; opacity:calc(.08 + .92 * var(--p)); transform:scale(calc(1 + .22 * var(--p))); transform-origin:50% 80%;
     animation:bgPulse 5s ease-in-out infinite; transition:opacity 1.2s, transform 1.2s; }
-  .bg-body .bg-glow { opacity:calc(.06 + .7 * var(--b)); transform:scale(calc(1 + .12 * var(--b))); }
+  .bg-body .bg-glow { opacity:calc(.04 + .45 * var(--b)); transform:scale(calc(1 + .12 * var(--b))); }
   .bg-seat { animation:bgBreath 6s ease-in-out infinite; transform-origin:50% 95%; }
   .bg-stand { filter:saturate(calc(.3 + .7 * var(--b))) brightness(calc(.62 + .38 * var(--b))); transition:filter 1.2s; }
   .bg-fill { -webkit-mask:var(--mask, url(sprites/stand.webp)) 50% 100% / contain no-repeat; mask:var(--mask, url(sprites/stand.webp)) 50% 100% / contain no-repeat;
-    background:linear-gradient(0deg, rgba(95,211,196,.42) calc(var(--b) * 100%), transparent calc(var(--b) * 100% + 1px)); mix-blend-mode:screen; }
+    background:linear-gradient(0deg, rgba(95,211,196,.12) calc(var(--b) * 100%), transparent calc(var(--b) * 100% + 1px)); mix-blend-mode:screen; }
   .bg-lab { position:relative; text-align:center; padding:4px 0 10px; line-height:1.1; }
   .bg-n { font-family:"Pixelify Sans", ui-sans-serif, system-ui; font-size:26px; font-weight:700; }
   .bg-k { font-family:"Pixelify Sans", ui-sans-serif, system-ui; font-size:12px; letter-spacing:.14em; text-transform:uppercase; opacity:.85; }
@@ -586,14 +586,10 @@
   <div class="hud">
     <div class="avatar" id="avatar"><img src="sprites/head.webp" alt=""></div>
     <div class="hud-mid">
-      <div class="hud-title"><span><b id="peakName">Prana</b></span><span id="altTxt">60%</span></div>
-      <div class="bar"><i id="xpBar"></i></div>
-      <div class="hud-title hud-body"><span>Body</span><span id="bodyTxt"></span></div>
-      <div class="bar bar-body"><i id="bodyBar"></i></div>
+      <div class="hud-title"><span><b id="peakName">Level 1</b></span></div>
       <div class="o2row" id="o2Txt"></div>
     </div>
     <div class="combo" id="combo"><div class="n" id="comboN">·</div><div class="l" id="comboL">days 70+</div></div>
-    <button class="gear" id="bagBtn" aria-label="Bag">🎒</button>
     <button class="gear" id="gear" aria-label="Settings">⚙️</button>
   </div>
   <div class="status"><span id="statusL">Loading your day…</span><span id="statusR"></span></div>
@@ -603,7 +599,6 @@
   <div id="loose"></div>
   <div id="main"></div>
   <div id="nextLine"></div>
-  <div id="questQuick" style="margin:10px 0 4px"></div>
   <div id="habits"></div>
 
   <h2><span>Skills</span><button class="add-btn" id="skillsBtn">Open</button></h2>
@@ -2536,8 +2531,8 @@
     openSheet(`<div id="bagView"></div>`, true);
     Bag.mount($("bagView"), BAG_CTX);
   }
-  $("bagBtn").onclick = openBag;
-  if (hasBag()) { try { Bag.mount(document.createElement("div"), BAG_CTX); Bag.mountQuick($("questQuick")); } catch (e) { console.warn("bag", e); } }
+  // 2026-10-10 (Junyan): the bag and quick slots are off for now ("drop the quickslots for the time being")
+  if (hasBag()) { try { Bag.mount(document.createElement("div"), BAG_CTX); } catch (e) { console.warn("bag", e); } }
 
   /* ---------- the morning (2026-10-09, d147) ----------
      One button opens a full-screen morning you tap through like stories (Junyan picked the Story
@@ -3394,15 +3389,10 @@
     const t = now(), all = blocks();
     const cur = currentOf(all, t), nxt = nextOf(all, t);
 
-    // HUD
+    // HUD: level, pillars and streak only. Prana and body live on the figures alone (Junyan, 2026-10-10: "I don't want two places to look")
     const P = Math.round(prana());
-    $("peakName").textContent = `Prana · Lv ${lvl()}`;
-    $("altTxt").textContent = `${P}%`;
-    $("xpBar").style.width = `${P}%`;
-    $("xpBar").className = P < 40 ? "low" : P < 70 ? "mid" : "";
+    $("peakName").textContent = `Level ${lvl()}`;
     drawBeing(P, Math.round(body()));
-    const Bd = Math.round(body());
-    $("bodyTxt").textContent = `${Bd}%`; $("bodyBar").style.width = `${Bd}%`;
     // today's three pillars: sadhana, body, on time
     const did = b => ["in","late"].includes(G.day.checks[gk(b)]);
     const sad = all.filter(isSadhana), bod = all.filter(b => isGym(b) || b.kind === "body"), timed = all.filter(b => needsCheck(b) && b.kind !== "open" && b.s <= t);
@@ -3568,7 +3558,7 @@
     $("trailMeta").textContent = `${fires.filter(st => st.lit).length} / ${fires.length} fires lit`;
 
     // log
-    $("dayXp").textContent = `prana ${Math.round(prana())}% · body ${Math.round(body())}%`;
+    $("dayXp").textContent = G.day.log.length ? `${G.day.log.length} today` : "";
     put("log", G.day.log.length ? G.day.log.map(e =>
       `<div><span>${fmtT(new Date(e.at))}</span><span>${esc(e.msg)}</span>${e.xp ? `<span class="xp${e.xp < 0 ? " neg" : ""}">${e.xp > 0 ? "+" : "−"}${Math.abs(e.xp)}</span>` : ""}</div>`).join("")
       : `<div><span></span><span>Nothing yet. Check in to your first quest.</span></div>`);
@@ -3610,6 +3600,6 @@
   pullAll();
 })();
 </script>
-<script src="quest-dash.js?v=20261010a"></script>
+<script src="quest-dash.js?v=20261010b"></script>
 </body>
 </html>
