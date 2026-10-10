@@ -1906,7 +1906,7 @@
      and any time from the Heart actions): a feeling word from the CNVC inventory, how strong,
      the need behind it, an optional line on what happened. "Conflict" walks Rosenberg's four
      steps on the spot (ground first, then observation, feelings, needs, a guess at theirs, a
-     request) and sends the result to his Giraffe Practice database in Notion. Both read prana
+     request) and keeps the result in his Feelings journal on still-api. Both read prana
      and body from the feelings (nvc-words.js has each family's amounts; d12). The words he
      uses are counted across days, so the app can show his vocabulary growing and offer words
      he has not used yet. */
@@ -2003,7 +2003,7 @@
     };
   }
 
-  // "Conflict": Rosenberg's four steps on the spot, then into Notion
+  // "Conflict": Rosenberg's four steps on the spot, then into the Feelings journal
   const NV_EVAL = /\b(always|never|you are|you're|should|rude|lazy|selfish|ignored|on purpose|every time|again)\b/i;
   const NV_DEMAND = /\b(stop|don'?t|never|quit|have to|must)\b/i;
   const NV_DEMAND_MSG = "Say what you do want, not what to stop. Something they can do now.";
@@ -2045,7 +2045,7 @@
       ${nav("Next: say it ›", S.req.trim().length > 10)}`; }
     if (S.step === 6) body = `<div class="win-lb">Giraffe translation</div>
       <textarea id="nvSay" rows="5" class="nvc-in">${esc(S.say || nvTranslation(S))}</textarea>
-      <p class="nvc-tip">Change any word so it sounds like you. Saving puts it in your Giraffe Practice in Notion.</p>
+      <p class="nvc-tip">Change any word so it sounds like you. Saving keeps it in your Feelings journal.</p>
       <div class="actions"><button class="btn ghost" data-back>‹ Back</button><button class="btn primary" id="nvSave">Save · ${esc(mqSum(nvScore(S.feel, S.strong)))}</button></div>`;
     openSheet(`<h3>⚡ Conflict</h3>${pills}${body}<div class="actions"><button class="btn ghost" id="nvX">Close</button></div>`, true);
     const sh = $("sheet");
@@ -2080,7 +2080,7 @@
     };
   }
   /* The feelings journal (Junyan, 2026-10-10: "make a new Db somewhere easy"): every check-in
-     and conflict is kept on still-api (/quest/nvc); conflicts also go to Notion. This sheet
+     and conflict is kept on still-api (/quest/nvc), the one store (d15: not Notion). This sheet
      reads it back with what his words show: how many he uses, the ones he leans on, the
      families he has not touched, the needs that keep coming up. */
   async function openJournal(){
@@ -2091,7 +2091,7 @@
     const usedFams = new Set(Object.keys(V.words).map(w => NV_FAM(w)).filter(Boolean).map(f => f.name));
     const untouched = NV.families.filter(f => !usedFams.has(f.name)).map(f => `${f.icon} ${f.name}`);
     const when = a => new Date(a).toLocaleString("en-US", { timeZone:PLAN_TZ || undefined, weekday:"short", month:"short", day:"numeric", hour:"numeric", minute:"2-digit" });
-    const row = e => `<div class="nvc-entry"><div class="nvc-tip">${esc(when(e.at))} · ${e.kind === "conflict" ? `⚡ Conflict${e.who ? " with " + esc(e.who) : ""}${e.notion ? " · in Notion" : ""}` : "🫶 Check-in"}${e.p ? ` · prana ${e.p > 0 ? "+" : ""}${e.p}` : ""}</div>
+    const row = e => `<div class="nvc-entry"><div class="nvc-tip">${esc(when(e.at))} · ${e.kind === "conflict" ? `⚡ Conflict${e.who ? " with " + esc(e.who) : ""}` : "🫶 Check-in"}${e.p ? ` · prana ${e.p > 0 ? "+" : ""}${e.p}` : ""}</div>
       <div>I feel <b>${esc(nvList(e.feelings || []))}</b>${(e.needs || []).length ? ` because I need <b>${esc(nvList(e.needs))}</b>` : ""}.</div>
       ${e.observation ? `<div class="nvc-tip">${esc(e.observation)}</div>` : ""}${e.request ? `<div class="nvc-tip">${esc(e.request)}</div>` : ""}</div>`;
     openSheet(`<h3>📓 Feelings journal</h3>
@@ -2105,18 +2105,14 @@
       <div class="actions"><button class="btn ghost" id="nvJX">Close</button></div>`, true);
     $("nvJX").onclick = closeSheet;
   }
-  // check-ins and conflicts go to still-api (conflicts on to Notion); anything that could not go yet waits in G.nvcOut
+  // check-ins and conflicts go to still-api (d15: not Notion); anything that could not go yet waits in G.nvcOut
   async function nvSend(){
     if (DRY || !questKey() || !(G.nvcOut || []).length) return;
     for (const e of [...G.nvcOut]) {
       try {
         const r = await qfetch("/quest/nvc", { method:"POST", body:JSON.stringify({ entry:e }) });
-        const done = r.entry && r.entry.notion;
         G.nvcOut = G.nvcOut.filter(x => x.id !== e.id);
-        if (e.kind === "conflict") {
-          if (done) log(`Saved to Giraffe Practice: ${e.observation.slice(0, 40)}`);
-          else log(`Giraffe Practice is waiting on Notion: ${r.entry && r.entry.err || "not uploaded yet"}`);
-        }
+        if (e.kind === "conflict" && r.ok) log(`Saved to your Feelings journal: ${e.observation.slice(0, 40)}`);
         saveG();
       } catch { break; }   // offline: try again on the next pull
     }
