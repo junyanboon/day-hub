@@ -283,7 +283,10 @@
     else { e.s = new Date(e.start); e.e = new Date(e.end); }
     return e;
   }
-  const visible = () => S.events.filter((e) => !S.hidden.has(e.calId)).map(deco);
+  // inside Day Quest's Change course the Dance Annex staff calendar stays out (Junyan, 2026-10-11: "it's confusing");
+  // the desktop planner still shows it
+  const offInQuest = (c) => EMBED && /staff/i.test((c && c.name) || "");
+  const visible = () => S.events.filter((e) => !S.hidden.has(e.calId) && !offInQuest(calById(e.calId))).map(deco);
   const cssVars = (e) => { const g = Q.GROUPS[Q.groupOf(e)]; return `--ring:${g.ring};--fill:${g.fill}`; };
   const writable = (e) => !!calById(e.calId)?.writable && !DRY;
 

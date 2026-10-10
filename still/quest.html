@@ -325,14 +325,16 @@
   .cal-ev { position:absolute; box-sizing:border-box; padding:4px 9px; border-radius:10px; text-align:left; overflow:hidden;
     border-left:4px solid var(--c); background:color-mix(in srgb, var(--c) 30%, rgba(255,255,255,.04)); color:var(--ink);
     font-size:13px; line-height:1.25; display:flex; flex-direction:column; gap:1px; }
-  .cal-ev b { font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding-right:30px; }
+  .cal-ev b { font-weight:600; white-space:nowrap; overflow:hidden; padding-right:30px; display:flex; align-items:center; gap:6px; min-width:0; }
+  .cal-ev b > span { overflow:hidden; text-overflow:ellipsis; }
+  .cal-ic { flex:none; }
   .cal-ev .cal-t { font-size:11.5px; color:var(--ink-soft); white-space:nowrap; }
   .cal-ev.one { flex-direction:row; align-items:center; gap:6px; padding-block:0; }
   .cal-ev.free { --c:rgba(255,255,255,.28); border-left-style:dashed; background:rgba(255,255,255,.035); color:var(--ink-soft); }
   .cal-ev.free b { font-weight:500; }
   .cal-ev.past { opacity:.62; }
   .cal-ev.now { opacity:1; box-shadow:0 0 0 1.5px var(--c), 0 6px 18px rgba(0,0,0,.28); }
-  .cal-ev.gone b { text-decoration:line-through; }
+  .cal-ev.gone b > span { text-decoration:line-through; }
   .cal-pts { position:absolute; right:8px; top:4px; font-size:11.5px; font-weight:700; color:var(--gold); }
   .cal-ev.one .cal-pts { top:50%; transform:translateY(-50%); }
   .cal-pts.neg { color:#ff9e9e; }
@@ -3507,6 +3509,9 @@
     : isSleep(b) || b.kind === "rest" ? "#9aa0cf" : b.kind === "travel" ? "#a99bff" : MAJOR.test(b.t) ? "#ff8f9e"
     : isGym(b) || ["body", "dance"].includes(b.kind) || /kayak|hike|walk|swim|surf|climb|run|cycl|bike|trek|felucca|sail/i.test(b.t) ? "#7fe3d4"
     : groupOf(b) === "work" ? "#85b7eb" : "#c3c8f0";
+  // the block's symbol in a ring of its calendar colour, like Change course shows (Junyan, 2026-10-11)
+  const calIcon = (b, c) => `<svg class="cal-ic" width="17" height="17" viewBox="-20 -20 40 40" aria-hidden="true"><circle r="17.5" fill="none" stroke="${c}" stroke-width="2.4"/>
+    <path d="${SYM[symOf(b)] || SYM["map-pin"]}" transform="translate(-11,-11) scale(.92)" fill="none" stroke="${c}" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
   function calendarHTML(stops, cur, t){
     if (!stops.length) return `<div class="empty">No blocks today.</div>`;
     const HR = 3600000, awake = stops.filter(st => !st.blocks.every(isSleep)), base = awake.length ? awake : stops;
@@ -3533,10 +3538,12 @@
       const rq = st.free ? null : (G.day.mealq || {})[gk(b0)];
       const pts = st.free ? 0 : st.blocks.reduce((a, b) => a + blockGain(b), 0) + (rq ? rq.p || 0 : 0);
       const ask = !rq && past && actRatable(b0) && t - st.e < 4 * 3600000;
-      const tick = st.lit ? "✓ " : "", time = `${fmtT(st.s)} to ${fmtT(st.e)}`;
+      // ✓ only when it is complete: closed as done, or checked in and over (not while it is still running)
+      const done = !st.free && st.blocks.some(b => G.day.closes[gk(b)] === "done") || (st.lit && past);
+      const tick = done ? "✓ " : "", time = `${fmtT(st.s)} to ${fmtT(st.e)}`;
       const cls = `cal-ev${st.free ? " free" : ""}${past ? " past" : ""}${isCur ? " now" : ""}${st.skipped ? " gone" : ""}${h < 36 ? " one" : ""}`;
       out += `<button class="${cls}" data-stop="${i}" style="${c ? `--c:${c};` : ""}top:${top}px;height:${h}px;left:calc(var(--cal-l) + (100% - var(--cal-l)) * ${lane} / ${n});width:calc((100% - var(--cal-l)) / ${n} - 3px)" aria-label="${esc(st.t)}, ${time}">` +
-        `<b>${tick}${esc(st.t)}</b><span class="cal-t">${h < 36 ? fmtT(st.s) : time}</span>${ask ? `<span class="cal-pts cal-ask" data-actq="${esc(gk(b0))}">Check ›</span>` : pts ? `<span class="cal-pts${pts < 0 ? " neg" : ""}">${pts > 0 ? "+" : ""}${pts}</span>` : ""}</button>`;
+        `<b>${calIcon(b0, c || "rgba(255,255,255,.45)")}<span>${tick}${esc(st.t)}</span></b><span class="cal-t">${h < 36 ? fmtT(st.s) : time}</span>${ask ? `<span class="cal-pts cal-ask" data-actq="${esc(gk(b0))}">Check ›</span>` : pts ? `<span class="cal-pts${pts < 0 ? " neg" : ""}">${pts > 0 ? "+" : ""}${pts}</span>` : ""}</button>`;
     }
     if (t >= a0 && t <= z0) out += `<div class="cal-now" style="top:${y(+t)}px"><span>${fmtT(t)}</span></div>`;
     return out + `</div>`;
