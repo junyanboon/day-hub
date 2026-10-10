@@ -593,7 +593,7 @@
 <script src="nvc-words.js?v=20261010a"></script>
 <script src="quest-fx.js?v=20261009b"></script>
 <script src="quest-night.js?v=20261010b"></script>
-<script src="quest-morning.js?v=20261010g"></script>
+<script src="quest-morning.js?v=20261010h"></script>
 </head>
 <body>
 <div id="sky" aria-hidden="true"><div class="sky-stars"></div><div class="sky-orb"></div>
@@ -2627,10 +2627,20 @@
     return { id, icon:h[4], label:name || h[5], name:name || h[5], mins:mins || 0, done:!!(G.day.habits || {})[id], auto:h[6] === "auto", cal:h[6] === "cal",
       gain:habitGain(id), at: at ? fmtT(at.s) : "", small: at ? `On the plan at ${fmtT(at.s)}` : mins ? `${mins} min` : h[1].replace(/\s*\(.*\)$/, "") };
   }
+  // a skill with stages that name daily practices (Yoga, d240 "based on the stages") shows those, then its
+  // some-days ones; the rest of its list stays out of the way
+  function skillToday(id){
+    const all = SKILL_TODAY[id] || [], si = planOf(id) && stageInfo(id), st = si && si.st;
+    if (!st || !st.dayHabits) return { items: all.map(([h, m, n]) => practiceItem(h, m, n)).filter(Boolean) };
+    const pick = (ids, some) => ids.map(h => all.find(x => x[0] === h) || [h, 0]).map(([h, m, n]) => practiceItem(h, m, n))
+      .filter(Boolean).map(x => some ? { ...x, small:`Some days · ${x.small}` } : x);
+    return { items: pick(st.dayHabits).concat(pick(st.some || [], true)),
+      note: `stage ${si.n} of ${si.of}${si.need ? ` · ${si.have} of ${si.need} days` : ""}` };
+  }
   const moPractices = () => {
     const act = SKILLS.filter(x => x.status === "active" && SKILL_TODAY[x.id]);
     if (!act.length) act.push({ id:"yoga", name:"Yoga" });   // skills not loaded yet (or test mode)
-    return act.map(x => [x.name, SKILL_TODAY[x.id].map(([id, m, n]) => practiceItem(id, m, n)).filter(Boolean)])
+    return act.map(x => { const t = skillToday(x.id); return [x.name + (t.note ? ` · ${t.note}` : ""), t.items]; })
       .concat([["Bryan Johnson", ["early", "bedtime"].map(id => practiceItem(id)).filter(Boolean)]]);
   };
 
@@ -2863,7 +2873,8 @@
     const pl = planOf(id), pr = progOf(id); if (!pl) return null;
     const n = Math.min(pr.stage || 1, pl.stages.length), st = pl.stages[n - 1], tg = st.target || {};
     const notes = CONTENT.filter(it => it.skill === id && it.note).length;
-    const have = tg.kind === "runs" ? pr.runs.length : tg.kind === "days" ? Object.keys(pr.days || {}).length
+    const since = tg.fromStage && pr.stageAt ? pr.stageAt.slice(0, 10) : "";   // Yoga: each stage counts its own days
+    const have = tg.kind === "runs" ? pr.runs.length : tg.kind === "days" ? Object.keys(pr.days || {}).filter(d => d >= since).length
       : tg.kind === "ticks" ? Object.keys(pr.ticks || {}).filter(k => (pl.finetune || []).includes(k)).length : tg.kind === "notes" ? notes : 0;
     const need = tg.kind === "ticks" ? (pl.finetune || []).length : tg.count || 0;
     return { n, of:pl.stages.length, st, have, need, ready: need > 0 && have >= need && n < pl.stages.length, pl, pr };
@@ -2881,6 +2892,8 @@
     if (si.ready) return { text:`Stage ${si.n} done. Ready for stage ${si.n + 1}: ${si.pl.stages[si.n].name}`, go:"open" };
     const k = (si.st.target || {}).kind;
     if (k === "runs") return { text:`Do the routine ${slot} with the guide (${si.have} of ${si.need})`, go:"guide" };
+    if (k === "days" && si.st.dayHabits) { const left = si.st.dayHabits.filter(h => !((G.day.habits || {})[h] > 0)).map(h => (HABITS.find(x => x[0] === h) || [])[5] || h);
+      return { text: left.length ? `Today: ${left.join(" and ")} (${si.have} of ${si.need} days)` : `Today counts (${si.have} of ${si.need} days)`, go:"open" }; }
     if (k === "days") return { text:`Routine ${slot} without the guide, then tick Dr Ellie ${slot === "tonight" ? "PM" : "AM"} (${si.have} of ${si.need} days)`, go:"open" };
     if (k === "ticks") { const left = (si.pl.finetune || []).find(x => !(si.pr.ticks || {})[x]); if (left) return { text:`Make this a habit: ${left}`, go:"open" }; }
     const vid = CONTENT.filter(it => it.skill === id && (it.state || "new") === "new").sort((a, b) => a.mins - b.mins)[0];
@@ -2896,7 +2909,7 @@
   // a day with the routine morning and night counts toward "without looking" (once a day)
   function practiceDay(){
     for (const [id, pl] of Object.entries(PRACTICE.plans || {})) {
-      const hs = pl.dayHabits || []; if (!hs.length || !hs.every(h => (G.day.habits || {})[h] > 0)) continue;
+      const si = stageInfo(id), hs = (si && si.st.dayHabits) || pl.dayHabits || []; if (!hs.length || !hs.every(h => (G.day.habits || {})[h] > 0)) continue;
       const pr = progOf(id), d = gameYmd(); if ((pr.days || {})[d]) continue;
       (pr.days = pr.days || {})[d] = true; practiceOp(id, { op:"day", date:d });
     }
@@ -2933,9 +2946,9 @@
     const on = (k, f) => { const el = q(`[data-pq="${k}"]`); if (el) el.onclick = f; };
     on("next", () => doNext(id));
     on("guide", () => openGuide(id));
-    on("up", () => { const pr = progOf(id); pr.stage = (pr.stage || 1) + 1; practiceOp(id, { op:"stage", stage:pr.stage });
+    on("up", () => { const pr = progOf(id); pr.stage = (pr.stage || 1) + 1; pr.stageAt = now().toISOString(); practiceOp(id, { op:"stage", stage:pr.stage });
       log(`${skillOf(id) ? skillOf(id).name : id}: stage ${pr.stage}`); saveG(); back(); });
-    on("down", () => { const pr = progOf(id); pr.stage = Math.max(1, (pr.stage || 1) - 1); practiceOp(id, { op:"stage", stage:pr.stage }); back(); });
+    on("down", () => { const pr = progOf(id); pr.stage = Math.max(1, (pr.stage || 1) - 1); pr.stageAt = now().toISOString(); practiceOp(id, { op:"stage", stage:pr.stage }); back(); });
     sh.querySelectorAll("[data-tick]").forEach(cb => cb.onchange = () => { const pl = planOf(id), item = pl.finetune[+cb.dataset.tick], pr = progOf(id);
       if (cb.checked) pr.ticks[item] = true; else delete pr.ticks[item]; practiceOp(id, { op:"tick", item, on:cb.checked }); });
     const ans = {};
