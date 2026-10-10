@@ -48,7 +48,7 @@
     if (!n || !n.date) return o;
     if (o.date !== n.date) return ms(o.date) > ms(n.date) ? o : n;
     const out = { ...o, ...n };
-    for (const k of ["checks", "closes", "missed", "caches", "started", "spent", "work"])
+    for (const k of ["checks", "closes", "missed", "caches", "started", "spent", "work", "meals", "mealq"])
       if (o[k] || n[k]) out[k] = { ...obj(o[k]), ...obj(n[k]) };
     if (o.habits || n.habits) {
       const h = { ...obj(o.habits) };

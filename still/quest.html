@@ -558,7 +558,7 @@
 </style>
 <script src="keeps.js?v=20261009k"></script>
 <script src="bag.js?v=20261009k"></script>
-<script src="quest-merge.js?v=20261009b"></script>
+<script src="quest-merge.js?v=20261010a"></script>
 <script src="quest-fx.js?v=20261009b"></script>
 <script src="quest-night.js?v=20261010a"></script>
 </head>
@@ -969,7 +969,8 @@
      spends more. Mostly ending days high moves him up; mostly low moves him down. */
   /* The habit list (Junyan, 2026-10-08: "very specific, not generic", water is one
      250 ml cup a tap). [id, full label, prana, max a day, icon, tile label, flags, group].
-     flags: "flat" = every tap gives the same, "cal" = no tile, only a calendar block
+     flags: "flat" = every tap gives the same, "quiz" = no tile, the meal quiz counts it
+     (2026-10-10), "cal" = no tile, only a calendar block
      naming it pays it (2026-10-10), "auto" = the game counts it from the
      calendar and check-ins (evening ones pay out the next morning). Ids that existed
      before keep their meaning except water, now 250 ml. No movement here: training,
@@ -979,7 +980,7 @@
      added; Dr Ellie split AM and PM; Blueprint meal = Super Veggie or Nutty Pudding. */
   const HABITS = [
     ["water", "Water, one 250 ml cup", 0.6, 12, "💧", "250 ml water", "flat", "Morning"],
-    ["protein", "30 g protein at breakfast", 3, 1, "🍳", "30 g protein AM", "", "Morning"],
+    ["protein", "30 g protein at breakfast", 3, 1, "🍳", "30 g protein AM", "quiz", "Morning"],
     ["supps", "Morning supplements taken", 1, 1, "💊", "Supplements", "", "Morning"],
     ["neem", "Neem and turmeric, every morning", 3, 1, "🌿", "Neem + turmeric", "", "Morning"],
     ["mouthAm", "Dr Ellie's mouthcare routine in the morning, the whole routine in one tap", 2, 1, "🦷", "Dr Ellie AM", "", "Morning"],
@@ -992,16 +993,16 @@
     ["bhuta", "Bhuta Shuddhi", 6, 1, "🔥", "Bhuta Shuddhi", "cal", "Practice"],
     ["barefoot", "Walk barefoot on natural ground (soil, grass or sand), daily, any length; most important around the new moon", 3, 1, "🦶", "Barefoot walk", "", "Practice"],
     ["nadi", "Nadi Shuddhi, 5 min", 3, 2, "🌬️", "Nadi Shuddhi 5'", "", "Practice"],
-    ["blueprint", "Blueprint meal: Super Veggie or Nutty Pudding", 6, 2, "🥗", "Veggie / Pudding", "", "Food"],
-    ["legumes", "150 g cooked beans or lentils", 3, 1, "🫘", "150 g lentils", "", "Food"],
-    ["veg", "250 g vegetables (about 2 big handfuls)", 3, 2, "🥦", "250 g veg", "", "Food"],
-    ["greens", "50 g leafy greens (a big handful)", 2, 1, "🥬", "50 g greens", "", "Food"],
-    ["evoo", "1 tbsp (15 ml) extra virgin olive oil", 2, 2, "🫒", "15 ml olive oil", "", "Food"],
-    ["nuts", "30 g nuts (walnuts, almonds, macadamia)", 2, 1, "🥜", "30 g nuts", "", "Food"],
-    ["berries", "100 g berries", 2, 1, "🫐", "100 g berries", "", "Food"],
-    ["seeds", "1 tbsp ground flax or chia", 1, 1, "🌱", "1 tbsp flax/chia", "", "Food"],
-    ["ferment", "Fermented food: 100 g yogurt, kefir or sauerkraut", 2, 1, "🥛", "100 g fermented food", "", "Food"],
-    ["heavy", "Heavy meal: tap it honestly when you ate too much or too heavy (lowers prana)", 5, 1, "🥘", "Heavy meal", "neg", "Food"],
+    ["blueprint", "Blueprint meal: Super Veggie or Nutty Pudding", 6, 2, "🥗", "Veggie / Pudding", "quiz", "Food"],
+    ["legumes", "150 g cooked beans or lentils", 3, 1, "🫘", "150 g lentils", "quiz", "Food"],
+    ["veg", "250 g vegetables (about 2 big handfuls)", 3, 2, "🥦", "250 g veg", "quiz", "Food"],
+    ["greens", "50 g leafy greens (a big handful)", 2, 1, "🥬", "50 g greens", "quiz", "Food"],
+    ["evoo", "1 tbsp (15 ml) extra virgin olive oil", 2, 2, "🫒", "15 ml olive oil", "quiz", "Food"],
+    ["nuts", "30 g nuts (walnuts, almonds, macadamia)", 2, 1, "🥜", "30 g nuts", "quiz", "Food"],
+    ["berries", "100 g berries", 2, 1, "🫐", "100 g berries", "quiz", "Food"],
+    ["seeds", "1 tbsp ground flax or chia", 1, 1, "🌱", "1 tbsp flax/chia", "quiz", "Food"],
+    ["ferment", "Fermented food: 100 g yogurt, kefir or sauerkraut", 2, 1, "🥛", "100 g fermented food", "quiz", "Food"],
+    ["heavy", "Heavy meal: tap it honestly when you ate too much or too heavy (lowers prana)", 5, 1, "🥘", "Heavy meal", "quiz", "Food"],
     ["xylitol", "Xylitol, 1 g (one mint or gum) after eating or drinking; Dr Ellie: 6 to 10 g a day", 0.6, 10, "🍬", "Xylitol 1 g", "flat", "Food"],
     ["lamp", "Light an oil lamp (natural oil, like sesame or ghee) before sleep", 2, 1, "🪔", "Oil lamp", "", "Evening"],
     ["mouth", "Dr Ellie's mouthcare routine at night, the whole routine in one tap", 2, 1, "🦷", "Dr Ellie PM", "", "Evening"],
@@ -1015,7 +1016,7 @@
   function habitGain(id){
     const h = HABITS.find(x => x[0] === id); if (!h) return 0;
     const n = (G.day.habits || {})[id] || 0;
-    if (h[6] === "neg") return n >= h[3] ? 0 : -h[2];   // a heavy meal lowers prana, the same each time
+    if (id === "heavy") return n >= h[3] ? 0 : -h[2];   // a heavy meal lowers prana, the same each time
     // full value again (d202): the two meters keep tiredness out of prana
     return n >= h[3] ? 0 : Math.max(1, Math.round(h[2] * (h[6] === "flat" ? 1 : (DIM[n] ?? .2)) * gainMult()));
   }
@@ -1230,7 +1231,7 @@
   // d206: his pixel icons replace the emoji as they arrive (still/sprites/icons/<id>.webp); add the id here
   const ICONS = new Set([]);
   const hIcon = (id, icon) => ICONS.has(id) ? `<img class="hi-img" src="sprites/icons/${id}.webp" alt="">` : icon;
-  const TILES = HABITS.filter(h => h[6] !== "cal");   // the calendar-only practices get no tile
+  const TILES = HABITS.filter(h => h[6] !== "cal" && h[6] !== "quiz");   // calendar practices and meal-quiz food get no tile
   const h7 = id => (HABITS.find(x => x[0] === id) || [])[7];
   function habitTile([id, full, , max, icon, short, flag]){
     const n = G.day.habits[id] || 0, g = habitGain(id), auto = flag === "auto", earned = auto && (G.day.earn || {})[id];
@@ -1243,11 +1244,11 @@
   }
   function habitsHTML(){
     const tile = habitTile;
-    const hDone = TILES.filter(h => h[6] !== "neg" && (G.day.habits[h[0]] || 0) > 0).length;
-    return `<div class="hhead"><span class="eyebrow">Prana actions · level ${lvl()} · ${hDone}/${TILES.length - 1}</span>` +
+    const hDone = TILES.filter(h => (G.day.habits[h[0]] || 0) > 0).length;
+    return `<div class="hhead"><span class="eyebrow">Prana actions · level ${lvl()} · ${hDone}/${TILES.length}</span>` +
       `<button class="hsnd" data-hsnd aria-label="Tap sounds">${window.QuestFx && QuestFx.soundOn() ? "🔊" : "🔇"}</button></div>` +
       `<div class="hkey"><b class="mp">gold</b> fills prana (Sadhguru) · <b class="mb">teal</b> fills body (Bryan Johnson)</div>` +
-      ["Morning", "Practice", "Food", "Evening"].map(gr => `<div class="hgrp"><div class="hgl">${gr}</div><div class="hgrid">${TILES.filter(h => h[7] === gr).map(tile).join("")}</div></div>`).join("");
+      ["Morning", "Practice", "Food", "Evening"].map(gr => `<div class="hgrp"><div class="hgl">${gr}</div><div class="hgrid">${gr === "Food" ? `<button class="htile" data-mealq=""><span class="hi">🍽️</span><span class="hl">Rate a meal</span><b class="mp">quiz</b></button>` : ""}${TILES.filter(h => h[7] === gr).map(tile).join("")}</div></div>`).join("");
   }
   /* Three picks for right now (Junyan, 2026-10-09: "only suggestions for this exact
      moment, 3 suggestions; the rest behind an All Actions button"). Each action has
@@ -1267,7 +1268,7 @@
     const afterMeal = all.some(b => isMeal(b) && +b.e <= +t && +t - +b.e <= 45 * 60000);
     const out = [];
     HABITS.forEach(([id, , , max, , , flag], k) => {
-      const w = WHEN[id]; if (!w || flag === "auto" || flag === "cal" || !habitGain(id) || h < w[0] || h > w[1]) return;
+      const w = WHEN[id]; if (!w || flag === "auto" || flag === "cal" || flag === "quiz" || !habitGain(id) || h < w[0] || h > w[1]) return;
       let sc = 10 + habitGain(id) / 3 - k * 0.01;
       if (w[1] - h < 1.5) sc += 4;                                     // its window closes soon
       if (FOOD.has(id)) sc += meal ? 9 : -4;
@@ -1286,13 +1287,16 @@
     const key = `${G.day.date}|${tzParts(now(), { hour:"numeric", hourCycle:"h23" }).hour}|${JSON.stringify(G.day.habits)}`;
     if (!SUGG || SUGG.key !== key) SUGG = { key, list: suggestions() };
     const hDone = TILES.filter(h => (G.day.habits[h[0]] || 0) > 0).length;
+    const mq = unratedMeal();
     return `<div class="hhead"><span class="eyebrow">Prana actions · right now</span>` +
       `<button class="hsnd" data-hsnd aria-label="Tap sounds">${window.QuestFx && QuestFx.soundOn() ? "🔊" : "🔇"}</button></div>` +
+      (mq ? `<button class="pa-all" style="margin:0 0 10px" data-mealq="${esc(gk(mq))}">🍽️ How was ${esc(shortName(mq))}?<span>Rate it ›</span></button>` : "") +
       (SUGG.list.length ? `<div class="hgrid sugg">${SUGG.list.map(habitTile).join("")}</div>` : `<div class="hint" style="margin:8px 2px">Nothing pressing right now.</div>`) +
       `<button class="pa-all" data-all>All prana actions<span>${hDone}/${TILES.length} done ›</span></button>`;
   }
   function bindHabits(root){
     root.querySelectorAll("[data-all]").forEach(bn => bn.onclick = openActions);
+    root.querySelectorAll("[data-mealq]").forEach(bn => bn.onclick = () => openMealQuiz(bn.dataset.mealq ? blocks().find(b => gk(b) === bn.dataset.mealq) : null));
     root.querySelectorAll("[data-habit]").forEach(bn => bn.onclick = () => tapHabit(bn));
     root.querySelectorAll("[data-hsnd]").forEach(bn => bn.onclick = () => { QuestFx.setSound(!QuestFx.soundOn()); refreshActions(); render(); });
   }
@@ -1794,7 +1798,7 @@
       <div class="win-lb">Eat with attention</div>
       <p>⏳ Sit with the food and wait two minutes before the first bite, so you eat by choice, not by compulsion (Sadhguru).</p>
       <button class="wck${M.phone ? " on" : ""}" id="mPhone"><span class="bx">${M.phone ? "✓" : ""}</span>Phone face down until I'm done</button>
-      <div class="actions"><button class="btn" id="mBp">🥗 Super Veggie or Nutty Pudding${habitGain("blueprint") ? ` +${habitGain("blueprint")}` : " (done)"}</button></div>
+      <div class="actions"><button class="btn" id="mBp">${(G.day.mealq || {})[k] ? `🍽️ Rated: ${mqSum(G.day.mealq[k])}` : "🍽️ Rate this meal"}</button></div>
       <div class="actions"><button class="btn ghost" id="mEdit">Change time or name</button></div>`, true);
     $("sheet").querySelectorAll("[data-plate]").forEach(bn => bn.onclick = () => {
       M.plate[bn.dataset.plate] = !M.plate[bn.dataset.plate];
@@ -1803,7 +1807,76 @@
     });
     $("mPhone").onclick = () => { M.phone = !M.phone; saveG(); openMeal(b); };
     $("mEdit").onclick = () => openEdit(b);
-    $("mBp").onclick = () => { logHabit("blueprint"); openMeal(b); };
+    $("mBp").onclick = () => openMealQuiz(b);
+  }
+
+  /* ---------- the meal quiz (Junyan, 2026-10-10) ----------
+     After each meal, a few taps say what it was; Confirm shares it out once. Prana by
+     Sadhguru's food rules (fresh, positive pranic, light, eaten with attention lift it;
+     negative pranic, stale and heavy lower it), Body by Bryan Johnson's Blueprint (the
+     old food tiles, same gains and daily limits, and ultra-processed food takes some).
+     Replaces the Food tiles and the Heavy meal tile. */
+  const MQ_PRANA = [
+    ["fresh", "🌿", "Fresh: cooked within 1.5 hr, or fresh raw food", 3],
+    ["pos", "🍈", "Positive pranic: fruit, ash gourd, sprouts, honey, raw veg", 3],
+    ["light", "🪶", "Stopped before full, light 30 min after", 2],
+    ["attn", "🙏", "Ate with attention: a pause first, phone away", 2],
+    ["neg", "🧄", "Negative pranic: garlic, onion, chili, asafoetida or eggplant", -3],
+    ["stale", "🧊", "Stale: leftovers, reheated, or long-stored packaged food", -2],
+    ["heavy", "🥘", "Heavy, or ate too much", 0],   // the old Heavy meal action
+  ];
+  const MQ_BODY = ["blueprint", "protein", "legumes", "veg", "greens", "evoo", "nuts", "berries", "seeds", "ferment"];
+  const MQ_JUNK = ["junk", "🍟", "Ultra-processed, fried or added sugar", -3];
+  const MQ_ONEOF = { fresh:"stale", stale:"fresh" };
+  const mqSum = q => [q.p ? `prana ${q.p > 0 ? "+" : ""}${q.p}` : "", q.b ? `body ${q.b > 0 ? "+" : ""}${q.b}` : ""].filter(Boolean).join(", ") || "no change";
+  // a meal that ended in the last 4 hours and has not been rated
+  function unratedMeal(){
+    const t = now(), q = G.day.mealq || {};
+    return blocks().filter(b => isMeal(b) && b.e <= t && t - b.e < 4 * 3600000 && !q[gk(b)]).pop() || null;
+  }
+  function mqScore(sel){
+    let p = 0, b = 0;
+    MQ_PRANA.forEach(([id, , , v]) => { if (sel[id]) p += id === "heavy" ? habitGain("heavy") : v > 0 ? Math.round(v * gainMult()) : v; });
+    MQ_BODY.forEach(id => { if (sel[id]) b += habitGain(id); });
+    if (sel.junk) b += MQ_JUNK[3];
+    return { p, b };
+  }
+  function openMealQuiz(b, sel = {}){
+    const k = b ? gk(b) : "meal:" + now().toISOString(), done = b && (G.day.mealq || {})[k];
+    const name = b ? shortName(b) : "This meal";
+    if (done) {
+      openSheet(`${b ? winHead(b) : ""}<h3>${esc(name)}: rated</h3><p>${esc(mqSum(done))}.</p>
+        <div class="actions"><button class="btn ghost" id="mqX">Done</button></div>`);
+      $("mqX").onclick = closeSheet; return;
+    }
+    const sc = mqScore(sel);
+    const row = (id, icon, txt, tag, cls) => `<button class="wck${sel[id] ? " on" : ""}" data-q="${id}"><span class="bx">${sel[id] ? "✓" : ""}</span><span>${icon} ${esc(txt)}</span><b class="${cls}" style="margin-left:auto;font-size:12px">${tag}</b></button>`;
+    const sign = v => v > 0 ? `+${v}` : `${v}`;
+    openSheet(`${b ? winHead(b) : ""}<h3>How was ${esc(name.toLowerCase() === "this meal" ? "this meal" : name)}?</h3>
+      <p>Tap what fits, then confirm.</p>
+      <div class="win-lb">Prana (Sadhguru)</div>
+      ${MQ_PRANA.map(([id, icon, txt, v]) => row(id, icon, txt, sign(id === "heavy" ? habitGain("heavy") || -5 : v > 0 ? Math.round(v * gainMult()) : v), "mp")).join("")}
+      <div class="win-lb">Body (Bryan Johnson)</div>
+      ${MQ_BODY.map(id => { const h = HABITS.find(x => x[0] === id), g = habitGain(id); return row(id, h[4], h[5], g ? sign(g) : "full today", "mb"); }).join("")}
+      ${row(MQ_JUNK[0], MQ_JUNK[1], MQ_JUNK[2], sign(MQ_JUNK[3]), "mb")}
+      <div class="actions" style="position:sticky;bottom:0"><button class="btn primary" id="mqOk">Confirm · ${esc(mqSum(sc))}</button></div>
+      <div class="actions"><button class="btn ghost" id="mqX">Not now</button></div>`, true);
+    $("sheet").querySelectorAll("[data-q]").forEach(bn => bn.onclick = () => {
+      const id = bn.dataset.q, top = $("sheet").scrollTop;
+      sel[id] = !sel[id]; if (sel[id] && MQ_ONEOF[id]) sel[MQ_ONEOF[id]] = false;
+      openMealQuiz(b, sel); $("sheet").scrollTop = top;
+    });
+    $("mqX").onclick = closeSheet;
+    $("mqOk").onclick = () => {
+      const q = mqScore(sel);
+      G.day.habits = G.day.habits || {};
+      [...MQ_BODY, "heavy"].forEach(id => { if (sel[id]) G.day.habits[id] = (G.day.habits[id] || 0) + 1; });
+      (G.day.mealq = G.day.mealq || {})[k] = { at:now().toISOString(), sel:Object.keys(sel).filter(x => sel[x]), p:q.p, b:q.b };
+      if (q.p) addPrana(q.p, `${name}: meal quiz`, "meal");
+      if (q.b) addBody(q.b, `${name}: meal quiz`, "meal");
+      log(`Rated ${name}: ${mqSum(q)}`); saveG();
+      closeSheet(); render(); refreshActions();
+    };
   }
 
   // Sadhana (d86): Shambhavi with a 21-minute timer that starts with the tap
@@ -2235,7 +2308,7 @@
      then today's practices: yogic and Bryan Johnson's (he dropped "one word for today": "I want things
      to be yogic practices / or bryan johnson practices"). They are the Prana actions habits, logged the same way. */
   const MO_PRACTICES = [["Yogic", ["kriya", "nadi"]],   // the rest come from the calendar
-    ["Bryan Johnson", ["protein", "blueprint", "early", "bedtime"]]];
+    ["Bryan Johnson", ["early", "bedtime"]]];   // food now comes through the meal quiz
   // full names, minus tour-sheet noise ("+ Extras", trailing dots)
   const moName = b => (b.t || "").replace(/\s*\+\s*extras\b/i, "").replace(/\.{2,}$/, "").replace(/^(tour|hike)\s*-\s*/i, (m, w) => w[0].toUpperCase() + w.slice(1).toLowerCase() + ": ").trim();
   function morningData(){
