@@ -596,7 +596,7 @@
 <script src="nvc-words.js?v=20261010a"></script>
 <script src="quest-fx.js?v=20261009b"></script>
 <script src="quest-night.js?v=20261010b"></script>
-<script src="quest-morning.js?v=20261010h"></script>
+<script src="quest-morning.js?v=20261011a"></script>
 </head>
 <body>
 <div id="sky" aria-hidden="true"><div class="sky-stars"></div><div class="sky-orb"></div>
@@ -2703,19 +2703,74 @@
   }
   // a skill with stages that name daily practices (Yoga, d240 "based on the stages") shows those, then its
   // some-days ones; the rest of its list stays out of the way
+  /* The week (Junyan, 2026-10-11): "every day is shambhavi and bhuta shuddhi but the rest of the yogas are
+     distributed through the week unless I am lucky enough to find a way to do a few in a day", and "set up my
+     weeks so that my workouts are also in there so it needs to be a part of my morning planning". A stage
+     names a count per week for each spread-out practice; training counts come from d109 (home weeks: 3 gym
+     sessions alternating Jack Woods Day 1 and Day 2, plus Matthew I. Smith; travel weeks at least one of each).
+     Today's pick is whatever is furthest behind for the days left in the week (Monday to Sunday). */
+  function weekDays(){ const t = Date.parse(gameYmd() + "T12:00:00Z"), dow = (new Date(t).getUTCDay() + 6) % 7;
+    return { days: Array.from({ length:7 }, (_, i) => new Date(t + (i - dow) * 86400000).toISOString().slice(0, 10)), left: 7 - dow }; }
+  const mondayOf = ymdStr => { const t = Date.parse(ymdStr + "T12:00:00Z"), dow = (new Date(t).getUTCDay() + 6) % 7; return new Date(t - dow * 86400000).toISOString().slice(0, 10); };
+  const doneToday = h => (G.day.habits || {})[h] > 0;
+  function weekDone(h, pr){
+    const { days } = weekDays(), today = gameYmd();
+    return days.filter(d => d === today ? doneToday(h) || ((pr.did || {})[d] || []).includes(h) : ((pr.did || {})[d] || []).includes(h)).length;
+  }
+  // full weeks (and this one) where every spread-out practice reached its count
+  function weeksOnTarget(weekly, pr, since){
+    const ks = Object.entries(weekly); if (!ks.length) return 0;
+    const by = {};
+    for (const [d, hs] of Object.entries(pr.did || {})) { if (d < since) continue; const w = mondayOf(d); for (const h of hs) ((by[w] = by[w] || {})[h] = (by[w][h] || 0) + 1); }
+    return Object.values(by).filter(c => ks.every(([h, q]) => (c[h] || 0) >= q)).length;
+  }
+  const homeWeek = () => { const f = z => new Date().toLocaleString("en-US", { timeZone:z, hour:"numeric", minute:"numeric", hourCycle:"h23" }); return f(TZ()) === f("America/Toronto"); };
+  const TRAINING = {
+    home: [["jw", "Jack Woods", 3, /Jack Woods/, 60], ["ms", "Matthew I. Smith", 1, /Matthew/, 45]],
+    travel: [["jw1", "Jack Woods · Day 1", 1, /Jack Woods · Day 1/, 60], ["jw2", "Jack Woods · Day 2", 1, /Jack Woods · Day 2/, 60], ["ms", "Matthew I. Smith", 1, /Matthew/, 45]],
+  };
+  function trainingWeek(){
+    const home = homeWeek(), { days, left } = weekDays(), today = gameYmd(), logs = (gymInfo.last || []).filter(w => days.includes(w.date));
+    const all = blocks();
+    const items = TRAINING[home ? "home" : "travel"].map(([key, name, q, re, mins]) => {
+      let have = logs.filter(w => re.test(w.program || "")).length;
+      const blk = all.find(b => isGym(b) && re.test(b.t.replace(/ Day/, " · Day")));
+      if (blk && ["in", "late"].includes(G.day.checks[gk(blk)]) && !logs.some(w => w.date === today && re.test(w.program || ""))) have++;
+      const prog = key === "jw" ? suggestProgram() : key === "ms" ? "Matthew I. Smith" : name;
+      const at = all.find(b => b.e > now() && isGym(b) && re.test(b.t.replace(/ Day/, " · Day")));
+      return { id:"w:" + key, icon: key === "ms" ? "🤸" : "🏋️", label:name, name:`Gym · ${prog.replace(" · ", " ")}`, mins, have, q, need: Math.max(0, q - have),
+        at: at ? fmtT(at.s) : "", cal:true, weekly:true };
+    });
+    return { home, items: pickToday(items, left) };
+  }
+  // mark today's picks: the most behind first, and anything that can no longer wait
+  function pickToday(items, left){
+    const open = items.filter(x => x.need > 0 && !x.doneToday && !x.at).sort((a, b) => b.need / left - a.need / left);
+    return items.map(x => ({ ...x, pick: !!open.length && (x === open[0] || x.need >= left) && x.need > 0 && !x.doneToday && !x.at,
+      small: `${x.have} of ${x.q} this week${x.at ? ` · on the plan at ${x.at}` : x.mins ? ` · ${x.mins} min` : ""}`, done: x.need <= 0 || !!x.doneToday }));
+  }
   function skillToday(id){
     const all = SKILL_TODAY[id] || [], si = planOf(id) && stageInfo(id), st = si && si.st;
     if (!st || !st.dayHabits) return { items: all.map(([h, m, n]) => practiceItem(h, m, n)).filter(Boolean) };
     const pick = (ids, some) => ids.map(h => all.find(x => x[0] === h) || [h, 0]).map(([h, m, n]) => practiceItem(h, m, n))
       .filter(Boolean).map(x => some ? { ...x, small:`Some days · ${x.small}` } : x);
-    return { items: pick(st.dayHabits).concat(pick(st.some || [], true)),
-      note: `stage ${si.n} of ${si.of}${si.need ? ` · ${si.have} of ${si.need} days` : ""}` };
+    const wk = Object.entries(st.weekly || {}).map(([h, q]) => { const b = all.find(x => x[0] === h) || [h, 0], p = practiceItem(b[0], b[1], b[2]); if (!p) return null;
+      const have = weekDone(h, si.pr); return { ...p, have, q, need: Math.max(0, q - have), doneToday: doneToday(h), weekly:true }; }).filter(Boolean);
+    const unit = (st.target || {}).kind === "weeks" ? "weeks" : "days";
+    return { items: pick(st.dayHabits).map(x => ({ ...x, small:`Every day · ${x.small}` })), week: pickToday(wk, weekDays().left), some: pick(st.some || [], true),
+      note: `stage ${si.n} of ${si.of}${si.need ? ` · ${si.have} of ${si.need} ${unit}` : ""}` };
   }
   const moPractices = () => {
     const act = SKILLS.filter(x => x.status === "active" && SKILL_TODAY[x.id]);
     if (!act.length) act.push({ id:"yoga", name:"Yoga" });   // skills not loaded yet (or test mode)
-    return act.map(x => { const t = skillToday(x.id); return [x.name + (t.note ? ` · ${t.note}` : ""), t.items]; })
-      .concat([["Bryan Johnson", ["early", "bedtime"].map(id => practiceItem(id)).filter(Boolean)]]);
+    const out = [];
+    for (const x of act) { const t = skillToday(x.id);
+      out.push([x.name + (t.note ? ` · ${t.note}` : ""), t.items]);
+      if (t.week && t.week.length) out.push([`${x.name} · this week`, t.week]);
+      if (t.some && t.some.length) out.push([`${x.name} · some days`, t.some]); }
+    const tw = trainingWeek();
+    out.push([`Training · ${tw.home ? "home" : "travel"} week`, tw.items]);
+    return out.concat([["Bryan Johnson", ["early", "bedtime"].map(id => practiceItem(id)).filter(Boolean)]]);
   };
 
   /* weather: Open-Meteo (free, no key). Where: the phone's location when he allows it (he is
@@ -2894,6 +2949,8 @@
     if (!Object.keys(INSIGHTS).length && questKey() && !openMorning.asked) { openMorning.asked = true;
       qfetch("/quest/insights").then(j => { INSIGHTS = j || {}; QuestMorning.redraw(); }).catch(() => {}); }
     loadWeather();
+    if (questKey() && !openMorning.gym) { openMorning.gym = true;   // this week's workouts, for Training
+      qfetch("/quest/workout").then(j => { gymInfo = j || gymInfo; QuestMorning.redraw(); }).catch(() => {}); }
     QuestMorning.open(MO_CTX);
   }
   function closeMorning(){ if (window.QuestMorning) QuestMorning.close(); }
@@ -2949,6 +3006,7 @@
     const notes = CONTENT.filter(it => it.skill === id && it.note).length;
     const since = tg.fromStage && pr.stageAt ? pr.stageAt.slice(0, 10) : "";   // Yoga: each stage counts its own days
     const have = tg.kind === "runs" ? pr.runs.length : tg.kind === "days" ? Object.keys(pr.days || {}).filter(d => d >= since).length
+      : tg.kind === "weeks" ? weeksOnTarget(st.weekly || {}, pr, since)
       : tg.kind === "ticks" ? Object.keys(pr.ticks || {}).filter(k => (pl.finetune || []).includes(k)).length : tg.kind === "notes" ? notes : 0;
     const need = tg.kind === "ticks" ? (pl.finetune || []).length : tg.count || 0;
     return { n, of:pl.stages.length, st, have, need, ready: need > 0 && have >= need && n < pl.stages.length, pl, pr };
@@ -2966,6 +3024,9 @@
     if (si.ready) return { text:`Stage ${si.n} done. Ready for stage ${si.n + 1}: ${si.pl.stages[si.n].name}`, go:"open" };
     const k = (si.st.target || {}).kind;
     if (k === "runs") return { text:`Do the routine ${slot} with the guide (${si.have} of ${si.need})`, go:"guide" };
+    if (k === "weeks") { const left = (si.st.dayHabits || []).filter(h => !((G.day.habits || {})[h] > 0)).map(h => (HABITS.find(x => x[0] === h) || [])[5] || h);
+      const wk = Object.entries(si.st.weekly || {}).map(([h, q]) => `${(HABITS.find(x => x[0] === h) || [])[5] || h} ${weekDone(h, si.pr)} of ${q}`).join(", ");
+      return { text:`${left.length ? `Today: ${left.join(" and ")}. ` : ""}This week: ${wk}${si.need ? ` (${si.have} of ${si.need} weeks)` : ""}`, go:"open" }; }
     if (k === "days" && si.st.dayHabits) { const left = si.st.dayHabits.filter(h => !((G.day.habits || {})[h] > 0)).map(h => (HABITS.find(x => x[0] === h) || [])[5] || h);
       return { text: left.length ? `Today: ${left.join(" and ")} (${si.have} of ${si.need} days)` : `Today counts (${si.have} of ${si.need} days)`, go:"open" }; }
     if (k === "days") return { text:`Routine ${slot} without the guide, then tick Dr Ellie ${slot === "tonight" ? "PM" : "AM"} (${si.have} of ${si.need} days)`, go:"open" };
@@ -2982,6 +3043,13 @@
   }
   // a day with the routine morning and night counts toward "without looking" (once a day)
   function practiceDay(){
+    for (const [id, pl] of Object.entries(PRACTICE.plans || {})) {   // a weekly practice done today is kept on its day
+      const si = stageInfo(id), pr = progOf(id), d = gameYmd();
+      for (const h of Object.keys((si && si.st.weekly) || {})) {
+        if (!((G.day.habits || {})[h] > 0) || ((pr.did || {})[d] || []).includes(h)) continue;
+        ((pr.did = pr.did || {})[d] = (pr.did[d] || [])).push(h); practiceOp(id, { op:"did", date:d, item:h });
+      }
+    }
     for (const [id, pl] of Object.entries(PRACTICE.plans || {})) {
       const si = stageInfo(id), hs = (si && si.st.dayHabits) || pl.dayHabits || []; if (!hs.length || !hs.every(h => (G.day.habits || {})[h] > 0)) continue;
       const pr = progOf(id), d = gameYmd(); if ((pr.days || {})[d]) continue;

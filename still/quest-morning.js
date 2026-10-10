@@ -20,7 +20,7 @@
     ["Does it work?", ["#ffd39a", "#e0785a", "#5b2d5e"]],
     ["Your schedule", ["#ffe1b0", "#c9786a", "#3a2c63"]],
     ["Tasks", ["#9fe3d0", "#3f8fa0", "#22305e"]],
-    ["Practices", ["#fff1c9", "#f0a35e", "#7b3f61"]],
+    ["Practices and training", ["#fff1c9", "#f0a35e", "#7b3f61"]],
     ["Your day", ["#ffc2d1", "#b8579a", "#2f2a66"]],
   ];
   const FEEL = [[1, "Wiped out"], [2, "Tired"], [3, "Okay"], [4, "Good"], [5, "Full of energy"]];
@@ -216,7 +216,7 @@
   #morning .mp-task.pick { box-shadow:inset 0 0 0 2px #ffd479; }
   #morning .mp-task.today { background:rgba(255,255,255,.9); color:#3b2a6b; }
   #morning .mp-task.later { opacity:.55; }
-  #morning .mp-pr .mp-tb { margin-top:7px; } #morning .mp-pr .mp-tb button { background:rgba(255,255,255,.9); color:#3b2a6b; }
+  #morning .mp-pr .mp-tb { margin-top:7px; } #morning .mp-pr.pick { box-shadow:inset 0 0 0 2px #ffd479; } #morning .mp-pr .mp-tb button { background:rgba(255,255,255,.9); color:#3b2a6b; }
   #morning .mp-task.done { background:rgba(143,227,176,.2); box-shadow:inset 0 0 0 2px #8fe3b0; }
   #morning .mp-note { display:block; width:100%; box-sizing:border-box; margin-top:9px; padding:10px 12px; border-radius:12px; border:0; font:inherit; font-size:15px; color:#3b2a6b; background:#fff; resize:vertical; }
   #morning .mp-note-t { margin:6px 0 0; font-size:14px; line-height:1.35; opacity:.92; }
@@ -312,15 +312,15 @@
 
   function stepPractices(D) {
     const gaps = gapsOf(D);
-    return `<div class="mp-h">Practices for your skills</div><p class="mp-lead">What your skills ask of today. Put one on the plan, or tap Done when it's done. Practices fill your prana.</p>
+    return `<div class="mp-h">Practices and training</div><p class="mp-lead">Every day first, then what your week still needs. ⭐ is today's pick: the one furthest behind. Fit in more if you can.</p>
       ${D.practices.map(([group, xs]) => `<div class="mo-kicker" style="margin-top:18px">${esc(group)}</div><div class="mo-prac">${xs.map((p) => {
         const fit = p.mins && !p.at && !p.done && gaps.find((g) => g.min >= p.mins);
         const btns = p.done || p.auto ? "" : [
           fit ? `<button data-pplan="${esc(p.id)}">Put on the plan at ${T(fit.s)}</button>` : "",
           p.action ? `<button data-pact="${esc(p.id)}">Open ›</button>` : "",
           !p.cal && !p.action ? `<button data-habit="${esc(p.id)}">Done</button>` : ""].join("");
-        return `<div class="mo-pr mp-pr${p.done ? " done" : ""}"><span class="mo-pr-i">${p.icon}</span>
-          <span class="mo-pr-t"><b>${esc(p.label)}</b><small>${esc(p.small)}${p.mins && !p.at && !p.done && !fit ? " · no free gap left" : ""}</small>${btns ? `<span class="mp-tb">${btns}</span>` : ""}</span>
+        return `<div class="mo-pr mp-pr${p.done ? " done" : p.pick ? " pick" : ""}"><span class="mo-pr-i">${p.icon}</span>
+          <span class="mo-pr-t"><b>${esc(p.label)}</b><small>${p.pick ? "⭐ Today's pick · " : ""}${esc(p.small)}${p.mins && !p.at && !p.done && !fit ? " · no free gap left" : ""}</small>${btns ? `<span class="mp-tb">${btns}</span>` : ""}</span>
           <span class="mo-pr-g">${p.done ? "✓" : p.auto ? "auto" : p.gain ? `+${p.gain}` : ""}</span></div>`; }).join("")}</div>`).join("")}`;
   }
 
