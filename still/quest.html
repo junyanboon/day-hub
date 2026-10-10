@@ -598,7 +598,7 @@
 <script src="nvc-words.js?v=20261010a"></script>
 <script src="quest-fx.js?v=20261009b"></script>
 <script src="quest-night.js?v=20261010b"></script>
-<script src="quest-morning.js?v=20261011a"></script>
+<script src="quest-morning.js?v=20261011b"></script>
 </head>
 <body>
 <div id="sky" aria-hidden="true"><div class="sky-stars"></div><div class="sky-orb"></div>
@@ -765,7 +765,10 @@
         const lastEnd = Math.max(...prev.blocks.map(b => +new Date(b.e)));
         const firstFixed = p.blocks.filter(b => !/^open space|^rest$/i.test(b.t)).map(b => +new Date(b.s));
         const cutoff = Math.max(at4, Math.min(lastEnd, at4 + 5 * 3600000, ...firstFixed));
-        if (+t < cutoff) { p = prev; day = y; }
+        // still on yesterday: today's events before the switch show on it too (2026-10-11: a midnight dinner,
+        // work and a 1 AM bus to Matrouh were missing from the calendar at 1:23 AM)
+        if (+t < cutoff) { p = { ...prev, blocks: prev.blocks.concat(p.blocks.filter(b => +new Date(b.s) < cutoff
+          && b.type !== "break" && !/^open space|^rest$/i.test(b.t) && !prev.blocks.some(x => x.s === b.s && x.t === b.t))) }; day = y; }
       }
     }
     PLAN = p;
@@ -2765,6 +2768,11 @@
     const wk = Object.entries(st.weekly || {}).map(([h, q]) => { const b = all.find(x => x[0] === h) || [h, 0], p = practiceItem(b[0], b[1], b[2]); if (!p) return null;
       const have = weekDone(h, si.pr); return { ...p, have, q, need: Math.max(0, q - have), doneToday: doneToday(h), weekly:true }; }).filter(Boolean);
     const unit = (st.target || {}).kind === "weeks" ? "weeks" : "days";
+    // travel weeks (Junyan, 2026-10-11: "travel weeks are very hard to do practices"): the daily ones stay,
+    // the spread-out ones become "if you can", with no count and no star
+    if (!homeWeek()) return { items: pick(st.dayHabits).map(x => ({ ...x, small:`Every day · ${x.small}` })), week: [],
+      some: wk.map(x => ({ ...x, small:`If you can · ${x.small}` })).concat(pick(st.some || [], true)), someTitle:"if you can (travel week)",
+      note: `stage ${si.n} of ${si.of}${si.need ? ` · ${si.have} of ${si.need} ${unit}` : ""}` };
     return { items: pick(st.dayHabits).map(x => ({ ...x, small:`Every day · ${x.small}` })), week: pickToday(wk, weekDays().left), some: pick(st.some || [], true),
       note: `stage ${si.n} of ${si.of}${si.need ? ` · ${si.have} of ${si.need} ${unit}` : ""}` };
   }
@@ -2775,7 +2783,7 @@
     for (const x of act) { const t = skillToday(x.id);
       out.push([x.name + (t.note ? ` · ${t.note}` : ""), t.items]);
       if (t.week && t.week.length) out.push([`${x.name} · this week`, t.week]);
-      if (t.some && t.some.length) out.push([`${x.name} · some days`, t.some]); }
+      if (t.some && t.some.length) out.push([`${x.name} · ${t.someTitle || "some days"}`, t.some]); }
     const tw = trainingWeek();
     out.push([`Training · ${tw.home ? "home" : "travel"} week`, tw.items]);
     return out.concat([["Bryan Johnson", ["early", "bedtime"].map(id => practiceItem(id)).filter(Boolean)]]);
