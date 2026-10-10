@@ -109,8 +109,8 @@
   .bg-glow { -webkit-mask:radial-gradient(closest-side, #000 72%, transparent); mask:radial-gradient(closest-side, #000 72%, transparent); mix-blend-mode:screen; opacity:calc(.08 + .92 * var(--p)); transform:scale(calc(1 + .22 * var(--p))); transform-origin:50% 80%;
     animation:bgPulse 5s ease-in-out infinite; transition:opacity 1.2s, transform 1.2s; }
   .bg-body .bg-glow { opacity:calc(.04 + .45 * var(--b)); transform:scale(calc(1 + .12 * var(--b))); }
-  .bg-seat { animation:bgBreath 6s ease-in-out infinite; transform-origin:50% 95%; }
-  .bg-stand { filter:saturate(calc(.3 + .7 * var(--b))) brightness(calc(.62 + .38 * var(--b))); transition:filter 1.2s; }
+  .bg-seat { animation:bgBreath 6s ease-in-out infinite; transform-origin:50% 95%; transition:opacity .38s; }
+  .bg-stand { filter:saturate(calc(.3 + .7 * var(--b))) brightness(calc(.62 + .38 * var(--b))); transition:filter 1.2s, opacity .38s; }
   /* the body level fills the standing figure from the feet like water: bright teal, a moving wave on top, a light rising
      through it (Junyan, 2026-10-10: "make the body stripe brighter and also animated"). The figure spans about 3% to 97%
      of its box, so the level is placed inside that. */
@@ -3364,6 +3364,12 @@
   let beingKey = "";
   // poses Junyan makes later (d210): add the name here once sprites/<name>.webp and <name>-glow.webp exist
   const POSES = new Set([]);   // "lie" (sleep), "walk" (hikes and tours), "eat" (meals)
+  // a stage change fades the old drawing out and the new one in
+  function swapImg(img, src){
+    if (!img.getAttribute("src") || !img.complete) { img.src = src; return; }
+    img.style.opacity = 0;
+    setTimeout(() => { img.onload = () => { img.style.opacity = ""; img.onload = null; }; img.src = src; }, 380);
+  }
   function drawBeing(P, B){
     const el = $("being"); if (!el) return;
     if (!el.firstChild) {
@@ -3380,18 +3386,20 @@
     const outfit = (G.unlocks || {}).robe && G.outfit !== "plain" ? "robe" : "stand";
     // d210: a pose for what he is doing now, once his sprites for it exist (POSES)
     const cur = currentOf(blocks(), now()), act = cur ? (isSleep(cur) ? "lie" : isMeal(cur) ? "eat" : /hike|walk|trek|climb|tour/i.test(cur.t) ? "walk" : "") : "";
-    const bodyImg = POSES.has(act) ? act : outfit;
+    // d221 (2026-10-10): the standing figure has a drawing per body stage: tired under 30%, steady, strong from 75%
+    const bodyImg = POSES.has(act) ? act : outfit === "robe" ? "robe" : B < 30 ? "stand-low" : B < 75 ? "stand" : "strong";
     const k = P + "|" + B + "|" + bodyImg; if (k === beingKey) return; beingKey = k;
     const st = el.firstChild;
     const bi = st.querySelector(".bg-stand");
-    if (!bi.src.endsWith(`${bodyImg}.webp`)) { bi.src = `sprites/${bodyImg}.webp`; st.querySelector(".bg-body .bg-glow").src = `sprites/${bodyImg}-glow.webp`;
+    if (!bi.src.endsWith(`/${bodyImg}.webp`)) { swapImg(bi, `sprites/${bodyImg}.webp`); swapImg(st.querySelector(".bg-body .bg-glow"), `sprites/${bodyImg}-glow.webp`);
       st.querySelector(".bg-fill").style.setProperty("--mask", `url(sprites/${bodyImg}.webp)`); }
     st.style.setProperty("--p", (P / 100).toFixed(2)); st.style.setProperty("--b", (B / 100).toFixed(2));
     document.documentElement.style.setProperty("--p", (P / 100).toFixed(2));
     $("bgP").textContent = `${P}%`; $("bgB").textContent = `${B}%`;
     $("bgPh").textContent = PRANA_WORD(P); $("bgBh").textContent = BODY_WORD(B);
-    const pose = P >= 60 ? "palms" : "seat";
-    if (!$("bgSeat").src.endsWith(`${pose}.webp`)) { $("bgSeat").src = `sprites/${pose}.webp`; st.querySelector(".bg-prana .bg-glow").src = `sprites/${pose}-glow.webp`; }
+    // d221: a drawing per prana stage: drained under 30%, settled, palms open from 60%, radiant from 85% (the third eye lit, drawn in)
+    const pose = P < 30 ? "seat-low" : P < 60 ? "seat" : P < 85 ? "palms" : "radiant";
+    if (!$("bgSeat").src.endsWith(`/${pose}.webp`)) { swapImg($("bgSeat"), `sprites/${pose}.webp`); swapImg(st.querySelector(".bg-prana .bg-glow"), `sprites/${pose}-glow.webp`); }
     // motes of light rise around the meditator, more as prana builds
     const n = Math.round(P / 8), mo = st.querySelector(".bg-motes");
     if (mo.children.length !== n) mo.innerHTML = Array.from({ length:n }, (_, i) => `<i style="left:${12 + (i * 37) % 32}%;animation-duration:${4 + (i % 4)}s;animation-delay:${(i * .9) % 5}s"></i>`).join("");
