@@ -335,6 +335,9 @@
   .cal-ev.gone b { text-decoration:line-through; }
   .cal-pts { position:absolute; right:8px; top:4px; font-size:11.5px; font-weight:700; color:var(--gold); }
   .cal-ev.one .cal-pts { top:50%; transform:translateY(-50%); }
+  .cal-pts.neg { color:#ff9e9e; }
+  .cal-ask { color:#14183a; background:var(--gold); border-radius:999px; padding:1px 8px; font-size:11px; opacity:1; }
+  .cal-ev.past:has(.cal-ask) { opacity:.9; }
   .cal-now { position:absolute; left:var(--cal-l); right:0; height:2px; margin-top:-1px; background:#ff8f9e; z-index:2; pointer-events:none; }
   .cal-now::before { content:""; position:absolute; left:-5px; top:-4px; width:10px; height:10px; border-radius:50%; background:#ff8f9e; }
   .cal-now span { position:absolute; left:calc(-1 * var(--cal-l) - 6px); width:calc(var(--cal-l) - 4px); top:-7px; text-align:right; white-space:nowrap; font-size:10.5px; font-weight:700; color:#ff8f9e; }
@@ -1314,10 +1317,11 @@
     const key = `${G.day.date}|${tzParts(now(), { hour:"numeric", hourCycle:"h23" }).hour}|${JSON.stringify(G.day.habits)}`;
     if (!SUGG || SUGG.key !== key) SUGG = { key, list: suggestions() };
     const hDone = TILES.filter(h => (G.day.habits[h[0]] || 0) > 0).length;
-    const mq = unratedMeal();
+    const mq = unratedMeal(), aq = unratedActivity();
     return `<div class="hhead"><span class="eyebrow">Prana actions · right now</span>` +
       `<button class="hsnd" data-hsnd aria-label="Tap sounds">${window.QuestFx && QuestFx.soundOn() ? "🔊" : "🔇"}</button></div>` +
       (mq ? `<button class="pa-all" style="margin:0 0 10px" data-mealq="${esc(gk(mq))}">🍽️ How was ${esc(shortName(mq))}?<span>Rate it ›</span></button>` : "") +
+      (aq ? `<button class="pa-all" style="margin:0 0 10px" data-actq="${esc(gk(aq))}">🧍 How was ${esc(shortName(aq))}?<span>Check it ›</span></button>` : "") +
       (nvDue() ? `<button class="pa-all" style="margin:0 0 10px" data-nvc="checkin">🫶 How are you, really?<span>Check in ›</span></button>` : "") +
       (SUGG.list.length ? `<div class="hgrid sugg">${SUGG.list.map(habitTile).join("")}</div>` : `<div class="hint" style="margin:8px 2px">Nothing pressing right now.</div>`) +
       `<button class="pa-all" data-all>All prana actions<span>${hDone}/${TILES.length} done ›</span></button>` +
@@ -1327,6 +1331,7 @@
     root.querySelectorAll("[data-all]").forEach(bn => bn.onclick = openActions);
     root.querySelectorAll("[data-nvc]").forEach(bn => bn.onclick = () => bn.dataset.nvc === "conflict" ? openConflict() : bn.dataset.nvc === "journal" ? openJournal() : openCheckin());
     root.querySelectorAll("[data-mealq]").forEach(bn => bn.onclick = () => openMealQuiz(bn.dataset.mealq ? blocks().find(b => gk(b) === bn.dataset.mealq) : null));
+    root.querySelectorAll("[data-actq]").forEach(bn => bn.onclick = () => { const b = blocks().find(x => gk(x) === bn.dataset.actq); if (b) openActQuiz(b); });
     root.querySelectorAll("[data-habit]").forEach(bn => bn.onclick = () => tapHabit(bn));
     root.querySelectorAll("[data-hsnd]").forEach(bn => bn.onclick = () => { QuestFx.setSound(!QuestFx.soundOn()); refreshActions(); render(); });
   }
@@ -1905,6 +1910,75 @@
       if (q.p) addPrana(q.p, `${name}: meal quiz`, "meal");
       if (q.b) addBody(q.b, `${name}: meal quiz`, "meal");
       log(`Rated ${name}: ${mqSum(q)}`); saveG();
+      closeSheet(); render(); refreshActions();
+    };
+  }
+
+  /* ---------- the activity check (Junyan, 2026-10-10: "after each activity there should also be some
+     assessment on my prana (posture, etc.)") ----------
+     After any activity ends (not meals, which have their own quiz; not sleep, rest, open time or the
+     practices the calendar already pays), a few taps say how it went. Prana by what Sadhguru names:
+     a straight spine, easy nose breathing, full involvement and contact with the elements lift it;
+     slumping and doing things on autopilot (compulsively, not consciously) lower it. Body by Bryan
+     Johnson: breaking up sitting and getting daylight help, a long unbroken sit costs. Kept in
+     G.day.mealq under the block's key with kind "act", so the server merges it like a meal rating. */
+  const AQ_PRANA = [
+    ["spine", "🧍", "Spine upright: sat or stood tall", 2],
+    ["breath", "🌬️", "Breath easy, through the nose", 1],
+    ["invol", "🔥", "Fully involved: did it with attention and joy", 2],
+    ["elem", "🌳", "Outdoors with earth, water, sun or open air", 2],
+    ["slump", "🪑", "Slumped or hunched much of the time", -2],
+    ["auto", "🌀", "Rushed or on autopilot, mind somewhere else", -2],
+  ];
+  const AQ_BODY = [
+    ["moved", "🚶", "Got up and moved at least every 30 to 60 min", 2],
+    ["daylight", "☀️", "Daylight outside", 1],
+    ["sat", "🛋️", "Sat still over an hour without a break", -2],
+  ];
+  const AQ_ONEOF = { spine:"slump", slump:"spine", invol:"auto", auto:"invol", moved:"sat", sat:"moved" };
+  const actRatable = b => !!b && !isMeal(b) && !isSleep(b) && !["rest", "open", "break"].includes(b.kind)
+    && !blockHabits(b).length && b.e - b.s >= 20 * 60000;
+  // an activity that ended in the last 4 hours and has not been checked
+  function unratedActivity(){
+    const t = now(), q = G.day.mealq || {};
+    return blocks().filter(b => actRatable(b) && b.e <= t && t - b.e < 4 * 3600000 && !q[gk(b)]).pop() || null;
+  }
+  const aqVal = v => v > 0 ? Math.round(v * gainMult()) : v;
+  function aqScore(sel){
+    let p = 0, b = 0;
+    AQ_PRANA.forEach(([id, , , v]) => { if (sel[id]) p += aqVal(v); });
+    AQ_BODY.forEach(([id, , , v]) => { if (sel[id]) b += aqVal(v); });
+    return { p, b };
+  }
+  function openActQuiz(b, sel = {}){
+    const k = gk(b), done = (G.day.mealq || {})[k], name = shortName(b);
+    if (done) {
+      openSheet(`${winHead(b)}<h3>${esc(name)}: checked</h3><p>${esc(mqSum(done))}.</p>
+        <div class="actions"><button class="btn ghost" id="aqX">Done</button></div>`);
+      $("aqX").onclick = closeSheet; return;
+    }
+    const sc = aqScore(sel), sign = v => v > 0 ? `+${v}` : `${v}`;
+    const row = ([id, icon, txt, v], cls) => `<button class="wck${sel[id] ? " on" : ""}" data-q="${id}"><span class="bx">${sel[id] ? "✓" : ""}</span><span>${icon} ${esc(txt)}</span><b class="${cls}" style="margin-left:auto;font-size:12px">${sign(aqVal(v))}</b></button>`;
+    openSheet(`${winHead(b)}<h3>How was ${esc(name)}?</h3>
+      <p>Tap what fits, then confirm.</p>
+      <div class="win-lb">Prana (Sadhguru)</div>
+      ${AQ_PRANA.map(x => row(x, "mp")).join("")}
+      <div class="win-lb">Body (Bryan Johnson)</div>
+      ${AQ_BODY.map(x => row(x, "mb")).join("")}
+      <div class="actions" style="position:sticky;bottom:0"><button class="btn primary" id="aqOk">Confirm · ${esc(mqSum(sc))}</button></div>
+      <div class="actions"><button class="btn ghost" id="aqX">Not now</button></div>`, true);
+    $("sheet").querySelectorAll("[data-q]").forEach(bn => bn.onclick = () => {
+      const id = bn.dataset.q, top = $("sheet").scrollTop;
+      sel[id] = !sel[id]; if (sel[id] && AQ_ONEOF[id]) sel[AQ_ONEOF[id]] = false;
+      openActQuiz(b, sel); $("sheet").scrollTop = top;
+    });
+    $("aqX").onclick = closeSheet;
+    $("aqOk").onclick = () => {
+      const q = aqScore(sel);
+      (G.day.mealq = G.day.mealq || {})[k] = { kind:"act", at:now().toISOString(), sel:Object.keys(sel).filter(x => sel[x]), p:q.p, b:q.b };
+      if (q.p) addPrana(q.p, `${name}: how it went`, "activity");
+      if (q.b) addBody(q.b, `${name}: how it went`, "activity");
+      log(`Checked ${name}: ${mqSum(q)}`); saveG();
       closeSheet(); render(); refreshActions();
     };
   }
@@ -3372,11 +3446,13 @@
     for (const { st, i, s, e, lane, n } of ev) {
       const b0 = st.blocks[0], isCur = cur && st.blocks.some(b => b.key === cur.key), past = st.e <= t && !isCur;
       const c = st.free ? "" : calColor(b0), top = y(s) + 1, h = Math.max(18, y(e) - y(s) - 2);
-      const pts = st.free ? 0 : st.blocks.reduce((a, b) => a + blockGain(b), 0);
+      const rq = st.free ? null : (G.day.mealq || {})[gk(b0)];
+      const pts = st.free ? 0 : st.blocks.reduce((a, b) => a + blockGain(b), 0) + (rq ? rq.p || 0 : 0);
+      const ask = !rq && past && actRatable(b0) && t - st.e < 4 * 3600000;
       const tick = st.lit ? "✓ " : "", time = `${fmtT(st.s)} to ${fmtT(st.e)}`;
       const cls = `cal-ev${st.free ? " free" : ""}${past ? " past" : ""}${isCur ? " now" : ""}${st.skipped ? " gone" : ""}${h < 36 ? " one" : ""}`;
       out += `<button class="${cls}" data-stop="${i}" style="${c ? `--c:${c};` : ""}top:${top}px;height:${h}px;left:calc(var(--cal-l) + (100% - var(--cal-l)) * ${lane} / ${n});width:calc((100% - var(--cal-l)) / ${n} - 3px)" aria-label="${esc(st.t)}, ${time}">` +
-        `<b>${tick}${esc(st.t)}</b><span class="cal-t">${h < 36 ? fmtT(st.s) : time}</span>${pts ? `<span class="cal-pts">+${pts}</span>` : ""}</button>`;
+        `<b>${tick}${esc(st.t)}</b><span class="cal-t">${h < 36 ? fmtT(st.s) : time}</span>${ask ? `<span class="cal-pts cal-ask" data-actq="${esc(gk(b0))}">Check ›</span>` : pts ? `<span class="cal-pts${pts < 0 ? " neg" : ""}">${pts > 0 ? "+" : ""}${pts}</span>` : ""}</button>`;
     }
     if (t >= a0 && t <= z0) out += `<div class="cal-now" style="top:${y(+t)}px"><span>${fmtT(t)}</span></div>`;
     return out + `</div>`;
@@ -3617,8 +3693,10 @@
     put("mtn", calendarHTML(stops, cur, t));
     const calBox = $("mtn").closest(".grid-stack-item-content"), nowLine = $("mtn").querySelector(".cal-now");
     if (calBox && nowLine && calScrolled !== dayKey()) { calScrolled = dayKey(); calBox.scrollTop = Math.max(0, nowLine.offsetTop - calBox.clientHeight / 3); }
-    $("mtn").querySelectorAll("[data-stop]").forEach(n => n.onclick = () => {
+    $("mtn").querySelectorAll("[data-stop]").forEach(n => n.onclick = e => {
       const st = stops[+n.dataset.stop]; if (!st) return;
+      const aq = e.target.closest("[data-actq]");
+      if (aq) { const b = blocks().find(x => gk(x) === aq.dataset.actq); if (b) return openActQuiz(b); }
       const fixed = st.blocks.find(b => b.kind !== "open" && b.kind !== "break");
       if (fixed && isGym(fixed) && fixed.s - now() < 3 * 3600000) return openGym(blocks().find(x => x.key === fixed.key) || fixed);
       if (fixed) openStop(blocks().find(x => x.key === fixed.key) || fixed); else openMove(st);
