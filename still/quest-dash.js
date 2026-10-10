@@ -5,7 +5,7 @@
    12-column grid. Drag a widget by its title bar, resize it from any edge or
    corner; the others make room. The layout is kept per device (localStorage
    quest-dash-v1); "Reset layout" brings back the default. The phone keeps the
-   single column. Grid engine: gridstack 10.3.1 from jsDelivr; if it fails to
+   single column. Grid engine: gridstack 10.3.1 (still/vendor/); if it fails to
    load, the page stays a single column. ?nodash=1 turns it off. */
 (function () {
   "use strict";
@@ -64,8 +64,9 @@
 
   async function build() {
     await Promise.all([
-      load("link", { rel: "stylesheet", href: "https://cdn.jsdelivr.net/npm/gridstack@10.3.1/dist/gridstack.min.css" }),
-      load("script", { src: "https://cdn.jsdelivr.net/npm/gridstack@10.3.1/dist/gridstack-all.js" }),
+      // served with the page (d212, 2026-10-10): one less address to look up on a shaky network
+      load("link", { rel: "stylesheet", href: "vendor/gridstack.min.css" }),
+      load("script", { src: "vendor/gridstack-all.js" }),
     ]);
     const app = document.getElementById("app");
     if (!app || !window.GridStack) return;
