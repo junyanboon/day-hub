@@ -933,7 +933,19 @@
     if (!ids.length && isRecovery(b)) ids.push("kriya");
     return ids;
   }
-  const payBlock = b => blockHabits(b).forEach(id => logHabit(id, true));
+  /* Paid by time only (Junyan, 2026-10-10: "Just give the same prana ... based on time.
+     Don't worry about the length of the practice"). Every minute of a practice block is
+     worth the same, whatever it names: 0.6 a minute before the level (30 min = +27 at
+     level 1). The practices it names are marked done for the day. */
+  const PRACTICE_PER_MIN = 0.6;
+  const blockGain = b => blockHabits(b).length ? Math.max(1, Math.round(Math.max(0, (b.e - b.s) / 60000) * PRACTICE_PER_MIN * gainMult())) : 0;
+  function payBlock(b){
+    const ids = blockHabits(b), g = blockGain(b); if (!ids.length) return;
+    G.day.habits = G.day.habits || {};
+    ids.forEach(id => { G.day.habits[id] = (G.day.habits[id] || 0) + 1; });
+    const names = ids.map(id => HABITS.find(x => x[0] === id)[5]).join(", ");
+    addHabit(ids[0], g, `${names}: ${Math.round((b.e - b.s) / 60000)} min`, names.toLowerCase());
+  }
   // today's not-yet-started block that will pay this practice, so its tile says when
   const schedFor = id => { const t = now(); return blocks().find(b => b.e > t && !(G.day.checks || {})[gk(b)] && blockHabits(b).includes(id)); };
   /* What effort costs an hour (Junyan, 2026-10-09, d187 to d189: "Hike should consume a
@@ -1341,7 +1353,7 @@
     addBody(Math.max(0, Math.min(100, level)) - body(), why, "sleep");
     render();
   }
-  const energyTag = b => { if (isSadhana(b)) return `fills +${habitGain("shambhavi")}`; const r = energy(b).rate; return r ? `uses about ${Math.round(r * spendMult())} body an hour` : ""; };
+  const energyTag = b => { const pg = blockGain(b); if (pg) return `fills +${pg}`; const r = energy(b).rate; return r ? `uses about ${Math.round(r * spendMult())} body an hour` : ""; };
   const onTimeMin = b => isSleep(b) ? 30 : ON_TIME_MIN;   // bedtime counts within 30 min (Blueprint: same time nightly)
   const SIDE_P = 5;
   /* Two meters (Junyan, 2026-10-09, d200 to d204: "Bryan johnson is about the body and sadhguru
