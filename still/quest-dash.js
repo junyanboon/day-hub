@@ -9,7 +9,7 @@
    load, the page stays a single column. ?nodash=1 turns it off. */
 (function () {
   "use strict";
-  const MIN_W = 1100, KEY = "quest-dash-v1", ROWS = 16;
+  const MIN_W = 1100, KEY = "quest-dash-v2", ROWS = 16;   // v2: the calendar column layout (d216, 2026-10-10)
   const mq = window.matchMedia(`(min-width: ${MIN_W}px)`);
   if (!mq.matches || /[?&]nodash=1/.test(location.search)) {
     mq.addEventListener && mq.addEventListener("change", (e) => { if (e.matches) location.reload(); });
@@ -24,12 +24,16 @@
     { id: "now", title: "Right now", pick: ["#brief", "#loose", "#main", "#nextLine"] },
     { id: "habits", title: "", pick: ["#habits"] },
   ];
+  // d216 (2026-10-10): Today's calendar down the left, the two figures in the middle with right now under them,
+  // prana actions and skills on the right
   const DEFAULT = {
     hud: { x: 0, y: 0, w: 12, h: 2 },
-    being: { x: 0, y: 2, w: 4, h: 7 },
-    now: { x: 0, y: 9, w: 4, h: 7 }, log: { x: 0, y: 16, w: 4, h: 4 },   // quick slots off (2026-10-10)
-    mtn: { x: 4, y: 2, w: 5, h: 8 }, skills: { x: 4, y: 10, w: 5, h: 6 },
-    habits: { x: 9, y: 2, w: 3, h: 14 },
+    mtn: { x: 0, y: 2, w: 4, h: 14 },
+    being: { x: 4, y: 2, w: 5, h: 9 },
+    now: { x: 4, y: 11, w: 5, h: 5 },
+    habits: { x: 9, y: 2, w: 3, h: 9 },
+    skills: { x: 9, y: 11, w: 3, h: 5 },
+    log: { x: 4, y: 16, w: 5, h: 4 },
   };
   const load = (tag, attrs) => new Promise((ok, fail) => {
     const el = document.createElement(tag);

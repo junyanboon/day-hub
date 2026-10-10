@@ -78,11 +78,11 @@
   html.sky-dawn { --dune1:#6a4660; --dune2:#4c3150; --dune3:#33223f; }
   html.sky-day  { --dune1:#9c7446; --dune2:#7d5a37; --dune3:#5e432b; }
   html.sky-dusk { --dune1:#7a4250; --dune2:#5a2f45; --dune3:#3c2036; }
-  /* d207: the pixel font on headings and numbers, to match the sprites */
-  h2, .eyebrow, .hgl, .win-lb, .quest-title, .summary b, .count .big, .hud-title b, #altTxt, #bodyTxt, .htile b, .combo .n, .combo .l,
-  .pa-all, .side-quest b, .sq b, .mo-open-t b { font-family:"Pixelify Sans", ui-sans-serif, system-ui; letter-spacing:.02em; }
+  /* one font for everything: Figtree (Junyan, 2026-10-10, d217; it replaced the pixel font of d207 and the serif on the morning card) */
+  :root { --font:"Figtree", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+  .bg-n, .count .big, .combo .n, .cal-t, .o2row, .lvn, .gk { font-variant-numeric:tabular-nums; }
   body { background:transparent; color:var(--ink);
-    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
+    font-family: var(--font);
     -webkit-font-smoothing:antialiased; }
   #app { max-width:480px; margin:0 auto;
     padding: calc(env(safe-area-inset-top) + 14px) 16px calc(env(safe-area-inset-bottom) + 110px); }
@@ -114,8 +114,8 @@
   .bg-fill { -webkit-mask:var(--mask, url(sprites/stand.webp)) 50% 100% / contain no-repeat; mask:var(--mask, url(sprites/stand.webp)) 50% 100% / contain no-repeat;
     background:linear-gradient(0deg, rgba(95,211,196,.12) calc(var(--b) * 100%), transparent calc(var(--b) * 100% + 1px)); mix-blend-mode:screen; }
   .bg-lab { position:relative; text-align:center; padding:4px 0 10px; line-height:1.1; }
-  .bg-n { font-family:"Pixelify Sans", ui-sans-serif, system-ui; font-size:26px; font-weight:700; }
-  .bg-k { font-family:"Pixelify Sans", ui-sans-serif, system-ui; font-size:12px; letter-spacing:.14em; text-transform:uppercase; opacity:.85; }
+  .bg-n { font-size:26px; font-weight:700; }
+  .bg-k { font-size:12px; letter-spacing:.14em; text-transform:uppercase; opacity:.85; }
   .bg-h { display:block; font-size:11px; color:var(--ink-soft); margin-top:3px; }
   .bg-prana .bg-n, .bg-prana .bg-k { color:#ffd479; text-shadow:0 0 calc(4px + 14px * var(--p)) rgba(255,196,110,.6); }
   .bg-body .bg-n, .bg-body .bg-k { color:#7fe3d4; }
@@ -265,11 +265,11 @@
   .gtop b { font-size:15px; }
   .gl { display:flex; align-items:center; gap:6px; flex:none; }
   .lv { width:32px; height:32px; border-radius:10px; background:rgba(255,255,255,.16); font-size:18px; }
-  .lvn { font:700 14px ui-monospace, Menlo, monospace; min-width:54px; text-align:center; }
+  .lvn { font:700 14px var(--font); min-width:54px; text-align:center; }
   .lvn.up { color:var(--gold); }
   .gsub { font-size:12.5px; color:var(--ink-soft); margin-top:4px; }
   .grow { display:grid; grid-template-columns:36px repeat(4, 1fr); gap:6px; margin-top:8px; align-items:center; }
-  .gk { font:600 11px ui-monospace, Menlo, monospace; color:var(--ink-faint); }
+  .gk { font:600 11px var(--font); color:var(--ink-faint); }
   .sheet input.set { margin:0; padding:10px 4px; text-align:center; font-size:16px; border-radius:10px; min-width:0; }
   .gchips { display:flex; flex-wrap:wrap; gap:6px; }
   .gchip { padding:9px 12px; border-radius:20px; background:rgba(255,255,255,.12); font-size:14px; }
@@ -280,7 +280,7 @@
   .hud-title { gap:8px; }
   .hud-title > span:first-child { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   #altTxt { white-space:nowrap; flex:none; font-variant-numeric:tabular-nums; }
-  .o2row { display:flex; align-items:center; gap:6px; margin-top:5px; font:600 10.5px ui-monospace, Menlo, monospace; color:var(--ink-soft); }
+  .o2row { display:flex; align-items:center; gap:6px; margin-top:5px; font:600 10.5px var(--font); color:var(--ink-soft); }
   .o2bar { flex:1; height:5px; border-radius:4px; background:rgba(0,0,0,.25); overflow:hidden; }
   .o2bar i { display:block; height:100%; width:80%; background:#7fd8ff; border-radius:4px; transition:width .6s; }
   .o2bar i.mid { background:#ffd479; } .o2bar i.thin { background:#ff9c9c; }
@@ -290,43 +290,27 @@
   .season b { color:var(--ink); font-variant-numeric:tabular-nums; }
   /* ---------- the mountain ---------- */
   .place { color:var(--ink); font-weight:600; }
+  /* ---------- Today: the calendar column (Junyan, 2026-10-10, d216 "C calendar column"; it replaced the mountain, d218) ---------- */
   #mtn { margin-top:4px; }
-  .mtn-svg { width:100%; height:auto; display:block; border-radius:22px;
-    background:linear-gradient(#0f1229, #262c62); }
-  .mtn-svg .m1 { fill:#2d336f; } .mtn-svg .m2 { fill:#3a4184; opacity:.55; }
-  .mtn-svg .star { fill:#eef0ff; animation:tw 3s ease-in-out infinite; }
-  @keyframes tw { 50% { opacity:.2; } }
-  .mtn-svg .seg { fill:none; stroke:#4a518f; stroke-width:5; stroke-linecap:round; stroke-dasharray:1 9; }
-  .mtn-svg .seg.walked { stroke:var(--gold); stroke-dasharray:none; stroke-width:3; opacity:.85; }
-  .mtn-svg .stopg { cursor:pointer; }
-  .mtn-svg .stopg.past { opacity:.7; }
-  .mtn-svg .hit { fill:transparent; }
-  .mtn-svg .sym.skip { opacity:.4; }
-  .quest-title .badge { flex:none; }
-  .mtn-svg .dotm { fill:#262c62; stroke:#a7abd8; stroke-width:2; }
-  .mtn-svg .dotm.done { fill:var(--good); stroke:var(--good); }
-  .mtn-svg .dotm.skip { stroke-dasharray:3 3; opacity:.5; }
-  .mtn-svg .ringm { fill:none; stroke:var(--gold); stroke-width:2; animation:mpulse 1.6s ease-in-out infinite; transform-box:fill-box; transform-origin:center; }
-  @keyframes mpulse { 50% { transform:scale(1.25); opacity:.4; } }
-  .mtn-svg .logr { fill:#9a7452; }
-  .mtn-svg .flame { fill:#3a4184; opacity:.8; }
-  .mtn-svg .flame2 { fill:var(--gold); opacity:0; }
-  .mtn-svg .glow { fill:#ff9c7a; opacity:0; }
-  .mtn-svg .fire.lit .flame { fill:#ff9c7a; opacity:1; transform-box:fill-box; transform-origin:50% 100%; animation:flick .6s ease-in-out infinite alternate; }
-  .mtn-svg .fire.lit .flame2 { opacity:1; transform-box:fill-box; transform-origin:50% 100%; animation:flick .45s ease-in-out infinite alternate-reverse; }
-  .mtn-svg .fire.lit .glow { opacity:.28; }
-  @keyframes flick { from { transform:scale(1,1) skewX(-3deg); } to { transform:scale(.9,1.12) skewX(4deg); } }
-  .mtn-svg .tm { font:600 9.5px ui-monospace, Menlo, monospace; fill:#a7abd8; }
-  .mtn-svg .nm { font:600 12.5px -apple-system, BlinkMacSystemFont, sans-serif; fill:#eef0ff; }
-  .mtn-svg .nm.gone { fill:#a7abd8; text-decoration:line-through; }
-  .mtn-svg .emo { font-size:22px; } .mtn-svg .emo.sm { font-size:15px; }
-  .mtn-svg .halo { fill:var(--gold); opacity:.25; animation:mpulse 2s ease-in-out infinite; transform-box:fill-box; transform-origin:center; }
-  .mtn-svg .me { fill:var(--gold); stroke:#141833; stroke-width:2; }
-  .mtn-svg .cloud ellipse { fill:#767bab; }
-  .mtn-svg .rain { stroke:#9fb4ff; stroke-width:1.5; stroke-linecap:round; animation:rain .7s linear infinite; }
-  @keyframes rain { from { transform:translateY(-3px); opacity:1; } to { transform:translateY(7px); opacity:0; } }
-  .mtn-svg .bolt { fill:var(--gold); animation:tw 1.2s steps(2) infinite; }
-  @media (prefers-reduced-motion: reduce) { .mtn-svg * { animation:none !important; } }
+  .cal { position:relative; --cal-l:50px; margin:6px 0 4px; }
+  .cal-hr { position:absolute; left:var(--cal-l); right:0; height:0; border-top:1px solid rgba(255,255,255,.09); }
+  .cal-hr span { position:absolute; left:calc(-1 * var(--cal-l)); width:calc(var(--cal-l) - 8px); top:-8px; text-align:right; font-size:11px; color:var(--ink-faint); }
+  .cal-ev { position:absolute; box-sizing:border-box; padding:4px 9px; border-radius:10px; text-align:left; overflow:hidden;
+    border-left:4px solid var(--c); background:color-mix(in srgb, var(--c) 30%, rgba(255,255,255,.04)); color:var(--ink);
+    font-size:13px; line-height:1.25; display:flex; flex-direction:column; gap:1px; }
+  .cal-ev b { font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding-right:30px; }
+  .cal-ev .cal-t { font-size:11.5px; color:var(--ink-soft); white-space:nowrap; }
+  .cal-ev.one { flex-direction:row; align-items:center; gap:6px; padding-block:0; }
+  .cal-ev.free { --c:rgba(255,255,255,.28); border-left-style:dashed; background:rgba(255,255,255,.035); color:var(--ink-soft); }
+  .cal-ev.free b { font-weight:500; }
+  .cal-ev.past { opacity:.62; }
+  .cal-ev.now { opacity:1; box-shadow:0 0 0 1.5px var(--c), 0 6px 18px rgba(0,0,0,.28); }
+  .cal-ev.gone b { text-decoration:line-through; }
+  .cal-pts { position:absolute; right:8px; top:4px; font-size:11.5px; font-weight:700; color:var(--gold); }
+  .cal-ev.one .cal-pts { top:50%; transform:translateY(-50%); }
+  .cal-now { position:absolute; left:var(--cal-l); right:0; height:2px; margin-top:-1px; background:#ff8f9e; z-index:2; pointer-events:none; }
+  .cal-now::before { content:""; position:absolute; left:-5px; top:-4px; width:10px; height:10px; border-radius:50%; background:#ff8f9e; }
+  .cal-now span { position:absolute; left:calc(-1 * var(--cal-l)); width:calc(var(--cal-l) - 10px); top:-7px; text-align:right; font-size:11px; font-weight:700; color:#ff8f9e; }
   /* ---------- trail ---------- */
   h2 { font-size:12px; letter-spacing:.14em; text-transform:uppercase; color:var(--ink-soft); font-weight:600;
     margin:26px 4px 10px; display:flex; justify-content:space-between; }
@@ -506,11 +490,11 @@
   @keyframes moPop { from { transform:scale(1.04); } to { transform:none; } }
   .mo-x { position:fixed; top:calc(env(safe-area-inset-top) + 14px); right:14px; z-index:5; width:36px; height:36px; border-radius:50%; background:rgba(0,0,0,.3); color:#fff; font-size:16px; }
   .mo-kicker { font-size:11px; letter-spacing:.16em; text-transform:uppercase; opacity:.8; }
-  .mo-place { font-family:Georgia, "Times New Roman", serif; font-size:40px; line-height:1.05; margin-top:6px; }
+  .mo-place { font-weight:700; letter-spacing:-.01em; font-size:40px; line-height:1.05; margin-top:6px; }
   .mo-date { font-size:15px; opacity:.85; margin-top:6px; }
-  .mo-big { font-family:Georgia, "Times New Roman", serif; font-size:28px; line-height:1.15; margin-top:6px; }
+  .mo-big { font-weight:700; letter-spacing:-.01em; font-size:28px; line-height:1.15; margin-top:6px; }
   .mo-lo { font-size:20px; opacity:.7; }
-  .mo-quote { font-family:Georgia, "Times New Roman", serif; font-style:italic; font-size:19px; line-height:1.4; margin:16px 0 0; padding-left:14px; border-left:3px solid #ffb37a; opacity:.95; }
+  .mo-quote { font-weight:500; font-size:19px; line-height:1.4; margin:16px 0 0; padding-left:14px; border-left:3px solid #ffb37a; opacity:.95; }
   .mo-soft { font-size:15px; opacity:.85; margin-top:12px; line-height:1.4; }
   .mo-tip { font-size:14px; margin-top:8px; padding:8px 12px; border-radius:12px; background:rgba(0,0,0,.2); line-height:1.35; }
   .mo-leave { margin-top:16px; padding:10px 14px; border-radius:14px; background:rgba(255,255,255,.12); font-size:14px; }
@@ -553,7 +537,7 @@
   .mo-det { padding:0 14px 14px; }
   .mo-det-time { font-size:13px; opacity:.8; }
   .mo-det-lb { font-size:11px; letter-spacing:.14em; text-transform:uppercase; opacity:.75; margin:14px 0 4px; }
-  .mo-det-quote { font-family:Georgia, serif; font-style:italic; font-size:16px; line-height:1.4; margin-top:10px; padding-left:10px; border-left:3px solid #ffb37a; }
+  .mo-det-quote { font-weight:500; font-size:16px; line-height:1.4; margin-top:10px; padding-left:10px; border-left:3px solid #ffb37a; }
   .mo-det-k { padding:6px 0; border-top:1px solid rgba(255,255,255,.1); font-size:14px; line-height:1.35; }
   .mo-det-k span { display:block; font-size:13px; opacity:.75; margin-top:2px; }
   .mo-ck { display:flex; gap:10px; align-items:center; width:100%; text-align:left; padding:9px 0; border-top:1px solid rgba(255,255,255,.1); font-size:14px; color:#fff; background:none; }
@@ -568,16 +552,16 @@
 </style>
 <link rel="stylesheet" href="bag.css">
 <style>
-  /* Pixelify Sans (OFL), served with the page so it needs no Google lookup (d212, 2026-10-10) */
-  @font-face { font-family:"Pixelify Sans"; font-style:normal; font-weight:400 700; font-display:swap;
-    src:url(fonts/pixelify-sans-latin.woff2) format("woff2"); }
+  /* Figtree (OFL), served with the page so it needs no Google lookup and works offline (d217, 2026-10-10) */
+  @font-face { font-family:"Figtree"; font-style:normal; font-weight:300 900; font-display:swap;
+    src:url(fonts/figtree-latin.woff2) format("woff2"); }
 </style>
 <script src="keeps.js?v=20261009k"></script>
 <script src="bag.js?v=20261009k"></script>
 <script src="quest-merge.js?v=20261010b"></script>
 <script src="nvc-words.js?v=20261010a"></script>
 <script src="quest-fx.js?v=20261009b"></script>
-<script src="quest-night.js?v=20261010a"></script>
+<script src="quest-night.js?v=20261010b"></script>
 <script src="quest-morning.js?v=20261010c"></script>
 </head>
 <body>
@@ -603,11 +587,11 @@
   <div id="nextLine"></div>
   <div id="habits"></div>
 
+  <h2><span>Today</span><button class="add-btn" id="addBtn">＋ Add</button></h2>
+  <div id="mtn"></div>
+
   <h2><span>Skills</span><button class="add-btn" id="skillsBtn">Open</button></h2>
   <div id="skillsRow"></div>
-
-  <h2><span>Today's mountain <span id="trailMeta" style="font-weight:400;color:var(--ink-faint)"></span></span><button class="add-btn" id="addBtn">＋ Add</button></h2>
-  <div id="mtn"></div>
 
   <h2><span>Quest log</span><span id="dayXp"></span></h2>
   <div class="log" id="log"></div>
@@ -3248,54 +3232,47 @@
     }
     return out;
   }
-  function mountainSVG(stops, cur, t, zap){
+  /* Today as a calendar column: hour lines, each block as tall as it lasts, coloured by its group,
+     a red line at now. Blocks that overlap share the width. Tap a block for the same sheet the trail opened. */
+  const CAL_PX = 54;   // pixels per hour
+  // calendar colours by what the block is: practice gold, food green, moving teal, travel violet, work blue, big events rose
+  const calColor = b => isSadhana(b) || b.kind === "practice" ? "#ffd479" : isMeal(b) || b.kind === "fuel" ? "#8fe3b0"
+    : isSleep(b) || b.kind === "rest" ? "#9aa0cf" : b.kind === "travel" ? "#a99bff" : MAJOR.test(b.t) ? "#ff8f9e"
+    : isGym(b) || ["body", "dance"].includes(b.kind) || /kayak|hike|walk|swim|surf|climb|run|cycl|bike|trek|felucca|sail/i.test(b.t) ? "#7fe3d4"
+    : groupOf(b) === "work" ? "#85b7eb" : "#c3c8f0";
+  function calendarHTML(stops, cur, t){
     if (!stops.length) return `<div class="empty">No blocks today.</div>`;
-    const n = stops.length, W = 340, ROW = 56, H = 96 + n * ROW;
-    const P = stops.map((_, i) => ({ x: Math.round(170 + 92 * Math.sin(i * 1.15 + 0.5)), y: H - 58 - i * ROW }));
-    const START = { x:170, y:H - 10 }, SUMMIT = { x:170, y:30 };
-    const ALL = [START, ...P, SUMMIT];
-    let curI = stops.findIndex(st => cur && st.blocks.some(b => b.key === cur.key));
-    const passed = stops.reduce((a, st, i) => st.e <= t ? i : a, -1);
-    const here = curI >= 0 ? curI : passed;              // between stops: wait at the last one passed
-    const tp = here < 0 ? START : here >= n ? SUMMIT : P[here];
-    let out = `<svg class="mtn-svg" viewBox="0 0 ${W} ${H}" role="img" aria-label="Today's trail, ${n} stops">`;
-    out += `<polygon class="m2" points="-20,${H} 60,${H * .38} 170,${H}"/><polygon class="m2" points="160,${H} 290,${H * .3} 380,${H}"/>`;
-    out += `<polygon class="m1" points="0,${H} 170,8 340,${H}"/>`;
-    for (let k = 0; k < 20; k++) { const sx = (k * 97) % 340, sy = (k * 53) % 150 + 6; if (Math.abs(sx - 170) < (sy + 10) * .5) continue;
-      out += `<circle class="star" cx="${sx}" cy="${sy}" r="${k % 3 ? .9 : 1.4}" style="animation-delay:${(k % 7) * .4}s"/>`; }
-    for (let k = 1; k < ALL.length; k++) {
-      const p0 = ALL[Math.max(k - 2, 0)], p1 = ALL[k - 1], p2 = ALL[k], p3 = ALL[Math.min(k + 1, ALL.length - 1)];
-      const c1x = p1.x + (p2.x - p0.x) / 6, c1y = p1.y + (p2.y - p0.y) / 6, c2x = p2.x - (p3.x - p1.x) / 6, c2y = p2.y - (p3.y - p1.y) / 6;
-      out += `<path class="seg${k - 1 <= here ? " walked" : ""}" d="M${p1.x},${p1.y} C${c1x},${c1y} ${c2x},${c2y} ${p2.x},${p2.y}"/>`;
+    const HR = 3600000, awake = stops.filter(st => !st.blocks.every(isSleep)), base = awake.length ? awake : stops;
+    const toHour = (ms, up) => { const p = tzParts(new Date(ms), { minute:"numeric", second:"numeric" });
+      const off = (+p.minute * 60 + +p.second) * 1000 + ms % 1000; return off ? ms - off + (up ? HR : 0) : ms; };
+    const a0 = toHour(Math.min(+base[0].s, +t), false), z0 = toHour(Math.max(+base[base.length - 1].e, +t + 30 * 60000), true);
+    const y = ms => Math.round((ms - a0) / HR * CAL_PX), H = y(z0);
+    let out = `<div class="cal" style="height:${H + 8}px">`;
+    // an hour label right next to the now line would sit under its time, so that one is left off
+    for (let h = a0; h <= z0; h += HR) out += `<div class="cal-hr" style="top:${y(h)}px">${Math.abs(h - t) < 15 * 60000 ? "" : `<span>${fmtT(new Date(h)).replace(":00", "")}</span>`}</div>`;
+    // lanes for blocks that overlap
+    const ev = stops.map((st, i) => ({ st, i, s:Math.max(+st.s, a0), e:Math.min(+st.e, z0) })).filter(x => x.e > x.s).sort((p, q) => p.s - q.s);
+    let lanes = [], group = [], end = 0;
+    const close = () => { group.forEach(x => x.n = lanes.length); group = []; lanes = []; };
+    for (const x of ev) {
+      if (group.length && x.s >= end) close();
+      let L = lanes.findIndex(e => e <= x.s); if (L < 0) { L = lanes.length; lanes.push(0); }
+      lanes[L] = x.e; x.lane = L; group.push(x); end = Math.max(end, x.e);
     }
-    out += `<text class="tm" x="${START.x}" y="${START.y + 2}" text-anchor="middle">MORNING</text>`;
-    out += `<text class="emo" x="${SUMMIT.x + 12}" y="${SUMMIT.y + 8}">⛺</text><text class="tm" x="${SUMMIT.x - 10}" y="${SUMMIT.y + 4}" text-anchor="end">${esc(peakName().toUpperCase())}</text>`;
-    stops.forEach((st, i) => {
-      const p = P[i], left = p.x >= 170, ax = left ? -24 : 24, anc = left ? "end" : "start";
-      const isCur = i === curI, past = st.e <= t && !isCur;
-      out += `<g class="stopg${past ? " past" : ""}" data-stop="${i}" transform="translate(${p.x},${p.y})">`;
-      out += `<circle class="hit" r="24"/>`;
-      // the symbol in its colour ring; anchors carry a small campfire that lights on check-in
-      const b0 = st.blocks[0], g = GROUPS[st.free ? "calm" : groupOf(b0)], r = st.free ? 10 : 13, done = st.lit || (past && st.free);
-      out += `<g class="sym${done ? " done" : ""}${st.skipped ? " skip" : ""}"><circle r="${r}" fill="${done ? g.ring : g.fill}" stroke="${g.ring}" stroke-width="2"/>` +
-        `<path d="${SYM[st.free ? "compass" : symOf(b0)] || SYM["map-pin"]}" transform="translate(${-r * .62},${-r * .62}) scale(${r * .052})" fill="none" stroke="${done ? g.fill : g.ring}" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></g>`;
-      if (st.anchor) out += `<g class="fire${st.lit ? " lit" : ""}" transform="translate(${left ? 13 : -13},-12) scale(.55)"><circle class="glow" r="14"/>` +
-        `<path class="flame" d="M0,6 C-9,1 -7,-8 0,-17 C1,-10 8,-8 7,-1 C6,4 3,6 0,6Z"/><path class="flame2" d="M0,5 C-4,2 -3,-3 0,-8 C1,-4 4,-3 3,1 C3,4 1,5 0,5Z"/></g>`;
-      if (isCur) out += `<circle class="ringm" r="${r + 4}"/>`;
-      const name = st.t.length > 24 ? st.t.slice(0, 23) + "…" : st.t;
-      out += `<text class="tm" x="${ax}" y="-3" text-anchor="${anc}">${fmtT(st.s)}</text>`;
-      out += `<text class="nm${st.skipped ? " gone" : ""}" x="${ax}" y="11" text-anchor="${anc}">${esc(name)}</text>`;
-      const flags = (isCur && st.free && G.day.side ? "🐉" : "") + "🚩".repeat(Math.min(st.flags, 3));
-      if (flags) out += `<text class="emo sm" x="${left ? 16 : -16}" y="-12" text-anchor="middle">${flags}</text>`;
-      out += `</g>`;
-    });
-    out += `<g class="trav" transform="translate(${tp.x},${tp.y})"><circle class="halo" r="16"/><circle class="me" r="7"/>`;
-    if (zap) out += `<g class="cloud" transform="translate(0,-40)"><ellipse cx="-9" cy="0" rx="11" ry="8"/><ellipse cx="6" cy="-4" rx="13" ry="10"/><ellipse cx="15" cy="2" rx="9" ry="7"/><ellipse cx="2" cy="4" rx="15" ry="6"/>` +
-      [-10, -2, 6, 14].map((x, k) => `<line class="rain" x1="${x}" y1="12" x2="${x - 2}" y2="17" style="animation-delay:${k * .17}s"/>`).join("") +
-      `<path class="bolt" d="M3,8 L-2,17 L2,17 L-1,24 L7,13 L3,13 L6,8Z"/></g>`;
-    out += `</g></svg>`;
-    return out;
+    close();
+    for (const { st, i, s, e, lane, n } of ev) {
+      const b0 = st.blocks[0], isCur = cur && st.blocks.some(b => b.key === cur.key), past = st.e <= t && !isCur;
+      const c = st.free ? "" : calColor(b0), top = y(s) + 1, h = Math.max(18, y(e) - y(s) - 2);
+      const pts = st.free ? 0 : st.blocks.reduce((a, b) => a + blockGain(b), 0);
+      const tick = st.lit ? "✓ " : "", time = `${fmtT(st.s)} to ${fmtT(st.e)}`;
+      const cls = `cal-ev${st.free ? " free" : ""}${past ? " past" : ""}${isCur ? " now" : ""}${st.skipped ? " gone" : ""}${h < 36 ? " one" : ""}`;
+      out += `<button class="${cls}" data-stop="${i}" style="${c ? `--c:${c};` : ""}top:${top}px;height:${h}px;left:calc(var(--cal-l) + (100% - var(--cal-l)) * ${lane} / ${n});width:calc((100% - var(--cal-l)) / ${n} - 3px)" aria-label="${esc(st.t)}, ${time}">` +
+        `<b>${tick}${esc(st.t)}</b><span class="cal-t">${h < 36 ? fmtT(st.s) : time}</span>${pts ? `<span class="cal-pts">+${pts}</span>` : ""}</button>`;
+    }
+    if (t >= a0 && t <= z0) out += `<div class="cal-now" style="top:${y(+t)}px"><span>${fmtT(t)}</span></div>`;
+    return out + `</div>`;
   }
+  let calScrolled = "";
   // Days saved before Altitude (2026-10-05) lack its fields; the season starts at 0 m
   function ensureDay(){
     const d = G.day;
@@ -3522,9 +3499,11 @@
     $("zap").classList.toggle("back", !!z);
     $("zap").onclick = z ? endZap : openCal;
 
-    // the mountain: today's stops, climbing from the morning to camp
+    // Today: the calendar column (d216); on the dashboard it opens scrolled to now, once a day
     const stops = stopsOf(all);
-    put("mtn", mountainSVG(stops, cur, t, z));
+    put("mtn", calendarHTML(stops, cur, t));
+    const calBox = $("mtn").closest(".grid-stack-item-content"), nowLine = $("mtn").querySelector(".cal-now");
+    if (calBox && nowLine && calScrolled !== dayKey()) { calScrolled = dayKey(); calBox.scrollTop = Math.max(0, nowLine.offsetTop - calBox.clientHeight / 3); }
     $("mtn").querySelectorAll("[data-stop]").forEach(n => n.onclick = () => {
       const st = stops[+n.dataset.stop]; if (!st) return;
       const fixed = st.blocks.find(b => b.kind !== "open" && b.kind !== "break");
@@ -3532,8 +3511,6 @@
       if (fixed) openStop(blocks().find(x => x.key === fixed.key) || fixed); else openAdd(st.s);
     });
     $("addBtn").onclick = () => openAdd();
-    const fires = stops.filter(st => st.anchor);
-    $("trailMeta").textContent = `${fires.filter(st => st.lit).length} / ${fires.length} fires lit`;
 
     // log
     $("dayXp").textContent = G.day.log.length ? `${G.day.log.length} today` : "";
@@ -3578,6 +3555,6 @@
   pullAll();
 })();
 </script>
-<script src="quest-dash.js?v=20261010b"></script>
+<script src="quest-dash.js?v=20261010c"></script>
 </body>
 </html>
