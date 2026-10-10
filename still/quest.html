@@ -111,8 +111,19 @@
   .bg-body .bg-glow { opacity:calc(.04 + .45 * var(--b)); transform:scale(calc(1 + .12 * var(--b))); }
   .bg-seat { animation:bgBreath 6s ease-in-out infinite; transform-origin:50% 95%; }
   .bg-stand { filter:saturate(calc(.3 + .7 * var(--b))) brightness(calc(.62 + .38 * var(--b))); transition:filter 1.2s; }
+  /* the body level fills the standing figure from the feet like water: bright teal, a moving wave on top, a light rising
+     through it (Junyan, 2026-10-10: "make the body stripe brighter and also animated"). The figure spans about 3% to 97%
+     of its box, so the level is placed inside that. */
   .bg-fill { -webkit-mask:var(--mask, url(sprites/stand.webp)) 50% 100% / contain no-repeat; mask:var(--mask, url(sprites/stand.webp)) 50% 100% / contain no-repeat;
-    background:linear-gradient(0deg, rgba(95,211,196,.12) calc(var(--b) * 100%), transparent calc(var(--b) * 100% + 1px)); mix-blend-mode:screen; }
+    --lvl:calc(3% + var(--b) * 94%); overflow:hidden; mix-blend-mode:screen;
+    background:linear-gradient(0deg, rgba(95,211,196,.34), rgba(127,240,222,.24) var(--lvl), transparent calc(var(--lvl) + 1px)); }
+  .bg-fill::before { content:""; position:absolute; left:0; right:0; height:12px; bottom:calc(var(--lvl) - 6px);
+    background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='12'%3E%3Cpath d='M0 6 Q15 0 30 6 T60 6 V12 H0Z' fill='%23b8fff2' fill-opacity='.85'/%3E%3C/svg%3E") repeat-x 0 0 / 60px 12px;
+    animation:bgWave 2.6s linear infinite; filter:drop-shadow(0 0 4px rgba(160,255,240,.9)); }
+  .bg-fill::after { content:""; position:absolute; left:0; right:0; height:22%; bottom:0;
+    background:linear-gradient(0deg, transparent, rgba(220,255,250,.55), transparent); animation:bgSurge 3.4s ease-in-out infinite; }
+  @keyframes bgWave { to { background-position-x:60px; } }
+  @keyframes bgSurge { 0% { bottom:-22%; opacity:0 } 25% { opacity:1 } 100% { bottom:calc(var(--lvl) - 22%); opacity:0 } }
   .bg-lab { position:relative; text-align:center; padding:4px 0 10px; line-height:1.1; }
   .bg-n { font-size:26px; font-weight:700; }
   .bg-k { font-size:12px; letter-spacing:.14em; text-transform:uppercase; opacity:.85; }
@@ -124,7 +135,7 @@
   @keyframes bgPulse { 50% { filter:brightness(1.25); } }
   @keyframes bgBreath { 50% { transform:scale(1.015); } }
   @keyframes bgRise { 0% { transform:translateY(0); opacity:0 } 20% { opacity:.9 } 100% { transform:translateY(-170px); opacity:0 } }
-  @media (prefers-reduced-motion: reduce) { .bg-stage * { animation:none !important; } }
+  @media (prefers-reduced-motion: reduce) { .bg-stage *, .bg-stage *::before, .bg-stage *::after { animation:none !important; } }
   .hud-mid { flex:1; min-width:0; }
   .hud-title { font-size:13px; color:var(--ink-soft); display:flex; justify-content:space-between; }
   .hud-title b { color:var(--ink); font-weight:600; }
@@ -326,7 +337,7 @@
   .cal-ev.one .cal-pts { top:50%; transform:translateY(-50%); }
   .cal-now { position:absolute; left:var(--cal-l); right:0; height:2px; margin-top:-1px; background:#ff8f9e; z-index:2; pointer-events:none; }
   .cal-now::before { content:""; position:absolute; left:-5px; top:-4px; width:10px; height:10px; border-radius:50%; background:#ff8f9e; }
-  .cal-now span { position:absolute; left:calc(-1 * var(--cal-l)); width:calc(var(--cal-l) - 10px); top:-7px; text-align:right; font-size:11px; font-weight:700; color:#ff8f9e; }
+  .cal-now span { position:absolute; left:calc(-1 * var(--cal-l) - 6px); width:calc(var(--cal-l) - 4px); top:-7px; text-align:right; white-space:nowrap; font-size:10.5px; font-weight:700; color:#ff8f9e; }
   /* ---------- trail ---------- */
   h2 { font-size:12px; letter-spacing:.14em; text-transform:uppercase; color:var(--ink-soft); font-weight:600;
     margin:26px 4px 10px; display:flex; justify-content:space-between; }
