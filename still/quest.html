@@ -826,7 +826,7 @@
   };
   const RULES = [
     [/sleep|nap\b|nap |wind.?down|\bbed\b|rest\b/i, "rest"],
-    [/shambhavi|sadhana|yoga|meditat|pooja|kriya|bhuta|breath/i, "practice"],
+    [/shambhavi|sadhana|yoga|meditat|pooja|kriya|bhuta|angamardana|surya|nadi shuddhi|breath/i, "practice"],
     [/breakfast|brunch|lunch|dinner|\beat\b|cook|meal|pudding|veggie|snack|groceries/i, "fuel"],
     [/ride|drive|flight|airport|check.?in|security|transfer|uber|\btrain\b|lounge|board|pack|\b[A-Z]{2}\d{2,4}\b/i, "travel"],
     [/gym|sauna|\brun\b|walk|mobility|swim|workout|training|stretch/i, "body"],
@@ -908,7 +908,7 @@
     Madrid:"Guadarrama Crest", Toronto:"Escarpment Line", London:"Thames Ridge", "São Paulo":"Serra do Mar" };
   const placeNow = () => (PLAN && PLAN.where && PLAN.where.place) || "Home";
   const peakName = () => PEAKS[placeNow()] || `${placeNow()} Ridge`;
-  const isSadhana = b => b.kind === "practice" || /shambhavi|sadhana|kriya/i.test(b.t);
+  const isSadhana = b => b.kind === "practice" || /shambhavi|sadhana|kriya|angamardana|yogasana/i.test(b.t);
   const isSleep = b => b.kind === "rest" && /sleep(?!er)|\bbed\b/i.test(b.t);   // not "Sleeper Train"
   const isMeal = b => b.kind === "fuel";
   // what a block is worth in prana: [on time, late, "not today", missed]
@@ -918,6 +918,24 @@
      missed block costs nothing: the app asks what he needs instead. */
   const RECOVER = [["Isha Kriya", 12], ["Upa Yoga", 20], ["NSDR", 20]];
   const isRecovery = b => /isha kriya|upa yoga|nsdr|yoga nidra|\bnap\b|recover/i.test(b.t);
+  /* Practices come from the calendar (Junyan, 2026-10-10: "instead of me clicking on
+     shambhavi, angamardana, surya kriya, yogasanas, bhuta shuddhi I want these to be
+     scheduled"). A practice block pays every practice its title names when it starts,
+     e.g. "Sadhana: Shambhavi, Angamardana, Surya Kriya, Yogasanas, Bhuta Shuddhi".
+     A sadhana block that names none pays Shambhavi; a recovery block pays Isha Kriya.
+     Shambhavi, Surya Kriya, Angamardana, Yogasanas and Bhuta Shuddhi have no tile at all
+     (Junyan, 2026-10-10: "I don't want any tiles for the listed ones"). */
+  const PRACTICE_NAMES = [["shambhavi", /shambhavi|mahamudra/i], ["surya", /surya/i], ["angam", /angamardana/i],
+    ["upa", /upa yoga/i], ["yogasana", /yogasana|hatha/i], ["bhuta", /bhuta/i], ["kriya", /isha kriya/i], ["nadi", /nadi/i]];
+  function blockHabits(b){
+    const ids = PRACTICE_NAMES.filter(([, re]) => re.test(b.t)).map(([id]) => id);
+    if (!ids.length && isSadhana(b)) ids.push("shambhavi");
+    if (!ids.length && isRecovery(b)) ids.push("kriya");
+    return ids;
+  }
+  const payBlock = b => blockHabits(b).forEach(id => logHabit(id, true));
+  // today's not-yet-started block that will pay this practice, so its tile says when
+  const schedFor = id => { const t = now(); return blocks().find(b => b.e > t && !(G.day.checks || {})[gk(b)] && blockHabits(b).includes(id)); };
   /* What effort costs an hour (Junyan, 2026-10-09, d187 to d189: "Hike should consume a
      lot more than 4 prana ... Sandboarding 4 hrs takes way more than 6"). Five kinds:
      very hard 10, hard 7, focused 5, light 2, free 0. Level 1 has no discount. */
@@ -939,7 +957,8 @@
      spends more. Mostly ending days high moves him up; mostly low moves him down. */
   /* The habit list (Junyan, 2026-10-08: "very specific, not generic", water is one
      250 ml cup a tap). [id, full label, prana, max a day, icon, tile label, flags, group].
-     flags: "flat" = every tap gives the same, "auto" = the game counts it from the
+     flags: "flat" = every tap gives the same, "cal" = no tile, only a calendar block
+     naming it pays it (2026-10-10), "auto" = the game counts it from the
      calendar and check-ins (evening ones pay out the next morning). Ids that existed
      before keep their meaning except water, now 250 ml. No movement here: training,
      cardio, cold and walks take energy, and their calendar blocks spend it (Junyan,
@@ -952,12 +971,13 @@
     ["supps", "Morning supplements taken", 1, 1, "💊", "Supplements", "", "Morning"],
     ["neem", "Neem and turmeric, every morning", 3, 1, "🌿", "Neem + turmeric", "", "Morning"],
     ["mouthAm", "Dr Ellie's mouthcare routine in the morning, the whole routine in one tap", 2, 1, "🦷", "Dr Ellie AM", "", "Morning"],
-    ["shambhavi", "Shambhavi Mahamudra (counts itself from the sadhana check-in)", 18, 1, "🧘", "Shambhavi", "", "Practice"],
+    ["shambhavi", "Shambhavi Mahamudra (counts itself from a sadhana block on the calendar)", 18, 1, "🧘", "Shambhavi", "cal", "Practice"],
     ["kriya", "Isha Kriya", 8, 1, "🌀", "Isha Kriya", "", "Practice"],
     ["upa", "Upa Yoga", 5, 1, "🙆", "Upa Yoga", "", "Practice"],
-    ["surya", "Surya Kriya", 10, 1, "☀️", "Surya Kriya", "", "Practice"],
-    ["angam", "Angamardana", 8, 1, "💪", "Angamardana", "", "Practice"],
-    ["bhuta", "Bhuta Shuddhi", 6, 1, "🔥", "Bhuta Shuddhi", "", "Practice"],
+    ["surya", "Surya Kriya", 10, 1, "☀️", "Surya Kriya", "cal", "Practice"],
+    ["angam", "Angamardana", 8, 1, "💪", "Angamardana", "cal", "Practice"],
+    ["yogasana", "Yogasanas", 8, 1, "🧘", "Yogasanas", "cal", "Practice"],
+    ["bhuta", "Bhuta Shuddhi", 6, 1, "🔥", "Bhuta Shuddhi", "cal", "Practice"],
     ["barefoot", "Walk barefoot on natural ground (soil, grass or sand), daily, any length; most important around the new moon", 3, 1, "🦶", "Barefoot walk", "", "Practice"],
     ["nadi", "Nadi Shuddhi, 5 min", 3, 2, "🌬️", "Nadi Shuddhi 5'", "", "Practice"],
     ["blueprint", "Blueprint meal: Super Veggie or Nutty Pudding", 6, 2, "🥗", "Veggie / Pudding", "", "Food"],
@@ -1198,21 +1218,24 @@
   // d206: his pixel icons replace the emoji as they arrive (still/sprites/icons/<id>.webp); add the id here
   const ICONS = new Set([]);
   const hIcon = (id, icon) => ICONS.has(id) ? `<img class="hi-img" src="sprites/icons/${id}.webp" alt="">` : icon;
+  const TILES = HABITS.filter(h => h[6] !== "cal");   // the calendar-only practices get no tile
+  const h7 = id => (HABITS.find(x => x[0] === id) || [])[7];
   function habitTile([id, full, , max, icon, short, flag]){
     const n = G.day.habits[id] || 0, g = habitGain(id), auto = flag === "auto", earned = auto && (G.day.earn || {})[id];
     const cls = ["htile", !auto && !g ? "full" : "", auto ? "auto" : "", earned || (auto && n) ? "earned" : "", id === "water" ? "water" : ""].filter(Boolean).join(" ");
     const cnt = id === "xylitol" ? `<span class="hc">${n ? `${n} g${n < 6 ? " / 6" : ""}` : ""}</span>` : id === "water" ? `<span class="hc">${n ? `${n * 250} ml` : ""}</span>` : max > 1 && n ? `<span class="hc">${n}/${max}</span>` : n ? `<span class="hc">✓</span>` : "";
     const fill = max > 1 && n ? `<i class="glass" style="height:${Math.round(n / max * 100)}%"></i>` : "";
-    const tg = id === "bedtime" && BED ? `${n ? "✓" : "✗"} ${BED.asleep}` : auto ? (n ? "✓ last night" : earned ? "✓ tonight" : "auto") : g ? (g > 0 ? `+${g}` : `${g}`) : "";
+    const sb = !auto && !n && g > 0 && h7(id) === "Practice" ? schedFor(id) : null;
+    const tg = id === "bedtime" && BED ? `${n ? "✓" : "✗"} ${BED.asleep}` : auto ? (n ? "✓ last night" : earned ? "✓ tonight" : "auto") : sb ? `📅 ${fmtT(sb.s)}` : g ? (g > 0 ? `+${g}` : `${g}`) : "";
     return `<button class="${cls}" data-habit="${id}" data-why="${esc(WHY[id] || full)}">${fill}<span class="hi">${hIcon(id, icon)}</span><span class="hl">${esc(short)}</span>${cnt}<b class="${meterOf(id) === "b" ? "mb" : "mp"}">${tg}</b></button>`;
   }
   function habitsHTML(){
     const tile = habitTile;
-    const hDone = HABITS.filter(h => h[6] !== "neg" && (G.day.habits[h[0]] || 0) > 0).length;
-    return `<div class="hhead"><span class="eyebrow">Prana actions · level ${lvl()} · ${hDone}/${HABITS.length - 1}</span>` +
+    const hDone = TILES.filter(h => h[6] !== "neg" && (G.day.habits[h[0]] || 0) > 0).length;
+    return `<div class="hhead"><span class="eyebrow">Prana actions · level ${lvl()} · ${hDone}/${TILES.length - 1}</span>` +
       `<button class="hsnd" data-hsnd aria-label="Tap sounds">${window.QuestFx && QuestFx.soundOn() ? "🔊" : "🔇"}</button></div>` +
       `<div class="hkey"><b class="mp">gold</b> fills prana (Sadhguru) · <b class="mb">teal</b> fills body (Bryan Johnson)</div>` +
-      ["Morning", "Practice", "Food", "Evening"].map(gr => `<div class="hgrp"><div class="hgl">${gr}</div><div class="hgrid">${HABITS.filter(h => h[7] === gr).map(tile).join("")}</div></div>`).join("");
+      ["Morning", "Practice", "Food", "Evening"].map(gr => `<div class="hgrp"><div class="hgl">${gr}</div><div class="hgrid">${TILES.filter(h => h[7] === gr).map(tile).join("")}</div></div>`).join("");
   }
   /* Three picks for right now (Junyan, 2026-10-09: "only suggestions for this exact
      moment, 3 suggestions; the rest behind an All Actions button"). Each action has
@@ -1232,7 +1255,7 @@
     const afterMeal = all.some(b => isMeal(b) && +b.e <= +t && +t - +b.e <= 45 * 60000);
     const out = [];
     HABITS.forEach(([id, , , max, , , flag], k) => {
-      const w = WHEN[id]; if (!w || flag === "auto" || !habitGain(id) || h < w[0] || h > w[1]) return;
+      const w = WHEN[id]; if (!w || flag === "auto" || flag === "cal" || !habitGain(id) || h < w[0] || h > w[1]) return;
       let sc = 10 + habitGain(id) / 3 - k * 0.01;
       if (w[1] - h < 1.5) sc += 4;                                     // its window closes soon
       if (FOOD.has(id)) sc += meal ? 9 : -4;
@@ -1250,11 +1273,11 @@
   function suggestHTML(){
     const key = `${G.day.date}|${tzParts(now(), { hour:"numeric", hourCycle:"h23" }).hour}|${JSON.stringify(G.day.habits)}`;
     if (!SUGG || SUGG.key !== key) SUGG = { key, list: suggestions() };
-    const hDone = HABITS.filter(h => (G.day.habits[h[0]] || 0) > 0).length;
+    const hDone = TILES.filter(h => (G.day.habits[h[0]] || 0) > 0).length;
     return `<div class="hhead"><span class="eyebrow">Prana actions · right now</span>` +
       `<button class="hsnd" data-hsnd aria-label="Tap sounds">${window.QuestFx && QuestFx.soundOn() ? "🔊" : "🔇"}</button></div>` +
       (SUGG.list.length ? `<div class="hgrid sugg">${SUGG.list.map(habitTile).join("")}</div>` : `<div class="hint" style="margin:8px 2px">Nothing pressing right now.</div>`) +
-      `<button class="pa-all" data-all>All prana actions<span>${hDone}/${HABITS.length} done ›</span></button>`;
+      `<button class="pa-all" data-all>All prana actions<span>${hDone}/${TILES.length} done ›</span></button>`;
   }
   function bindHabits(root){
     root.querySelectorAll("[data-all]").forEach(bn => bn.onclick = openActions);
@@ -1466,8 +1489,7 @@
     G.day.checks[gk(b)] = late ? "late" : "in";
     G.day.started = G.day.started || {}; G.day.started[gk(b)] = now().toISOString();
     log(`Started ${shortName(b)}`); saveG();
-    if (isSadhana(b)) logHabit("shambhavi", true);
-    if (isRecovery(b)) logHabit("kriya", true);
+    payBlock(b);
     // the bag hands out tools at real moments
     if (isSadhana(b)) giveItem("breath", "After Shambhavi.");
     if (isMeal(b)) giveItem("water", `At ${shortName(b)}.`);
@@ -1482,8 +1504,7 @@
     G.day.started = G.day.started || {};
     list.forEach(b => {
       G.day.checks[gk(b)] = "in"; G.day.started[gk(b)] = b.s.toISOString();
-      if (isSadhana(b)) logHabit("shambhavi", true);
-      if (isRecovery(b)) logHabit("kriya", true);
+      payBlock(b);
     });
     saveG();
   }
@@ -1564,7 +1585,7 @@
     if (G.day.missed[gk(b)]) return;
     G.day.missed[gk(b)] = happened ? "yes" : "no";
     if (happened) { G.day.checks[gk(b)] = "late"; G.day.closes[gk(b)] = "done"; log(`Did it, forgot to tap: ${shortName(b)}`); saveG();
-      if (isSadhana(b)) logHabit("shambhavi", true); spend(b); }
+      payBlock(b); spend(b); }
     else { G.day.checks[gk(b)] = "skip"; G.day.closes[gk(b)] = "missed"; log(`Didn't happen: ${shortName(b)}`); saveG(); }
     if (!quiet) render();
   }
@@ -2201,7 +2222,7 @@
      morning, weather, the schedule (each activity opens its window), one slide per prepped moment,
      then today's practices: yogic and Bryan Johnson's (he dropped "one word for today": "I want things
      to be yogic practices / or bryan johnson practices"). They are the Prana actions habits, logged the same way. */
-  const MO_PRACTICES = [["Yogic", ["shambhavi", "surya", "kriya", "nadi"]],
+  const MO_PRACTICES = [["Yogic", ["kriya", "nadi"]],   // the rest come from the calendar
     ["Bryan Johnson", ["protein", "blueprint", "early", "bedtime"]]];
   // full names, minus tour-sheet noise ("+ Extras", trailing dots)
   const moName = b => (b.t || "").replace(/\s*\+\s*extras\b/i, "").replace(/\.{2,}$/, "").replace(/^(tour|hike)\s*-\s*/i, (m, w) => w[0].toUpperCase() + w.slice(1).toLowerCase() + ": ").trim();
@@ -3080,7 +3101,7 @@
     // d148 (2026-10-09): no check-ins. A block on the calendar counts as happening from its start;
     // Change course is how the day changes. Effort is counted when a block ends.
     const since = new Date(G.day.pranaSince || G.day.since);
-    autoStart(all.filter(b => needsCheck(b) && b.s <= t && b.e > since && !G.day.checks[gk(b)]));
+    autoStart(all.filter(b => needsCheck(b) && b.s <= t && (b.e > since || blockHabits(b).length) && !G.day.checks[gk(b)]));
     all.filter(b => b.e <= t && ["in", "late"].includes(G.day.checks[gk(b)]) && !(G.day.spent || {})[gk(b)]).forEach(spend);
     all.filter(b => b.e <= t && ["in", "late"].includes(G.day.checks[gk(b)]) && (G.day.spent || {})[gk(b)]).forEach(respend);
     // coming up: the next real thing, with its prep, so he is ready before it starts

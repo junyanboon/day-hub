@@ -20,7 +20,7 @@
   };
   const RULES = [
     [/sleep|nap\b|nap |wind.?down|\bbed\b|rest\b/i, "rest"],
-    [/shambhavi|sadhana|yoga|meditat|pooja|kriya|bhuta|breath/i, "practice"],
+    [/shambhavi|sadhana|yoga|meditat|pooja|kriya|bhuta|angamardana|surya|nadi shuddhi|breath/i, "practice"],
     [/breakfast|brunch|lunch|dinner|\beat\b|cook|meal|pudding|veggie|snack|groceries/i, "fuel"],
     [/ride|drive|flight|airport|check.?in|security|transfer|uber|\btrain\b|lounge|board|pack|\b[A-Z]{2}\d{2,4}\b/i, "travel"],
     [/gym|sauna|\brun\b|walk|mobility|swim|workout|training|stretch/i, "body"],
