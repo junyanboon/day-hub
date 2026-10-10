@@ -1052,7 +1052,7 @@
   function habitGain(id){
     const h = HABITS.find(x => x[0] === id); if (!h) return 0;
     const n = (G.day.habits || {})[id] || 0;
-    if (id === "heavy") return n >= h[3] ? 0 : -h[2];   // a heavy meal lowers prana, the same each time
+    if (id === "heavy") return -h[2];   // every heavy meal lowers prana the same (2026-10-11: a second one counted 0 while it showed -5)
     // full value again (d202): the two meters keep tiredness out of prana
     return n >= h[3] ? 0 : Math.max(1, Math.round(h[2] * (h[6] === "flat" ? 1 : (DIM[n] ?? .2)) * gainMult()));
   }
@@ -1903,7 +1903,7 @@
     openSheet(`${b ? winHead(b) : ""}<h3>How was ${esc(name.toLowerCase() === "this meal" ? "this meal" : name)}?</h3>
       <p>Tap what fits, then confirm.</p>
       <div class="win-lb">Prana (Sadhguru)</div>
-      ${MQ_PRANA.map(([id, icon, txt, v]) => row(id, icon, txt, sign(id === "heavy" ? habitGain("heavy") || -5 : v > 0 ? Math.round(v * gainMult()) : v), "mp")).join("")}
+      ${MQ_PRANA.map(([id, icon, txt, v]) => row(id, icon, txt, sign(id === "heavy" ? habitGain("heavy") : v > 0 ? Math.round(v * gainMult()) : v), "mp")).join("")}
       <div class="win-lb">Body (Bryan Johnson)</div>
       ${MQ_BODY.map(id => { const h = HABITS.find(x => x[0] === id), g = habitGain(id); return row(id, h[4], h[5], g ? sign(g) : "full today", "mb"); }).join("")}
       ${row(MQ_JUNK[0], MQ_JUNK[1], MQ_JUNK[2], sign(MQ_JUNK[3]), "mb")}
