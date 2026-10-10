@@ -600,7 +600,7 @@
 <script src="nvc-words.js?v=20261010a"></script>
 <script src="quest-fx.js?v=20261009b"></script>
 <script src="quest-night.js?v=20261010b"></script>
-<script src="quest-morning.js?v=20261011b"></script>
+<script src="quest-morning.js?v=20261011d"></script>
 </head>
 <body>
 <div id="sky" aria-hidden="true"><div class="sky-stars"></div><div class="sky-orb"></div>
@@ -1401,7 +1401,7 @@
   // sleep sets the body for the day: the Oura sleep score, or hours slept x 10 (d201)
   function refillSleep(level, why){
     if (G.day.slept) return;
-    G.day.slept = true;
+    G.day.slept = true; G.day.sleepScore = Math.round(level);   // the Oura score, or hours x 10
     addBody(Math.max(0, Math.min(100, level)) - body(), why, "sleep");
     render();
   }
@@ -2742,6 +2742,21 @@
     home: [["jw", "Jack Woods", 3, /Jack Woods/, 60], ["ms", "Matthew I. Smith", 1, /Matthew/, 45]],
     travel: [["jw1", "Jack Woods · Day 1", 1, /Jack Woods · Day 1/, 60], ["jw2", "Jack Woods · Day 2", 1, /Jack Woods · Day 2/, 60], ["ms", "Matthew I. Smith", 1, /Matthew/, 45]],
   };
+  /* A day to go easy on strength (Junyan, 2026-10-11, d245: "we should always try our best to get everything in,
+     but look at the calendar and consider lack of sleep due to travel (especially when changing locations)... in
+     these situations strength training can be damaging"). Reasons: a sleep score under 70, a long trip on today's
+     calendar (flight, bus, train, ferry of an hour or more, the overnight ones included), or waking up somewhere new.
+     Strength is not suggested and a gym block gets a warning; Matthew I. Smith mobility stays. */
+  const STRENGTH = b => isGym(b) && !/matthew|smith|mobility|stretch/i.test(b.t);
+  function recoveryReasons(){
+    const why = [], sc = G.day.sleepScore;
+    if (typeof sc === "number" && sc < 70) why.push(`sleep score ${sc}`);
+    const trip = blocks().find(b => b.e - b.s >= 3600000 && /flight|\bbus\b|\btrain\b|ferry|overnight|\b[A-Z]{2}\d{2,4}\b/.test(b.t.replace(/bus|train|ferry|flight|overnight/gi, m => m.toLowerCase())));
+    if (trip) why.push(`travel day (${shortName(trip)})`);
+    const prev = Object.entries(G.days || {}).filter(([k]) => k !== G.day.date).sort((a, b) => Date.parse(b[0]) - Date.parse(a[0]))[0];
+    if (prev && prev[1].place && PLAN && PLAN.where && PLAN.where.place && prev[1].place !== PLAN.where.place) why.push(`new place (${PLAN.where.place})`);
+    return why;
+  }
   function trainingWeek(){
     const home = homeWeek(), { days, left } = weekDays(), today = gameYmd(), logs = (gymInfo.last || []).filter(w => days.includes(w.date));
     const all = blocks();
@@ -2754,7 +2769,11 @@
       return { id:"w:" + key, icon: key === "ms" ? "🤸" : "🏋️", label:name, name:`Gym · ${prog.replace(" · ", " ")}`, mins, have, q, need: Math.max(0, q - have),
         at: at ? fmtT(at.s) : "", cal:true, weekly:true };
     });
-    return { home, items: pickToday(items, left) };
+    const why = recoveryReasons();
+    if (!why.length) return { home, items: pickToday(items, left) };
+    // strength waits for a better day: no star, no button, the reason instead
+    return { home, easy: why, items: pickToday(items.map(x => x.id === "w:ms" ? x : { ...x, rest:true }), left).map(x => x.rest
+      ? { ...x, pick:false, small:`${x.have} of ${x.q} this week · not today: ${why.join(", ")}. Strength after travel or little sleep can do harm.` } : x) };
   }
   // mark today's picks: the most behind first, and anything that can no longer wait
   function pickToday(items, left){
@@ -2787,7 +2806,7 @@
       if (t.week && t.week.length) out.push([`${x.name} · this week`, t.week]);
       if (t.some && t.some.length) out.push([`${x.name} · ${t.someTitle || "some days"}`, t.some]); }
     const tw = trainingWeek();
-    out.push([`Training · ${tw.home ? "home" : "travel"} week`, tw.items]);
+    out.push([`Training · ${tw.home ? "home" : "travel"} week${tw.easy ? " · go easy today" : ""}`, tw.items]);
     return out.concat([["Bryan Johnson", ["early", "bedtime"].map(id => practiceItem(id)).filter(Boolean)]]);
   };
 
@@ -2919,9 +2938,10 @@
       G.day.plan = G.day.plan || {};
       const est = G.day.plan.est || {};
       return { now:t, today:tzYmd(t), greet:d.greet, place:d.place, date:d.date, prana:d.prana, body:body(), wx:moWx(), plan:G.day.plan,
+        recovery: recoveryReasons(),
         practiced: all.some(b => isSadhana(b) && ["in", "late"].includes(G.day.checks[gk(b)])) || HABITS.some(h => h[7] === "Practice" && (G.day.habits || {})[h[0]]),
         items: all.map(b => ({ key:b.key, name:moName(b), s:b.s, e:b.e, kind:b.kind, open:b.kind === "open", brk:b.kind === "break", meal:isMeal(b), sleep:isSleep(b),
-          sadhana:isSadhana(b), flight:/flight|\b[A-Z]{2}\d{2,4}\b/.test(b.t) && b.kind === "travel", extra:!!b.extra, taskId:b.taskId || null,
+          sadhana:isSadhana(b), strength:STRENGTH(b), flight:/flight|\b[A-Z]{2}\d{2,4}\b/.test(b.t) && b.kind === "travel", extra:!!b.extra, taskId:b.taskId || null,
           cost:energy(b).rate * spendMult() * Math.max(0, (b.e - b.s) / 3600000), badge:badge(b, 30) })),
         tasks: TASKS.map(x => est[x.id] ? { ...x, estimate:`${est[x.id]} min` } : x),
         practices: moPractices() };
@@ -2931,6 +2951,7 @@
     at: (ref, h, dd) => new Date(+fromField(`${String(Math.floor(h)).padStart(2, "0")}:${String(Math.round((h % 1) * 60)).padStart(2, "0")}`, ref) + (dd || 0) * 86400000),
     move: (key, min) => { const b = blkByKey(key); if (b) return saveBlock(b, new Date(+b.s + min * 60000), new Date(+b.e + min * 60000), b.t, false); },
     setTime: (key, s, e) => { const b = blkByKey(key); if (b) return saveBlock(b, s, e, b.t, false); },
+    rename: (key, t) => { const b = blkByKey(key); if (b) return saveBlock(b, b.s, b.e, t, false); },
     drop: key => { const b = blkByKey(key); if (b) return dropBlock(b); },
     add: (t, s, e, extra) => { log(`Planned ${t}: ${fmtT(s)} to ${fmtT(e)}`);
       return writeOps(o => o.adds.push({ key:"x" + s.getTime(), s:s.toISOString(), e:e.toISOString(), t, type:"task", cal:"you", ...(extra || {}) })); },

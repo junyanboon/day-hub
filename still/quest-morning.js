@@ -119,6 +119,10 @@
         why: endB < 0 ? "More than you have. Something should get shorter or go." : `You'd end near ${endB}%. Tight.`,
         fixes: top && top.i.e - top.i.s > 45 * MIN ? [[`Cut ${top.i.name} by 30 min`, () => C.setTime(top.i.key, top.i.s, new Date(+top.i.e - 30 * MIN))]] : [] });
     }
+    // strength on a short-sleep or travel day (d245): offer mobility instead
+    if ((D.recovery || []).length) f.filter((i) => i.strength).forEach((g) => out.push({ id: "easy:" + g.key, warn: true, icon: "🛌",
+      text: `${g.name} at ${T(g.s)}, on a day to go easy.`, why: `${D.recovery.join(", ")}. Strength after travel or little sleep can do harm.`,
+      fixes: [["Swap for Matthew I. Smith mobility", () => C.rename(g.key, "Gym · Matthew I. Smith")], ["Not today", () => C.drop(g.key)]] }));
     // practice: something for prana still ahead
     if (!f.some((i) => i.sadhana) && !D.practiced) {
       const g = firstGap(D, 15, t);
@@ -315,12 +319,12 @@
     return `<div class="mp-h">Practices and training</div><p class="mp-lead">Every day first, then what your week still needs. ⭐ is today's pick: the one furthest behind. Fit in more if you can.</p>
       ${D.practices.map(([group, xs]) => `<div class="mo-kicker" style="margin-top:18px">${esc(group)}</div><div class="mo-prac">${xs.map((p) => {
         const fit = p.mins && !p.at && !p.done && gaps.find((g) => g.min >= p.mins);
-        const btns = p.done || p.auto ? "" : [
+        const btns = p.done || p.auto || p.rest ? "" : [
           fit ? `<button data-pplan="${esc(p.id)}">Put on the plan at ${T(fit.s)}</button>` : "",
           p.action ? `<button data-pact="${esc(p.id)}">Open ›</button>` : "",
           !p.cal && !p.action ? `<button data-habit="${esc(p.id)}">Done</button>` : ""].join("");
         return `<div class="mo-pr mp-pr${p.done ? " done" : p.pick ? " pick" : ""}"><span class="mo-pr-i">${p.icon}</span>
-          <span class="mo-pr-t"><b>${esc(p.label)}</b><small>${p.pick ? "⭐ Today's pick · " : ""}${esc(p.small)}${p.mins && !p.at && !p.done && !fit ? " · no free gap left" : ""}</small>${btns ? `<span class="mp-tb">${btns}</span>` : ""}</span>
+          <span class="mo-pr-t"><b>${esc(p.label)}</b><small>${p.pick ? "⭐ Today's pick · " : ""}${esc(p.small)}${p.mins && !p.at && !p.done && !p.rest && !fit ? " · no free gap left" : ""}</small>${btns ? `<span class="mp-tb">${btns}</span>` : ""}</span>
           <span class="mo-pr-g">${p.done ? "✓" : p.auto ? "auto" : p.gain ? `+${p.gain}` : ""}</span></div>`; }).join("")}</div>`).join("")}`;
   }
 
