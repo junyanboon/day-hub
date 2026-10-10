@@ -218,7 +218,9 @@
   .hud .combo { display:flex; align-items:baseline; gap:4px; min-width:0; text-align:left; }
   .hud .combo .n { font-size:13px; } .hud .combo .l { font-size:11px; margin:0; letter-spacing:0; text-transform:none; }
   .hud .gear { width:26px; height:26px; font-size:13px; background:transparent; }
-  @media (max-width:600px) { .hud { flex-wrap:wrap; row-gap:4px; } .hud .status { order:9; flex-basis:100%; justify-content:space-between; } }
+  /* always one line (Junyan, 2026-10-10): on a narrow screen the streak words go and the place gives way first */
+  .hud { flex-wrap:nowrap; white-space:nowrap; } .hud .o2row { flex:none; }
+  @media (max-width:600px) { .hud .combo .l { display:none; } .hud { gap:8px; } }
 
   /* ---------- cards ---------- */
   .card { background:var(--glass); border:1px solid var(--glass-border); border-radius:22px;
@@ -3403,8 +3405,8 @@
     $("combo").classList.toggle("hot", P >= 70);
     const where = PLAN && PLAN.where && PLAN.where.place;
     $("statusL").innerHTML = pullErr ? `<span class="dry">Offline: ${esc(pullErr)}</span>`
-      : PLAN ? `<span class="place">📍 ${esc(where || "Home")}</span> ${fmtT(t)} local` : "Loading your day…";
-    $("statusR").innerHTML = [DRY ? `<a class="dry" href="${location.pathname}">Test mode: nothing is saved. Tap for the real game</a>` : "", AT ? `<span class="dry">clock ${fmtT(t)}</span>` : ""].filter(Boolean).join(" · ");
+      : PLAN ? `<span class="place">📍 ${esc(where || "Home")}</span> ${fmtT(t)}` : "Loading your day…";
+    $("statusR").innerHTML = [DRY ? `<a class="dry" href="${location.pathname}" title="Nothing is saved here. Tap for the real game">Test mode</a>` : "", AT ? `<span class="dry">clock ${fmtT(t)}</span>` : ""].filter(Boolean).join(" · ");
 
     // mode
     const z = G.day.zap;
