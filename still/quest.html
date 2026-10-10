@@ -593,7 +593,7 @@
 <script src="nvc-words.js?v=20261010a"></script>
 <script src="quest-fx.js?v=20261009b"></script>
 <script src="quest-night.js?v=20261010b"></script>
-<script src="quest-morning.js?v=20261010e"></script>
+<script src="quest-morning.js?v=20261010f"></script>
 </head>
 <body>
 <div id="sky" aria-hidden="true"><div class="sky-stars"></div><div class="sky-orb"></div>
@@ -2758,10 +2758,25 @@
     drop: key => { const b = blkByKey(key); if (b) return dropBlock(b); },
     add: (t, s, e, extra) => { log(`Planned ${t}: ${fmtT(s)} to ${fmtT(e)}`);
       return writeOps(o => o.adds.push({ key:"x" + s.getTime(), s:s.toISOString(), e:e.toISOString(), t, type:"task", cal:"you", ...(extra || {}) })); },
+    // done in Notion; the answer carries the status it had, so Undo can put it back (2026-10-10)
     taskDone: async id => {
+      let was = "";
       if (!DRY) { const r = await fetch(API + "/tasks/done", { method:"POST", headers:{ "Content-Type":"application/json" }, body:JSON.stringify({ id, done:true }) });
-        if (!r.ok) { alert("Could not mark it done in Notion: HTTP " + r.status); return; } }
+        if (!r.ok) { alert("Could not mark it done in Notion: HTTP " + r.status); return null; }
+        was = ((await r.json().catch(() => ({}))).was) || ""; }
       const x = TASKS.find(y => y.id === id); TASKS = TASKS.filter(y => y.id !== id); if (x) log(`Done: ${x.task}`); saveG();
+      return { was };
+    },
+    taskUndo: async (task, was) => {
+      if (!DRY) { const r = await fetch(API + "/tasks/done", { method:"POST", headers:{ "Content-Type":"application/json" }, body:JSON.stringify({ id:task.id, done:false, status:was || "" }) });
+        if (!r.ok) { alert("Could not reopen it in Notion: HTTP " + r.status); return false; } }
+      if (!TASKS.some(y => y.id === task.id)) TASKS.push(task);
+      log(`Undone, open again: ${task.task}`); saveG(); return true;
+    },
+    taskNote: async (task, note) => {
+      if (!DRY) { const r = await fetch(API + "/tasks/note", { method:"POST", headers:{ "Content-Type":"application/json" }, body:JSON.stringify({ id:task.id, note }) });
+        if (!r.ok) { alert("Could not save the note in Notion: HTTP " + r.status); return false; } }
+      log(`Note on ${task.task}: ${note}`); saveG(); return true;
     },
     habit: id => { logHabit(id, true); saveG(); },
     detail: key => { const b = blkByKey(key); return b && !b.extra ? moDetail(b) : ""; },

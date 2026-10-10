@@ -27,7 +27,7 @@
   const FEEL_LOAD = { 1: .25, 2: .4, 3: .6, 4: .75, 5: .9 };   // how much of the free time to fill with tasks
   const MON = { jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5, jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11 };
 
-  let C = null, el = null, busy = false, showAll = false;
+  let C = null, el = null, busy = false, showAll = false, noting = null, draft = "";
   const P = () => { const d = C.data(); d.plan.ok = d.plan.ok || {}; d.plan.tasks = d.plan.tasks || {}; d.plan.lead = d.plan.lead || {}; return d; };
   const T = (d) => C.fmtT(d);
   const names = (xs) => xs.map((x) => x.name).join(", ");
@@ -216,6 +216,9 @@
   #morning .mp-task.pick { box-shadow:inset 0 0 0 2px #ffd479; }
   #morning .mp-task.today { background:rgba(255,255,255,.9); color:#3b2a6b; }
   #morning .mp-task.later { opacity:.55; }
+  #morning .mp-task.done { background:rgba(143,227,176,.2); box-shadow:inset 0 0 0 2px #8fe3b0; }
+  #morning .mp-note { display:block; width:100%; box-sizing:border-box; margin-top:9px; padding:10px 12px; border-radius:12px; border:0; font:inherit; font-size:15px; color:#3b2a6b; background:#fff; resize:vertical; }
+  #morning .mp-note-t { margin:6px 0 0; font-size:14px; line-height:1.35; opacity:.92; }
   #morning .mp-task b { display:block; font-size:15px; line-height:1.3; }
   #morning .mp-task small { display:block; font-size:12.5px; opacity:.8; margin-top:3px; }
   #morning .mp-tb { display:flex; flex-wrap:wrap; gap:6px; margin-top:9px; }
@@ -283,11 +286,18 @@
     const today = ranked.filter((t) => st[t.id] === "today" || placed(t.id)), want = today.reduce((a, t) => a + t.est, 0);
     const waiting = today.filter((t) => !placed(t.id));
     const list = showAll ? ranked.slice(0, 30) : ranked.slice(0, 8);
+    // marked done today: stays here with Undo and a note (Junyan, 2026-10-10)
+    const done = Object.values(D.plan.done || {}).sort((a, b) => (b.at || "").localeCompare(a.at || ""));
     return `<div class="mp-h">What to do today</div>
       <p class="mp-lead">${hm(free)} for tasks${left < free ? ` (${hm(left)} still free)` : ""}. Feeling ${esc((FEEL.find((f) => f[0] === D.plan.feel) || [0, "okay"])[1].toLowerCase())}, I'd fill about ${hm(cap)}. Gold ones are my pick.</p>
       <div class="mp-meter"><i style="width:${Math.min(100, free ? (want / free) * 100 : 0)}%"></i></div>
       <p class="mo-soft" style="margin-top:2px">Today: ${hm(want)} of ${hm(free)}${want > free ? ". That's more than you have." : ""}</p>
       ${waiting.length ? `<button class="mp-big-btn" data-place="1">Put ${waiting.length} on the plan</button>` : ""}
+      ${done.map((x) => `<div class="mp-task done"><b>✓ ${esc(x.task.task)}</b><small>Done in Notion${(x.notes || []).length ? "" : ". Add a note if you like."}</small>
+        ${(x.notes || []).map((n) => `<p class="mp-note-t">📝 ${esc(n)}</p>`).join("")}
+        ${noting === x.task.id ? `<textarea class="mp-note" id="mpNote" rows="3" placeholder="What happened? (saved to the task's Notes in Notion)">${esc(draft)}</textarea>
+          <div class="mp-tb"><button class="on" data-notesave="${esc(x.task.id)}">Save note</button><button data-notex="1">Cancel</button></div>`
+        : `<div class="mp-tb"><button data-undo="${esc(x.task.id)}">↩︎ Undo</button><button data-noteopen="${esc(x.task.id)}">📝 ${(x.notes || []).length ? "Add another note" : "Add a note"}</button></div>`}</div>`).join("")}
       ${list.map((t) => {
         const s = st[t.id], p = placed(t.id), isToday = s === "today" || p;
         return `<div class="mp-task${isToday ? " today" : s === "later" ? " later" : mine.has(t.id) ? " pick" : ""}"><b>${esc(t.task)}</b>
@@ -352,7 +362,18 @@
     on("[data-task]", (d) => { D.plan.tasks[d.task] = D.plan.tasks[d.task] === d.v ? undefined : d.v; C.save(); draw(true); });
     on("[data-est]", (d) => { const t = D.tasks.find((x) => x.id === d.est); if (t) { t.estimate = `${d.m} min`; (D.plan.est = D.plan.est || {})[d.est] = +d.m; C.save(); } draw(true); });
     on("[data-all]", () => { showAll = !showAll; draw(true); });
-    on("[data-tdone]", (d) => act(async () => { await C.taskDone(d.tdone); delete D.plan.tasks[d.tdone]; C.save(); }));
+    on("[data-tdone]", (d) => { const t = D.tasks.find((x) => x.id === d.tdone); if (!t) return;
+      act(async () => { const r = await C.taskDone(t.id); if (!r) return;
+        delete D.plan.tasks[t.id]; (D.plan.done = D.plan.done || {})[t.id] = { task: t, was: r.was, at: new Date().toISOString(), notes: [] };
+        noting = t.id; draft = ""; C.save(); }); });
+    on("[data-undo]", (d) => { const x = (D.plan.done || {})[d.undo]; if (!x) return;
+      act(async () => { if (await C.taskUndo(x.task, x.was)) { delete D.plan.done[d.undo]; if (noting === d.undo) noting = null; C.save(); } }); });
+    on("[data-noteopen]", (d) => { noting = d.noteopen; draft = ""; draw(true); const n = el.querySelector("#mpNote"); if (n) n.focus(); });
+    on("[data-notex]", () => { noting = null; draft = ""; draw(true); });
+    on("[data-notesave]", (d) => { const x = (D.plan.done || {})[d.notesave], txt = (el.querySelector("#mpNote") || {}).value || draft;
+      if (!x || !txt.trim()) return;
+      act(async () => { if (await C.taskNote(x.task, txt.trim())) { (x.notes = x.notes || []).push(txt.trim()); noting = null; draft = ""; C.save(); } }); });
+    const nb = el.querySelector("#mpNote"); if (nb) nb.oninput = () => { draft = nb.value; };
     on("[data-unplace]", (d) => act(async () => { await C.drop(d.unplace); D.plan.tasks[d.t] = "later"; C.save(); }));
     on("[data-place]", () => act(() => placeAll()));
     on("[data-habit]", (d) => { C.habit(d.habit); draw(true); });
@@ -371,7 +392,7 @@
     }
   }
 
-  function close() { if (el) { el.className = ""; el.innerHTML = ""; } el = null; open.clear(); showAll = false; C && C.onClose && C.onClose(); }
+  function close() { if (el) { el.className = ""; el.innerHTML = ""; } el = null; open.clear(); showAll = false; noting = null; draft = ""; C && C.onClose && C.onClose(); }
 
   root.QuestMorning = {
     open(ctx) {
