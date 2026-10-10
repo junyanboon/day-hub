@@ -385,6 +385,7 @@
     },
     redraw() { if (el && el.className === "open") draw(true); },
     isOpen: () => !!(el && el.className === "open"),
+    rankTasks: (D) => rankTasks(D),   // the Your move box offers the same top tasks
     // how many things the day check would raise right now (the button's subtitle)
     count(ctx) { C = C || ctx; try { return checks(P()).length; } catch { return 0; } },
     close,

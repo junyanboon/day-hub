@@ -341,6 +341,10 @@
   .node { cursor:pointer; border-radius:14px; }
   .node:active { background:rgba(255,255,255,.08); }
   .node.past { opacity:.62; }
+  .mv-lb { font-size:11px; letter-spacing:.14em; text-transform:uppercase; opacity:.7; margin:14px 0 6px; }
+  .mv-opt { display:flex; align-items:center; gap:10px; width:100%; text-align:left; padding:10px 12px; margin:0 0 6px; border-radius:14px; background:rgba(255,255,255,.1); color:inherit; }
+  .mv-opt b { display:block; font-size:15px; font-weight:600; line-height:1.25; } .mv-opt small { display:block; font-size:12px; opacity:.75; margin-top:2px; }
+  .mv-opt .i { font-size:22px; flex:none; width:28px; text-align:center; }
   .add-btn { background:rgba(255,255,255,.18); border-radius:20px; padding:4px 12px; font-size:12px; letter-spacing:.06em;
     text-transform:none; font-weight:600; color:var(--ink); }
   .row { display:flex; gap:8px; margin-top:12px; }
@@ -576,7 +580,7 @@
 <script src="nvc-words.js?v=20261010a"></script>
 <script src="quest-fx.js?v=20261009b"></script>
 <script src="quest-night.js?v=20261010b"></script>
-<script src="quest-morning.js?v=20261010d"></script>
+<script src="quest-morning.js?v=20261010e"></script>
 </head>
 <body>
 <div id="sky" aria-hidden="true"><div class="sky-stars"></div><div class="sky-orb"></div>
@@ -599,7 +603,7 @@
   <div id="nextLine"></div>
   <div id="habits"></div>
 
-  <h2><span>Today</span><button class="add-btn" id="addBtn">＋ Add</button></h2>
+  <h2><span>Today</span><button class="add-btn" id="zap">🧭 Change course</button></h2>
   <div id="mtn"></div>
 
   <h2><span>Skills</span><button class="add-btn" id="skillsBtn">Open</button></h2>
@@ -609,7 +613,6 @@
   <div class="log" id="log"></div>
 </div>
 
-<button class="zap" id="zap">⚡ Something came up</button>
 
 <div class="scrim" id="scrim"></div>
 <div class="sheet" id="sheet"></div>
@@ -2196,6 +2199,38 @@
     $("eDrop").onclick = () => { closeSheet(); dropBlock(b); };
   }
 
+  /* Your move (Junyan, 2026-10-10: "To change the day plans I want to click 'your move' and then it
+     gives me different options there in the pop up box"). A free stretch on the calendar offers what
+     could go in it: the tasks the planner would pick, a practice, rest, food, pulling the next thing
+     earlier, anything else, or the whole planner. Each choice goes on today's plan at once. */
+  function openMove(st){
+    const t = now(), S = new Date(Math.ceil(Math.max(+st.s, +t) / 300000) * 300000), room = Math.round((st.e - S) / 60000);
+    if (room < 5) return openAdd(st.s);
+    const fits = m => Math.max(5, Math.min(m, room));
+    const D = MO_CTX.data(), tasks = window.QuestMorning ? QuestMorning.rankTasks(D).filter(x => !D.items.some(i => i.taskId === x.id && i.e > t)).slice(0, 4) : [];
+    const h = MO_CTX.hour(S), meal = h < 11 ? "Breakfast" : h < 16 ? "Lunch" : h < 18 ? "Snack" : "Dinner";
+    const next = blocks().find(b => +b.s >= +st.e - 60000 && b.kind !== "open" && b.kind !== "break");
+    const pull = next && +next.s > +S + 5 * 60000 && !/flight|\b[A-Z]{2}\d{2,4}\b/.test(next.t);
+    const groups = [
+      ["Get something done", tasks.map(x => ["📝", x.task, `${x.why ? x.why + " · " : ""}${fits(x.est)} min`, x.task.length > 70 ? x.task.slice(0, 69) + "…" : x.task, fits(x.est), { taskId:x.id }])],
+      ["Practice", [["🌀", "Isha Kriya", "12 min, fills prana", "Isha Kriya", fits(15)], ["🌬️", "Nadi Shuddhi", "5 min, fills prana", "Nadi Shuddhi", fits(10)], ["🙆", "Upa Yoga", "20 min", "Upa Yoga", fits(20)]]],
+      ["Rest and body", [["😴", "NSDR", "20 min lying down, gives body back", "NSDR", fits(20)], ["🚶", "Walk", "30 min outside", "Walk", fits(30)], ["🍽️", meal, "45 min", meal, fits(45)]]],
+    ];
+    const opts = groups.flatMap(g => g[1]);
+    openSheet(`<h3>Your move</h3><p>${fmtT(S)} to ${fmtT(st.e)} · ${fmtHM(room)} free. Pick what goes here.</p>
+      ${groups.filter(g => g[1].length).map(([lb, xs]) => `<div class="mv-lb">${lb}</div>${xs.map(o => `<button class="mv-opt" data-mv="${opts.indexOf(o)}"><span class="i">${o[0]}</span><span><b>${esc(o[1])}</b><small>${esc(o[2])}</small></span></button>`).join("")}`).join("")}
+      <div class="mv-lb">Change the plan</div>
+      ${pull ? `<button class="mv-opt" id="mvPull"><span class="i">⏩</span><span><b>Start ${esc(shortName(next))} at ${fmtT(S)}</b><small>Pulls it earlier, today only</small></span></button>` : ""}
+      <button class="mv-opt" id="mvOther"><span class="i">✏️</span><span><b>Something else</b><small>Name it and pick a length</small></span></button>
+      ${window.QuestMorning ? `<button class="mv-opt" id="mvPlan"><span class="i">☀️</span><span><b>Plan the whole day</b><small>Check the day, tasks and practices step by step</small></span></button>` : ""}
+      <div class="actions"><button class="btn ghost" id="mvCancel">Close</button></div>`, true);
+    $("sheet").querySelectorAll("[data-mv]").forEach(bn => bn.onclick = () => { const o = opts[+bn.dataset.mv]; closeSheet();
+      MO_CTX.add(o[3], S, new Date(+S + o[4] * 60000), o[5]); });
+    if ($("mvPull")) $("mvPull").onclick = () => { closeSheet(); log(`Pulled ${next.t} to ${fmtT(S)}`); saveBlock(next, S, new Date(+S + (next.e - next.s)), next.t, false); };
+    $("mvOther").onclick = () => { closeSheet(); setTimeout(() => openAdd(S), 50); };
+    if ($("mvPlan")) $("mvPlan").onclick = () => { closeSheet(); openMorning(); };
+    $("mvCancel").onclick = closeSheet;
+  }
   function openAdd(from){
     const t0 = new Date(Math.ceil(Math.max(now().getTime(), from ? from.getTime() : 0) / 300000) * 300000);
     let dur = 30;
@@ -3520,9 +3555,8 @@
       const st = stops[+n.dataset.stop]; if (!st) return;
       const fixed = st.blocks.find(b => b.kind !== "open" && b.kind !== "break");
       if (fixed && isGym(fixed) && fixed.s - now() < 3 * 3600000) return openGym(blocks().find(x => x.key === fixed.key) || fixed);
-      if (fixed) openStop(blocks().find(x => x.key === fixed.key) || fixed); else openAdd(st.s);
+      if (fixed) openStop(blocks().find(x => x.key === fixed.key) || fixed); else openMove(st);
     });
-    $("addBtn").onclick = () => openAdd();
 
     // log
     $("dayXp").textContent = G.day.log.length ? `${G.day.log.length} today` : "";
