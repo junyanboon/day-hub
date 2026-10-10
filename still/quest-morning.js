@@ -178,7 +178,7 @@
   #morning .mp-scroll { position:absolute; inset:0; overflow-y:auto; -webkit-overflow-scrolling:touch; background:linear-gradient(180deg, var(--g3) 0%, var(--g2) 62%, var(--g1) 100%); }
   #morning .mp-c { position:relative; max-width:560px; margin:0 auto; padding:calc(env(safe-area-inset-top) + 40px) 20px calc(env(safe-area-inset-bottom) + 110px); }
   #morning .mp-step { font-size:11px; letter-spacing:.16em; text-transform:uppercase; opacity:.75; }
-  #morning .mp-h { font-family:Georgia, "Times New Roman", serif; font-size:30px; line-height:1.1; margin:6px 0 4px; }
+  #morning .mp-h { font-weight:700; letter-spacing:-.01em; font-size:30px; line-height:1.1; margin:6px 0 4px; }
   #morning .mp-lead { font-size:15px; opacity:.88; line-height:1.4; margin:6px 0 14px; }
   #morning .mp-nav { position:fixed; left:0; right:0; bottom:0; z-index:4; display:flex; gap:10px; justify-content:center; padding:12px 16px calc(env(safe-area-inset-bottom) + 12px);
     background:linear-gradient(0deg, rgba(20,14,40,.7), rgba(20,14,40,0)); }
