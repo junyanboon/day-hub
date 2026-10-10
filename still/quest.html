@@ -394,6 +394,7 @@
   .nvc-tip { font-size:13px; color:var(--ink-soft); }
   .nvc-warn { font-size:13px; color:var(--gold); }
   .nvc-in { width:100%; box-sizing:border-box; padding:10px; border-radius:12px; border:1px solid var(--glass-border); background:rgba(0,0,0,.2); color:var(--ink); font:inherit; font-size:15px; }
+  .nvc-entry { padding:10px 2px; border-top:1px solid rgba(255,255,255,.08); font-size:15px; }
   .nvc-steps { display:flex; flex-wrap:wrap; gap:4px; margin:4px 0 10px; font-size:11px; }
   .nvc-steps span { padding:3px 7px; border-radius:999px; background:var(--glass); color:var(--ink-faint); }
   .nvc-steps span.on { background:var(--gold); color:#2a1f00; }
@@ -1264,7 +1265,7 @@
     return `<div class="hhead"><span class="eyebrow">Prana actions · level ${lvl()} · ${hDone}/${TILES.length}</span>` +
       `<button class="hsnd" data-hsnd aria-label="Tap sounds">${window.QuestFx && QuestFx.soundOn() ? "🔊" : "🔇"}</button></div>` +
       `<div class="hkey"><b class="mp">gold</b> fills prana (Sadhguru) · <b class="mb">teal</b> fills body (Bryan Johnson)</div>` +
-      `<div class="hgrp"><div class="hgl">Heart</div><div class="hgrid"><button class="htile" data-nvc="checkin"><span class="hi">🫶</span><span class="hl">How am I?</span><b class="mp">check in</b></button><button class="htile" data-nvc="conflict"><span class="hi">⚡</span><span class="hl">Conflict</span><b class="mp">NVC</b></button></div></div>` +
+      `<div class="hgrp"><div class="hgl">Heart</div><div class="hgrid"><button class="htile" data-nvc="checkin"><span class="hi">🫶</span><span class="hl">How am I?</span><b class="mp">check in</b></button><button class="htile" data-nvc="conflict"><span class="hi">⚡</span><span class="hl">Conflict</span><b class="mp">NVC</b></button><button class="htile" data-nvc="journal"><span class="hi">📓</span><span class="hl">Journal</span><b class="mp">feelings</b></button></div></div>` +
       ["Morning", "Practice", "Food", "Evening"].map(gr => `<div class="hgrp"><div class="hgl">${gr}</div><div class="hgrid">${gr === "Food" ? `<button class="htile" data-mealq=""><span class="hi">🍽️</span><span class="hl">Rate a meal</span><b class="mp">quiz</b></button>` : ""}${TILES.filter(h => h[7] === gr).map(tile).join("")}</div></div>`).join("");
   }
   /* Three picks for right now (Junyan, 2026-10-09: "only suggestions for this exact
@@ -1315,7 +1316,7 @@
   }
   function bindHabits(root){
     root.querySelectorAll("[data-all]").forEach(bn => bn.onclick = openActions);
-    root.querySelectorAll("[data-nvc]").forEach(bn => bn.onclick = () => bn.dataset.nvc === "conflict" ? openConflict() : openCheckin());
+    root.querySelectorAll("[data-nvc]").forEach(bn => bn.onclick = () => bn.dataset.nvc === "conflict" ? openConflict() : bn.dataset.nvc === "journal" ? openJournal() : openCheckin());
     root.querySelectorAll("[data-mealq]").forEach(bn => bn.onclick = () => openMealQuiz(bn.dataset.mealq ? blocks().find(b => gk(b) === bn.dataset.mealq) : null));
     root.querySelectorAll("[data-habit]").forEach(bn => bn.onclick = () => tapHabit(bn));
     root.querySelectorAll("[data-hsnd]").forEach(bn => bn.onclick = () => { QuestFx.setSound(!QuestFx.soundOn()); refreshActions(); render(); });
@@ -1994,7 +1995,10 @@
     $("nvX").onclick = closeSheet;
     if ($("nvOk")) $("nvOk").onclick = () => {
       keep();
-      nvApply({ id:"f" + Date.now(), kind:"checkin", at:now().toISOString(), win:nvDue() || "", feelings:S.feel, strong:S.strong, needs:S.needs, observation:S.note.trim() });
+      const e = { id:"f" + Date.now(), kind:"checkin", at:now().toISOString(), win:nvDue() || "", feelings:S.feel, strong:S.strong, needs:S.needs, observation:S.note.trim() };
+      nvApply(e);
+      (G.nvcOut = G.nvcOut || []).push(e); saveG();   // into the feelings journal on the server
+      nvSend();
       closeSheet(); render(); refreshActions();
     };
   }
@@ -2075,7 +2079,33 @@
       closeSheet(); render(); refreshActions();
     };
   }
-  // conflicts go to Notion through still-api; anything that could not go yet waits in G.nvcOut
+  /* The feelings journal (Junyan, 2026-10-10: "make a new Db somewhere easy"): every check-in
+     and conflict is kept on still-api (/quest/nvc); conflicts also go to Notion. This sheet
+     reads it back with what his words show: how many he uses, the ones he leans on, the
+     families he has not touched, the needs that keep coming up. */
+  async function openJournal(){
+    let list = (G.day.feel || []).slice().reverse(), from = "today on this device";
+    openSheet(`<h3>📓 Feelings journal</h3><p class="nvc-tip">Loading…</p>`, true);
+    if (questKey() && !DRY) try { const r = await qfetch("/quest/nvc"); if (Array.isArray(r.entries) && r.entries.length) { list = r.entries; from = "all your entries"; } } catch {}
+    const V = nvVocab(), top = (o, n) => Object.entries(o).sort((a, b) => b[1] - a[1]).slice(0, n);
+    const usedFams = new Set(Object.keys(V.words).map(w => NV_FAM(w)).filter(Boolean).map(f => f.name));
+    const untouched = NV.families.filter(f => !usedFams.has(f.name)).map(f => `${f.icon} ${f.name}`);
+    const when = a => new Date(a).toLocaleString("en-US", { timeZone:PLAN_TZ || undefined, weekday:"short", month:"short", day:"numeric", hour:"numeric", minute:"2-digit" });
+    const row = e => `<div class="nvc-entry"><div class="nvc-tip">${esc(when(e.at))} · ${e.kind === "conflict" ? `⚡ Conflict${e.who ? " with " + esc(e.who) : ""}${e.notion ? " · in Notion" : ""}` : "🫶 Check-in"}${e.p ? ` · prana ${e.p > 0 ? "+" : ""}${e.p}` : ""}</div>
+      <div>I feel <b>${esc(nvList(e.feelings || []))}</b>${(e.needs || []).length ? ` because I need <b>${esc(nvList(e.needs))}</b>` : ""}.</div>
+      ${e.observation ? `<div class="nvc-tip">${esc(e.observation)}</div>` : ""}${e.request ? `<div class="nvc-tip">${esc(e.request)}</div>` : ""}</div>`;
+    openSheet(`<h3>📓 Feelings journal</h3>
+      <div class="win-lb">Your words</div>
+      <p>${Object.keys(V.words).length} of ${nvTotal()} feeling words used, ${Object.keys(V.needs).length} needs named.</p>
+      ${top(V.words, 5).length ? `<p class="nvc-tip">Most used: ${top(V.words, 5).map(([w, c]) => `${esc(nvLabel(w))} (${c})`).join(", ")}</p>` : ""}
+      ${top(V.needs, 5).length ? `<p class="nvc-tip">Needs that keep coming up: ${top(V.needs, 5).map(([w, c]) => `${esc(nvLabel(w))} (${c})`).join(", ")}</p>` : ""}
+      ${untouched.length ? `<p class="nvc-tip">Families you have not used yet: ${esc(untouched.join(", "))}</p>` : ""}
+      <div class="win-lb">Entries (${esc(from)})</div>
+      ${list.length ? list.slice(0, 60).map(row).join("") : `<p>No entries yet.</p>`}
+      <div class="actions"><button class="btn ghost" id="nvJX">Close</button></div>`, true);
+    $("nvJX").onclick = closeSheet;
+  }
+  // check-ins and conflicts go to still-api (conflicts on to Notion); anything that could not go yet waits in G.nvcOut
   async function nvSend(){
     if (DRY || !questKey() || !(G.nvcOut || []).length) return;
     for (const e of [...G.nvcOut]) {
@@ -2083,8 +2113,10 @@
         const r = await qfetch("/quest/nvc", { method:"POST", body:JSON.stringify({ entry:e }) });
         const done = r.entry && r.entry.notion;
         G.nvcOut = G.nvcOut.filter(x => x.id !== e.id);
-        if (done) log(`Saved to Giraffe Practice: ${e.observation.slice(0, 40)}`);
-        else log(`Giraffe Practice is waiting on Notion: ${r.entry && r.entry.err || "not uploaded yet"}`);
+        if (e.kind === "conflict") {
+          if (done) log(`Saved to Giraffe Practice: ${e.observation.slice(0, 40)}`);
+          else log(`Giraffe Practice is waiting on Notion: ${r.entry && r.entry.err || "not uploaded yet"}`);
+        }
         saveG();
       } catch { break; }   // offline: try again on the next pull
     }
