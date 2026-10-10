@@ -3004,7 +3004,7 @@
     const pl = planOf(id), pr = progOf(id); if (!pl) return null;
     const n = Math.min(pr.stage || 1, pl.stages.length), st = pl.stages[n - 1], tg = st.target || {};
     const notes = CONTENT.filter(it => it.skill === id && it.note).length;
-    const since = tg.fromStage && pr.stageAt ? pr.stageAt.slice(0, 10) : "";   // Yoga: each stage counts its own days
+    const since = tg.fromStage && pr.stageAt ? tzYmd(new Date(pr.stageAt)) : "";   // his local day, not UTC   // Yoga: each stage counts its own days
     const have = tg.kind === "runs" ? pr.runs.length : tg.kind === "days" ? Object.keys(pr.days || {}).filter(d => d >= since).length
       : tg.kind === "weeks" ? weeksOnTarget(st.weekly || {}, pr, since)
       : tg.kind === "ticks" ? Object.keys(pr.ticks || {}).filter(k => (pl.finetune || []).includes(k)).length : tg.kind === "notes" ? notes : 0;
