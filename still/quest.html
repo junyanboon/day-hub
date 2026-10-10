@@ -592,9 +592,9 @@
   <div class="hud">
     <div class="avatar" id="avatar"><img src="sprites/head.webp" alt=""></div>
     <b id="peakName">Level 1</b>
-    <div class="o2row" id="o2Txt"></div>
     <div class="status"><span id="statusL">Loading your day…</span><span id="statusR"></span></div>
     <div class="combo" id="combo" title="Days in a row ending at 70% prana or more"><span class="n" id="comboN">·</span><span class="l" id="comboL">days 70+</span></div>
+    <button class="gear" id="bagBtn" aria-label="Bag">🎒</button>
     <button class="gear" id="gear" aria-label="Settings">⚙️</button>
   </div>
   <div id="being"></div>
@@ -2566,7 +2566,8 @@
     openSheet(`<div id="bagView"></div>`, true);
     Bag.mount($("bagView"), BAG_CTX);
   }
-  // 2026-10-10 (Junyan): the bag and quick slots are off for now ("drop the quickslots for the time being")
+  // 2026-10-10 (Junyan): the quick slots are off for now ("drop the quickslots for the time being"); the bag button came back the same day
+  $("bagBtn").onclick = openBag;
   if (hasBag()) { try { Bag.mount(document.createElement("div"), BAG_CTX); } catch (e) { console.warn("bag", e); } }
 
   /* ---------- the morning (2026-10-09, d147) ----------
@@ -3394,11 +3395,7 @@
     const P = Math.round(prana());
     $("peakName").textContent = `Level ${lvl()}`;
     drawBeing(P, Math.round(body()));
-    // today's three pillars: sadhana, body, on time
-    const did = b => ["in","late"].includes(G.day.checks[gk(b)]);
-    const sad = all.filter(isSadhana), bod = all.filter(b => isGym(b) || b.kind === "body"), timed = all.filter(b => needsCheck(b) && b.kind !== "open" && b.s <= t);
-    $("o2Txt").innerHTML = `<span class="${sad.some(did) ? "ok" : ""}">Sadhana ${sad.some(did) ? "✓" : sad.length ? "·" : "none planned"}</span>` +
-      `<span class="${bod.some(did) ? "ok" : ""}">Training ${bod.some(did) ? "✓" : "·"}</span>`;
+    // the Sadhana and Training pillars left the top bar (Junyan d219, 2026-10-10): the calendar column shows them
     const sk = streak();
     $("comboN").textContent = sk || "·";
     $("comboL").textContent = sk === 1 ? "day at 70%+" : "days at 70%+";
