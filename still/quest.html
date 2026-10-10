@@ -205,6 +205,20 @@
 
   .status { font-size:11px; color:var(--ink-faint); margin:10px 2px 0; display:flex; justify-content:space-between; }
   .status .dry { color:var(--warn); }
+  /* the top bar as one quiet line (Junyan, 2026-10-10: "make this much more discrete"): small face, level, pillars,
+     place and time, streak and settings, no card; it brightens under the pointer */
+  .hud { gap:10px; min-height:30px; font-size:12px; color:var(--ink-soft); opacity:.72; transition:opacity .2s; }
+  .hud:hover, .hud:focus-within { opacity:1; }
+  .hud .avatar { width:24px; height:24px; box-shadow:none; }
+  .hud #peakName { font-weight:600; color:var(--ink); white-space:nowrap; }
+  .hud .o2row { margin:0; font-size:12px; font-weight:500; }
+  .hud .status { flex:1; min-width:0; margin:0; font-size:12px; gap:12px; justify-content:flex-end; color:var(--ink-faint); white-space:nowrap; overflow:hidden; }
+  .hud .status > span { overflow:hidden; text-overflow:ellipsis; }
+  .hud .status .place { color:var(--ink-soft); }
+  .hud .combo { display:flex; align-items:baseline; gap:4px; min-width:0; text-align:left; }
+  .hud .combo .n { font-size:13px; } .hud .combo .l { font-size:11px; margin:0; letter-spacing:0; text-transform:none; }
+  .hud .gear { width:26px; height:26px; font-size:13px; background:transparent; }
+  @media (max-width:600px) { .hud { flex-wrap:wrap; row-gap:4px; } .hud .status { order:9; flex-basis:100%; justify-content:space-between; } }
 
   /* ---------- cards ---------- */
   .card { background:var(--glass); border:1px solid var(--glass-border); border-radius:22px;
@@ -571,14 +585,12 @@
 <div id="app">
   <div class="hud">
     <div class="avatar" id="avatar"><img src="sprites/head.webp" alt=""></div>
-    <div class="hud-mid">
-      <div class="hud-title"><span><b id="peakName">Level 1</b></span></div>
-      <div class="o2row" id="o2Txt"></div>
-    </div>
-    <div class="combo" id="combo"><div class="n" id="comboN">·</div><div class="l" id="comboL">days 70+</div></div>
+    <b id="peakName">Level 1</b>
+    <div class="o2row" id="o2Txt"></div>
+    <div class="status"><span id="statusL">Loading your day…</span><span id="statusR"></span></div>
+    <div class="combo" id="combo" title="Days in a row ending at 70% prana or more"><span class="n" id="comboN">·</span><span class="l" id="comboL">days 70+</span></div>
     <button class="gear" id="gear" aria-label="Settings">⚙️</button>
   </div>
-  <div class="status"><span id="statusL">Loading your day…</span><span id="statusR"></span></div>
   <div id="being"></div>
 
   <div id="brief"></div>
@@ -3352,7 +3364,7 @@
       `<span class="${bod.some(did) ? "ok" : ""}">Training ${bod.some(did) ? "✓" : "·"}</span>`;
     const sk = streak();
     $("comboN").textContent = sk || "·";
-    $("comboL").textContent = "days 70+";
+    $("comboL").textContent = sk === 1 ? "day at 70%+" : "days at 70%+";
     $("combo").classList.toggle("hot", P >= 70);
     const where = PLAN && PLAN.where && PLAN.where.place;
     $("statusL").innerHTML = pullErr ? `<span class="dry">Offline: ${esc(pullErr)}</span>`
@@ -3555,6 +3567,6 @@
   pullAll();
 })();
 </script>
-<script src="quest-dash.js?v=20261010c"></script>
+<script src="quest-dash.js?v=20261010d"></script>
 </body>
 </html>

@@ -19,7 +19,7 @@
 
   // known parts of the page, by the ids quest.html draws into
   const KNOWN = [
-    { id: "hud", title: "", pick: [".hud", ".status"] },
+    { id: "hud", title: "", pick: [".hud"] },
     { id: "being", title: "", pick: ["#being"] },
     { id: "now", title: "Right now", pick: ["#brief", "#loose", "#main", "#nextLine"] },
     { id: "habits", title: "", pick: ["#habits"] },
@@ -27,11 +27,11 @@
   // d216 (2026-10-10): Today's calendar down the left, the two figures in the middle with right now under them,
   // prana actions and skills on the right
   const DEFAULT = {
-    hud: { x: 0, y: 0, w: 12, h: 2 },
-    mtn: { x: 0, y: 2, w: 4, h: 14 },
-    being: { x: 4, y: 2, w: 5, h: 9 },
+    hud: { x: 0, y: 0, w: 12, h: 1 },   // one quiet line (2026-10-10)
+    mtn: { x: 0, y: 1, w: 4, h: 15 },
+    being: { x: 4, y: 1, w: 5, h: 10 },
     now: { x: 4, y: 11, w: 5, h: 5 },
-    habits: { x: 9, y: 2, w: 3, h: 9 },
+    habits: { x: 9, y: 1, w: 3, h: 10 },
     skills: { x: 9, y: 11, w: 3, h: 5 },
     log: { x: 4, y: 16, w: 5, h: 4 },
   };
@@ -82,7 +82,8 @@
       body.dash .w-head:active { cursor:grabbing; }
       body.dash .w-grip { display:flex; justify-content:space-between; font-size:11px; letter-spacing:.12em; text-transform:uppercase;
         color:var(--ink-faint); margin:0 -4px 6px; padding:2px 4px; }
-      body.dash .w-hud .w-grip { margin-bottom:2px; }
+      body.dash .w-hud { background:none; border:0; backdrop-filter:none; -webkit-backdrop-filter:none; padding:0 10px; overflow:hidden; display:flex; align-items:center; }
+      body.dash .w-hud > .w-grip { display:none; } body.dash .w-hud > .hud { flex:1; min-width:0; }
       body.dash .grid-stack-item-content > h2.w-head { margin-top:2px; }
       body.dash .w-now .card:first-of-type, body.dash .w-now > div > .card:first-child { margin-top:4px; }
       body.dash .grid-stack-placeholder > .placeholder-content { background:rgba(255,255,255,.08); border:1px dashed rgba(255,255,255,.35); border-radius:18px; }
@@ -100,6 +101,8 @@
       body.dash .w-grip:has(> span:first-child:empty) { position:absolute; top:4px; right:10px; margin:0; z-index:2; }`;
     document.head.appendChild(css);
     const lay = saved(), grid = document.createElement("div");
+    if (lay.hud) { lay.hud.h = 1; lay.hud.y = 0; }   // the top bar is one line now; the widgets below move up to fill
+
     grid.className = "grid-stack";
     let nextY = ROWS;
     for (const g of groups(app)) {
