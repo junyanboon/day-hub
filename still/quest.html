@@ -336,6 +336,8 @@
   .cal-pts { position:absolute; right:8px; top:4px; font-size:11.5px; font-weight:700; color:var(--gold); }
   .cal-ev.one .cal-pts { top:50%; transform:translateY(-50%); }
   .cal-pts.neg { color:#ff9e9e; }
+  .bedline { margin:0 0 10px; padding:10px 12px; border-radius:14px; font-size:13px; line-height:1.35; color:#dfe3ff;
+    background:rgba(120,110,220,.18); border:1px solid rgba(170,160,255,.35); }
   .cal-ask { color:#14183a; background:var(--gold); border-radius:999px; padding:1px 8px; font-size:11px; opacity:1; }
   .cal-ev.past:has(.cal-ask) { opacity:.9; }
   .cal-now { position:absolute; left:var(--cal-l); right:0; height:2px; margin-top:-1px; background:#ff8f9e; z-index:2; pointer-events:none; }
@@ -1313,6 +1315,11 @@
   // days from a known new moon (2000-01-06 18:14 UTC), synodic month 29.53 days
   const nearNewMoon = t => { const a = (((+t - Date.UTC(2000, 0, 6, 18, 14)) / 86400000) % 29.530588 + 29.530588) % 29.530588; return a < 1.5 || a > 28; };
   let SUGG = null;   // keep the same three on screen until one is tapped or the hour turns
+  // minutes past 11 PM where he is, from 11 PM to the end of the game day at 4 AM; null otherwise (d223, d225)
+  function pastBed(t){
+    const p = tzParts(t, { hour:"numeric", minute:"numeric", hourCycle:"h23" }), h = +p.hour, m = +p.minute;
+    return h >= 23 ? (h - 23) * 60 + m : h < 4 ? (h + 1) * 60 + m : null;
+  }
   function suggestHTML(){
     const key = `${G.day.date}|${tzParts(now(), { hour:"numeric", hourCycle:"h23" }).hour}|${JSON.stringify(G.day.habits)}`;
     if (!SUGG || SUGG.key !== key) SUGG = { key, list: suggestions() };
@@ -1320,6 +1327,7 @@
     const mq = unratedMeal(), aq = unratedActivity();
     return `<div class="hhead"><span class="eyebrow">Prana actions · right now</span>` +
       `<button class="hsnd" data-hsnd aria-label="Tap sounds">${window.QuestFx && QuestFx.soundOn() ? "🔊" : "🔇"}</button></div>` +
+      (pastBed(now()) != null ? `<div class="bedline">🌙 Past bedtime: body drops 3 every half hour you stay up${G.day.lateBody ? ` (−${G.day.lateBody} so far)` : ""}. Time to wind down.</div>` : "") +
       (mq ? `<button class="pa-all" style="margin:0 0 10px" data-mealq="${esc(gk(mq))}">🍽️ How was ${esc(shortName(mq))}?<span>Rate it ›</span></button>` : "") +
       (aq ? `<button class="pa-all" style="margin:0 0 10px" data-actq="${esc(gk(aq))}">🧍 How was ${esc(shortName(aq))}?<span>Check it ›</span></button>` : "") +
       (nvDue() ? `<button class="pa-all" style="margin:0 0 10px" data-nvc="checkin">🫶 How are you, really?<span>Check in ›</span></button>` : "") +
@@ -3656,6 +3664,14 @@
       <div class="actions" style="flex-wrap:wrap">${[5, 6, 7, 8, 9].map(h => `<button class="btn" data-slept="${h}">${h} h</button>`).join("")}</div></div>` + bh;
     put("brief", bh);
     $("brief").querySelectorAll("[data-slept]").forEach(bn => bn.onclick = () => refillSleep(+bn.dataset.slept * 10, `Slept ${bn.dataset.slept} h`));
+    // d223 (Junyan, 2026-10-11): still up after 11 PM costs body, 3 for every half hour, up to 15 (Bryan Johnson's
+    // fixed bedtime). Prana is left alone: Sadhguru does not name it. Counted only while the page is open, since
+    // being on it is the proof he is up; the game day runs to 4 AM, and the morning's Oura sleep score resets body.
+    const pb = pastBed(t);
+    if (pb != null && document.visibilityState !== "hidden") {
+      const due = Math.min(15, 3 * Math.floor(pb / 30)), had = G.day.lateBody || 0;
+      if (due > had) { G.day.lateBody = due; addBody(-(due - had), `Still up ${fmtHM(pb)} past bedtime`, "past bedtime"); }
+    }
     // auto habits for tonight (paid next morning): last meal 3 hr before bed, bed on time
     const slp = all.find(isSleep);
     if (slp && t >= slp.s) {
