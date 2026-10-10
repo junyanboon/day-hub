@@ -216,6 +216,7 @@
   #morning .mp-task.pick { box-shadow:inset 0 0 0 2px #ffd479; }
   #morning .mp-task.today { background:rgba(255,255,255,.9); color:#3b2a6b; }
   #morning .mp-task.later { opacity:.55; }
+  #morning .mp-pr .mp-tb { margin-top:7px; } #morning .mp-pr .mp-tb button { background:rgba(255,255,255,.9); color:#3b2a6b; }
   #morning .mp-task.done { background:rgba(143,227,176,.2); box-shadow:inset 0 0 0 2px #8fe3b0; }
   #morning .mp-note { display:block; width:100%; box-sizing:border-box; margin-top:9px; padding:10px 12px; border-radius:12px; border:0; font:inherit; font-size:15px; color:#3b2a6b; background:#fff; resize:vertical; }
   #morning .mp-note-t { margin:6px 0 0; font-size:14px; line-height:1.35; opacity:.92; }
@@ -310,10 +311,17 @@
   }
 
   function stepPractices(D) {
-    return `<div class="mp-h">Practices for today</div><p class="mp-lead">Tap one when it's done. Each fills your prana. The rest come from your calendar.</p>
-      ${D.practices.map(([group, xs]) => `<div class="mo-kicker" style="margin-top:18px">${esc(group)}</div><div class="mo-prac">${xs.map((p) =>
-        `<button class="mo-pr${p.done ? " done" : ""}"${p.auto ? " disabled" : ` data-habit="${p.id}"`}><span class="mo-pr-i">${p.icon}</span>
-        <span class="mo-pr-t"><b>${esc(p.label)}</b><small>${esc(p.small)}</small></span><span class="mo-pr-g">${p.done ? "✓" : p.auto ? "auto" : p.gain ? `+${p.gain}` : ""}</span></button>`).join("")}</div>`).join("")}`;
+    const gaps = gapsOf(D);
+    return `<div class="mp-h">Practices for your skills</div><p class="mp-lead">What your skills ask of today. Put one on the plan, or tap Done when it's done. Practices fill your prana.</p>
+      ${D.practices.map(([group, xs]) => `<div class="mo-kicker" style="margin-top:18px">${esc(group)}</div><div class="mo-prac">${xs.map((p) => {
+        const fit = p.mins && !p.at && !p.done && gaps.find((g) => g.min >= p.mins);
+        const btns = p.done || p.auto ? "" : [
+          fit ? `<button data-pplan="${esc(p.id)}">Put on the plan at ${T(fit.s)}</button>` : "",
+          p.action ? `<button data-pact="${esc(p.id)}">Open ›</button>` : "",
+          !p.cal && !p.action ? `<button data-habit="${esc(p.id)}">Done</button>` : ""].join("");
+        return `<div class="mo-pr mp-pr${p.done ? " done" : ""}"><span class="mo-pr-i">${p.icon}</span>
+          <span class="mo-pr-t"><b>${esc(p.label)}</b><small>${esc(p.small)}${p.mins && !p.at && !p.done && !fit ? " · no free gap left" : ""}</small>${btns ? `<span class="mp-tb">${btns}</span>` : ""}</span>
+          <span class="mo-pr-g">${p.done ? "✓" : p.auto ? "auto" : p.gain ? `+${p.gain}` : ""}</span></div>`; }).join("")}</div>`).join("")}`;
   }
 
   function stepDay(D) {
@@ -377,6 +385,9 @@
     on("[data-unplace]", (d) => act(async () => { await C.drop(d.unplace); D.plan.tasks[d.t] = "later"; C.save(); }));
     on("[data-place]", () => act(() => placeAll()));
     on("[data-habit]", (d) => { C.habit(d.habit); draw(true); });
+    on("[data-pact]", (d) => { close(); C.practiceAction(d.pact); });
+    on("[data-pplan]", (d) => { const p = D.practices.flatMap((g) => g[1]).find((x) => x.id === d.pplan), g = p && firstGap(D, p.mins, D.now);
+      if (g) act(() => C.add(p.name, g.s, new Date(+g.s + p.mins * MIN))); });
     C.bind(el, () => draw(true));
   }
 

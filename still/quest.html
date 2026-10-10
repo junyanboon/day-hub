@@ -593,7 +593,7 @@
 <script src="nvc-words.js?v=20261010a"></script>
 <script src="quest-fx.js?v=20261009b"></script>
 <script src="quest-night.js?v=20261010b"></script>
-<script src="quest-morning.js?v=20261010f"></script>
+<script src="quest-morning.js?v=20261010g"></script>
 </head>
 <body>
 <div id="sky" aria-hidden="true"><div class="sky-stars"></div><div class="sky-orb"></div>
@@ -2588,8 +2588,6 @@
      morning, weather, the schedule (each activity opens its window), one slide per prepped moment,
      then today's practices: yogic and Bryan Johnson's (he dropped "one word for today": "I want things
      to be yogic practices / or bryan johnson practices"). They are the Prana actions habits, logged the same way. */
-  const MO_PRACTICES = [["Yogic", ["kriya", "nadi"]],   // the rest come from the calendar
-    ["Bryan Johnson", ["early", "bedtime"]]];   // food now comes through the meal quiz
   // full names, minus tour-sheet noise ("+ Extras", trailing dots)
   const moName = b => (b.t || "").replace(/\s*\+\s*extras\b/i, "").replace(/\.{2,}$/, "").replace(/^(tour|hike)\s*-\s*/i, (m, w) => w[0].toUpperCase() + w.slice(1).toLowerCase() + ": ").trim();
   function morningData(){
@@ -2612,8 +2610,29 @@
       <path d="M0 ${h * .62} C80 ${h * .45} 150 ${h * .58} 220 ${h * .5} S350 ${h * .4} 400 ${h * .52} V${h} H0Z" fill="#f4a76b" opacity=".55"/>
       <path d="M0 ${h * .75} C70 ${h * .62} 160 ${h * .78} 250 ${h * .66} S360 ${h * .62} 400 ${h * .7} V${h} H0Z" fill="#d9744f" opacity=".75"/>
       <path d="M0 ${h * .88} C90 ${h * .78} 200 ${h * .92} 300 ${h * .82} S380 ${h * .8} 400 ${h * .84} V${h} H0Z" fill="#7a3b52"/></svg>`;
-  const moPractices = () => MO_PRACTICES.map(([group, ids]) => [group, ids.map(id => HABITS.find(x => x[0] === id)).filter(Boolean).map(h => ({
-    id:h[0], icon:h[4], label:h[5], small:h[1].replace(/\s*\(.*\)$/, ""), done:!!(G.day.habits || {})[h[0]], auto:h[6] === "auto", gain:habitGain(h[0]) }))]);
+  /* The planner's Practices come from his skills (Junyan, 2026-10-10: "Practices for today are things to
+     improve my skills ... build out things that I need to do from my skills list (i.e. Angamardana)").
+     Each active skill lists what it asks of a day: [habit id, usual minutes, name]; Bryan Johnson's two
+     count themselves. A practice can go on the plan in a free gap (its block pays it when it starts). */
+  const SKILL_TODAY = {
+    yoga: [["shambhavi", 21, "Shambhavi"], ["angam", 30, "Angamardana"], ["surya", 40, "Surya Kriya"], ["yogasana", 30, "Yogasanas"],
+      ["upa", 20, "Upa Yoga"], ["bhuta", 10, "Bhuta Shuddhi"], ["kriya", 12, "Isha Kriya"], ["nadi", 5, "Nadi Shuddhi"]],
+    "mouth-care": [["mouthAm", 0, "Dr Ellie AM"], ["mouth", 0, "Dr Ellie PM"]],
+    nvc: [["nvc", 0, "How am I?"]],
+  };
+  function practiceItem(id, mins, name){
+    if (id === "nvc") return { id, icon:"🫶", label:name, small:"Check in: the feeling and the need under it", action:true };
+    const h = HABITS.find(x => x[0] === id); if (!h) return null;
+    const at = schedFor(id);
+    return { id, icon:h[4], label:name || h[5], name:name || h[5], mins:mins || 0, done:!!(G.day.habits || {})[id], auto:h[6] === "auto", cal:h[6] === "cal",
+      gain:habitGain(id), at: at ? fmtT(at.s) : "", small: at ? `On the plan at ${fmtT(at.s)}` : mins ? `${mins} min` : h[1].replace(/\s*\(.*\)$/, "") };
+  }
+  const moPractices = () => {
+    const act = SKILLS.filter(x => x.status === "active" && SKILL_TODAY[x.id]);
+    if (!act.length) act.push({ id:"yoga", name:"Yoga" });   // skills not loaded yet (or test mode)
+    return act.map(x => [x.name, SKILL_TODAY[x.id].map(([id, m, n]) => practiceItem(id, m, n)).filter(Boolean)])
+      .concat([["Bryan Johnson", ["early", "bedtime"].map(id => practiceItem(id)).filter(Boolean)]]);
+  };
 
   /* weather: Open-Meteo (free, no key). Where: the phone's location when he allows it (he is
      there), else the calendar's place looked up by name, else nothing. Cached for 2 hours. */
@@ -2779,6 +2798,7 @@
       log(`Note on ${task.task}: ${note}`); saveG(); return true;
     },
     habit: id => { logHabit(id, true); saveG(); },
+    practiceAction: id => { if (id === "nvc") { closeMorning(); openCheckin(); } },
     detail: key => { const b = blkByKey(key); return b && !b.extra ? moDetail(b) : ""; },
     bind: (root, redraw) => bindDetail(root, redraw),
     begin: () => { G.day.briefDone = true; log("Planned the day"); saveG(); },
