@@ -269,6 +269,9 @@
 
   /* side quest */
   .side-list { margin-top:12px; display:flex; flex-direction:column; gap:8px; }
+  .rest-tip { cursor:default; }
+  .rest-tip .nm small { display:block; margin-top:3px; font-size:12.5px; color:var(--ink-faint); line-height:1.35; }
+  .rest-tip .btn { flex:none; padding:7px 11px; font-size:13px; }
   .side { display:flex; align-items:center; gap:10px; text-align:left; width:100%; padding:11px 12px;
     border-radius:14px; background:rgba(255,255,255,.12); font-size:14px; }
   .side .pr { flex:none; font-size:12px; }
@@ -1631,6 +1634,32 @@
       closeSheet(); render();
     });
   }
+  /* What to do in a Rest block (Junyan, 2026-10-11, d246: "Let's figure out what I should be doing during my rest ...
+     Let's use sadhguru and bryan johnson"). The rules are his Rest skill in the wiki (d247): water first; Shambhavi
+     when it is not done yet, the stomach is empty and there is room; a 20 minute lie-down only after short sleep or
+     travel, before 3 PM and well before bed (Bryan Johnson: tonight's sleep comes first); light fruit after a long
+     gap, after practice; short rests stay short; no scrolling. */
+  function restGuide(cur, all, t){
+    const left = (cur.e - t) / 60000, out = [], tired = recoveryReasons();
+    const ate = lastMealBefore(t, all), nextMeal = all.find(b => isMeal(b) && b.s > t), bed = all.find(b => isSleep(b) && b.s > t);
+    const hour = +tzParts(t, { hour:"numeric", hourCycle:"h23" }).hour, cups = (G.day.habits || {}).water || 0;
+    const sadhanaDone = doneToday("shambhavi") || all.some(b => isSadhana(b) && ["in", "late"].includes(G.day.checks[gk(b)]));
+    out.push({ icon:"💧", text:"Water first", why:`${tired.length ? "Travel and sun dry you out. " : ""}${cups ? `${cups} cup${cups > 1 ? "s" : ""} so far today.` : "A full cup before anything else."}`, habit:"water", btn:"+1 cup" });
+    if (!sadhanaDone && left >= 20) {
+      if (emptyStomach(t, all)) out.push({ icon:"🪷", text:"Shambhavi, 21 min", why:"Not done yet today, and your stomach is empty. A shower first is a good start.", habit:"shambhavi", btn:"Done" });
+      else out.push({ icon:"🪷", text:"Shambhavi later", why:`You ate at ${fmtT(ate)}. Shambhavi wants about 3 hours after a meal.` });
+    }
+    if (tired.length && left >= 20 && hour < 15 && (!bed || bed.s - t > 6 * 3600000))
+      out.push({ icon:"😴", text:"Lie down, 20 min timer", why:`${tired.join(", ").replace(/^./, c => c.toUpperCase())}. Up by ${fmtT(new Date(+t + 20 * 60000))}, so tonight's sleep stays whole.` });
+    if ((!ate || t - ate >= 4 * 3600000) && (!nextMeal || nextMeal.s - t > 90 * 60000))
+      out.push({ icon:"🍉", text:"Light fruit", why:`${ate ? `No meal on the plan since ${fmtT(ate)}` : "No meal on the plan yet today"}${nextMeal ? `, and the next is ${fmtT(nextMeal.s)}` : ""}. Watery fruit, after practice, not before.` });
+    if (left < 20) out.push({ icon:"🌬️", text:"Stand up, look far away", why:"A few rounds of Nadi Shuddhi if you like.", habit: doneToday("nadi") ? "" : "nadi", btn:"Did Nadi Shuddhi" });
+    out.push({ icon:"📵", text:"Phone down", why:"Scrolling isn't rest, for Sadhguru or Bryan Johnson." });
+    return out;
+  }
+  const restHtml = (cur, all, t) => `<div class="eyebrow" style="margin-top:14px">For this rest</div><div class="side-list">${restGuide(cur, all, t).map(x =>
+    `<div class="side rest-tip"><span class="pr">${x.icon}</span><span class="nm">${esc(x.text)}<small>${esc(x.why)}</small></span>${x.habit
+      ? `<button class="btn ghost" data-rhabit="${x.habit}">${esc(x.btn)}</button>` : ""}</div>`).join("")}</div>`;
   function openRecoverMenu(){
     openSheet(`<h3>Recover now</h3><p>Starts now and goes on today's plan.</p>
       <div class="actions" style="flex-direction:column">${RECOVER.map(([t, m]) => `<button class="btn" data-rec="${t}|${m}">${t} · ${m} min</button>`).join("")}</div>`);
@@ -3784,6 +3813,7 @@
           html += trainHtml(cur, t);
         }
       }
+      if (cur.kind === "rest" && !isSleep(cur)) html += restHtml(cur, all, t);
       html += `</div>`;
     }
     put("main", html);
@@ -3795,6 +3825,7 @@
     $("skillsRow").querySelectorAll("[data-sknext]").forEach(b => b.onclick = () => doNext(b.dataset.sknext));
     practiceDay();
     on("bGym", () => openGym(cur));
+    $("main").querySelectorAll("[data-rhabit]").forEach(bn => bn.onclick = () => { logHabit(bn.dataset.rhabit, true); saveG(); render(); });
     $("main").querySelectorAll("[data-side]").forEach(bn => bn.onclick = () => takeSide(bn.dataset.side));
     $("main").querySelectorAll("[data-now]").forEach(bn => bn.onclick = () => { const [n, m] = bn.dataset.now.split("|"); startNow(n, +m); });
     const qt = $("main").querySelector(".quest-title"), tb = cur || nxt;
