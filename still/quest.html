@@ -602,7 +602,7 @@
 <script src="quest-merge.js?v=20261010b"></script>
 <script src="nvc-words.js?v=20261010a"></script>
 <script src="quest-fx.js?v=20261009b"></script>
-<script src="quest-night.js?v=20261010b"></script>
+<script src="quest-night.js?v=20261011a"></script>
 <script src="quest-morning.js?v=20261011d"></script>
 </head>
 <body>
@@ -1219,7 +1219,12 @@
       days, birth: G.birth || null, note: night.note || "",
       exerciseIndex: Math.floor(Date.parse(gameYmd() + "T12:00:00Z") / 86400000),
       deathbedDone: !!G.day.deathbed,
-      onDeathbed: () => { G.day.deathbed = now().toISOString(); log("Sat as if on my deathbed"); },
+      onDeathbed: () => { G.day.deathbed = now().toISOString(); log("Sat as if on my deathbed"); saveG(); },
+      bed: night.bed || null,
+      // his answer to "was it worthwhile?" and the line it gave him (2026-10-11)
+      onBed: bed => { const o = (G.night = G.night || {})[G.day.date] || {}; G.night[G.day.date] = { ...o, bed:{ ...bed, at:now().toISOString() } };
+        if (bed.answer && (!o.bed || o.bed.answer !== bed.answer)) log(`Deathbed: was today worthwhile? ${({ yes:"Yes", partly:"Partly", no:"Not really" })[bed.answer]}`);
+        saveG(); },
       onNote: (text, prompt) => { const o = (G.night = G.night || {})[G.day.date] || {}; G.night[G.day.date] = { ...o, note:text, prompt, at:now().toISOString() }; saveG(); },
       onBirth: v => { G.birth = v; saveG(); },
       keeps: keepCandidates(all),
@@ -1227,6 +1232,11 @@
         await qfetch("/quest/keeps", { method:"POST", body:JSON.stringify({ op:"want", want:{ key:c.key, date:gameYmd(), title:c.title, place:placeNow(),
           s:c.s.toISOString(), e:c.e.toISOString() } }) });
         (KEEP.wants = KEEP.wants || []).push({ key:c.key }); log(`Keepsake asked for: ${c.name}`);
+      },
+      // a second tap takes it back (Junyan, 2026-10-11: "I can't unclick these")
+      onUnkeep: async c => {
+        await qfetch("/quest/keeps", { method:"POST", body:JSON.stringify({ op:"unwant", key:c.key }) });
+        KEEP.wants = (KEEP.wants || []).filter(w => w.key !== c.key); log(`Keepsake taken back: ${c.name}`);
       },
     });
   }

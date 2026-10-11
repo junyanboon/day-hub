@@ -50,12 +50,44 @@
       <div class="nt-hint">Each bar is a day's ending prana, the last ${list.length} days.</div>`;
   }
 
+  /* The deathbed sitting, guided (Junyan, 2026-10-11: "I need help answering this question"): three things to
+     look at, a one-minute timer, then the question with three answers and a line for what it showed him. */
+  const BED_ANSWERS = [
+    ["yes", "Yes, it was", "Good. Nothing left to finish tonight: let it go to sleep with you. What made it so?"],
+    ["partly", "Partly", "Name the part that was. Then one thing that would make tomorrow more so."],
+    ["no", "Not really", "That is honest, and useful. What is one small thing you would change tomorrow?"],
+  ];
+
   function open(d) {
     if (document.getElementById("night")) return;
     const el = document.createElement("div");
     el.id = "night"; el.className = "nt";
     let ex = d.exerciseIndex % EXERCISES.length;
+    let bedOpen = false, bedLeft = null, bedTimer = null;
+    const bed = d.bed || {};
+    const bedHtml = () => {
+      const did = d.today.done.filter((x) => x.startsWith("✓")).map((x) => x.slice(2));
+      const pick = BED_ANSWERS.find((a) => a[0] === bed.answer);
+      return `<div class="nt-bed">
+        <div class="nt-hint">There is no wrong answer. The point is not to judge the day, only to see it plainly, so you don't carry it into sleep.</div>
+        <ol>
+          <li>Sit up on your bed and close your eyes. Take it as true: this is your last minute.</li>
+          <li>Run back through the day from waking up${did.length ? `: ${esc(did.slice(0, 6).join(", "))}` : ""}.</li>
+          <li>For each part, ask: was I really there for it, or somewhere else in my head? Was I kind to the people in it? Is anything left unsaid or undone?</li>
+        </ol>
+        ${bedLeft != null ? `<div class="nt-min"><b id="ntMinN">${bedLeft}</b><span>seconds left. Eyes closed.</span></div>`
+          : `<button class="btn ghost" id="ntMin">${bed.answer ? "Sit the minute again" : "Start the minute"}</button>`}
+        <h4>Was today worthwhile?</h4>
+        <div class="nt-ans">${BED_ANSWERS.map(([k, l]) => `<button data-bed="${k}" class="${bed.answer === k ? "on" : ""}">${l}</button>`).join("")}</div>
+        ${pick ? `<div class="nt-hint" style="margin:10px 0 6px">${esc(pick[2])}</div>
+          <textarea id="ntBedLine" rows="2" placeholder="A line, if you want to keep it">${esc(bed.line || "")}</textarea>
+          <div class="nt-row"><button class="btn" id="ntBedSave">Keep it</button></div>` : ""}
+      </div>`;
+    };
     const draw = () => {
+      // keep his place and anything typed: a tap used to redraw the screen and throw him back to the top
+      const prevBody = el.querySelector(".nt-body"), scroll = prevBody ? prevBody.scrollTop : 0;
+      const typed = {}; el.querySelectorAll("textarea[id]").forEach((t) => typed[t.id] = t.value);
       const now = Date.now(), b = d.birth ? Date.parse(d.birth + "T00:00:00") : null;
       const lived = b ? Math.floor((now - b) / 86400000) : null, left = b ? Math.max(0, Math.floor((b + YEARS * 365.25 * 86400000 - now) / 86400000)) : null;
       const summers = b ? Math.max(0, Math.round(YEARS - (now - b) / (365.25 * 86400000))) : "your remaining";
@@ -78,14 +110,15 @@
             : `<div class="nt-hint">${esc(d.tomorrow.note || "Nothing on the calendar yet.")}</div>`}
         </section>
         ${d.keeps && d.keeps.length ? `<section><h3>Keep a memory</h3>
-          <div class="nt-hint" style="margin-bottom:8px">Tap what was amazing today. Overnight it becomes a keepsake in your bag, with its own poem and song.</div>
-          <div class="nt-keeps">${d.keeps.map((c, i) => `<button class="nt-keep${c.state ? " on" : ""}" data-keep="${i}"${c.state ? " disabled" : ""}>
-            <span>${c.state === "made" ? "🎁" : c.state === "asked" ? "✨" : "☆"}</span><span><b>${esc(c.name)}</b><small>${esc(c.time)}${c.state === "made" ? " · in your bag" : c.state === "asked" ? " · being made" : ""}</small></span></button>`).join("")}</div>
+          <div class="nt-hint" style="margin-bottom:8px">Tap what was amazing today. Overnight it becomes a keepsake in your bag, with its own poem and song. Tap again to take it back.</div>
+          <div class="nt-keeps">${d.keeps.map((c, i) => `<button class="nt-keep${c.state ? " on" : ""}${c.state === "made" ? " made" : ""}" data-keep="${i}"${c.state === "made" ? " disabled" : ""}>
+            <span>${c.state === "made" ? "🎁" : c.state === "asked" ? "✨" : "☆"}</span><span><b>${esc(c.name)}</b><small>${esc(c.time)}${c.state === "made" ? " · in your bag" : c.state === "asked" ? " · being made · tap to undo" : ""}</small></span></button>`).join("")}</div>
         </section>` : ""}
         <section>
           <button class="nt-tile${d.deathbedDone ? " done" : ""}" id="ntBed"><span class="nt-ti">🕯️</span><span>
             <b>Sit as if on your deathbed</b><small>Sit on your bed. One minute left to live. Look back on your day: was it worthwhile?</small></span>
-            <em>${d.deathbedDone ? "✓" : ""}</em></button>
+            <em>${d.deathbedDone ? "✓" : bedOpen ? "⌃" : "⌄"}</em></button>
+          ${bedOpen ? bedHtml() : ""}
         </section>
         <section><h3>Consider the end</h3>
           <p class="nt-ex">${esc(EXERCISES[ex].replace("{summers}", summers))}</p>
@@ -99,20 +132,40 @@
             : `<div class="nt-birth"><label>Your birth date, to lay your days on a life of ${YEARS} years</label><input type="date" id="ntBirth"><button class="btn" id="ntBirthOk">Save</button></div>`}
         </section>
       </div>`;
+      for (const [id, v] of Object.entries(typed)) { const t = el.querySelector("#" + id); if (t) t.value = v; }
+      el.querySelector(".nt-body").scrollTop = scroll;
       el.querySelector("#ntX").onclick = close;
       el.querySelectorAll("[data-feel]").forEach((bn) => bn.onclick = () => { d.feel = +bn.dataset.feel; d.onFeel(d.feel); draw(); });
       el.querySelectorAll("[data-keep]").forEach((bn) => bn.onclick = async () => {
-        const c = d.keeps[+bn.dataset.keep]; bn.disabled = true;
-        try { await d.onKeep(c); c.state = "asked"; } catch (e) { bn.disabled = false; bn.querySelector("small").textContent = "Could not save it. Try again."; return; }
+        const c = d.keeps[+bn.dataset.keep]; if (c.state === "made") return;
+        bn.disabled = true;
+        try { if (c.state === "asked") { await d.onUnkeep(c); c.state = ""; } else { await d.onKeep(c); c.state = "asked"; } }
+        catch (e) { bn.disabled = false; bn.querySelector("small").textContent = "Could not save it. Try again."; return; }
         draw();
       });
-      el.querySelector("#ntBed").onclick = () => { if (!d.deathbedDone) { d.deathbedDone = true; d.onDeathbed(); draw(); } };
+      el.querySelector("#ntBed").onclick = () => { bedOpen = !bedOpen; draw(); };
+      const mn = el.querySelector("#ntMin");
+      if (mn) mn.onclick = () => {
+        bedLeft = 60; draw();
+        bedTimer = setInterval(() => {
+          bedLeft--;
+          const n = el.querySelector("#ntMinN"); if (n) n.textContent = bedLeft;
+          if (bedLeft <= 0) { clearInterval(bedTimer); bedTimer = null; bedLeft = null; try { navigator.vibrate && navigator.vibrate(200); } catch {} draw(); }
+        }, 1000);
+      };
+      el.querySelectorAll("[data-bed]").forEach((bn) => bn.onclick = () => {
+        bed.answer = bn.dataset.bed; d.onBed({ ...bed });
+        if (!d.deathbedDone) { d.deathbedDone = true; d.onDeathbed(); }
+        draw();
+      });
+      const bs = el.querySelector("#ntBedSave");
+      if (bs) bs.onclick = () => { bed.line = el.querySelector("#ntBedLine").value.trim(); d.onBed({ ...bed }); bs.textContent = "Kept ✓"; };
       el.querySelector("#ntNext").onclick = () => { ex = (ex + 1) % EXERCISES.length; draw(); };
       el.querySelector("#ntSave").onclick = () => { d.note = el.querySelector("#ntNote").value.trim(); d.onNote(d.note, EXERCISES[ex]); el.querySelector("#ntSave").textContent = "Kept ✓"; };
       const bo = el.querySelector("#ntBirthOk");
       if (bo) bo.onclick = () => { const v = el.querySelector("#ntBirth").value; if (!v) return; d.birth = v; d.onBirth(v); draw(); };
     };
-    const close = () => { el.classList.remove("open"); setTimeout(() => el.remove(), 250); };
+    const close = () => { clearInterval(bedTimer); el.classList.remove("open"); setTimeout(() => el.remove(), 250); };
     draw();
     document.body.appendChild(el);
     requestAnimationFrame(() => el.classList.add("open"));
@@ -161,6 +214,15 @@
     .nt-keep > span:first-child { font-size:20px; width:24px; text-align:center; }
     .nt-keep b { display:block; font-size:14px; } .nt-keep small { display:block; font-size:12px; color:var(--ink-soft); margin-top:2px; }
     .nt-keep.on { border-color:rgba(240,166,192,.6); background:linear-gradient(135deg, rgba(240,166,192,.16), rgba(255,255,255,.04)); cursor:default; }
+    .nt-keep.made { cursor:default; }
+    .nt-bed { margin-top:10px; padding:14px; border-radius:16px; background:rgba(0,0,0,.18); border:1px solid var(--glass-border); }
+    .nt-bed ol { margin:10px 0 12px; padding-left:20px; font-size:14px; line-height:1.45; } .nt-bed li { margin-bottom:6px; }
+    .nt-bed h4 { font-size:15px; margin:14px 0 8px; font-weight:600; }
+    .nt-min { display:flex; align-items:baseline; gap:8px; } .nt-min b { font-size:30px; font-variant-numeric:tabular-nums; color:var(--gold); }
+    .nt-min span { font-size:13px; color:var(--ink-soft); }
+    .nt-ans { display:grid; grid-template-columns:repeat(3, 1fr); gap:6px; }
+    .nt-ans button { background:var(--glass); border:1px solid var(--glass-border); border-radius:12px; padding:10px 4px; color:var(--ink); font:inherit; font-size:13.5px; cursor:pointer; }
+    .nt-ans button.on { border-color:#ffd479; background:rgba(255,212,121,.16); }
     .nt-birth { display:flex; flex-direction:column; gap:8px; margin-top:12px; } .nt-birth label { font-size:13px; color:var(--ink-soft); }`;
   document.head.appendChild(css);
   root.QuestNight = { open };
