@@ -591,7 +591,7 @@
   .mo-row { display:flex; align-items:center; gap:10px; width:100%; padding:10px 12px; border-radius:16px; background:rgba(255,255,255,.14); color:#fff; text-align:left; }
   .mo-row-t { width:66px; flex:none; font-size:13px; opacity:.85; } .mo-row-n { flex:1; min-width:0; font-size:15px; } .mo-row-go { flex:none; opacity:.7; font-size:18px; }
 </style>
-<link rel="stylesheet" href="bag.css">
+<link rel="stylesheet" href="bag.css?v=20261011a">
 <style>
   /* Figtree (OFL), served with the page so it needs no Google lookup and works offline (d217, 2026-10-10) */
   @font-face { font-family:"Figtree"; font-style:normal; font-weight:300 900; font-display:swap;
@@ -746,6 +746,20 @@
 
   /* ---------- live data: plan + edit layer + tasks ---------- */
   let PLAN = null, OPS = { edits:{}, drops:[], adds:[], ts:0 }, TASKS = [], lastPull = null, pullErr = null, INSIGHTS = {};
+  /* Open with the last day this device saw, if it is under 3 hours old and the same game day (Junyan,
+     2026-10-11, slow internet in Egypt: "it takes way too long for my app to load"). The page showed
+     "Reading your calendars" until the plan, edits, tasks and game had all come in; now it shows the
+     saved day at once and swaps in the fresh one when pullAll finishes. Not with a test clock (?at=); a test
+     server (?api=) keeps its own saved day. */
+  const SNAP = "quest-snap" + (qs.get("api") ? ":" + qs.get("api") : ""), SNAP_OK = !AT;
+  if (SNAP_OK) try {
+    const s = JSON.parse(localStorage.getItem(SNAP));
+    if (s && s.plan && Array.isArray(s.plan.blocks) && Date.now() - s.at < 3 * 3600000) {
+      PLAN_TZ = s.plan.tz || null;
+      if (s.ymd === tzYmd(new Date(now() - 4 * 3600000))) { PLAN = s.plan; GAME_YMD = s.ymd; OPS = s.ops || OPS; TASKS = s.tasks || []; }
+      else PLAN_TZ = null;
+    }
+  } catch {}
 
   async function getPlan(date){
     const r = await fetch(API + "/plan?date=" + date, { cache:"no-store" });
@@ -756,6 +770,9 @@
   }
   async function pullPlan(){
     const t = now(), today = tzYmd(t);
+    // before noon yesterday's plan may still be the day: ask for both at once (one wait, not two)
+    const early = +tzParts(t, { hour:"numeric", hourCycle:"h23" }).hour < 12, prevY = tzYmd(new Date(t - 86400000));
+    const prevP = early ? getPlan(prevY).catch(() => null) : null;
     let p = await getPlan(today);
     PLAN_TZ = p.tz || null;
     let day = today;
@@ -764,7 +781,8 @@
       // Stay on yesterday's mountain until 4 AM, or until its last block ends
       // if that is later (capped at 9 AM, and at today's first fixed block).
       const y = tzYmd(new Date(t - 86400000));
-      const prev = await getPlan(y).catch(() => null);
+      // the plan's own zone can move the date: then ask again for the right one
+      const prev = prevP && y === prevY ? await prevP : await getPlan(y).catch(() => null);
       if (prev && prev.blocks.length) {
         const at4 = new Date(`${today}T04:00:00Z`).getTime() - tzOff(t) * 60000;
         const lastEnd = Math.max(...prev.blocks.map(b => +new Date(b.e)));
@@ -807,6 +825,7 @@
       pullKeeps();
       nvSend();
       lastPull = new Date(); pullErr = null;
+      if (SNAP_OK) try { localStorage.setItem(SNAP, JSON.stringify({ at:Date.now(), ymd:GAME_YMD, plan:PLAN, ops:OPS, tasks:TASKS })); } catch {}
       setTimeout(openPending, 0);
     } catch (e) { pullErr = String(e.message || e); }
     render();
@@ -3686,7 +3705,7 @@
     $("combo").classList.toggle("hot", P >= 70);
     const where = PLAN && PLAN.where && PLAN.where.place;
     $("statusL").innerHTML = pullErr ? `<span class="dry">Offline: ${esc(pullErr)}</span>`
-      : PLAN ? `<span class="place">📍 ${esc(where || "Home")}</span> ${fmtT(t)}` : "Loading your day…";
+      : PLAN ? `<span class="place">📍 ${esc(where || "Home")}</span> ${fmtT(t)}${lastPull ? "" : " · updating…"}` : "Loading your day…";
     $("statusR").innerHTML = [DRY ? `<a class="dry" href="${location.pathname}" title="Nothing is saved here. Tap for the real game">Test mode</a>` : "", AT ? `<span class="dry">clock ${fmtT(t)}</span>` : ""].filter(Boolean).join(" · ");
 
     // mode
@@ -3876,6 +3895,10 @@
       const r = await fetch(location.pathname, { method:"HEAD", cache:"no-store" });
       const lm = Date.parse(r.headers.get("last-modified") || ""), mine = Date.parse(document.lastModified);
       if (!(lm - mine > 5000) || sessionStorage.getItem("quest-reloaded") === String(lm)) return false;
+      // the service worker opens the saved copy, so fetch the new page into it first (2026-10-11)
+      const fresh = await fetch(location.pathname, { cache:"no-store", headers:{ "x-dq-fresh":"1" } });
+      if (!fresh.ok) return false;
+      await fresh.text();
       sessionStorage.setItem("quest-reloaded", String(lm));
       if (syncTimer) await pushG();
       location.reload();
@@ -3892,6 +3915,7 @@
   addEventListener("pageshow", e => { if (e.persisted) wake(); });
   addEventListener("focus", wake);
   addEventListener("pagehide", () => { if (syncTimer) pushG(true); });
+  render();   // the saved day, if there is one, before the network answers
   checkFresh();
   pullAll();
 })();

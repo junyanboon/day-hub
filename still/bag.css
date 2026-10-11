@@ -1,5 +1,7 @@
 /* Day Quest bag (inventory), d103. Pairs with bag.js. Every class is prefixed bag- or ba-. */
-@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&display=swap');
+/* Cinzel is saved here (2026-10-11): the Google Fonts import held up the first paint on slow hotel internet */
+@font-face { font-family:"Cinzel"; font-style:normal; font-weight:600 700; font-display:swap;
+  src:url(fonts/cinzel-latin.woff2) format("woff2"); }
 
 .bag-root, .bag-qroot, .bag-layer {
   --bag-ink: rgba(255,255,255,.95);

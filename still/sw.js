@@ -3,12 +3,18 @@
    2. A saved copy (Junyan, 2026-10-10, d211: "my FBS studio monitor loads easily but this app just
       struggles"). The hotel router sometimes fails to look up addresses (DNS_PROBE_FINISHED_BAD_CONFIG),
       and with no saved copy there was nothing to open. Now:
-      - pages (quest.html, Stillness): the network first, but never more than 3 s; then the saved copy;
-      - the page's own files (scripts, styles, sprites, fonts): the saved copy at once, refreshed behind it;
+      - pages (quest.html, Stillness): the saved copy at once. Day Quest asks for a fresh one itself when
+        GitHub has a newer page (checkFresh in quest.html); otherwise the page is refreshed behind it, at most
+        every 10 minutes;
+      - the page's own files (scripts, styles, sprites, fonts): the saved copy at once. A file with ?v= in its
+        address never changes, so it is never fetched again; any other is refreshed behind it once a day;
       - his data from still-api (plan, edits, tasks, game, steps, sleep): the network first, 4 s at most,
         then the last good answer. Saves (POST) always go to the network; the page keeps them until it can.
-      Everything else (YouTube, weather) is left alone. */
-const SHELL = "dq-shell-v1", DATA = "dq-data-v1";
+      Everything else (YouTube, weather) is left alone.
+   3. Faster opens on slow internet (Junyan, 2026-10-11, Egypt, about 65 KB/s: "it takes way too long for my
+      app to load"). Before this, every open downloaded the whole page (95 KB) and fetched every script and
+      sprite again behind the saved copy, which crowded out the plan. Now an open sends almost nothing. */
+const SHELL = "dq-shell-v2", DATA = "dq-data-v1";   // v2: the smaller sprites (2026-10-11)
 const API = "https://still.srv1948070.hstgr.cloud";
 const DATA_PATHS = /^\/(plan|ops|tasks|steps|bedtime|sleep)(\/|$)|^\/quest\/(state|insights|skills|content|wiki|keeps|practice)(\/|$)/;
 
@@ -34,13 +40,16 @@ async function networkFirst(req, cacheName, ms, key) {
     return net;   // nothing saved yet: wait for the network after all
   }
 }
-// the saved copy at once, refreshed behind it
-async function savedFirst(req) {
+// how old a saved copy is, from the Date GitHub stamped on it
+const age = (res) => Date.now() - (Date.parse(res.headers.get("date") || "") || 0);
+// the saved copy at once; fetched again behind it only when older than `maxAge` (never for a ?v= file)
+async function savedFirst(req, maxAge, key) {
   const cache = await caches.open(SHELL);
-  const hit = await cache.match(req, { ignoreVary: true });
-  const net = fetch(req).then((res) => { if (res && res.ok) cache.put(req, res.clone()).catch(() => {}); return res; });
-  if (hit) { net.catch(() => {}); return hit; }
-  return net;
+  const hit = await cache.match(key || req, { ignoreVary: true });
+  const fetchIt = () => fetch(req).then((res) => { if (res && res.ok) cache.put(key || req, res.clone()).catch(() => {}); return res; });
+  if (!hit) return fetchIt();
+  if (age(hit) > maxAge) fetchIt().catch(() => {});
+  return hit;
 }
 
 self.addEventListener("fetch", (e) => {
@@ -50,10 +59,16 @@ self.addEventListener("fetch", (e) => {
   if (url.origin === self.location.origin && url.pathname.startsWith(new URL(self.registration.scope).pathname)) {
     if (req.mode === "navigate" || /\.html$/.test(url.pathname)) {
       // one saved copy per page, whatever its ?query
-      e.respondWith(networkFirst(req, SHELL, 3000, new Request(url.origin + url.pathname)));
+      const key = new Request(url.origin + url.pathname);
+      // Day Quest found a newer page on GitHub: fetch it and finish saving it before the page reloads
+      if (req.headers.get("x-dq-fresh")) e.respondWith(fetch(req).then(async (res) => {
+        if (res.ok) await (await caches.open(SHELL)).put(key, res.clone()).catch(() => {});
+        return res; }));
+      // quest.html checks for a newer copy itself (a tiny HEAD), so it is never fetched again behind it
+      else e.respondWith(savedFirst(req, /quest\.html$/.test(url.pathname) ? Infinity : 10 * 60000, key));
       return;
     }
-    e.respondWith(savedFirst(req));
+    e.respondWith(savedFirst(req, url.search.includes("v=") ? Infinity : 86400000));
     return;
   }
   if (url.origin === API && DATA_PATHS.test(url.pathname)) e.respondWith(networkFirst(req, DATA, 4000));
