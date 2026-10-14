@@ -174,13 +174,6 @@
   .htile.full { background:linear-gradient(160deg, rgba(255,212,121,.30), rgba(255,212,121,.08)); border-color:rgba(255,212,121,.6); }
   .htile.full .hc { color:var(--gold); }
   .htile.auto { border-style:dashed; } .htile.auto b { color:var(--ink-faint); } .htile.earned { border-color:rgba(143,227,176,.7); }
-  .calx { position:fixed; inset:0; z-index:60; display:flex; flex-direction:column; background:#191d3c;
-    transform:translateY(100%); transition:transform .25s cubic-bezier(.2,.8,.2,1); padding-top:env(safe-area-inset-top); }
-  .calx.open { transform:none; }
-  .calx-top { display:flex; justify-content:space-between; align-items:center; padding:10px 14px; font-size:17px; }
-  .calx-top .btn { flex:none; padding:8px 16px; }
-  .calx iframe { flex:1; width:100%; border:0; background:#191d3c; }
-  .calx-zap { margin:8px 14px calc(env(safe-area-inset-bottom) + 10px); padding:10px; border-radius:14px; background:var(--glass); color:var(--ink-soft); font-size:13px; }
   .sq { display:flex; gap:12px; align-items:center; margin-top:12px; padding:12px 14px; border-radius:16px; background:var(--glass); border:1px solid var(--glass-border); }
   .sq.done { border-color:rgba(143,227,176,.65); background:linear-gradient(135deg, rgba(143,227,176,.18), rgba(127,208,255,.10)); }
   .sq-i { font-size:22px; } .sq-t { flex:1; font-weight:600; font-size:14px; }
@@ -321,7 +314,13 @@
   /* ---------- the mountain ---------- */
   .place { color:var(--ink); font-weight:600; }
   /* ---------- Today: the calendar column (Junyan, 2026-10-10, d216 "C calendar column"; it replaced the mountain, d218) ---------- */
-  #mtn { margin-top:4px; }
+  /* the agenda (2026-10-14): yesterday to 3 days ahead in one scroll, opening on now */
+  #mtn { position:relative; margin-top:4px; max-height:min(72vh, 680px); overflow-y:auto; overscroll-behavior:contain; scrollbar-width:thin; }
+  body.dash .w-mtn { display:flex; flex-direction:column; overflow:hidden; }
+  body.dash .w-mtn > #mtn { flex:1; min-height:0; max-height:none; }
+  .cal-sticky { position:sticky; top:0; z-index:7; padding:5px 2px 6px; font-size:11.5px; font-weight:700; letter-spacing:.07em; text-transform:uppercase;
+    color:var(--ink-soft); background:rgba(25,29,60,.88); backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px); }
+  .cal-ro { font-size:12px; color:var(--ink-faint); margin:4px 2px 2px; }
   .cal { position:relative; --cal-l:50px; margin:6px 0 4px; }
   .cal-hr { position:absolute; left:var(--cal-l); right:0; height:0; border-top:1px solid rgba(255,255,255,.09); }
   .cal-hr span { position:absolute; left:calc(-1 * var(--cal-l)); width:calc(var(--cal-l) - 8px); top:-8px; text-align:right; font-size:11px; color:var(--ink-faint); }
@@ -348,6 +347,24 @@
   .cal-now { position:absolute; left:var(--cal-l); right:0; height:2px; margin-top:-1px; background:#ff8f9e; z-index:2; pointer-events:none; }
   .cal-now::before { content:""; position:absolute; left:-5px; top:-4px; width:10px; height:10px; border-radius:50%; background:#ff8f9e; }
   .cal-now span { position:absolute; left:calc(-1 * var(--cal-l) - 6px); width:calc(var(--cal-l) - 4px); top:-7px; text-align:right; white-space:nowrap; font-size:10.5px; font-weight:700; color:#ff8f9e; }
+  .cal-day { position:absolute; left:0; right:0; height:0; border-top:1.5px solid rgba(255,255,255,.32); }
+  .cal-day span { position:absolute; left:0; top:3px; width:calc(var(--cal-l) - 8px); text-align:right; font-size:11px; line-height:1.15; font-weight:700; color:var(--ink); text-transform:uppercase; }
+  .cal-day.today span { color:#ff8f9e; }
+  /* move and stretch like Apple Calendar: drag a block, or its top or bottom edge; a finger holds it first */
+  .cal-ev.drag { cursor:grab; touch-action:pan-y; -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; }
+  .cal-ev.dragging { cursor:grabbing; z-index:6; opacity:1 !important; box-shadow:0 0 0 2px var(--c), 0 12px 26px rgba(0,0,0,.45); }
+  .cal-h { position:absolute; left:0; right:0; height:9px; cursor:ns-resize; touch-action:none; z-index:2; }
+  .cal-h.top { top:0; } .cal-h.bot { bottom:0; }
+  .cal-h::after { content:""; position:absolute; left:50%; width:24px; margin-left:-12px; height:3px; border-radius:2px; background:var(--c); opacity:0; transition:opacity .15s; }
+  .cal-h.top::after { top:2px; } .cal-h.bot::after { bottom:2px; }
+  .cal-ev.drag:hover .cal-h::after, .cal-ev.dragging .cal-h::after { opacity:.9; }
+  @media (pointer:coarse) { .cal-h { height:14px; } .cal-h::after { opacity:.55; } }
+  .cal-ev.ro { cursor:not-allowed; }
+  .cal-ev.pend { animation:calPend .9s ease-in-out infinite alternate; }
+  @keyframes calPend { to { opacity:.55; } }
+  .cal-toast { position:fixed; left:50%; bottom:calc(env(safe-area-inset-bottom) + 22px); transform:translateX(-50%); z-index:80; max-width:min(440px, 92vw);
+    padding:10px 16px; border-radius:14px; background:rgba(25,29,60,.94); border:1px solid var(--glass-border); color:var(--ink); font-size:13.5px;
+    box-shadow:0 10px 30px rgba(0,0,0,.4); transition:opacity .3s; }
   /* ---------- trail ---------- */
   h2 { font-size:12px; letter-spacing:.14em; text-transform:uppercase; color:var(--ink-soft); font-weight:600;
     margin:26px 4px 10px; display:flex; justify-content:space-between; }
@@ -604,6 +621,7 @@
 <script src="quest-fx.js?v=20261009b"></script>
 <script src="quest-night.js?v=20261011a"></script>
 <script src="quest-morning.js?v=20261011d"></script>
+<script src="quest-agenda.js?v=20261014a"></script>
 </head>
 <body>
 <div id="sky" aria-hidden="true"><div class="sky-stars"></div><div class="sky-orb"></div>
@@ -626,8 +644,8 @@
   <div id="nextLine"></div>
   <div id="habits"></div>
 
-  <h2><span>Today</span><button class="add-btn" id="zap">🧭 Change course</button></h2>
-  <div id="mtn"></div>
+  <h2><span>Calendar</span><button class="add-btn" id="zap" hidden>↩︎ Back to the quest</button></h2>
+  <div id="mtn"><div class="cal-sticky" id="calDay"></div><div id="calBody"></div></div>
 
   <h2><span>Skills</span><button class="add-btn" id="skillsBtn">Open</button></h2>
   <div id="skillsRow"></div>
@@ -746,6 +764,8 @@
 
   /* ---------- live data: plan + edit layer + tasks ---------- */
   let PLAN = null, OPS = { edits:{}, drops:[], adds:[], ts:0 }, TASKS = [], lastPull = null, pullErr = null, INSIGHTS = {};
+  // the agenda's other days (yesterday to 3 ahead, not the game's own day): date -> that day's plan blocks
+  let AG = {};
   /* Open with the last day this device saw, if it is under 3 hours old and the same game day (Junyan,
      2026-10-11, slow internet in Egypt: "it takes way too long for my app to load"). The page showed
      "Reading your calendars" until the plan, edits, tasks and game had all come in; now it shows the
@@ -756,7 +776,7 @@
     const s = JSON.parse(localStorage.getItem(SNAP));
     if (s && s.plan && Array.isArray(s.plan.blocks) && Date.now() - s.at < 3 * 3600000) {
       PLAN_TZ = s.plan.tz || null;
-      if (s.ymd === tzYmd(new Date(now() - 4 * 3600000))) { PLAN = s.plan; GAME_YMD = s.ymd; OPS = s.ops || OPS; TASKS = s.tasks || []; }
+      if (s.ymd === tzYmd(new Date(now() - 4 * 3600000))) { PLAN = s.plan; GAME_YMD = s.ymd; OPS = s.ops || OPS; TASKS = s.tasks || []; AG = s.ag || {}; }
       else PLAN_TZ = null;
     }
   } catch {}
@@ -798,6 +818,17 @@
     PLAN_TZ = p.tz || null;
     GAME_YMD = day;
   }
+  /* The agenda's other days, each its own /plan (cached a minute on the server). Not awaited by
+     pullAll, so a slow line never holds up today; a day that fails keeps what it had. */
+  async function pullAgenda(){
+    if (!window.QuestAgenda) return;
+    const days = QuestAgenda.agendaDays(tzYmd(now())).filter(d => d !== GAME_YMD);
+    const got = await Promise.all(days.map(d => getPlan(d).then(p => [d, p.blocks]).catch(() => [d, AG[d] || null])));
+    const next = {};
+    for (const [d, b] of got) if (b) next[d] = b;
+    AG = next;
+  }
+  const saveSnap = () => { if (SNAP_OK) try { localStorage.setItem(SNAP, JSON.stringify({ at:Date.now(), ymd:GAME_YMD, plan:PLAN, ops:OPS, tasks:TASKS, ag:AG })); } catch {} };
   async function pullOps(){
     const r = await fetch(API + "/ops?d=" + encodeURIComponent(dayKey()), { cache:"no-store" });
     if (!r.ok) return;
@@ -813,6 +844,7 @@
   async function pullAll(){
     try {
       await pullPlan();   // first: it sets the zone, which decides today's date key
+      pullAgenda().then(() => { saveSnap(); if (!$("sheet").classList.contains("open")) render(); }).catch(() => {});
       await Promise.all([pullOps(), pullTasks().catch(() => {}), pullState()]);
       seedFromOura();
       pullSteps();
@@ -825,7 +857,7 @@
       pullKeeps();
       nvSend();
       lastPull = new Date(); pullErr = null;
-      if (SNAP_OK) try { localStorage.setItem(SNAP, JSON.stringify({ at:Date.now(), ymd:GAME_YMD, plan:PLAN, ops:OPS, tasks:TASKS })); } catch {}
+      saveSnap();
       setTimeout(openPending, 0);
     } catch (e) { pullErr = String(e.message || e); }
     render();
@@ -941,10 +973,16 @@
     [/brunch/i, "Brunch"], [/lunch/i, "Lunch"], [/dinner/i, t => /pack/i.test(t) ? "Dinner + pack" : "Dinner"],
     [/quad/i, "Quad bikes"], [/check.?out/i, "Check-out"], [/walk/i, "Walk"], [/video|shoot|film/i, "Video shoot"],
   ];
+  // words that stand in for a name ("see notes", "activities", "details"): never shown alone
+  const VAGUE = /^((see|check|read)\s+(the\s+)?notes?|notes?|activit(y|ies)|details?|info|tbd|tba|tbc|plans?|program(me)?|itinerary|misc)$/i;
   function shortName(b){
     const t = String(b.t || "");
     for (const [re, v] of SHORT) if (re.test(t)) return typeof v === "function" ? v(t) : v;
-    let x = t.replace(/\s*[·@(].*$/, "").replace(/^(tour|trip|event)\s*[-:–]\s*/i, "").replace(/[!?.]+$/, "").trim();
+    // "Tour - Safari Day" reads "Safari Day", but "Tour - See notes" and "Tour - Activities (See notes)"
+    // read "Tour": the part after the dash is a pointer to the notes, not a name (Junyan, 2026-10-14)
+    let x = t.replace(/\s*[·@(].*$/, "").replace(/\s*[-:–]\s*(see|check|read)\s+(the\s+)?notes?$/i, "").replace(/[!?.]+$/, "").trim();
+    const m = /^(tour|trip|event)\s*[-:–]\s*(.*)$/i.exec(x);
+    if (m) x = m[2].trim() && !VAGUE.test(m[2].trim()) ? m[2].trim() : m[1][0].toUpperCase() + m[1].slice(1).toLowerCase();
     return x.length > 22 ? x.slice(0, 21).trim() + "…" : (x || t);
   }
   // the symbol in its coloured ring, as inline SVG (main card, next line, windows)
@@ -1086,27 +1124,6 @@
     G.day.habits[id] = (G.day.habits[id] || 0) + 1;
     addHabit(id, g, h[1], h[1].toLowerCase());
     if (!quiet) render();
-  }
-  /* ---------- Change course: the calendar, full screen, to change the day now ----------
-     The desktop planner (plan.html?embed=1, same pairing) in a frame: tap an event
-     to change its time, name or calendar, tap an empty slot to add one. Closing it
-     pulls the plan again so the mountain shows the change. The old "Something came
-     up" interruption log stays one tap away at the bottom. */
-  function openCal(){
-    if ($("calx")) return;
-    const q = new URLSearchParams({ embed:"1" });
-    if (DRY) q.set("dry", "1");
-    if (qs.get("api")) q.set("api", qs.get("api"));
-    const el = document.createElement("div");
-    el.id = "calx"; el.className = "calx";
-    el.innerHTML = `<div class="calx-top"><b>🧭 Change course</b><button class="btn" id="calxDone">Done</button></div>
-      <iframe src="plan.html?${q}" title="Calendar"></iframe>
-      <button class="calx-zap" id="calxZap">⚡ Log an interruption instead</button>`;
-    document.body.appendChild(el);
-    requestAnimationFrame(() => el.classList.add("open"));
-    const close = () => { el.classList.remove("open"); setTimeout(() => el.remove(), 250); pullAll(); };
-    $("calxDone").onclick = close;
-    $("calxZap").onclick = () => { close(); setTimeout(openZapSheet, 260); };
   }
 
   /* ---------- Steps side quest (Junyan, 2026-10-09, d165) ----------
@@ -1837,7 +1854,10 @@
   }
   async function addBlockCal(t, s, e, makeRoom){
     try { await qfetch("/cal/event", { method:"POST", body:JSON.stringify({ s:s.toISOString(), e:e.toISOString(), title:t }) }); }
-    catch (err) { alert(`Could not add it to the calendar (${err.message}). Added for today only.`); return addBlock(t, s, e, makeRoom); }
+    catch (err) {
+      // today's plan cannot hold another day, so a failed add there is only reported
+      if (gameDayOf(s) !== gameYmd()) return calToast(`Could not add ${t} to the calendar (${err.message}). Nothing was added.`, 7000);
+      alert(`Could not add it to the calendar (${err.message}). Added for today only.`); return addBlock(t, s, e, makeRoom); }
     log(`Added ${t} to the calendar: ${fmtT(s)} to ${fmtT(e)}`);
     if (makeRoom) await writeOps(o => blocks().forEach(x => {
       if (x.s < s) return;
@@ -2392,13 +2412,16 @@
   function openAdd(from){
     const t0 = new Date(Math.ceil(Math.max(now().getTime(), from ? from.getTime() : 0) / 300000) * 300000);
     let dur = 30;
-    openSheet(`<h3>Add to today</h3>
+    // open space on another day of the agenda: it can only go in the calendar (today's plan has no other days)
+    const other = gameDayOf(t0) !== gameYmd(), canAdd = questKey() && !DRY;
+    if (other && !canAdd) return calToast(DRY ? "Test mode: nothing can be added here." : "Pair this device in ⚙️ to add to other days.");
+    openSheet(`<h3>Add to ${other ? esc(shortDay(tzYmd(t0), tzYmd(now()))) : "today"}</h3>
       <input id="aT" placeholder="What is it?" maxlength="80">
       <div class="row"><label>Start<input id="aS" type="time" value="${toField(t0)}"></label></div>
       <div class="chips" style="grid-template-columns:repeat(4,1fr)">${[15,30,60,90].map(m =>
         `<button class="chip ${m === dur ? "sel" : ""}" data-d="${m}" style="text-align:center">${m < 60 ? m + "m" : m/60 + "h"}</button>`).join("")}</div>
-      ${questKey() && !DRY ? `<label class="check"><input id="aCal" type="checkbox" checked> Add it to Google Calendar (Junyan)</label>` : ""}
-      <label class="check"><input id="aRoom" type="checkbox"> Make room (push what follows later, today only)</label>
+      ${other ? `<p style="font-size:12px">It goes in Google Calendar (Junyan).</p>` : canAdd ? `<label class="check"><input id="aCal" type="checkbox" checked> Add it to Google Calendar (Junyan)</label>` : ""}
+      ${other ? "" : `<label class="check"><input id="aRoom" type="checkbox"> Make room (push what follows later, today only)</label>`}
       <div class="actions"><button class="btn ghost" id="aCancel">Cancel</button><button class="btn primary" id="aGo">Add</button></div>`);
     $("sheet").querySelectorAll("[data-d]").forEach(c => c.onclick = () => {
       $("sheet").querySelectorAll("[data-d]").forEach(x => x.classList.remove("sel"));
@@ -2407,9 +2430,9 @@
     $("aCancel").onclick = closeSheet;
     $("aGo").onclick = () => {
       const t = $("aT").value.trim(); if (!t) { $("aT").focus(); return; }
-      const s = fromField($("aS").value, now()), e = new Date(s.getTime() + dur * 60000);
-      const cal = $("aCal") && $("aCal").checked;
-      closeSheet(); (cal ? addBlockCal : addBlock)(t, s, e, $("aRoom").checked);
+      const s = fromField($("aS").value, other ? t0 : now()), e = new Date(s.getTime() + dur * 60000);
+      const cal = other || $("aCal") && $("aCal").checked;
+      closeSheet(); (cal ? addBlockCal : addBlock)(t, s, e, !other && $("aRoom").checked);
     };
     setTimeout(() => $("aT").focus(), 300);
   }
@@ -3591,41 +3614,186 @@
   // the block's symbol in a ring of its calendar colour, like Change course shows (Junyan, 2026-10-11)
   const calIcon = (b, c) => `<svg class="cal-ic" width="17" height="17" viewBox="-20 -20 40 40" aria-hidden="true"><circle r="17.5" fill="none" stroke="${c}" stroke-width="2.4"/>
     <path d="${SYM[symOf(b)] || SYM["map-pin"]}" transform="translate(-11,-11) scale(.92)" fill="none" stroke="${c}" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  /* The agenda (Junyan, 2026-10-14): yesterday to 3 days ahead as one column, scrolled, opening on now.
+     "Instead of change course, be able to change things directly on the calendar shown": drag a block
+     to move it (to another day too), drag its top or bottom edge to change its length, in 15 minute
+     steps, mouse or finger (a finger holds it a moment first, so the column still scrolls). A calendar
+     event is saved to Google Calendar; a block added in Quest is saved in today's plan; open space is
+     the gap between things and does not move. Tap still opens the block's window. */
+  const AGD = () => window.QuestAgenda;
+  // the game day an instant belongs to: like gameYmd, its day runs to 4 AM
+  const gameDayOf = d => tzYmd(new Date(+d - 4 * 3600000));
+  const shortDay = (ymd, today) => dayLabel(ymd, today).replace(/ ·.*/, "");
+  const dragCtx = () => ({ paired:!!questKey(), dry:DRY });
+  const dayStart = ymd => fromField("00:00", new Date(ymd + "T12:00:00Z"));
+  const dayLabel = (ymd, today) => {
+    const d = new Date(ymd + "T12:00:00Z"), w = d.toLocaleDateString("en-US", { timeZone:"UTC", weekday:"short", month:"short", day:"numeric" });
+    const rel = ymd === today ? "Today" : ymd === AGD().addDays(today, -1) ? "Yesterday" : ymd === AGD().addDays(today, 1) ? "Tomorrow" : "";
+    return rel ? `${rel} · ${w}` : w;
+  };
+  let CAL = { stops:[], a0:0, z0:0, days:[], today:"" };
+  // every block the agenda shows: the game's day (with its edits) and the other days' plans, a move waiting on the calendar shown where it went
+  const PEND = {};
+  function agendaBlocks(t){
+    const game = blocks();
+    if (!AGD()) return game;
+    for (const k in PEND) if (Date.now() - PEND[k].at > 3 * 60000) delete PEND[k];
+    const others = Object.values(AG).map(list => list.map(b => ({ ...b, key:keyOf(b), kind:kindOf(b) })));
+    return AGD().applyPending(AGD().mergeAgenda(game, others), PEND, Date.now()).sort((x, y) => x.s - y.s);
+  }
   function calendarHTML(stops, cur, t){
-    if (!stops.length) return `<div class="empty">No blocks today.</div>`;
-    const HR = 3600000, awake = stops.filter(st => !st.blocks.every(isSleep)), base = awake.length ? awake : stops;
-    const toHour = (ms, up) => { const p = tzParts(new Date(ms), { minute:"numeric", second:"numeric" });
-      const off = (+p.minute * 60 + +p.second) * 1000 + ms % 1000; return off ? ms - off + (up ? HR : 0) : ms; };
-    const a0 = toHour(Math.min(+base[0].s, +t), false), z0 = toHour(Math.max(+base[base.length - 1].e, +t + 30 * 60000), true);
+    const HR = 3600000, today = tzYmd(t), days = AGD() ? AGD().agendaDays(today) : [gameYmd()];
+    const a0 = +dayStart(days[0]), z0 = +dayStart(AGD() ? AGD().addDays(days[days.length - 1], 1) : days[0]) || a0 + 24 * HR;
+    CAL = { stops, a0, z0, days, today };
     const y = ms => Math.round((ms - a0) / HR * CAL_PX), H = y(z0);
     let out = `<div class="cal" style="height:${H + 8}px">`;
+    // each day from its own midnight (a clock change makes a day 23 or 25 hours): a day line with the date, then hour lines;
     // an hour label right next to the now line would sit under its time, so that one is left off
-    for (let h = a0; h <= z0; h += HR) out += `<div class="cal-hr" style="top:${y(h)}px">${Math.abs(h - t) < 15 * 60000 ? "" : `<span>${fmtT(new Date(h)).replace(":00", "")}</span>`}</div>`;
-    // lanes for blocks that overlap
-    const ev = stops.map((st, i) => ({ st, i, s:Math.max(+st.s, a0), e:Math.min(+st.e, z0) })).filter(x => x.e > x.s).sort((p, q) => p.s - q.s);
-    let lanes = [], group = [], end = 0;
-    const close = () => { group.forEach(x => x.n = lanes.length); group = []; lanes = []; };
-    for (const x of ev) {
-      if (group.length && x.s >= end) close();
-      let L = lanes.findIndex(e => e <= x.s); if (L < 0) { L = lanes.length; lanes.push(0); }
-      lanes[L] = x.e; x.lane = L; group.push(x); end = Math.max(end, x.e);
-    }
-    close();
+    days.forEach((d, i) => {
+      const m0 = +dayStart(d), m1 = i + 1 < days.length ? +dayStart(days[i + 1]) : z0, nd = new Date(d + "T12:00:00Z");
+      const wd = nd.toLocaleDateString("en-US", { timeZone:"UTC", weekday:"short" }), md = nd.toLocaleDateString("en-US", { timeZone:"UTC", month:"short", day:"numeric" });
+      out += `<div class="cal-day${d === today ? " today" : ""}" style="top:${y(m0)}px"><span>${wd}<br>${md}</span></div>`;
+      for (let h = m0 + HR; h < m1 - 5 * 60000; h += HR)
+        out += `<div class="cal-hr" style="top:${y(h)}px">${Math.abs(h - t) < 15 * 60000 ? "" : `<span>${fmtT(new Date(h)).replace(":00", "")}</span>`}</div>`;
+    });
+    const ctx = dragCtx();
+    const ev = AGD() ? AGD().lanes(stops.map((st, i) => ({ st, i, s:Math.max(+st.s, a0), e:Math.min(+st.e, z0) })).filter(x => x.e > x.s)) : [];
     for (const { st, i, s, e, lane, n } of ev) {
-      const b0 = st.blocks[0], isCur = cur && st.blocks.some(b => b.key === cur.key), past = st.e <= t && !isCur;
+      const b0 = st.blocks[0], isCur = cur && st.blocks.some(b => b.key === cur.key), past = st.e <= t && !isCur, game = !!b0.game;
       const c = st.free ? "" : calColor(b0), top = y(s) + 1, h = Math.max(18, y(e) - y(s) - 2);
-      const rq = st.free ? null : (G.day.mealq || {})[gk(b0)];
-      const pts = st.free ? 0 : st.blocks.reduce((a, b) => a + blockGain(b), 0) + (rq ? rq.p || 0 : 0);
-      const ask = !rq && past && actRatable(b0) && t - st.e < 4 * 3600000;
+      const rq = st.free || !game ? null : (G.day.mealq || {})[gk(b0)];
+      const pts = st.free || !game ? 0 : st.blocks.reduce((a, b) => a + blockGain(b), 0) + (rq ? rq.p || 0 : 0);
+      const ask = game && !rq && past && actRatable(b0) && t - st.e < 4 * 3600000;
       // ✓ only when it is complete: closed as done, or checked in and over (not while it is still running)
-      const done = !st.free && st.blocks.some(b => G.day.closes[gk(b)] === "done") || (st.lit && past);
+      const done = game && (!st.free && st.blocks.some(b => G.day.closes[gk(b)] === "done") || (st.lit && past));
+      const dk = st.free ? { kind:"free" } : AGD().dragKind(b0, ctx), drag = dk.kind === "cal" || dk.kind === "day";
       const tick = done ? "✓ " : "", time = `${fmtT(st.s)} to ${fmtT(st.e)}`;
-      const cls = `cal-ev${st.free ? " free" : ""}${past ? " past" : ""}${isCur ? " now" : ""}${st.skipped ? " gone" : ""}${h < 36 ? " one" : ""}`;
+      const cls = `cal-ev${st.free ? " free" : ""}${past ? " past" : ""}${isCur ? " now" : ""}${st.skipped ? " gone" : ""}${h < 36 ? " one" : ""}${drag ? " drag" : dk.kind === "lock" ? " ro" : ""}${b0.pending ? " pend" : ""}`;
       out += `<button class="${cls}" data-stop="${i}" style="${c ? `--c:${c};` : ""}top:${top}px;height:${h}px;left:calc(var(--cal-l) + (100% - var(--cal-l)) * ${lane} / ${n});width:calc((100% - var(--cal-l)) / ${n} - 3px)" aria-label="${esc(st.t)}, ${time}">` +
-        `<b>${calIcon(b0, c || "rgba(255,255,255,.45)")}<span>${tick}${esc(st.t)}</span></b><span class="cal-t">${h < 36 ? fmtT(st.s) : time}</span>${ask ? `<span class="cal-pts cal-ask" data-actq="${esc(gk(b0))}">Check ›</span>` : pts ? `<span class="cal-pts${pts < 0 ? " neg" : ""}">${pts > 0 ? "+" : ""}${pts}</span>` : ""}</button>`;
+        `<b>${calIcon(b0, c || "rgba(255,255,255,.45)")}<span>${tick}${esc(st.t)}</span></b><span class="cal-t">${h < 36 ? fmtT(st.s) : time}</span>${ask ? `<span class="cal-pts cal-ask" data-actq="${esc(gk(b0))}">Check ›</span>` : pts ? `<span class="cal-pts${pts < 0 ? " neg" : ""}">${pts > 0 ? "+" : ""}${pts}</span>` : ""}` +
+        `${drag ? `${h >= 24 ? `<i class="cal-h top" data-h="top"></i>` : ""}<i class="cal-h bot" data-h="bottom"></i>` : ""}</button>`;
     }
     if (t >= a0 && t <= z0) out += `<div class="cal-now" style="top:${y(+t)}px"><span>${fmtT(t)}</span></div>`;
     return out + `</div>`;
+  }
+  // the day at the top of the scroll, in the line that stays put
+  function calDayLine(){
+    const m = $("mtn"), body = $("calBody"); if (!m || !body || !CAL.days.length) return;
+    const at = CAL.a0 + Math.max(0, m.scrollTop - body.offsetTop + 30) / CAL_PX * 3600000;
+    const d = CAL.days.slice().reverse().find(x => +dayStart(x) <= at) || CAL.days[0];
+    const txt = dayLabel(d, CAL.today) + (questKey() || DRY ? "" : " · 🔒 read only");
+    if ($("calDay").textContent !== txt) $("calDay").textContent = txt;
+  }
+  function calToast(msg, ms = 4200){
+    let el = document.querySelector(".cal-toast");
+    if (!el) { el = document.createElement("div"); el.className = "cal-toast"; document.body.appendChild(el); }
+    el.textContent = msg; el.style.opacity = 1; clearTimeout(el._t);
+    el._t = setTimeout(() => { el.style.opacity = 0; setTimeout(() => el.remove(), 300); }, ms);
+  }
+
+  /* dragging: pointer events on the column, wired once */
+  let DRAG = null, dragEnded = 0;
+  function wireAgenda(){
+    const m = $("mtn"); if (!m || m._wired) return; m._wired = true;
+    m.addEventListener("scroll", calDayLine, { passive:true });
+    const begin = () => {
+      const d = DRAG; if (!d || d.live) return;
+      clearTimeout(d.timer);
+      if (d.dk.kind === "lock") { calToast(d.dk.why); DRAG = null; return; }
+      if (d.dk.kind !== "cal" && d.dk.kind !== "day") { DRAG = null; return; }
+      d.live = true; d.el.classList.add("dragging");
+      try { d.el.setPointerCapture(d.id); } catch {}
+      if (d.touch && navigator.vibrate) navigator.vibrate(12);
+      const loop = () => { if (DRAG !== d || !d.live) return;
+        const r = m.getBoundingClientRect(), edge = 44;
+        const v = d.lastY < r.top + edge ? -Math.ceil((r.top + edge - d.lastY) / 4) : d.lastY > r.bottom - edge ? Math.ceil((d.lastY - r.bottom + edge) / 4) : 0;
+        if (v) { m.scrollTop += v; move(); }
+        requestAnimationFrame(loop); };
+      requestAnimationFrame(loop);
+      move();
+    };
+    const result = d => { return AGD().dragResult(d.mode, d.b.s, d.b.e, d.lastY - d.y0 + (m.scrollTop - d.scroll0), CAL_PX); };
+    const move = () => {
+      const d = DRAG; if (!d || !d.live) return;
+      const r = result(d), y = ms => (ms - CAL.a0) / 3600000 * CAL_PX;
+      d.el.style.top = (y(+r.s) + 1) + "px"; d.el.style.height = Math.max(18, y(+r.e) - y(+r.s) - 2) + "px";
+      const other = tzYmd(r.s) !== tzYmd(d.b.s), ts = d.el.querySelector(".cal-t");
+      if (ts) ts.textContent = `${other ? shortDay(tzYmd(r.s), CAL.today) + " " : ""}${fmtT(r.s)} to ${fmtT(r.e)}`;
+    };
+    const end = (cancel) => {
+      const d = DRAG; DRAG = null; if (!d) return;
+      clearTimeout(d.timer);
+      if (!d.live) return;
+      dragEnded = Date.now();
+      const r = result(d);
+      if (cancel || (+r.s === +d.b.s && +r.e === +d.b.e)) { $("calBody")._h = ""; render(); return; }
+      commitDrag(d.b, d.dk, r.s, r.e);
+    };
+    m.addEventListener("pointerdown", e => {
+      if (e.button > 0) return;
+      if (DRAG) { if (DRAG.live) return; clearTimeout(DRAG.timer); DRAG = null; }   // a press that never ended (released outside the window)
+      const el = e.target.closest(".cal-ev"); if (!el || e.target.closest("[data-actq]")) return;
+      const st = CAL.stops[+el.dataset.stop]; if (!st || st.free || !AGD()) return;
+      const b = st.blocks[0], dk = AGD().dragKind(b, dragCtx());
+      const hd = e.target.closest(".cal-h"), touch = e.pointerType !== "mouse";
+      DRAG = { el, b, dk, mode: hd ? hd.dataset.h : "move", id:e.pointerId, x0:e.clientX, y0:e.clientY, lastY:e.clientY, scroll0:m.scrollTop, touch, live:false };
+      // a finger holds a block a moment before it moves, so a swipe still scrolls; an edge handle answers at once
+      if (hd) { e.preventDefault(); begin(); }
+      else if (touch) DRAG.timer = setTimeout(begin, 320);
+    });
+    addEventListener("pointermove", e => {
+      const d = DRAG; if (!d || e.pointerId !== d.id) return;
+      d.lastY = e.clientY;
+      if (d.live) { e.preventDefault(); move(); return; }
+      if (Math.hypot(e.clientX - d.x0, e.clientY - d.y0) > 6) { if (d.touch) { clearTimeout(d.timer); DRAG = null; } else begin(); }
+    }, { passive:false });
+    addEventListener("pointerup", e => { if (DRAG && e.pointerId === DRAG.id) end(false); });
+    addEventListener("pointercancel", e => { if (DRAG && e.pointerId === DRAG.id) end(true); });
+    addEventListener("blur", () => { if (DRAG) end(true); });
+    // once a block is held, the finger moves it instead of scrolling the column
+    m.addEventListener("touchmove", e => { if (DRAG && DRAG.live) e.preventDefault(); }, { passive:false });
+    m.addEventListener("contextmenu", e => { if (DRAG) e.preventDefault(); });
+    // the click that ends a drag is not a tap
+    m.addEventListener("click", e => { if (Date.now() - dragEnded < 450) { e.stopPropagation(); e.preventDefault(); } }, true);
+  }
+  async function commitDrag(b, dk, s, e){
+    const k = b.id ? "id:" + b.id : b.key, what = shortName(b), when = `${tzYmd(s) !== tzYmd(b.s) ? shortDay(tzYmd(s), tzYmd(now())) + " " : ""}${fmtT(s)} to ${fmtT(e)}`;
+    const show = () => { $("calBody")._h = ""; render(); };
+    if (+s < CAL.a0 || +e > CAL.z0) { show(); calToast("That is past the days shown here, so it stayed where it was."); return; }
+    if (dk.dry) { PEND[k] = { s:+s, e:+e, at:Date.now() }; show(); calToast(`Test mode: ${what} now ${when}, on this screen only. Nothing is saved.`); return; }
+    if (dk.kind === "day") {
+      // a block added in Quest lives in today's plan, which has no other days
+      if (gameDayOf(s) !== gameYmd() || gameDayOf(e - 60000) !== gameYmd()) { show(); calToast(`${what} was added in Quest, so it lives in today's plan only. It can move within its day, not to another day.`, 6000); return; }
+      await saveBlock(b, s, e, b.t, false);
+      calToast(`${what}: ${when}. Saved in today's plan.`);
+      return;
+    }
+    PEND[k] = { s:+s, e:+e, at:Date.now() }; show();
+    try {
+      await qfetch("/cal/event", { method:"POST", body:JSON.stringify({ id:b.id, calId:b.calId, raw:b.raw, s:s.toISOString(), e:e.toISOString(), title:"" }) });
+    } catch (err) {
+      delete PEND[k]; show();
+      calToast(`Could not save the move (${err.message}). ${what} is back where it was.`, 7000);
+      return;
+    }
+    calToast(`${what}: ${when}. Saved to Google Calendar${b.cal ? ` (${b.cal})` : ""}.`);
+    try {
+      if (b.game) {
+        log(`Moved ${what} in the calendar: ${when}`);
+        // the calendar now holds the change, so drop any today-only edit of it
+        if (OPS.edits[b.key]) await writeOps(o => { delete o.edits[b.key]; });
+      }
+      await pullAll();
+    } catch {}   // the calendar has it; the next pull shows it
+  }
+  // a block on another day of the agenda: what it is, and how to change it
+  function openAgendaItem(b){
+    const dk = AGD().dragKind(b, dragCtx());
+    openSheet(`${winHead(b)}
+      <p>${esc(dayLabel(tzYmd(b.s), tzYmd(now())))}${b.cal ? ` · ${esc(b.cal)}` : ""}${b.loc ? ` · 📍 ${esc(b.loc)}` : ""}</p>
+      <p style="font-size:12.5px">${dk.kind === "cal" ? "Drag it on the calendar to move it, to another day too. Drag its top or bottom edge to change how long it is. It saves to Google Calendar." : esc(dk.why || "")}</p>
+      <div class="actions"><button class="btn ghost" id="agClose">Close</button></div>`);
+    $("agClose").onclick = closeSheet;
   }
   let calScrolled = "";
   // Days saved before Altitude (2026-10-05) lack its fields; the season starts at 0 m
@@ -3777,7 +3945,7 @@
     }
     // phone and desktop alike: the steps card, three picks for right now, then the full list one tap away (2026-10-09)
     const endAt = lastItemEnd(all), nightNow = PLAN && endAt && +t >= endAt;
-    if (nightNow && !G.day.nightShown && !$("sheet").classList.contains("open") && !$("calx") && !$("night")) { G.day.nightShown = true; saveG(); openNight(); }
+    if (nightNow && !G.day.nightShown && !$("sheet").classList.contains("open") && !$("night")) { G.day.nightShown = true; saveG(); openNight(); }
     put("habits", PLAN ? (nightNow ? `<button class="pa-all nt-open" data-night>🌙 Day's end<span>tomorrow, deathbed, reflection ›</span></button>` : "") + stepsHTML() + suggestHTML() : ""); bindHabits($("habits"));
     $("habits").querySelectorAll("[data-night]").forEach(bn => bn.onclick = openNight);
     if (PLAN && !z && body() < 40 && !G.day.lotusGiven) { G.day.lotusGiven = true; giveItem("lotus", "Your energy is low today."); }
@@ -3862,22 +4030,28 @@
 
     put("nextLine", cur && nxt && !z ? `<div class="next"><span>Next: <b>${esc(shortName(nxt))}</b></span><span>${fmtT(nxt.s)}</span></div>` : "");
 
-    // zap button
-    // the big button opens the calendar to change the day right there (Junyan, 2026-10-08, d163)
-    $("zap").textContent = z ? "↩︎ Back to the quest" : "🧭 Change course";
-    $("zap").classList.toggle("back", !!z);
-    $("zap").onclick = z ? endZap : openCal;
+    // Change course is gone (2026-10-14): the calendar below is changed in place. The button only shows during a logged interruption
+    $("zap").hidden = !z;
+    $("zap").onclick = endZap;
 
-    // Today: the calendar column (d216); on the dashboard it opens scrolled to now, once a day
-    const stops = stopsOf(all);
-    put("mtn", calendarHTML(stops, cur, t));
-    const calBox = $("mtn").closest(".grid-stack-item-content"), nowLine = $("mtn").querySelector(".cal-now");
-    if (calBox && nowLine && calScrolled !== dayKey()) { calScrolled = dayKey(); calBox.scrollTop = Math.max(0, nowLine.offsetTop - calBox.clientHeight / 3); }
-    $("mtn").querySelectorAll("[data-stop]").forEach(n => n.onclick = e => {
-      const st = stops[+n.dataset.stop]; if (!st) return;
+    // the calendar column (d216), now an agenda from yesterday to 3 days ahead; it opens scrolled to now
+    const stops = stopsOf(agendaBlocks(t));
+    if (!DRAG) put("calBody", calendarHTML(stops, cur, t));
+    wireAgenda();
+    // once a day, and again when the dashboard takes the column into its widget (that resets the scroll)
+    const mt = $("mtn"), nowLine = mt.querySelector(".cal-now"), skey = dayKey() + "|" + document.body.classList.contains("dash");
+    if (nowLine && mt.clientHeight && calScrolled !== skey) {
+      calScrolled = skey;
+      mt.scrollTop = Math.max(0, nowLine.offsetTop + $("calBody").offsetTop - mt.clientHeight / 3);
+    }
+    calDayLine();
+    mt.querySelectorAll("[data-stop]").forEach(n => n.onclick = e => {
+      const st = CAL.stops[+n.dataset.stop]; if (!st) return;   // the stops the column on screen was drawn from
       const aq = e.target.closest("[data-actq]");
       if (aq) { const b = blocks().find(x => gk(x) === aq.dataset.actq); if (b) return openActQuiz(b); }
       const fixed = st.blocks.find(b => b.kind !== "open" && b.kind !== "break");
+      // another day of the agenda: what it is and how to change it; open space there takes a new calendar event
+      if (!st.blocks[0].game) { if (fixed) return openAgendaItem(fixed); if (st.e > now()) openAdd(new Date(Math.max(+st.s, +now()))); return; }
       if (fixed && isGym(fixed) && fixed.s - now() < 3 * 3600000) return openGym(blocks().find(x => x.key === fixed.key) || fixed);
       if (fixed) openStop(blocks().find(x => x.key === fixed.key) || fixed); else openMove(st);
     });
