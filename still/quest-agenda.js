@@ -80,5 +80,67 @@
     });
   }
 
-  root.QuestAgenda = { addDays, agendaDays, mergeAgenda, snap, dragResult, dragKind, lanes, applyPending };
+  /* ---------- Your move: pick from a list (Junyan, 2026-10-14, d10 "A", d7 and d8) ----------
+     Tap a free stretch, pick one thing, and it goes on today's plan (the /ops layer, never Google
+     Calendar). One block per task per day: picking it again moves its block. */
+
+  // where a pick lands: now rounded up to 5 minutes if the gap has begun, else the gap start;
+  // the task's estimate, at least 15 minutes, never past the gap end
+  function pickSpan(gs, ge, t, est){
+    const s = Math.ceil(Math.max(+gs, +t) / (5 * MIN)) * 5 * MIN;
+    return { s:new Date(s), e:new Date(Math.min(s + Math.max(+est || 0, 15) * MIN, +ge)) };
+  }
+
+  // a key no other block has, even one added at the same minute ("x<start ms>" alone collided)
+  let seq = 0;
+  const addKey = s => "x" + (+s) + "-" + (Date.now() % 1e6).toString(36) + (++seq).toString(36) + Math.random().toString(36).slice(2, 6);
+
+  // is this added block the same task as the pick? A Notion task by its id; anything else by name
+  const samePick = (a, p) => p.taskId ? a.taskId === p.taskId
+    : !a.taskId && ((p.pick && a.pick === p.pick) || (a.t || "").trim().toLowerCase() === (p.t || "").trim().toLowerCase());
+
+  /* Put a pick on today's adds. p: { t, s, e, taskId?, pick? }. Returns the new list (the given one is
+     left alone), the key of the block, whether it moved, and what it replaced (for Undo). */
+  function placePick(adds, p, key){
+    const before = adds.filter(a => samePick(a, p)).map(a => ({ ...a }));
+    const s = new Date(p.s).toISOString(), e = new Date(p.e).toISOString();
+    const extra = { ...(p.taskId ? { taskId:p.taskId } : {}), ...(p.pick ? { pick:p.pick } : {}) };
+    if (before.length) {
+      const k = before[0].key, gone = new Set(before.slice(1).map(a => a.key));
+      const out = adds.filter(a => !gone.has(a.key)).map(a => a.key === k ? { ...a, s, e, ...extra } : a);
+      return { adds:out, key:k, moved:true, before };
+    }
+    return { adds:adds.concat([{ key, s, e, t:p.t, type:"task", cal:"you", ...extra }]), key, moved:false, before:[] };
+  }
+  // put today's adds back the way they were before the pick
+  function undoPick(adds, r){
+    const back = new Set([r.key, ...r.before.map(a => a.key)]);
+    return adds.filter(a => !back.has(a.key)).concat(r.before.map(a => ({ ...a })));
+  }
+
+  /* A block added in Quest uses up the open space it covers, so no "Your move" is drawn under or
+     beside it (before, the open space stayed underneath and split around it, which looked like a
+     copy). Calendar events are left to the planner. Leftover pieces under 5 minutes go. */
+  function carveFree(list){
+    const isFree = b => b.kind === "open" || b.kind === "break";
+    const taken = list.filter(b => b.extra && !isFree(b)).map(b => [+b.s, +b.e]).sort((x, y) => x[0] - y[0]);
+    const out = [];
+    for (const b of list) {
+      if (!isFree(b) || !taken.length) { out.push(b); continue; }
+      let pieces = [[+b.s, +b.e]];
+      for (const [ts, te] of taken) pieces = pieces.flatMap(([s, e]) => te <= s || ts >= e ? [[s, e]]
+        : [[s, Math.min(e, ts)], [Math.max(s, te), e]].filter(([x, y]) => y - x >= 5 * MIN));
+      for (const [s, e] of pieces) out.push(s === +b.s && e === +b.e ? b : { ...b, s:new Date(s), e:new Date(e) });
+    }
+    return out.sort((x, y) => x.s - y.s || x.e - y.e);
+  }
+
+  // "7:25 PM" and "7:40 PM" read "7:25 to 7:40 PM"
+  function rangeText(a, b){
+    const m = /\s?([AP]M)$/i, x = a.match(m), y = b.match(m);
+    return x && y && x[1] === y[1] ? `${a.replace(m, "")} to ${b}` : `${a} to ${b}`;
+  }
+
+  root.QuestAgenda = { addDays, agendaDays, mergeAgenda, snap, dragResult, dragKind, lanes, applyPending,
+    pickSpan, addKey, samePick, placePick, undoPick, carveFree, rangeText };
 })(typeof window !== "undefined" ? window : globalThis);
