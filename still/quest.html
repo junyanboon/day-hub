@@ -627,7 +627,7 @@
 <script src="quest-fx.js?v=20261009b"></script>
 <script src="quest-night.js?v=20261011a"></script>
 <script src="quest-morning.js?v=20261011d"></script>
-<script src="quest-agenda.js?v=20261014b"></script>
+<script src="quest-agenda.js?v=20261014c"></script>
 </head>
 <body>
 <div id="sky" aria-hidden="true"><div class="sky-stars"></div><div class="sky-orb"></div>
@@ -2403,14 +2403,14 @@
     const h = MO_CTX.hour(S), meal = h < 11 ? "Breakfast" : h < 16 ? "Lunch" : h < 18 ? "Snack" : "Dinner";
     const next = blocks().find(b => +b.s >= +st.e - 60000 && b.kind !== "open" && b.kind !== "break");
     const pull = next && +next.s > +S + 5 * 60000 && !/flight|\b[A-Z]{2}\d{2,4}\b/.test(next.t);
-    // [icon, title, note, est min, { taskId?, pick }]
+    // [icon, title, note, est min, { taskId?, pickId }]
     const groups = [
-      ["Get something done", tasks.map(x => ["📝", x.task.length > 70 ? x.task.slice(0, 69) + "…" : x.task, x.why || "", x.est, { taskId:x.id, pick:"task:" + x.id }])],
+      ["Get something done", tasks.map(x => ["📝", x.task.length > 70 ? x.task.slice(0, 69) + "…" : x.task, x.why || "", x.est, { taskId:x.id, pickId:"task:" + x.id }])],
       ["Practice", [["🌀", "Isha Kriya", "Fills prana", 12], ["🌬️", "Nadi Shuddhi", "Fills prana", 5], ["🙆", "Upa Yoga", "", 20]]],
       ["Rest and body", [["😴", "NSDR", "Lying down, gives body back", 20], ["🚶", "Walk", "Outside", 30], ["🍽️", meal, "", 45]]],
     ];
-    const opts = groups.flatMap(g => g[1]).map(o => { const p = o[4] || { pick:o[1].toLowerCase() };
-      const on = (OPS.adds || []).some(a => AGD().samePick(a, { ...p, t:o[1] }));
+    const opts = groups.flatMap(g => g[1]).map(o => { const p = o[4] || { pickId:o[1].toLowerCase() };
+      const on = (OPS.adds || []).some(a => AGD().samePick(a, { ...p, t:o[1] }) && !pickDone(a));
       return { o, p, sp:span(o[3]), on }; });
     let i = 0;
     openSheet(`<h3>Your move</h3><p>${fmtT(S)} to ${fmtT(st.e)} · ${fmtHM(room)} free. Pick what goes here.</p>
@@ -2428,10 +2428,12 @@
     if ($("mvPlan")) $("mvPlan").onclick = () => { closeSheet(); openMorning(); };
     $("mvCancel").onclick = closeSheet;
   }
+  // a block that is already history (ended, or checked in or closed) stays where it happened: a re-pick adds a new one
+  const pickDone = a => +new Date(a.e) <= +now() || !!(G.day.checks || {})[gk(a)] || !!(G.day.closes || {})[gk(a)];
   // put the pick on today's plan (or move its block there), glow it, and offer Undo for 5 seconds
   async function pickMove(p){
     let r = null;
-    await writeOps(o => { r = AGD().placePick(o.adds, p, newKey(p.s)); o.adds = r.adds; FRESH = { key:r.key, at:Date.now() }; });
+    await writeOps(o => { r = AGD().placePick(o.adds, p, newKey(p.s), pickDone); o.adds = r.adds; FRESH = { key:r.key, at:Date.now() }; });
     if (!r) return;
     const msg = `${r.moved ? "Moved" : "Added"}: ${p.t}, ${AGD().rangeText(fmtT(p.s), fmtT(p.e))}`;
     log(msg.replace(/^Added/, "Planned")); saveG(); render();

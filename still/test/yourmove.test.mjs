@@ -34,16 +34,16 @@ test("two picks with the same start get different keys", () => {
 });
 
 test("picking a task that is not on today's plan adds one block", () => {
-  const r = A.placePick([], { t:"Walk", pick:"walk", s:at(19, 25), e:at(19, 55) }, "x1-a");
+  const r = A.placePick([], { t:"Walk", pickId:"walk", s:at(19, 25), e:at(19, 55) }, "x1-a");
   assert.equal(r.moved, false);
   assert.equal(r.key, "x1-a");
-  assert.deepEqual(plain(r.adds), [{ key:"x1-a", s:iso(at(19, 25)), e:iso(at(19, 55)), t:"Walk", type:"task", cal:"you", pick:"walk" }]);
+  assert.deepEqual(plain(r.adds), [{ key:"x1-a", s:iso(at(19, 25)), e:iso(at(19, 55)), t:"Walk", type:"task", cal:"you", pickId:"walk" }]);
 });
 
 test("picking a task that is already on today's plan moves its block, never a second copy", () => {
   const adds = [{ key:"x9-a", s:iso(at(15)), e:iso(at(15, 20)), t:"Pay the bill", type:"task", cal:"you", taskId:"T1" },
     { key:"x7-b", s:iso(at(12)), e:iso(at(12, 30)), t:"Lunch", type:"task", cal:"you" }];
-  const r = A.placePick(adds, { t:"Pay the bill", taskId:"T1", pick:"task:T1", s:at(19, 25), e:at(19, 40) }, "new-key");
+  const r = A.placePick(adds, { t:"Pay the bill", taskId:"T1", pickId:"task:T1", s:at(19, 25), e:at(19, 40) }, "new-key");
   assert.equal(r.moved, true);
   assert.equal(r.key, "x9-a");   // same block, so its check-ins stay with it
   assert.equal(r.adds.length, 2);
@@ -54,11 +54,11 @@ test("picking a task that is already on today's plan moves its block, never a se
 
 test("a practice or rest pick matches today's block of the same name too", () => {
   const adds = [{ key:"x5-a", s:iso(at(8)), e:iso(at(8, 15)), t:"Isha Kriya", type:"task", cal:"you" }];
-  const r = A.placePick(adds, { t:"Isha Kriya", pick:"isha kriya", s:at(19, 25), e:at(19, 40) }, "k");
-  assert.equal(r.moved, true); assert.equal(r.adds.length, 1); assert.equal(r.adds[0].pick, "isha kriya");
+  const r = A.placePick(adds, { t:"Isha Kriya", pickId:"isha kriya", s:at(19, 25), e:at(19, 40) }, "k");
+  assert.equal(r.moved, true); assert.equal(r.adds.length, 1); assert.equal(r.adds[0].pickId, "isha kriya");
   // a Notion task never matches by name alone
   const r2 = A.placePick([{ key:"x5-a", s:iso(at(8)), e:iso(at(8, 15)), t:"Call Chase", type:"task", cal:"you" }],
-    { t:"Call Chase", taskId:"T2", pick:"task:T2", s:at(19), e:at(19, 15) }, "k2");
+    { t:"Call Chase", taskId:"T2", pickId:"task:T2", s:at(19), e:at(19, 15) }, "k2");
   assert.equal(r2.moved, false); assert.equal(r2.adds.length, 2);
 });
 
@@ -66,7 +66,7 @@ test("old duplicates of the task collapse into the one moved block, and Undo bri
   const adds = [{ key:"x1", s:iso(at(9)), e:iso(at(9, 15)), t:"Walk", type:"task", cal:"you" },
     { key:"x2", s:iso(at(10)), e:iso(at(10, 15)), t:"Walk", type:"task", cal:"you" },
     { key:"x3", s:iso(at(11)), e:iso(at(11, 15)), t:"Lunch", type:"task", cal:"you" }];
-  const r = A.placePick(adds, { t:"Walk", pick:"walk", s:at(19), e:at(19, 30) }, "k");
+  const r = A.placePick(adds, { t:"Walk", pickId:"walk", s:at(19), e:at(19, 30) }, "k");
   assert.deepEqual([...r.adds.map(x => x.key)].sort(), ["x1", "x3"]);
   const back = A.undoPick(r.adds, r);
   assert.deepEqual(plain(back.slice().sort((p, q) => p.key < q.key ? -1 : 1)), plain(adds));
@@ -74,7 +74,7 @@ test("old duplicates of the task collapse into the one moved block, and Undo bri
 
 test("Undo of an add removes only that block, even when another starts at the same time", () => {
   const other = { key:A.addKey(at(19, 25)), s:iso(at(19, 25)), e:iso(at(19, 40)), t:"Nadi Shuddhi", type:"task", cal:"you" };
-  const r = A.placePick([other], { t:"Walk", pick:"walk", s:at(19, 25), e:at(19, 55) }, A.addKey(at(19, 25)));
+  const r = A.placePick([other], { t:"Walk", pickId:"walk", s:at(19, 25), e:at(19, 55) }, A.addKey(at(19, 25)));
   assert.equal(r.adds.length, 2);
   assert.deepEqual(plain(A.undoPick(r.adds, r)), plain([other]));
 });
@@ -110,7 +110,29 @@ test("time range reads like 7:25 to 7:40 PM", () => {
 
 test("the list knows which tasks are already on today's plan (the Move here tag)", () => {
   const adds = [{ key:"x1", t:"Walk", taskId:undefined }, { key:"x2", t:"Pay", taskId:"T1" }];
-  assert.equal(adds.some(a => A.samePick(a, { t:"Walk", pick:"walk" })), true);
-  assert.equal(adds.some(a => A.samePick(a, { t:"NSDR", pick:"nsdr" })), false);
+  assert.equal(adds.some(a => A.samePick(a, { t:"Walk", pickId:"walk" })), true);
+  assert.equal(adds.some(a => A.samePick(a, { t:"NSDR", pickId:"nsdr" })), false);
   assert.equal(adds.some(a => A.samePick(a, { t:"Pay something", taskId:"T1" })), true);
+});
+
+test("a block that is already history (ended or checked in) stays put; the pick adds a new one", () => {
+  const adds = [{ key:"x1", s:iso(at(8)), e:iso(at(8, 30)), t:"Walk", type:"task", cal:"you" },
+    { key:"x2", s:iso(at(9)), e:iso(at(9, 15)), t:"Pay", type:"task", cal:"you", taskId:"T1" }];
+  const done = a => a.key === "x1" || a.key === "x2";
+  let r = A.placePick(adds, { t:"Walk", pickId:"walk", s:at(19), e:at(19, 30) }, "k1", done);
+  assert.equal(r.moved, false); assert.equal(r.adds.length, 3); assert.equal(r.adds[0].s, iso(at(8)));
+  r = A.placePick(adds, { t:"Pay", taskId:"T1", s:at(19), e:at(19, 15) }, "k2", done);
+  assert.equal(r.moved, false); assert.equal(r.adds.length, 3);
+});
+
+// quest.html is the caller: it names picks with pickId (the module's field) and tells placePick which
+// blocks are already history, so a re-pick never drags this morning's checked-in block to the evening
+test("quest.html calls placePick with pickId picks and a history check", () => {
+  const html = fs.readFileSync(new URL("../quest.html", import.meta.url), "utf8");
+  const move = html.slice(html.indexOf("function openMove("), html.indexOf("function undoToast("));
+  assert.ok(move.length > 100, "openMove and pickMove are there");
+  assert.doesNotMatch(move, /[{,]\s*pick:/, "no old pick: field");
+  assert.match(move, /pickId:/);
+  assert.match(move, /placePick\([^;]*newKey\([^)]*\),\s*\w+\)/, "placePick gets a fourth argument (done)");
+  assert.match(move, /samePick\([^)]*\)\s*&&\s*!\w+\(a\)/, "the Move here tag skips blocks that are history");
 });

@@ -97,14 +97,16 @@
 
   // is this added block the same task as the pick? A Notion task by its id; anything else by name
   const samePick = (a, p) => p.taskId ? a.taskId === p.taskId
-    : !a.taskId && ((p.pick && a.pick === p.pick) || (a.t || "").trim().toLowerCase() === (p.t || "").trim().toLowerCase());
+    : !a.taskId && ((p.pickId && a.pickId === p.pickId) || (a.t || "").trim().toLowerCase() === (p.t || "").trim().toLowerCase());
 
-  /* Put a pick on today's adds. p: { t, s, e, taskId?, pick? }. Returns the new list (the given one is
-     left alone), the key of the block, whether it moved, and what it replaced (for Undo). */
-  function placePick(adds, p, key){
-    const before = adds.filter(a => samePick(a, p)).map(a => ({ ...a }));
+  /* Put a pick on today's adds. p: { t, s, e, taskId?, pickId? }. Returns the new list (the given one is
+     left alone), the key of the block, whether it moved, and what it replaced (for Undo).
+     done(a) says a block is already history (it has ended, or was checked in): it stays where it
+     happened, so this morning's Walk is not pulled to the evening with its check-in. */
+  function placePick(adds, p, key, done = () => false){
+    const before = adds.filter(a => samePick(a, p) && !done(a)).map(a => ({ ...a }));
     const s = new Date(p.s).toISOString(), e = new Date(p.e).toISOString();
-    const extra = { ...(p.taskId ? { taskId:p.taskId } : {}), ...(p.pick ? { pick:p.pick } : {}) };
+    const extra = { ...(p.taskId ? { taskId:p.taskId } : {}), ...(p.pickId ? { pickId:p.pickId } : {}) };
     if (before.length) {
       const k = before[0].key, gone = new Set(before.slice(1).map(a => a.key));
       const out = adds.filter(a => !gone.has(a.key)).map(a => a.key === k ? { ...a, s, e, ...extra } : a);
