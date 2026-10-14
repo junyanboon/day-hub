@@ -1581,7 +1581,9 @@
 
   /* ---------- the day's loop ---------- */
   // latest-starting block containing now wins (same rule as Stillness)
-  function currentOf(all, t){ let hit = null; all.forEach(b => { if (t >= b.s && t < b.e) hit = b; }); return hit; }
+  // a block added in Quest uses up the open space under it (Your move, 2026-10-14), so a free stretch that
+  // starts while it runs does not take over the Right now card
+  function currentOf(all, t){ let hit = null; all.forEach(b => { if (t >= b.s && t < b.e && !(hit && hit.extra && hit.kind !== "open" && hit.kind !== "break" && (b.kind === "open" || b.kind === "break"))) hit = b; }); return hit; }
   function nextOf(all, t){ return all.find(b => b.s > t) || null; }
   const needsCheck = b => b.kind !== "break" && b.kind !== "open";   // open time is a choice, not a check-in
   // Check-ins follow the calendar event, not its time: a block that moves (in
@@ -1820,7 +1822,7 @@
   /* ---------- changing the schedule ----------
      Same edit layer as Stillness (/ops): a change here shows on the phone app
      and the desktop orb. Calendar blocks are keyed by their original start and
-     title; blocks you add are keyed "x<start ms>-<random>" (newKey). */
+     title; blocks added here are keyed "x<start ms>-<random>" (newKey); Stillness still adds "x<start ms>". */
   function setBlock(o, b, s, e, t){
     if (b.extra) { const a = o.adds.find(x => x.key === b.key); if (a) { a.s = s.toISOString(); a.e = e.toISOString(); a.t = t; } }
     else o.edits[b.key] = { s:s.toISOString(), e:e.toISOString(), t };
@@ -2396,7 +2398,7 @@
      block. The new block glows, drags and stretches like any other, and a toast offers Undo. */
   let FRESH = { key:"", at:0 };
   function openMove(st){
-    const t = now(), S = new Date(Math.ceil(Math.max(+st.s, +t) / 300000) * 300000), room = Math.round((st.e - S) / 60000);
+    const t = now(), S = new Date(+t > +st.s ? Math.ceil(+t / 300000) * 300000 : +st.s), room = Math.round((st.e - S) / 60000);
     if (room < 5 || !AGD()) return openAdd(st.s);
     const span = est => AGD().pickSpan(st.s, st.e, t, est), when = sp => AGD().rangeText(fmtT(sp.s), fmtT(sp.e));
     const D = MO_CTX.data(), tasks = window.QuestMorning ? QuestMorning.rankTasks(D).slice(0, 4) : [];
@@ -2428,8 +2430,9 @@
     if ($("mvPlan")) $("mvPlan").onclick = () => { closeSheet(); openMorning(); };
     $("mvCancel").onclick = closeSheet;
   }
-  // a block that is already history (ended, or checked in or closed) stays where it happened: a re-pick adds a new one
-  const pickDone = a => +new Date(a.e) <= +now() || !!(G.day.checks || {})[gk(a)] || !!(G.day.closes || {})[gk(a)];
+  // a block that is already history (checked in or closed) stays where it happened: a re-pick adds a new one.
+  // One that only ended, never started, is moved like any other (d7: one block per task per day)
+  const pickDone = a => !!(G.day.checks || {})[gk(a)] || !!(G.day.closes || {})[gk(a)];
   // put the pick on today's plan (or move its block there), glow it, and offer Undo for 5 seconds
   async function pickMove(p){
     let r = null;
@@ -2443,16 +2446,7 @@
       FRESH = { key:"", at:0 }; log(`Undone: ${msg}`); saveG(); render();
     });
   }
-  function undoToast(msg, onUndo, ms = 5000){
-    let el = document.querySelector(".cal-toast");
-    if (!el) { el = document.createElement("div"); el.className = "cal-toast"; document.body.appendChild(el); }
-    el.classList.add("undo");
-    el.innerHTML = `<span>${esc(msg)}</span><button type="button">Undo</button>`;
-    el.style.opacity = 1; clearTimeout(el._t);
-    const b = el.querySelector("button");
-    b.onclick = () => { b.disabled = true; clearTimeout(el._t); el.style.opacity = 0; setTimeout(() => el.remove(), 300); onUndo(); };
-    el._t = setTimeout(() => { el.style.opacity = 0; setTimeout(() => el.remove(), 300); }, ms);
-  }
+  function undoToast(msg, onUndo, ms = 5000){ return calToast(msg, ms, onUndo); }
   function openAdd(from){
     const t0 = new Date(Math.ceil(Math.max(now().getTime(), from ? from.getTime() : 0) / 300000) * 300000);
     let dur = 30;
@@ -3729,11 +3723,18 @@
     const txt = dayLabel(d, CAL.today) + (questKey() || DRY ? "" : " · 🔒 read only");
     if ($("calDay").textContent !== txt) $("calDay").textContent = txt;
   }
-  function calToast(msg, ms = 4200){
+  function calToast(msg, ms = 4200, onUndo){
     let el = document.querySelector(".cal-toast");
     if (!el) { el = document.createElement("div"); el.className = "cal-toast"; document.body.appendChild(el); }
-    el.classList.remove("undo"); el.textContent = msg; el.style.opacity = 1; clearTimeout(el._t);
-    el._t = setTimeout(() => { el.style.opacity = 0; setTimeout(() => el.remove(), 300); }, ms);
+    clearTimeout(el._t); clearTimeout(el._r);   // the last toast's fade must not take this one with it
+    const hide = () => { el.style.opacity = 0; el._r = setTimeout(() => el.remove(), 300); };
+    el.classList.toggle("undo", !!onUndo);
+    if (onUndo) {
+      el.innerHTML = `<span>${esc(msg)}</span><button type="button">Undo</button>`;
+      const b = el.querySelector("button");
+      b.onclick = () => { b.disabled = true; clearTimeout(el._t); hide(); onUndo(); };
+    } else el.textContent = msg;
+    el.style.opacity = 1; el._t = setTimeout(hide, ms);
   }
 
   /* dragging: pointer events on the column, wired once */

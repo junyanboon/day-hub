@@ -2,7 +2,7 @@
    (node --test still/test). Junyan, 2026-10-14: "Instead of change course, be able to change
    things directly on the calendar shown", an agenda from yesterday to 3 days ahead in one
    scroll that opens on now, and blocks that move and stretch like Apple Calendar.
-   Every function is pure: blocks are { s:Date, e:Date, t, id?, calId?, key?, type?, kind? }. */
+   Every function is pure except addKey (it reads the clock and a counter): blocks are { s:Date, e:Date, t, id?, calId?, key?, type?, kind? }. */
 (function (root) {
   const MIN = 60000, HR = 3600000;
 
@@ -87,7 +87,7 @@
   // where a pick lands: now rounded up to 5 minutes if the gap has begun, else the gap start;
   // the task's estimate, at least 15 minutes, never past the gap end
   function pickSpan(gs, ge, t, est){
-    const s = Math.ceil(Math.max(+gs, +t) / (5 * MIN)) * 5 * MIN;
+    const s = +t > +gs ? Math.ceil(+t / (5 * MIN)) * 5 * MIN : +gs;
     return { s:new Date(s), e:new Date(Math.min(s + Math.max(+est || 0, 15) * MIN, +ge)) };
   }
 
@@ -132,7 +132,10 @@
       let pieces = [[+b.s, +b.e]];
       for (const [ts, te] of taken) pieces = pieces.flatMap(([s, e]) => te <= s || ts >= e ? [[s, e]]
         : [[s, Math.min(e, ts)], [Math.max(s, te), e]].filter(([x, y]) => y - x >= 5 * MIN));
-      for (const [s, e] of pieces) out.push(s === +b.s && e === +b.e ? b : { ...b, s:new Date(s), e:new Date(e) });
+      // each piece gets its own key (the one at the stretch's start keeps the original), so check-ins and
+      // the calendar never mistake two pieces for one block
+      for (const [s, e] of pieces) out.push(s === +b.s && e === +b.e ? b
+        : { ...b, s:new Date(s), e:new Date(e), ...(s === +b.s ? {} : { key:(b.key || "free") + "@" + s }) });
     }
     return out.sort((x, y) => x.s - y.s || x.e - y.e);
   }

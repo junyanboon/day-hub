@@ -136,3 +136,16 @@ test("quest.html calls placePick with pickId picks and a history check", () => {
   assert.match(move, /placePick\([^;]*newKey\([^)]*\),\s*\w+\)/, "placePick gets a fourth argument (done)");
   assert.match(move, /samePick\([^)]*\)\s*&&\s*!\w+\(a\)/, "the Move here tag skips blocks that are history");
 });
+
+test("a gap that has not begun starts the pick at its own start, even off a 5 minute mark", () => {
+  assert.equal(iso(A.pickSpan(at(19, 7), at(21), at(18), 30).s), iso(at(19, 7)));
+  assert.equal(iso(A.pickSpan(at(19, 7), at(21), at(19, 8), 30).s), iso(at(19, 10)));   // begun: now, rounded up
+});
+
+test("the pieces of a carved open stretch each get their own key", () => {
+  const open = { s:at(18), e:at(21), t:"Open space", kind:"open", key:"o1" };
+  const out = A.carveFree([open, { s:at(19), e:at(19, 30), t:"Walk", kind:"body", key:"x", extra:true }]);
+  const keys = out.map(b => b.key);
+  assert.equal(new Set(keys).size, keys.length, "no two blocks share a key");
+  assert.equal(out.find(b => +b.s === +at(18)).key, "o1", "the piece at the stretch's own start keeps its key");
+});
