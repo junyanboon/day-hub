@@ -359,6 +359,7 @@
   .cal-h.top::after { top:2px; } .cal-h.bot::after { bottom:2px; }
   .cal-ev.drag:hover .cal-h::after, .cal-ev.dragging .cal-h::after { opacity:.9; }
   @media (pointer:coarse) { .cal-h { height:14px; } .cal-h::after { opacity:.55; } }
+  .cal-ev.ro { cursor:not-allowed; }
   .cal-ev.pend { animation:calPend .9s ease-in-out infinite alternate; }
   @keyframes calPend { to { opacity:.55; } }
   .cal-toast { position:fixed; left:50%; bottom:calc(env(safe-area-inset-bottom) + 22px); transform:translateX(-50%); z-index:80; max-width:min(440px, 92vw);
@@ -1855,7 +1856,7 @@
     try { await qfetch("/cal/event", { method:"POST", body:JSON.stringify({ s:s.toISOString(), e:e.toISOString(), title:t }) }); }
     catch (err) {
       // today's plan cannot hold another day, so a failed add there is only reported
-      if (tzYmd(s) !== gameYmd()) return calToast(`Could not add ${t} to the calendar (${err.message}). Nothing was added.`, 7000);
+      if (gameDayOf(s) !== gameYmd()) return calToast(`Could not add ${t} to the calendar (${err.message}). Nothing was added.`, 7000);
       alert(`Could not add it to the calendar (${err.message}). Added for today only.`); return addBlock(t, s, e, makeRoom); }
     log(`Added ${t} to the calendar: ${fmtT(s)} to ${fmtT(e)}`);
     if (makeRoom) await writeOps(o => blocks().forEach(x => {
@@ -2412,9 +2413,9 @@
     const t0 = new Date(Math.ceil(Math.max(now().getTime(), from ? from.getTime() : 0) / 300000) * 300000);
     let dur = 30;
     // open space on another day of the agenda: it can only go in the calendar (today's plan has no other days)
-    const other = tzYmd(t0) !== gameYmd() && tzYmd(t0) !== tzYmd(now()), canAdd = questKey() && !DRY;
+    const other = gameDayOf(t0) !== gameYmd(), canAdd = questKey() && !DRY;
     if (other && !canAdd) return calToast(DRY ? "Test mode: nothing can be added here." : "Pair this device in ⚙️ to add to other days.");
-    openSheet(`<h3>Add to ${other ? esc(dayLabel(tzYmd(t0), tzYmd(now())).replace(/ ·.*/, "")) : "today"}</h3>
+    openSheet(`<h3>Add to ${other ? esc(shortDay(tzYmd(t0), tzYmd(now()))) : "today"}</h3>
       <input id="aT" placeholder="What is it?" maxlength="80">
       <div class="row"><label>Start<input id="aS" type="time" value="${toField(t0)}"></label></div>
       <div class="chips" style="grid-template-columns:repeat(4,1fr)">${[15,30,60,90].map(m =>
@@ -3620,6 +3621,10 @@
      event is saved to Google Calendar; a block added in Quest is saved in today's plan; open space is
      the gap between things and does not move. Tap still opens the block's window. */
   const AGD = () => window.QuestAgenda;
+  // the game day an instant belongs to: like gameYmd, its day runs to 4 AM
+  const gameDayOf = d => tzYmd(new Date(+d - 4 * 3600000));
+  const shortDay = (ymd, today) => dayLabel(ymd, today).replace(/ ·.*/, "");
+  const dragCtx = () => ({ paired:!!questKey(), dry:DRY });
   const dayStart = ymd => fromField("00:00", new Date(ymd + "T12:00:00Z"));
   const dayLabel = (ymd, today) => {
     const d = new Date(ymd + "T12:00:00Z"), w = d.toLocaleDateString("en-US", { timeZone:"UTC", weekday:"short", month:"short", day:"numeric" });
@@ -3632,6 +3637,7 @@
   function agendaBlocks(t){
     const game = blocks();
     if (!AGD()) return game;
+    for (const k in PEND) if (Date.now() - PEND[k].at > 3 * 60000) delete PEND[k];
     const others = Object.values(AG).map(list => list.map(b => ({ ...b, key:keyOf(b), kind:kindOf(b) })));
     return AGD().applyPending(AGD().mergeAgenda(game, others), PEND, Date.now()).sort((x, y) => x.s - y.s);
   }
@@ -3641,14 +3647,16 @@
     CAL = { stops, a0, z0, days, today };
     const y = ms => Math.round((ms - a0) / HR * CAL_PX), H = y(z0);
     let out = `<div class="cal" style="height:${H + 8}px">`;
-    const mids = new Set(days.map(d => +dayStart(d)));
-    // hour lines; a day line with the date at each midnight; an hour label right next to the now line would sit under its time, so that one is left off
-    for (let h = a0; h < z0; h += HR) {
-      if (mids.has(h)) { const d = days.find(x => +dayStart(x) === h), lb = dayLabel(d, today).replace(/^(Today|Yesterday|Tomorrow) · /, "");
-        out += `<div class="cal-day${d === today ? " today" : ""}" style="top:${y(h)}px"><span>${esc(lb.split(" ")[0].replace(",", ""))}<br>${esc(lb.split(" ").slice(1).join(" "))}</span></div>`; continue; }
-      out += `<div class="cal-hr" style="top:${y(h)}px">${Math.abs(h - t) < 15 * 60000 ? "" : `<span>${fmtT(new Date(h)).replace(":00", "")}</span>`}</div>`;
-    }
-    const ctx = { paired:!!questKey(), dry:DRY };
+    // each day from its own midnight (a clock change makes a day 23 or 25 hours): a day line with the date, then hour lines;
+    // an hour label right next to the now line would sit under its time, so that one is left off
+    days.forEach((d, i) => {
+      const m0 = +dayStart(d), m1 = i + 1 < days.length ? +dayStart(days[i + 1]) : z0, nd = new Date(d + "T12:00:00Z");
+      const wd = nd.toLocaleDateString("en-US", { timeZone:"UTC", weekday:"short" }), md = nd.toLocaleDateString("en-US", { timeZone:"UTC", month:"short", day:"numeric" });
+      out += `<div class="cal-day${d === today ? " today" : ""}" style="top:${y(m0)}px"><span>${wd}<br>${md}</span></div>`;
+      for (let h = m0 + HR; h < m1 - 5 * 60000; h += HR)
+        out += `<div class="cal-hr" style="top:${y(h)}px">${Math.abs(h - t) < 15 * 60000 ? "" : `<span>${fmtT(new Date(h)).replace(":00", "")}</span>`}</div>`;
+    });
+    const ctx = dragCtx();
     const ev = AGD() ? AGD().lanes(stops.map((st, i) => ({ st, i, s:Math.max(+st.s, a0), e:Math.min(+st.e, z0) })).filter(x => x.e > x.s)) : [];
     for (const { st, i, s, e, lane, n } of ev) {
       const b0 = st.blocks[0], isCur = cur && st.blocks.some(b => b.key === cur.key), past = st.e <= t && !isCur, game = !!b0.game;
@@ -3660,10 +3668,10 @@
       const done = game && (!st.free && st.blocks.some(b => G.day.closes[gk(b)] === "done") || (st.lit && past));
       const dk = st.free ? { kind:"free" } : AGD().dragKind(b0, ctx), drag = dk.kind === "cal" || dk.kind === "day";
       const tick = done ? "✓ " : "", time = `${fmtT(st.s)} to ${fmtT(st.e)}`;
-      const cls = `cal-ev${st.free ? " free" : ""}${past ? " past" : ""}${isCur ? " now" : ""}${st.skipped ? " gone" : ""}${h < 36 ? " one" : ""}${drag ? " drag" : ""}${b0.pending ? " pend" : ""}`;
+      const cls = `cal-ev${st.free ? " free" : ""}${past ? " past" : ""}${isCur ? " now" : ""}${st.skipped ? " gone" : ""}${h < 36 ? " one" : ""}${drag ? " drag" : dk.kind === "lock" ? " ro" : ""}${b0.pending ? " pend" : ""}`;
       out += `<button class="${cls}" data-stop="${i}" style="${c ? `--c:${c};` : ""}top:${top}px;height:${h}px;left:calc(var(--cal-l) + (100% - var(--cal-l)) * ${lane} / ${n});width:calc((100% - var(--cal-l)) / ${n} - 3px)" aria-label="${esc(st.t)}, ${time}">` +
         `<b>${calIcon(b0, c || "rgba(255,255,255,.45)")}<span>${tick}${esc(st.t)}</span></b><span class="cal-t">${h < 36 ? fmtT(st.s) : time}</span>${ask ? `<span class="cal-pts cal-ask" data-actq="${esc(gk(b0))}">Check ›</span>` : pts ? `<span class="cal-pts${pts < 0 ? " neg" : ""}">${pts > 0 ? "+" : ""}${pts}</span>` : ""}` +
-        `${drag && h >= 24 ? `<i class="cal-h top" data-h="top"></i><i class="cal-h bot" data-h="bottom"></i>` : ""}</button>`;
+        `${drag ? `${h >= 24 ? `<i class="cal-h top" data-h="top"></i>` : ""}<i class="cal-h bot" data-h="bottom"></i>` : ""}</button>`;
     }
     if (t >= a0 && t <= z0) out += `<div class="cal-now" style="top:${y(+t)}px"><span>${fmtT(t)}</span></div>`;
     return out + `</div>`;
@@ -3710,7 +3718,7 @@
       const r = result(d), y = ms => (ms - CAL.a0) / 3600000 * CAL_PX;
       d.el.style.top = (y(+r.s) + 1) + "px"; d.el.style.height = Math.max(18, y(+r.e) - y(+r.s) - 2) + "px";
       const other = tzYmd(r.s) !== tzYmd(d.b.s), ts = d.el.querySelector(".cal-t");
-      if (ts) ts.textContent = `${other ? dayLabel(tzYmd(r.s), CAL.today).replace(/ ·.*/, "") + " " : ""}${fmtT(r.s)} to ${fmtT(r.e)}`;
+      if (ts) ts.textContent = `${other ? shortDay(tzYmd(r.s), CAL.today) + " " : ""}${fmtT(r.s)} to ${fmtT(r.e)}`;
     };
     const end = (cancel) => {
       const d = DRAG; DRAG = null; if (!d) return;
@@ -3718,14 +3726,15 @@
       if (!d.live) return;
       dragEnded = Date.now();
       const r = result(d);
-      if (cancel || (+r.s === +d.b.s && +r.e === +d.b.e)) { m.querySelector("#calBody")._h = ""; render(); return; }
+      if (cancel || (+r.s === +d.b.s && +r.e === +d.b.e)) { $("calBody")._h = ""; render(); return; }
       commitDrag(d.b, d.dk, r.s, r.e);
     };
     m.addEventListener("pointerdown", e => {
-      if (e.button > 0 || DRAG) return;
+      if (e.button > 0) return;
+      if (DRAG) { if (DRAG.live) return; clearTimeout(DRAG.timer); DRAG = null; }   // a press that never ended (released outside the window)
       const el = e.target.closest(".cal-ev"); if (!el || e.target.closest("[data-actq]")) return;
       const st = CAL.stops[+el.dataset.stop]; if (!st || st.free || !AGD()) return;
-      const b = st.blocks[0], dk = AGD().dragKind(b, { paired:!!questKey(), dry:DRY });
+      const b = st.blocks[0], dk = AGD().dragKind(b, dragCtx());
       const hd = e.target.closest(".cal-h"), touch = e.pointerType !== "mouse";
       DRAG = { el, b, dk, mode: hd ? hd.dataset.h : "move", id:e.pointerId, x0:e.clientX, y0:e.clientY, lastY:e.clientY, scroll0:m.scrollTop, touch, live:false };
       // a finger holds a block a moment before it moves, so a swipe still scrolls; an edge handle answers at once
@@ -3740,6 +3749,7 @@
     }, { passive:false });
     addEventListener("pointerup", e => { if (DRAG && e.pointerId === DRAG.id) end(false); });
     addEventListener("pointercancel", e => { if (DRAG && e.pointerId === DRAG.id) end(true); });
+    addEventListener("blur", () => { if (DRAG) end(true); });
     // once a block is held, the finger moves it instead of scrolling the column
     m.addEventListener("touchmove", e => { if (DRAG && DRAG.live) e.preventDefault(); }, { passive:false });
     m.addEventListener("contextmenu", e => { if (DRAG) e.preventDefault(); });
@@ -3747,12 +3757,13 @@
     m.addEventListener("click", e => { if (Date.now() - dragEnded < 450) { e.stopPropagation(); e.preventDefault(); } }, true);
   }
   async function commitDrag(b, dk, s, e){
-    const k = b.id ? "id:" + b.id : b.key, what = shortName(b), when = `${tzYmd(s) !== tzYmd(b.s) ? dayLabel(tzYmd(s), tzYmd(now())).replace(/ ·.*/, "") + " " : ""}${fmtT(s)} to ${fmtT(e)}`;
+    const k = b.id ? "id:" + b.id : b.key, what = shortName(b), when = `${tzYmd(s) !== tzYmd(b.s) ? shortDay(tzYmd(s), tzYmd(now())) + " " : ""}${fmtT(s)} to ${fmtT(e)}`;
     const show = () => { $("calBody")._h = ""; render(); };
+    if (+s < CAL.a0 || +e > CAL.z0) { show(); calToast("That is past the days shown here, so it stayed where it was."); return; }
     if (dk.dry) { PEND[k] = { s:+s, e:+e, at:Date.now() }; show(); calToast(`Test mode: ${what} now ${when}, on this screen only. Nothing is saved.`); return; }
     if (dk.kind === "day") {
       // a block added in Quest lives in today's plan, which has no other days
-      if (tzYmd(s) !== tzYmd(b.s)) { show(); calToast(`${what} was added in Quest, so it lives in today's plan only. It can move within its day, not to another day.`, 6000); return; }
+      if (gameDayOf(s) !== gameYmd() || gameDayOf(e - 60000) !== gameYmd()) { show(); calToast(`${what} was added in Quest, so it lives in today's plan only. It can move within its day, not to another day.`, 6000); return; }
       await saveBlock(b, s, e, b.t, false);
       calToast(`${what}: ${when}. Saved in today's plan.`);
       return;
@@ -3766,16 +3777,18 @@
       return;
     }
     calToast(`${what}: ${when}. Saved to Google Calendar${b.cal ? ` (${b.cal})` : ""}.`);
-    if (b.game) {
-      log(`Moved ${what} in the calendar: ${when}`);
-      // the calendar now holds the change, so drop any today-only edit of it
-      if (OPS.edits[b.key]) await writeOps(o => { delete o.edits[b.key]; });
-    }
-    await pullAll();
+    try {
+      if (b.game) {
+        log(`Moved ${what} in the calendar: ${when}`);
+        // the calendar now holds the change, so drop any today-only edit of it
+        if (OPS.edits[b.key]) await writeOps(o => { delete o.edits[b.key]; });
+      }
+      await pullAll();
+    } catch {}   // the calendar has it; the next pull shows it
   }
   // a block on another day of the agenda: what it is, and how to change it
   function openAgendaItem(b){
-    const dk = AGD().dragKind(b, { paired:!!questKey(), dry:DRY });
+    const dk = AGD().dragKind(b, dragCtx());
     openSheet(`${winHead(b)}
       <p>${esc(dayLabel(tzYmd(b.s), tzYmd(now())))}${b.cal ? ` · ${esc(b.cal)}` : ""}${b.loc ? ` · 📍 ${esc(b.loc)}` : ""}</p>
       <p style="font-size:12.5px">${dk.kind === "cal" ? "Drag it on the calendar to move it, to another day too. Drag its top or bottom edge to change how long it is. It saves to Google Calendar." : esc(dk.why || "")}</p>
@@ -4033,7 +4046,7 @@
     }
     calDayLine();
     mt.querySelectorAll("[data-stop]").forEach(n => n.onclick = e => {
-      const st = stops[+n.dataset.stop]; if (!st) return;
+      const st = CAL.stops[+n.dataset.stop]; if (!st) return;   // the stops the column on screen was drawn from
       const aq = e.target.closest("[data-actq]");
       if (aq) { const b = blocks().find(x => gk(x) === aq.dataset.actq); if (b) return openActQuiz(b); }
       const fixed = st.blocks.find(b => b.kind !== "open" && b.kind !== "break");
