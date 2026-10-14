@@ -77,10 +77,16 @@
     [/brunch/i, "Brunch"], [/lunch/i, "Lunch"], [/dinner/i, t => /pack/i.test(t) ? "Dinner + pack" : "Dinner"],
     [/quad/i, "Quad bikes"], [/check.?out/i, "Check-out"], [/walk/i, "Walk"], [/video|shoot|film/i, "Video shoot"],
   ];
+  // words that stand in for a name ("see notes", "activities", "details"): never shown alone
+  const VAGUE = /^((see|check|read)\s+(the\s+)?notes?|notes?|activit(y|ies)|details?|info|tbd|tba|tbc|plans?|program(me)?|itinerary|misc)$/i;
   function shortName(b){
     const t = String(b.t || "");
     for (const [re, v] of SHORT) if (re.test(t)) return typeof v === "function" ? v(t) : v;
-    let x = t.replace(/\s*[·@(].*$/, "").replace(/^(tour|trip|event)\s*[-:–]\s*/i, "").replace(/[!?.]+$/, "").trim();
+    // "Tour - Safari Day" reads "Safari Day", but "Tour - See notes" and "Tour - Activities (See notes)"
+    // read "Tour": the part after the dash is a pointer to the notes, not a name (Junyan, 2026-10-14)
+    let x = t.replace(/\s*[·@(].*$/, "").replace(/\s*[-:–]\s*(see|check|read)\s+(the\s+)?notes?$/i, "").replace(/[!?.]+$/, "").trim();
+    const m = /^(tour|trip|event)\s*[-:–]\s*(.*)$/i.exec(x);
+    if (m) x = m[2].trim() && !VAGUE.test(m[2].trim()) ? m[2].trim() : m[1][0].toUpperCase() + m[1].slice(1).toLowerCase();
     return x.length > 22 ? x.slice(0, 21).trim() + "…" : (x || t);
   }
   // the symbol in its coloured ring, as inline SVG (main card, next line, windows)
