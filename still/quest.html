@@ -361,10 +361,16 @@
   @media (pointer:coarse) { .cal-h { height:14px; } .cal-h::after { opacity:.55; } }
   .cal-ev.ro { cursor:not-allowed; }
   .cal-ev.pend { animation:calPend .9s ease-in-out infinite alternate; }
+  .cal-ev.fresh { z-index:5; animation:calFresh 1.1s ease-out 3; }
+  @keyframes calFresh { 0% { box-shadow:0 0 0 3px var(--c), 0 0 22px var(--c); } 100% { box-shadow:0 0 0 1.5px var(--c), 0 0 0 transparent; } }
   @keyframes calPend { to { opacity:.55; } }
   .cal-toast { position:fixed; left:50%; bottom:calc(env(safe-area-inset-bottom) + 22px); transform:translateX(-50%); z-index:80; max-width:min(440px, 92vw);
     padding:10px 16px; border-radius:14px; background:rgba(25,29,60,.94); border:1px solid var(--glass-border); color:var(--ink); font-size:13.5px;
     box-shadow:0 10px 30px rgba(0,0,0,.4); transition:opacity .3s; }
+  .cal-toast.undo { display:flex; align-items:center; gap:12px; }
+  .cal-toast.undo span { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .cal-toast.undo button { flex:none; padding:5px 12px; border-radius:10px; background:rgba(255,255,255,.14); color:inherit; font-weight:600; }
+  .mv-opt .mv-tag { flex:none; margin-left:auto; font-size:11.5px; font-weight:600; padding:3px 8px; border-radius:9px; background:rgba(255,212,121,.22); color:#ffd479; white-space:nowrap; }
   /* ---------- trail ---------- */
   h2 { font-size:12px; letter-spacing:.14em; text-transform:uppercase; color:var(--ink-soft); font-weight:600;
     margin:26px 4px 10px; display:flex; justify-content:space-between; }
@@ -621,7 +627,7 @@
 <script src="quest-fx.js?v=20261009b"></script>
 <script src="quest-night.js?v=20261011a"></script>
 <script src="quest-morning.js?v=20261011d"></script>
-<script src="quest-agenda.js?v=20261014a"></script>
+<script src="quest-agenda.js?v=20261014c"></script>
 </head>
 <body>
 <div id="sky" aria-hidden="true"><div class="sky-stars"></div><div class="sky-orb"></div>
@@ -875,6 +881,9 @@
   }
 
   const keyOf = b => b.s + "|" + b.t;
+  /* Blocks added in Quest get a key no other block has (2026-10-14: "x<start ms>" alone made two picks
+     at the same minute one key, so removing one removed both). */
+  const newKey = s => window.QuestAgenda ? QuestAgenda.addKey(s) : "x" + (+s) + "-" + Math.random().toString(36).slice(2, 8);
   function blocks(){
     if (!PLAN) return [];
     const out = [];
@@ -1539,7 +1548,7 @@
   function addSadhana(S){
     const E = new Date(+S + 30 * 60000);
     log(`Added Shambhavi at ${fmtT(S)}`);
-    return writeOps(o => o.adds.push({ key:"x" + S.getTime(), s:S.toISOString(), e:E.toISOString(), t:"Shambhavi", type:"task", cal:"you" }));
+    return writeOps(o => o.adds.push({ key:newKey(S), s:S.toISOString(), e:E.toISOString(), t:"Shambhavi", type:"task", cal:"you" }));
   }
   // d78: a meal that ends less than 3 hr before bed or practice
   function mealWarn(b, all){
@@ -1572,7 +1581,9 @@
 
   /* ---------- the day's loop ---------- */
   // latest-starting block containing now wins (same rule as Stillness)
-  function currentOf(all, t){ let hit = null; all.forEach(b => { if (t >= b.s && t < b.e) hit = b; }); return hit; }
+  // a block added in Quest uses up the open space under it (Your move, 2026-10-14), so a free stretch that
+  // starts while it runs does not take over the Right now card
+  function currentOf(all, t){ let hit = null; all.forEach(b => { if (t >= b.s && t < b.e && !(hit && hit.extra && hit.kind !== "open" && hit.kind !== "break" && (b.kind === "open" || b.kind === "break"))) hit = b; }); return hit; }
   function nextOf(all, t){ return all.find(b => b.s > t) || null; }
   const needsCheck = b => b.kind !== "break" && b.kind !== "open";   // open time is a choice, not a check-in
   // Check-ins follow the calendar event, not its time: a block that moves (in
@@ -1713,7 +1724,7 @@
   }
   // put a block on today's plan starting now, and start it
   async function startNow(t, min){
-    const S = new Date(Math.floor(+now() / 60000) * 60000), E = new Date(+S + min * 60000), key = "x" + S.getTime();
+    const S = new Date(Math.floor(+now() / 60000) * 60000), E = new Date(+S + min * 60000), key = newKey(S);
     log(`Your move: ${t}`);
     await writeOps(o => o.adds.push({ key, s:S.toISOString(), e:E.toISOString(), t, type:"task", cal:"you" }));
     const b = blocks().find(x => x.key === key); if (b) checkIn(b); else render();
@@ -1811,7 +1822,7 @@
   /* ---------- changing the schedule ----------
      Same edit layer as Stillness (/ops): a change here shows on the phone app
      and the desktop orb. Calendar blocks are keyed by their original start and
-     title; blocks you add are keyed "x<start ms>". */
+     title; blocks added here are keyed "x<start ms>-<random>" (newKey); Stillness still adds "x<start ms>". */
   function setBlock(o, b, s, e, t){
     if (b.extra) { const a = o.adds.find(x => x.key === b.key); if (a) { a.s = s.toISOString(); a.e = e.toISOString(); a.t = t; } }
     else o.edits[b.key] = { s:s.toISOString(), e:e.toISOString(), t };
@@ -1880,7 +1891,7 @@
         if (x.s < s) return;
         setBlock(o, x, new Date(x.s.getTime() + dur), new Date(x.e.getTime() + dur), x.t);
       });
-      o.adds.push({ key:"x" + s.getTime(), s:s.toISOString(), e:e.toISOString(), t, type:"task", cal:"you" });
+      o.adds.push({ key:newKey(s), s:s.toISOString(), e:e.toISOString(), t, type:"task", cal:"you" });
     });
   }
   // time inputs speak the calendar's clock, not the device's
@@ -2381,34 +2392,61 @@
      gives me different options there in the pop up box"). A free stretch on the calendar offers what
      could go in it: the tasks the planner would pick, a practice, rest, food, pulling the next thing
      earlier, anything else, or the whole planner. Each choice goes on today's plan at once. */
+  /* Pick from a list (Junyan, 2026-10-14, d10 "A"): each choice shows the exact time it would land,
+     and picking it puts it there at once, in today's plan only (d8, never Google Calendar). One block
+     per task per day (d7): a task already on today's plan says "Move here" and picking it moves that
+     block. The new block glows, drags and stretches like any other, and a toast offers Undo. */
+  let FRESH = { key:"", at:0 };
   function openMove(st){
-    const t = now(), S = new Date(Math.ceil(Math.max(+st.s, +t) / 300000) * 300000), room = Math.round((st.e - S) / 60000);
-    if (room < 5) return openAdd(st.s);
-    const fits = m => Math.max(5, Math.min(m, room));
-    const D = MO_CTX.data(), tasks = window.QuestMorning ? QuestMorning.rankTasks(D).filter(x => !D.items.some(i => i.taskId === x.id && i.e > t)).slice(0, 4) : [];
+    const t = now(), S = new Date(+t > +st.s ? Math.ceil(+t / 300000) * 300000 : +st.s), room = Math.round((st.e - S) / 60000);
+    if (room < 5 || !AGD()) return openAdd(st.s);
+    const span = est => AGD().pickSpan(st.s, st.e, t, est), when = sp => AGD().rangeText(fmtT(sp.s), fmtT(sp.e));
+    const D = MO_CTX.data(), tasks = window.QuestMorning ? QuestMorning.rankTasks(D).slice(0, 4) : [];
     const h = MO_CTX.hour(S), meal = h < 11 ? "Breakfast" : h < 16 ? "Lunch" : h < 18 ? "Snack" : "Dinner";
     const next = blocks().find(b => +b.s >= +st.e - 60000 && b.kind !== "open" && b.kind !== "break");
     const pull = next && +next.s > +S + 5 * 60000 && !/flight|\b[A-Z]{2}\d{2,4}\b/.test(next.t);
+    // [icon, title, note, est min, { taskId?, pickId }]
     const groups = [
-      ["Get something done", tasks.map(x => ["📝", x.task, `${x.why ? x.why + " · " : ""}${fits(x.est)} min`, x.task.length > 70 ? x.task.slice(0, 69) + "…" : x.task, fits(x.est), { taskId:x.id }])],
-      ["Practice", [["🌀", "Isha Kriya", "12 min, fills prana", "Isha Kriya", fits(15)], ["🌬️", "Nadi Shuddhi", "5 min, fills prana", "Nadi Shuddhi", fits(10)], ["🙆", "Upa Yoga", "20 min", "Upa Yoga", fits(20)]]],
-      ["Rest and body", [["😴", "NSDR", "20 min lying down, gives body back", "NSDR", fits(20)], ["🚶", "Walk", "30 min outside", "Walk", fits(30)], ["🍽️", meal, "45 min", meal, fits(45)]]],
+      ["Get something done", tasks.map(x => ["📝", x.task.length > 70 ? x.task.slice(0, 69) + "…" : x.task, x.why || "", x.est, { taskId:x.id, pickId:"task:" + x.id }])],
+      ["Practice", [["🌀", "Isha Kriya", "Fills prana", 12], ["🌬️", "Nadi Shuddhi", "Fills prana", 5], ["🙆", "Upa Yoga", "", 20]]],
+      ["Rest and body", [["😴", "NSDR", "Lying down, gives body back", 20], ["🚶", "Walk", "Outside", 30], ["🍽️", meal, "", 45]]],
     ];
-    const opts = groups.flatMap(g => g[1]);
+    const opts = groups.flatMap(g => g[1]).map(o => { const p = o[4] || { pickId:o[1].toLowerCase() };
+      const on = (OPS.adds || []).some(a => AGD().samePick(a, { ...p, t:o[1] }) && !pickDone(a));
+      return { o, p, sp:span(o[3]), on }; });
+    let i = 0;
     openSheet(`<h3>Your move</h3><p>${fmtT(S)} to ${fmtT(st.e)} · ${fmtHM(room)} free. Pick what goes here.</p>
-      ${groups.filter(g => g[1].length).map(([lb, xs]) => `<div class="mv-lb">${lb}</div>${xs.map(o => `<button class="mv-opt" data-mv="${opts.indexOf(o)}"><span class="i">${o[0]}</span><span><b>${esc(o[1])}</b><small>${esc(o[2])}</small></span></button>`).join("")}`).join("")}
+      ${groups.filter(g => g[1].length).map(([lb, xs]) => `<div class="mv-lb">${lb}</div>${xs.map(() => { const x = opts[i];
+        return `<button class="mv-opt" data-mv="${i++}"><span class="i">${x.o[0]}</span><span><b>${esc(x.o[1])}</b><small>${esc(when(x.sp))}${x.o[2] ? " · " + esc(x.o[2]) : ""}</small></span>${x.on ? `<span class="mv-tag">Move here</span>` : ""}</button>`; }).join("")}`).join("")}
       <div class="mv-lb">Change the plan</div>
       ${pull ? `<button class="mv-opt" id="mvPull"><span class="i">⏩</span><span><b>Start ${esc(shortName(next))} at ${fmtT(S)}</b><small>Pulls it earlier, today only</small></span></button>` : ""}
       <button class="mv-opt" id="mvOther"><span class="i">✏️</span><span><b>Something else</b><small>Name it and pick a length</small></span></button>
       ${window.QuestMorning ? `<button class="mv-opt" id="mvPlan"><span class="i">☀️</span><span><b>Plan the whole day</b><small>Check the day, tasks and practices step by step</small></span></button>` : ""}
       <div class="actions"><button class="btn ghost" id="mvCancel">Close</button></div>`, true);
-    $("sheet").querySelectorAll("[data-mv]").forEach(bn => bn.onclick = () => { const o = opts[+bn.dataset.mv]; closeSheet();
-      MO_CTX.add(o[3], S, new Date(+S + o[4] * 60000), o[5]); });
+    $("sheet").querySelectorAll("[data-mv]").forEach(bn => bn.onclick = () => { const x = opts[+bn.dataset.mv]; closeSheet();
+      pickMove({ t:x.o[1], s:x.sp.s, e:x.sp.e, ...x.p }); });
     if ($("mvPull")) $("mvPull").onclick = () => { closeSheet(); log(`Pulled ${next.t} to ${fmtT(S)}`); saveBlock(next, S, new Date(+S + (next.e - next.s)), next.t, false); };
     $("mvOther").onclick = () => { closeSheet(); setTimeout(() => openAdd(S), 50); };
     if ($("mvPlan")) $("mvPlan").onclick = () => { closeSheet(); openMorning(); };
     $("mvCancel").onclick = closeSheet;
   }
+  // a block that is already history (checked in or closed) stays where it happened: a re-pick adds a new one.
+  // One that only ended, never started, is moved like any other (d7: one block per task per day)
+  const pickDone = a => !!(G.day.checks || {})[gk(a)] || !!(G.day.closes || {})[gk(a)];
+  // put the pick on today's plan (or move its block there), glow it, and offer Undo for 5 seconds
+  async function pickMove(p){
+    let r = null;
+    await writeOps(o => { r = AGD().placePick(o.adds, p, newKey(p.s), pickDone); o.adds = r.adds; FRESH = { key:r.key, at:Date.now() }; });
+    if (!r) return;
+    const msg = `${r.moved ? "Moved" : "Added"}: ${p.t}, ${AGD().rangeText(fmtT(p.s), fmtT(p.e))}`;
+    log(msg.replace(/^Added/, "Planned")); saveG(); render();
+    const el = document.querySelector(`.cal-ev.fresh`); if (el) el.scrollIntoView({ behavior:"smooth", block:"nearest" });
+    undoToast(msg, async () => {
+      await writeOps(o => { o.adds = AGD().undoPick(o.adds, r); });
+      FRESH = { key:"", at:0 }; log(`Undone: ${msg}`); saveG(); render();
+    });
+  }
+  function undoToast(msg, onUndo, ms = 5000){ return calToast(msg, ms, onUndo); }
   function openAdd(from){
     const t0 = new Date(Math.ceil(Math.max(now().getTime(), from ? from.getTime() : 0) / 300000) * 300000);
     let dur = 30;
@@ -3035,7 +3073,7 @@
     rename: (key, t) => { const b = blkByKey(key); if (b) return saveBlock(b, b.s, b.e, t, false); },
     drop: key => { const b = blkByKey(key); if (b) return dropBlock(b); },
     add: (t, s, e, extra) => { log(`Planned ${t}: ${fmtT(s)} to ${fmtT(e)}`);
-      return writeOps(o => o.adds.push({ key:"x" + s.getTime(), s:s.toISOString(), e:e.toISOString(), t, type:"task", cal:"you", ...(extra || {}) })); },
+      return writeOps(o => o.adds.push({ key:newKey(s), s:s.toISOString(), e:e.toISOString(), t, type:"task", cal:"you", ...(extra || {}) })); },
     // done in Notion; the answer carries the status it had, so Undo can put it back (2026-10-10)
     taskDone: async id => {
       let was = "";
@@ -3639,7 +3677,8 @@
     if (!AGD()) return game;
     for (const k in PEND) if (Date.now() - PEND[k].at > 3 * 60000) delete PEND[k];
     const others = Object.values(AG).map(list => list.map(b => ({ ...b, key:keyOf(b), kind:kindOf(b) })));
-    return AGD().applyPending(AGD().mergeAgenda(game, others), PEND, Date.now()).sort((x, y) => x.s - y.s);
+    // a block added in Quest uses up the open space under it (Your move, 2026-10-14)
+    return AGD().carveFree(AGD().applyPending(AGD().mergeAgenda(game, others), PEND, Date.now()));
   }
   function calendarHTML(stops, cur, t){
     const HR = 3600000, today = tzYmd(t), days = AGD() ? AGD().agendaDays(today) : [gameYmd()];
@@ -3659,7 +3698,7 @@
     const ctx = dragCtx();
     const ev = AGD() ? AGD().lanes(stops.map((st, i) => ({ st, i, s:Math.max(+st.s, a0), e:Math.min(+st.e, z0) })).filter(x => x.e > x.s)) : [];
     for (const { st, i, s, e, lane, n } of ev) {
-      const b0 = st.blocks[0], isCur = cur && st.blocks.some(b => b.key === cur.key), past = st.e <= t && !isCur, game = !!b0.game;
+      const b0 = st.blocks[0], isCur = cur && st.blocks.some(b => b.key === cur.key) && (!st.free || (t >= st.s && t < st.e)), past = st.e <= t && !isCur, game = !!b0.game;
       const c = st.free ? "" : calColor(b0), top = y(s) + 1, h = Math.max(18, y(e) - y(s) - 2);
       const rq = st.free || !game ? null : (G.day.mealq || {})[gk(b0)];
       const pts = st.free || !game ? 0 : st.blocks.reduce((a, b) => a + blockGain(b), 0) + (rq ? rq.p || 0 : 0);
@@ -3668,7 +3707,7 @@
       const done = game && (!st.free && st.blocks.some(b => G.day.closes[gk(b)] === "done") || (st.lit && past));
       const dk = st.free ? { kind:"free" } : AGD().dragKind(b0, ctx), drag = dk.kind === "cal" || dk.kind === "day";
       const tick = done ? "✓ " : "", time = `${fmtT(st.s)} to ${fmtT(st.e)}`;
-      const cls = `cal-ev${st.free ? " free" : ""}${past ? " past" : ""}${isCur ? " now" : ""}${st.skipped ? " gone" : ""}${h < 36 ? " one" : ""}${drag ? " drag" : dk.kind === "lock" ? " ro" : ""}${b0.pending ? " pend" : ""}`;
+      const cls = `cal-ev${st.free ? " free" : ""}${past ? " past" : ""}${isCur ? " now" : ""}${st.skipped ? " gone" : ""}${h < 36 ? " one" : ""}${drag ? " drag" : dk.kind === "lock" ? " ro" : ""}${b0.pending ? " pend" : ""}${FRESH.key && game && b0.key === FRESH.key && Date.now() - FRESH.at < 6000 ? " fresh" : ""}`;
       out += `<button class="${cls}" data-stop="${i}" style="${c ? `--c:${c};` : ""}top:${top}px;height:${h}px;left:calc(var(--cal-l) + (100% - var(--cal-l)) * ${lane} / ${n});width:calc((100% - var(--cal-l)) / ${n} - 3px)" aria-label="${esc(st.t)}, ${time}">` +
         `<b>${calIcon(b0, c || "rgba(255,255,255,.45)")}<span>${tick}${esc(st.t)}</span></b><span class="cal-t">${h < 36 ? fmtT(st.s) : time}</span>${ask ? `<span class="cal-pts cal-ask" data-actq="${esc(gk(b0))}">Check ›</span>` : pts ? `<span class="cal-pts${pts < 0 ? " neg" : ""}">${pts > 0 ? "+" : ""}${pts}</span>` : ""}` +
         `${drag ? `${h >= 24 ? `<i class="cal-h top" data-h="top"></i>` : ""}<i class="cal-h bot" data-h="bottom"></i>` : ""}</button>`;
@@ -3684,11 +3723,18 @@
     const txt = dayLabel(d, CAL.today) + (questKey() || DRY ? "" : " · 🔒 read only");
     if ($("calDay").textContent !== txt) $("calDay").textContent = txt;
   }
-  function calToast(msg, ms = 4200){
+  function calToast(msg, ms = 4200, onUndo){
     let el = document.querySelector(".cal-toast");
     if (!el) { el = document.createElement("div"); el.className = "cal-toast"; document.body.appendChild(el); }
-    el.textContent = msg; el.style.opacity = 1; clearTimeout(el._t);
-    el._t = setTimeout(() => { el.style.opacity = 0; setTimeout(() => el.remove(), 300); }, ms);
+    clearTimeout(el._t); clearTimeout(el._r);   // the last toast's fade must not take this one with it
+    const hide = () => { el.style.opacity = 0; el._r = setTimeout(() => el.remove(), 300); };
+    el.classList.toggle("undo", !!onUndo);
+    if (onUndo) {
+      el.innerHTML = `<span>${esc(msg)}</span><button type="button">Undo</button>`;
+      const b = el.querySelector("button");
+      b.onclick = () => { b.disabled = true; clearTimeout(el._t); hide(); onUndo(); };
+    } else el.textContent = msg;
+    el.style.opacity = 1; el._t = setTimeout(hide, ms);
   }
 
   /* dragging: pointer events on the column, wired once */
