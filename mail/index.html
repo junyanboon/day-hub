@@ -261,6 +261,7 @@ main>.empty,.pair .summary,.note{color:#fff;text-shadow:0 1px 2px rgba(9,22,50,.
   function pillFor(x){
     if (S.done[x.id]) return `<span class="seal stamp" title="${esc(S.done[x.id].label)}">✓</span>`;
     if (x.rule) return `<span class="pill money">${x.rule.stopped ? "Rule stopped" : "Rule did not finish"}</span>`;
+    if (x.ruleUnverified) return `<span class="pill money">Not verified</span>`;
     if (x.money) return `<span class="pill money">Money: Claude</span>`;
     if (x.read) return `<span class="pill claude">New sender · Claude: ${esc(readWhat(x.read, true))}</span>`;
     if (x.jevState === "pending") return `<span class="pill jev">Jev reading…</span>`;
@@ -273,6 +274,12 @@ main>.empty,.pair .summary,.note{color:#fff;text-shadow:0 1px 2px rgba(9,22,50,.
     const r = x.rule;
     if (r.stopped) return `<div class="jevline money">You flagged the standing rule "${esc(r.name)}" for this email, so it is back here. ${r.task ? "Its task is still in your Tasks Inbox: " + taskLink(r.task) + ". " : ""}Claude will check it.</div>`;
     return `<div class="jevline money">The standing rule "${esc(r.name)}" did not finish, so it was not archived: ${esc(r.error || "unknown error")}. ${r.task ? "Task: " + taskLink(r.task) + ". " : ""}Approve it to CRA, or leave it for now.</div>`;
+  }
+  // a standing rule matched this email but Gmail did not verify the sender (DMARC, d363): the rule did nothing
+  function skippedLine(x){
+    const k = x.ruleUnverified;
+    if (!k) return "";
+    return `<div class="jevline money">${esc(k.note)}. Gmail's check: ${esc(k.why || "not verified")}. Nothing was filed, no task was made. Do not use links in it.</div>`;
   }
   // Claude's suggestion in words: a tray, "Make a task: …", or "Reply needed"
   function readWhat(r, short){
@@ -320,7 +327,7 @@ main>.empty,.pair .summary,.note{color:#fff;text-shadow:0 1px 2px rgba(9,22,50,.
       let body = "";
       if (open){
         const route = S.picks[x.id] || x.suggest || "";
-        body = `<div class="body">${claudeLine(x)}${jevLine(x)}
+        body = `<div class="body">${skippedLine(x)}${claudeLine(x)}${jevLine(x)}
           ${x.snippet ? `<p class="summary">${esc(x.snippet)}</p>` : ""}
           ${mailBlock(x)}
           <div class="why">Goes to</div>
