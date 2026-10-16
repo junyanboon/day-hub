@@ -224,7 +224,7 @@ main>.empty,.pair .summary,.note{color:#fff;text-shadow:0 1px 2px rgba(9,22,50,.
     try { await post("/inbox/sync"); } catch (e) { toastErr("Gmail check failed: " + e.message); }
     S.busy = false; await load();
   }
-  const currentList = () => !S.data ? [] : S.tab === "sort" ? sortList() : S.tab === "messages" ? S.data.messages : (S.report?.auto || []);
+  const currentList = () => !S.data ? [] : S.tab === "sort" ? sortList() : S.tab === "messages" ? S.data.messages : [...(S.report?.rules || []), ...(S.report?.auto || [])];
   // approved cards stay on screen (sealed) until the next reload, so he sees what he just did
   const sortList = () => [...S.data.sort, ...Object.values(S.done).filter(d => d.card.tab !== "messages" && !S.data.sort.some(c => c.id === d.card.id)).map(d => d.card)];
 
@@ -249,12 +249,21 @@ main>.empty,.pair .summary,.note{color:#fff;text-shadow:0 1px 2px rgba(9,22,50,.
 
   function pillFor(x){
     if (S.done[x.id]) return `<span class="seal stamp" title="${esc(S.done[x.id].label)}">✓</span>`;
+    if (x.rule) return `<span class="pill money">${x.rule.stopped ? "Rule stopped" : "Rule did not finish"}</span>`;
     if (x.money) return `<span class="pill money">Money: Claude</span>`;
     if (x.jevState === "pending") return `<span class="pill jev">Jev reading…</span>`;
     if (x.jev && x.jev.shown) return `<span class="pill jev">Jev: ${esc(routeName(x.jev.route))}</span>`;
     return `<span class="pill">No guess yet</span>`;
   }
+  // a standing rule ran on this email but it is a card again: it did not finish, or he flagged it
+  const taskLink = t => t ? `<a href="${esc(t.url)}" target="_blank" rel="noopener">${esc(t.title)}</a>` : "";
+  function ruleLine(x){
+    const r = x.rule;
+    if (r.stopped) return `<div class="jevline money">You flagged the standing rule "${esc(r.name)}" for this email, so it is back here. ${r.task ? "Its task is still in your Tasks Inbox: " + taskLink(r.task) + ". " : ""}Claude will check it.</div>`;
+    return `<div class="jevline money">The standing rule "${esc(r.name)}" did not finish, so it was not archived: ${esc(r.error || "unknown error")}. ${r.task ? "Task: " + taskLink(r.task) + ". " : ""}Approve it to CRA, or leave it for now.</div>`;
+  }
   function jevLine(x){
+    if (x.rule) return ruleLine(x);
     if (x.money) return `<div class="jevline money">Money or travel email: Jev is not asked. Claude checks it against YNAB and Cindia.</div>`;
     if (x.jevState === "pending") return `<div class="jevline">Jev is reading the sender and subject…</div>`;
     if (x.jevState === "failed") return `<div class="jevline quiet">Jev did not answer this time. Pick a tray.</div>`;
@@ -325,6 +334,18 @@ main>.empty,.pair .summary,.note{color:#fff;text-shadow:0 1px 2px rgba(9,22,50,.
     const r = S.report;
     if (!r) return `<div class="empty">Loading…</div>`;
     const pct = r.jev.shown ? Math.round(r.jev.agreed / r.jev.shown * 100) + "%" : "n/a";
+    const rules = (r.rules || []).map(x => {
+      const pill = x.flagged ? `<span class="pill money">Flagged</span>` : x.error ? `<span class="pill money">Did not finish</span>` : `<span class="pill auto">Rule</span>`;
+      const did = x.error ? `It did not finish (${esc(x.error)}), so it stayed in your inbox as a card.`
+        : `Filed to CRA${x.archived ? " and archived" : ""}${x.task ? `, and ${x.task.reused ? "it found the task already made" : "made a task"}: ${taskLink(x.task)}` : ""}.`;
+      const body = S.open === x.id ? `<div class="body"><p class="summary">Standing rule: ${esc(x.name)}. ${did}</p>
+        <div class="btns">${x.flagged ? `<span class="pill money">Rule stopped for this email. It is back in Sort, and Claude will check it.</span>`
+          : x.error ? "" : `<button class="btn primary" type="button" data-flag="${esc(x.id)}" data-kind="rule">Flag this</button><button class="btn quiet" type="button" data-open="${esc(x.id)}">Looks fine</button>`}
+          ${x.task ? `<a class="btn quiet" href="${esc(x.task.url)}" target="_blank" rel="noopener">Open the task</a>` : ""}
+          <a class="btn quiet" href="${esc(x.gmail)}" target="_blank" rel="noopener">Open in Gmail</a></div></div>` : "";
+      const row = { ...x, subject: `Standing rule: ${x.name}` };
+      return `<div class="row ${S.open===x.id?"open":""}">${head(row, x.flagged||x.error?"flag":"auto", pill)}${body}</div>`;
+    }).join("");
     const rows = r.auto.map(x => {
       const pill = x.flagged ? `<span class="pill money">Flagged</span>` : `<span class="pill auto">${esc(x.filedAs)}</span>`;
       const body = S.open === x.id ? `<div class="body"><p class="summary">Filed to ${esc(x.filedAs)} by itself, because you approved this sender there 10 times in a row.</p>
@@ -333,7 +354,8 @@ main>.empty,.pair .summary,.note{color:#fff;text-shadow:0 1px 2px rgba(9,22,50,.
           <a class="btn quiet" href="${esc(x.gmail)}" target="_blank" rel="noopener">Open in Gmail</a></div></div>` : "";
       return `<div class="row ${S.open===x.id?"open":""}">${head(x, x.flagged?"flag":"auto", pill)}${body}</div>`;
     }).join("");
-    return `<div class="tiles"><div class="tile"><b>${r.auto.length}</b><span>handled by itself, last 14 days</span></div><div class="tile"><b>${pct}</b><span>Jev matched you (${r.jev.agreed} of ${r.jev.shown})</span></div><div class="tile"><b>${r.flagged}</b><span>flagged by you</span></div></div>
+    return `<div class="tiles"><div class="tile"><b>${r.auto.length + (r.rules || []).filter(x => !x.error && !x.flagged).length}</b><span>handled by itself, last 14 days</span></div><div class="tile"><b>${pct}</b><span>Jev matched you (${r.jev.agreed} of ${r.jev.shown})</span></div><div class="tile"><b>${r.flagged}</b><span>flagged by you</span></div></div>
+      ${rules ? `<div class="lane"><span>Standing rules · rules you set once</span><span>${r.rules.length}</span></div><div class="list">${rules}</div>` : ""}
       <div class="lane"><span>What Jev learned from you</span><span>${r.learned.length}</span></div>
       <div class="list learned">${r.learned.length ? r.learned.map(l => `<div><b>${esc(l.who)}</b><span>${esc(l.from)} → ${esc(l.to)}</span></div>`).join("") : `<div><span style="color:var(--dim)">Nothing yet. When you pick a different tray than Jev, it shows here and Jev uses it next time.</span></div>`}</div>
       <div class="lane"><span>Handled by itself · flag anything that looks off</span><span>${r.auto.length}</span></div>
@@ -397,7 +419,7 @@ main>.empty,.pair .summary,.note{color:#fff;text-shadow:0 1px 2px rgba(9,22,50,.
     const ts = e.target.closest("[data-tosort]");
     if (ts){ try { await post("/inbox/decide", { id: ts.dataset.tosort, action:"to-sort" }); toast("Moved to Sort."); } catch (err) { toastErr(err.message); } return load(); }
     const f = e.target.closest("[data-flag]");
-    if (f){ try { await post("/inbox/flag", { id: f.dataset.flag }); toast("Flagged. That sender asks you again, and Claude will check this one."); } catch (err) { toastErr(err.message); } return load(); }
+    if (f){ try { await post("/inbox/flag", { id: f.dataset.flag }); toast(f.dataset.kind === "rule" ? "Flagged. The rule is undone for this email: it is back in Sort, and Claude will check it." : "Flagged. That sender asks you again, and Claude will check this one."); } catch (err) { toastErr(err.message); } return load(); }
     if (e.target.closest("#refresh")) return checkNow();
     if (e.target.closest("#pairGo")){ const v = $("#pairCode").value.trim(); if (!v) return;
       store.set("quest-key", v); S.error = null; await load();
