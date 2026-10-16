@@ -100,6 +100,11 @@ is worth doing before or after that event). Mind the event's time: a lunch event
 at lunch, an evening class wants dinner after.
 
 Times, from the stay's or event place's address:
+- **The cloud network blocks some of these services** (first run, 2026-10-16: `routing.openstreetmap.de`
+  was refused by the proxy). When `curl` or Python is refused, fetch the same URL with the WebFetch
+  tool instead. If that fails too, estimate: straight-line distance times 1.3, walked at 80 m a
+  minute (the card's own rule), and say "estimated" in the report. For a position, use the
+  coordinates from the place's own website, its Google Maps link, or Wanderlog.
 - Geocode with Nominatim (`https://nominatim.openstreetmap.org/search?format=json&q=...`, send a
   User-Agent header, one request a second). A beach or park comes back as its middle point: use the
   nearest entrance or the nearest stretch of sand instead.
