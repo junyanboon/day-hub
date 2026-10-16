@@ -130,10 +130,20 @@ test("today's Caney placed at the old 10 min grows to 15 if it has not started, 
   // a length he chose himself (not the old 10) is his
   adds = [add("caney", at(7), at(7, 30), "c")];
   assert.equal(B.growCaney(adds, now, () => false, []), 0); assert.equal(adds[0].e, iso(at(7, 30)));
-  // a Domestics already under way does not move
+  // a Domestics already under way does not move, and Caney stays at 10 rather than overlap it
   adds = [add("caney", at(7), at(7, 10), "c"), add("domestics", at(7, 10), at(8, 10), "d")];
-  B.growCaney(adds, now, a => a.key === "d", []);
-  assert.equal(adds[0].e, iso(at(7, 15))); assert.equal(adds[1].s, iso(at(7, 10)));
+  assert.equal(B.growCaney(adds, now, a => a.key === "d", []), 0);
+  assert.equal(adds[0].e, iso(at(7, 10))); assert.equal(adds[1].s, iso(at(7, 10)));
+  // something fixed right after Caney (Domestics moved away): Caney stays at 10, no overlap
+  adds = [add("caney", at(7), at(7, 10), "c"), add("domestics", at(10), at(11), "d")];
+  assert.equal(B.growCaney(adds, now, () => false, [[+at(7, 10), +at(7, 40)]]), 0); assert.equal(adds[0].e, iso(at(7, 10)));
+  // another add right after Caney: same
+  adds = [add("caney", at(7), at(7, 10), "c"), add(undefined, at(7, 10), at(7, 30), "x")];
+  assert.equal(B.growCaney(adds, now, () => false, []), 0); assert.equal(adds[0].e, iso(at(7, 10)));
+  // a short Domestics boxed in by something fixed would drop under 15 min: nothing changes
+  adds = [add("caney", at(7), at(7, 10), "c"), add("domestics", at(7, 10), at(7, 25), "d")];
+  assert.equal(B.growCaney(adds, now, () => false, [[+at(7, 25), +at(8)]]), 0);
+  assert.equal(adds[0].e, iso(at(7, 10))); assert.equal(adds[1].s, iso(at(7, 10))); assert.equal(adds[1].e, iso(at(7, 25)));
 });
 
 test("no breakfast: the first free gap of 25 min or more after waking", () => {

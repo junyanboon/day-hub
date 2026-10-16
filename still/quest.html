@@ -3100,7 +3100,7 @@
     // one note per basic (what it had to give up today); a basic he dropped takes its note with it
     const keepNotes = r => { const n = (G.day.plan.basicNotes = G.day.plan.basicNotes && !Array.isArray(G.day.plan.basicNotes) ? G.day.plan.basicNotes : {}); r.notes.forEach(x => { n[x.id] = x.t; }); };
     // a Caney placed at the old 10 min (before 2026-10-16's "one 15 minute block") and not started grows to 15 in place
-    const started = a => +new Date(a.s) <= +now() || !!G.day.closes[a.key] || !!G.day.checks[a.key];
+    const started = a => !!G.day.closes[gk(a)] || !!G.day.checks[gk(a)];   // growCaney checks the clock itself
     const fixed = () => MO_CTX.data().items.filter(i => !i.open && !i.brk && !i.sleep && !i.basic).map(i => [+i.s, +i.e]);
     const grow = QB().growCaney(JSON.parse(JSON.stringify(OPS.adds || [])), now(), started, fixed()) > 0;
     const first = QB().placeBasics(placeArgs());

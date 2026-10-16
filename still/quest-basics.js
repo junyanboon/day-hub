@@ -105,24 +105,31 @@
   }
 
   /* A Caney block placed today at the old 10 min grows to 15 on the next refresh, in place (no second block).
-     Only one that has not started (its start is still ahead and started(a) is false: not ticked, not closed);
-     a length he set himself is his. A Domestics that began right where the old Caney ended (and has not started)
-     moves with it, same length, unless that runs into something fixed in busy ([[s ms, e ms]], not the basics):
-     then it keeps its end and starts 5 min later. adds: today's edit-layer adds, changed in place.
+     Only one that has not started (its start is still ahead and started(a) is false: not ticked, not closed).
+     A Domestics that begins right where the old Caney ended (and has not started) moves 5 min later with it,
+     same length; if that runs into something fixed in busy ([[s ms, e ms]], not the basics) it keeps its end
+     and starts 5 min later, as long as 15 min are left. When neither fits, or something fixed sits in the
+     5 min after Caney, Caney stays at 10 rather than overlap. adds: today's edit-layer adds, changed in place.
+     Only matters on 2026-10-16 (adds are today-only); any 10 min Caney counts as the old one.
      Returns how many Caney blocks it grew. */
   function growCaney(adds, now, started, busy){
     let n = 0;
-    const ahead = a => Date.parse(a.s) > +now && !started(a), d5 = (CANEY.min - CANEY_OLD) * MIN;
+    const ahead = a => Date.parse(a.s) > +now && !started(a), shift = (CANEY.min - CANEY_OLD) * MIN;
+    const blocked = (x, y) => (busy || []).some(([p, q]) => p < y && q > x);
     (adds || []).forEach(c => {
       if (c.basic !== "caney" || !ahead(c) || Date.parse(c.e) - Date.parse(c.s) !== CANEY_OLD * MIN) return;
-      const oldE = Date.parse(c.e), newE = oldE + d5;
+      const oldE = Date.parse(c.e), newE = oldE + shift;
+      const d = adds.find(a => a.basic === "domestics" && Date.parse(a.s) === oldE);
+      if (d && !ahead(d)) return;   // Domestics already under way right after it: no room to grow
+      if (!d) {
+        if (blocked(oldE, newE) || adds.some(a => a !== c && Date.parse(a.s) < newE && Date.parse(a.e) > oldE)) return;
+      } else {
+        const de = Date.parse(d.e);
+        if (!blocked(de, de + shift)) d.e = new Date(de + shift).toISOString();
+        else if (de - newE < 15 * MIN) return;
+        d.s = new Date(newE).toISOString();
+      }
       c.e = new Date(newE).toISOString(); n++;
-      const d = adds.find(a => a.basic === "domestics" && Date.parse(a.s) === oldE && ahead(a));
-      if (!d) return;
-      const ds = Date.parse(d.s), de = Date.parse(d.e);
-      const hits = (busy || []).some(([x, y]) => x < de + d5 && y > de);
-      d.s = new Date(ds + d5).toISOString();
-      if (!hits) d.e = new Date(de + d5).toISOString();
     });
     return n;
   }
