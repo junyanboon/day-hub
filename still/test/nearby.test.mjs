@@ -211,7 +211,7 @@ test("Near me: rough times from where he is, nearest first, marked ~, Directions
   for (const s of N.STAYS) for (const p of [].concat(s.places || [], s.eat || [])) assert.ok(p.lat != null && p.lng != null, `${s.id}/${p.id}`);
 });
 
-// d3 (2026-10-16): stays the weekly job writes to still/nearby-stays.json
+// d3 (2026-10-16): stays the weekly job keeps on the Still server (GET /quest/nearby)
 test("stays from the job's file join the list, are found by their times, and never replace a hand-made one", () => {
   const S = [{ id:"a", match:/alpha/i, tz:"Europe/Madrid", in:"2026-10-16T13:00", out:"2026-10-20T12:00", places:[] }];
   const rio = { id:"rio-flat-flamengo", name:"Flat Moderno no Flamengo", short:"Flamengo flat", kind:"apartment",
@@ -225,12 +225,7 @@ test("stays from the job's file join the list, are found by their times, and nev
   // no match pattern: the name is matched as plain text
   N.addStays([{ id:"n", name:"Hotel (Centro)", in:"2027-02-01T14:00", out:"2027-02-02T12:00", tz:"America/Sao_Paulo" }], S);
   assert.ok(S.find(s => s.id === "n").match.test("Check in: Hotel (Centro)"));
-  // the real file parses and every stay in it has what the card needs
-  const file = JSON.parse(fs.readFileSync(fileURLToPath(new URL("../nearby-stays.json", import.meta.url)), "utf8"));
-  for (const s of file.stays) {
-    assert.ok(s.id && s.name && s.tz && s.in < s.out && s.origin, s.id);
-    for (const p of [].concat(s.places || [], s.eat || [])) assert.ok(p.id && p.name && p.what && p.lat != null && (p.walk != null || p.car != null || p.transit != null), `${s.id}/${p.id}`);
-  }
   const page = fs.readFileSync(fileURLToPath(new URL("../quest.html", import.meta.url)), "utf8");
-  assert.match(page, /fetch\("nearby-stays\.json"\)/);
+  assert.match(page, /qfetch\("\/quest\/nearby"\)/);   // private: on the Still server, never in this public repo
+  assert.ok(!fs.existsSync(fileURLToPath(new URL("../nearby-stays.json", import.meta.url))), "no stays file in the public repo");
 });
