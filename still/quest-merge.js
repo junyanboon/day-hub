@@ -129,6 +129,14 @@
     // the weekly gym slots Day Quest placed on the calendar (2026-10-16): kept from both, so a device that never
     // saw a placement cannot bring a session he deleted back. The newer copy wins a key both have.
     if (o.gymPlan || n.gymPlan) out.gymPlan = { ...obj(o.gymPlan), ...obj(n.gymPlan) };
+    // gym sessions he moved from a gym card (2026-10-16): kept from both, so the planner never fills their old slot again
+    if (o.gymMoves || n.gymMoves) out.gymMoves = { ...obj(o.gymMoves), ...obj(n.gymMoves) };
+    // "I'm ill" and "I'm better", one answer a day (2026-10-16): kept from both; for one day the later answer wins
+    if (o.ill || n.ill) {
+      const ill = { ...obj(o.ill) };
+      for (const [k, v] of Object.entries(obj(n.ill))) if (!ill[k] || ms(v && v.at) >= ms(ill[k].at)) ill[k] = v;
+      out.ill = ill;
+    }
     if (o.bag || n.bag) out.bag = mergeBag(o.bag, n.bag);
     if (o.nvc || n.nvc) {   // the NVC words he has used: the higher count of each
       const w = {}, nd = {};
