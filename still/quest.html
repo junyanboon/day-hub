@@ -343,7 +343,6 @@
   .gmv-ask-b { display:flex; gap:6px; margin-left:auto; }
   .gmv-o.nx { background:rgba(255,255,255,.1); }
   .gmv-more { margin-top:8px; }
-  .gmv-ill { margin-top:8px; width:100%; padding:11px; border-radius:12px; background:rgba(0,0,0,.25); color:#fff; font:600 14px var(--font); }
   .gmv .gnote { margin:6px 0 0; color:#fff; }
   .gfoot { display:flex; gap:8px; margin-top:16px; position:sticky; bottom:-20px; padding:10px 0; background:#3d3872; }
   .gnote { font-size:12.5px; color:var(--ink-soft); margin-top:4px; }
@@ -704,7 +703,7 @@
 <script src="quest-fx.js?v=20261009b"></script>
 <script src="quest-night.js?v=20261011a"></script>
 <script src="quest-basics.js?v=20261016d"></script>
-<script src="quest-gym.js?v=20261016h"></script>
+<script src="quest-gym.js?v=20261016i"></script>
 <script src="quest-morning.js?v=20261016g"></script>
 <script src="quest-agenda.js?v=20261014c"></script>
 <script src="quest-nearby.js?v=20261016k"></script>
@@ -760,6 +759,9 @@
   const hashPair = /[#&]pair=([^&]+)/.exec(location.hash);
   if (hashPair) { store.set("quest-key", decodeURIComponent(hashPair[1]).trim()); history.replaceState(null, "", location.pathname + location.search); }
   const questKey = () => store.get("quest-key") || "";
+  // the gym plan's last run and counts on this device (planGym). "2" since the ill feature went (2026-10-16): the copy
+  // saved before could still carry the ill line and would hold the planner off for 2 hours
+  const GYM_AT = "quest-gym-at2", GYM_WK = "quest-gym-wk2";
   async function qfetch(path, opts = {}){
     const r = await fetch(API + path, { ...opts, cache:"no-store",
       headers:{ "Content-Type":"application/json", "X-Quest-Key":questKey(), ...(opts.headers || {}) } });
@@ -2653,7 +2655,7 @@
   let gymShowMove = false, gymTesting = null, gymRow = null;
   async function openGym(block){
     gymShowMove = false; gymTesting = null; gymRow = null; GYMASK = null;
-    // opening the log at the gym means you're there; opening it early (to move it, or because you're ill) does not
+    // opening the log at the gym means you're there; opening it early (to move it) does not
     if (block && !G.day.checks[gk(block)] && block.s - now() < 30 * 60000) checkIn(block);
     await loadGymInfo();
     // a draft from earlier today comes back at his levels now (an old draft's default L1 never wins, quest-levels.js)
@@ -2672,7 +2674,7 @@
     const early = blk && blk.s - now() >= 30 * 60000;   // not at the gym yet: the move options come first
     const tr = gymTrend();
     const asking = GYMASK && GYMASK.kind === "skip" && blk && GYMASK.key === blk.key;
-    let h = `<div class="gym-head"><h3>🏋️ Gym log</h3><span class="gym-hb">${blk && !early ? `<button class="btn ghost small" id="gMove">${gymShowMove ? "Hide" : "Reschedule or ill"}</button>` : ""}${blk ? `<button class="btn ghost small" id="gSkip">Skip</button>` : ""}<button class="btn ghost small" id="gClose">Close</button></span></div>
+    let h = `<div class="gym-head"><h3>🏋️ Gym log</h3><span class="gym-hb">${blk && !early ? `<button class="btn ghost small" id="gMove">${gymShowMove ? "Hide" : "Reschedule"}</button>` : ""}${blk ? `<button class="btn ghost small" id="gSkip">Skip</button>` : ""}<button class="btn ghost small" id="gClose">Close</button></span></div>
       ${asking ? `<div class="gmv-ask"><span>Are you sure? ${esc(shortName(blk))} at ${fmtT(blk.s)} comes off your schedule${blk.id && blk.calId ? " and Google Calendar" : ""}.</span>
         <span class="gmv-ask-b"><button class="btn ghost small" id="gSkipNo">Cancel</button><button class="btn primary small" id="gSkipYes">Yes, skip</button></span></div>` : ""}
       ${blk && (early || gymShowMove) ? gymMoveHTML(blk) : ""}
@@ -3069,28 +3071,24 @@
     const { today, mon, tzOf, evsOf, modeOf } = await gymWorld();
     if (questKey() && !(gymInfo.last || []).length) await loadGymInfo();
     const logs = gymInfo.last || [], placed = Object.fromEntries(Object.entries(G.gymPlan || {}).filter(([, v]) => v && !v.failed).map(([k]) => [k, true]));
-    // ill days (this week and the end of last, up to today) and today's answer; sessions he moved out of a week
-    const illList = QG().illDays(G.ill || {}, QG().addDays(mon, -2), today), illSet = new Set(illList), illNow = illToday().ill;
+    // sessions he moved out of a week (old ill answers in his saved state are not read: the ill feature was dropped, 2026-10-16)
     const wkOf = iso => mondayOf(QG().localYmd(Date.parse(iso), TZ()));
     const movedOut = wk => gymMovesNow().filter(([, m]) => !m.key && wkOf(m.from0 || m.from) === wk && wkOf(m.to) !== wk)
       .map(([, m]) => QG().sessionOf(m.t) === "ms" ? "ms" : "jw");
     const out = [];
-    // d21: when each placed slot went in, and the gym sessions Day Quest took off an ill day (G.ill[day].skipped)
-    const placedS = Object.fromEntries(Object.entries(G.gymPlan || {}).filter(([, v]) => v && !v.failed && v.s).map(([k, v]) => [k, Date.parse(v.s)]));
-    const illSkips = Object.values(G.ill || {}).flatMap(v => (v && v.ill && Array.isArray(v.skipped) ? v.skipped : []));
     for (const wk of [mon, QG().addDays(mon, 7)]) {
       const week = Array.from({ length:7 }, (_, i) => QG().addDays(wk, i));
-      const info = week.map(d => QG().dayInfo(d, tzOf[d], modeOf(d), evsOf(d), evsOf(QG().addDays(d, -1)), d === today ? G.day.sleepScore : null, illSet.has(d)));
+      const info = week.map(d => QG().dayInfo(d, tzOf[d], modeOf(d), evsOf(d), evsOf(QG().addDays(d, -1)), d === today ? G.day.sleepScore : null));
       const seen = new Set(), sessions = week.flatMap(evsOf).filter(x => isGym(x) && !seen.has(x.id || x.s + "|" + x.t) && seen.add(x.id || x.s + "|" + x.t));
-      out.push(QG().planWeek({ week:wk, days:info, sessions, logs, placed, placedS, now:+now(), today, ill:illList, illNow, illSkips, movedOut:movedOut(wk) }));
+      out.push(QG().planWeek({ week:wk, days:info, sessions, logs, placed, now:+now(), today, movedOut:movedOut(wk) }));
     }
     return out;
   }
   async function planGym(force){
     if (!QG() || !PLAN || !lastPull || gymBusy) return;
-    const stamp = store.get("quest-gym-at") || "", [day, at] = stamp.split("|");
+    const stamp = store.get(GYM_AT) || "", [day, at] = stamp.split("|");
     // between runs the last plan's counts come back from this device's saved copy, so the line shows at once
-    if (!GYMWK && day === gameYmd()) try { const w = JSON.parse(store.get("quest-gym-wk") || "null"); if (w && w.length) GYMWK = { weeks:w, at:+at || 0 }; } catch {}
+    if (!GYMWK && day === gameYmd()) try { const w = JSON.parse(store.get(GYM_WK) || "null"); if (w && w.length) GYMWK = { weeks:w, at:+at || 0 }; } catch {}
     if (!force && day === gameYmd() && Date.now() - (+at || 0) < 2 * 3600000) return;
     if (force && day === gameYmd() && GYMWK && Date.now() - GYMWK.at < 2 * 3600000) return;
     gymBusy = true;
@@ -3118,13 +3116,13 @@
           saveG(); go.forEach(p => { delete PLANS[p.ymd]; });
           // the counts stay the planned ones (the far days' plans are cached up to 5 min on the server), less any write that failed
           weeks.forEach(w => { const bad = w.place.filter(p => (G.gymPlan[p.key] || {}).failed).length;
-            if (bad) { w.have -= bad; w.line = `Gym: ${w.have} of ${w.total} placed this week${w.excused ? ` · ${w.excused} skipped, ill` : ""}`; } });
+            if (bad) { w.have -= bad; w.line = `Gym: ${w.have} of ${w.total} placed this week`; } });
           pullAgenda().then(render).catch(() => {});
         }
       }
       GYMWK = { weeks, at:Date.now() };
-      store.set("quest-gym-at", gameYmd() + "|" + Date.now());
-      store.set("quest-gym-wk", JSON.stringify(weeks.map(w => ({ week:w.week, mode:w.mode, have:w.have, total:w.total, by:w.by, excused:w.excused || 0, excusedBy:w.excusedBy || null, line:w.line }))));
+      store.set(GYM_AT, gameYmd() + "|" + Date.now());
+      store.set(GYM_WK, JSON.stringify(weeks.map(w => ({ week:w.week, mode:w.mode, have:w.have, total:w.total, by:w.by, line:w.line }))));
     } catch (e) { console.warn("gym plan", e); }
     finally { gymBusy = false; }
     if (window.QuestMorning) QuestMorning.redraw();
@@ -3136,44 +3134,39 @@
   // the time zone with Toronto's); before the plan has run, today's answer stands in
   const homeWeek = () => { const w = GYMWK && GYMWK.weeks && GYMWK.weeks[0];
     return w && w.week === mondayOf(gameYmd()) ? w.mode === "home" : dayMode() === "home"; };
-  /* ---------- reschedule a gym session, and "I'm ill" (Junyan, 2026-10-16: "If I click on a gym card I want it to give
-     me the option to reschedule with different days/times I can reschedule to. This way I can stick to it. The other
-     option is if I'm ill. If I'm ill I can't work out.") ----------
+  /* ---------- reschedule a gym session (Junyan, 2026-10-16: "If I click on a gym card I want it to give me the option
+     to reschedule with different days/times I can reschedule to. This way I can stick to it.") ----------
      Tapping a gym block (the calendar, Plan your day, the Gym log) shows up to 6 free times in the next 7 days that
      follow the weekly plan's rules (quest-gym.js moveOptions), its own week first. One tap moves the real event on
      Junyan or Joint Plans through /cal/event: title and colour stay, the note gets "moved by Junyan from <old time>".
      G.gymMoves keeps the move (merged across devices), so the planner never fills its old slot again.
-     "I'm ill" writes today's answer in G.ill (synced, one answer a day, merged per day), takes today's gym off the plan
-     and stops new sessions until he says "I'm better"; each next day asks "Still ill?" once. Ill days count as days to
-     go easy (d245) and let sessions off the week's count instead of a shortfall. */
-  const illToday = () => QG() ? QG().illStatus(G.ill || {}, gameYmd()) : { ill:false, ask:false, since:null };
+     The ill switch that came with it is gone (later 2026-10-16, "drop the illness thing"): Skip in the Gym log takes a
+     session off. Old ill answers in his saved state (still kept by the shared merge file) are never read. */
   const gymMovesNow = () => { const cut = Date.now() - 21 * 86400000; return Object.entries(G.gymMoves || {}).filter(([, m]) => m && Date.parse(m.to) > cut); };
   // the options shown per block (key -> { at, r }, 2 min), the block each box was drawn for, the reads in flight;
-  // MOVEGEN goes up on every move or ill answer, so a read that started before it is thrown away
+  // MOVEGEN goes up on every move, so a read that started before it is thrown away
   const MOVEOPT = {}, GMVB = {}, GMVASK = new Set();
-  let gymMoveBusy = false, illBusy = false, MOVEGEN = 0, GYMASK = null;   // GYMASK: the one-line confirm showing, { key, kind, text, yes }
+  let gymMoveBusy = false, MOVEGEN = 0, GYMASK = null;   // GYMASK: the Skip "Are you sure?" showing, { key, kind:"skip" }
   const moveOpt = k => { const c = MOVEOPT[k]; return c && Date.now() - c.at < 120000 ? c : null; };
   const clearMoveOpts = () => { MOVEGEN++; for (const x in MOVEOPT) delete MOVEOPT[x]; for (const x in GMVB) delete GMVB[x]; GMVASK.clear(); };
   async function gymMoveChoices(b){
     const Q = QG(), today = gameYmd(), W = await gymWorld({ from:Q.addDays(today, -1), n:9, at:5 });
     const sig = x => x.id ? "id:" + x.id : (+x.s) + "|" + x.t, me = sig(calEv(b));
     const next7 = Array.from({ length:7 }, (_, i) => Q.addDays(today, i));
-    const ill = illToday().ill ? [today] : [];
     const days = next7.map(d => Q.dayInfo(d, W.tzOf[d] || TZ(), W.modeOf(d), W.evsOf(d).filter(x => sig(x) !== me), W.evsOf(Q.addDays(d, -1)),
-      d === today ? G.day.sleepScore : null, ill.includes(d)));
+      d === today ? G.day.sleepScore : null));
     const gymDays = next7.filter(d => W.evsOf(d).some(x => isGym(x) && sig(x) !== me && Q.localYmd(x.s, W.tzOf[d] || TZ()) === d));
     const modes = {};
     for (const wk of new Set(next7.map(mondayOf))) { const w = GYMWK && GYMWK.weeks.find(x => x.week === wk);
       modes[wk] = w ? w.mode : Q.weekMode(Array.from({ length:7 }, (_, i) => ({ mode:W.modeOf(Q.addDays(wk, i)) }))); }
-    return Q.moveOptions({ kind:Q.sessionOf(b.t), s:+b.s, e:+b.e, days, week:mondayOf(gameDayOf(b.s)), gymDays, ill, modes, now:+now() });
+    return Q.moveOptions({ kind:Q.sessionOf(b.t), s:+b.s, e:+b.e, days, week:mondayOf(gameDayOf(b.s)), gymDays, modes, now:+now() });
   }
   function gymMoveHTML(b){
     if (!QG() || !isGym(b)) return "";
-    const st = illToday(), k = gk(b), c = moveOpt(k), todayB = gameDayOf(b.s) === gameYmd();
+    const k = gk(b), c = moveOpt(k);
     GMVB[b.key] = b;
     let h = `<div class="gmv" data-gmv="${esc(b.key)}"><div class="glabel">Reschedule</div>`;
-    if (st.ill && todayB) h += `<p class="gnote">You're ill today, so no gym. When you feel better, tap I'm better and the rest of the week is planned again.</p>`;
-    else if (!(b.id && b.calId)) h += `<p class="gnote">This one is only in today's plan, so it can't go to another day. Drag it on the calendar to change its time today.</p>`;
+    if (!(b.id && b.calId)) h += `<p class="gnote">This one is only in today's plan, so it can't go to another day. Drag it on the calendar to change its time today.</p>`;
     else if (!c) h += `<p class="gnote">Finding free times…</p>`;
     else {
       h += c.r.options.length ? `<div class="gmv-os">${c.r.options.map((o, i) => `<button class="gmv-o${o.same ? "" : " nx"}" data-gmvgo="${i}">${esc(o.label)}${o.same ? "" : `<small>${o.later ? "next week" : "week before"}</small>`}</button>`).join("")}</div>` : "";
@@ -3181,19 +3174,14 @@
     }
     /* Later 2026-10-16, Junyan: "Get rid of change time or name and put on google calendar. these are not necessary.
        Let's just have a simple skip button that is beside close that asks 'are you sure' and then will remove it from
-       the schedule." Skip lives in the Gym log's header (drawGym); here stay the times to move to and ill / better.
-       "I'm ill" asks first when it would delete today's gym from Google Calendar (d22). */
-    const ask = GYMASK && GYMASK.key === b.key && GYMASK.kind === "ill" ? GYMASK : null;
-    if (ask) return h + `<div class="gmv-ask"><span>${esc(ask.text)}</span><span class="gmv-ask-b"><button class="btn ghost small" data-gmvno>Back</button>
-      <button class="btn primary small" data-gmvyes>${esc(ask.yes)}</button></span></div></div>`;
-    h += `<button class="gmv-ill" data-gmvill="${st.ill ? 0 : 1}">${st.ill ? "🙂 I'm better" : "🤒 I'm ill, no workout"}</button>`;
+       the schedule." Skip lives in the Gym log's header (drawGym); here stay the times to move to. */
     return h + `</div>`;
   }
   function bindGymMove(root, redraw){
     root.querySelectorAll("[data-gmv]").forEach(el => {
       const b = GMVB[el.dataset.gmv]; if (!b) return;
-      const k = gk(b), st = illToday();
-      if (!moveOpt(k) && !GMVASK.has(k) && b.id && b.calId && !(st.ill && gameDayOf(b.s) === gameYmd())) {
+      const k = gk(b);
+      if (!moveOpt(k) && !GMVASK.has(k) && b.id && b.calId) {
         GMVASK.add(k); const gen = MOVEGEN;
         gymMoveChoices(b).then(r => ({ options:r.options, note:r.note }), e => { console.warn("gym move", e);
           return { options:[], note:`Could not read the calendar (${e.message}).` }; })
@@ -3201,14 +3189,6 @@
       }
       el.querySelectorAll("[data-gmvgo]").forEach(bt => bt.onclick = e => { e.stopPropagation();
         const c = moveOpt(k), o = c && c.r.options[+bt.dataset.gmvgo]; if (o) moveGym(b, o); });
-      el.querySelectorAll("[data-gmvill]").forEach(bt => bt.onclick = e => { e.stopPropagation();
-        const ill = bt.dataset.gmvill === "1", cal = ill ? gymCalToday() : [];
-        if (cal.length) { GYMASK = { key:b.key, kind:"ill", yes:"Yes, I'm ill",
-          text:`You're ill: ${cal.map(x => `${shortName(x)} at ${fmtT(x.s)}`).join(" and ")} comes off Google Calendar too.` }; return redraw(); }
-        setIll(ill).then(redraw); });
-      el.querySelectorAll("[data-gmvno]").forEach(bt => bt.onclick = e => { e.stopPropagation(); GYMASK = null; redraw(); });
-      el.querySelectorAll("[data-gmvyes]").forEach(bt => bt.onclick = async e => { e.stopPropagation();
-        const ask = GYMASK; GYMASK = null; if (ask && ask.kind === "ill") { await setIll(true); redraw(); } });
     });
   }
   // Skip (later 2026-10-16): after "Are you sure?", the session leaves the schedule; a Google Calendar gym event is deleted (d22)
@@ -3220,8 +3200,6 @@
     if (ok) calToast(ok === "dry" ? `Test mode: ${shortName(b)} would be skipped${onCal ? " and deleted from Google Calendar" : ""}. Nothing is saved.`
       : `${shortName(b)} is skipped${onCal ? " and deleted from Google Calendar" : ""}.`, 6000);
   }
-  // today's gym sessions still ahead that are Google Calendar events (what "I'm ill" would delete)
-  const gymCalToday = () => blocks().filter(x => isGym(x) && x.id && x.calId && x.e > now() && !G.day.closes[gk(x)]);
   /* d22: a gym session Day Quest drops comes off Google Calendar too. still-api's /cal/delete deletes only events it
      can tell are gym sessions (and refuses anything else). Today's copy leaves the plan either way; a failed delete
      says so and the event stays. Returns true, "dry" in test mode, or false. */
@@ -3233,7 +3211,7 @@
     log(`Deleted ${b.t} from Google Calendar: ${fmtT(b.s)}`);
     await dropBlock(b);
     for (const d in PLANS) delete PLANS[d];
-    store.set("quest-gym-at", "");
+    store.set(GYM_AT, "");
     pullAll().catch(() => {});
     return true;
   }
@@ -3259,50 +3237,12 @@
     log(`Moved ${what} to ${o.label} (was ${from})`); saveG();
     clearMoveOpts();
     for (const d in PLANS) delete PLANS[d];
-    store.set("quest-gym-at", "");
+    store.set(GYM_AT, "");
     closeSheet();
     calToast(`${what}: ${o.label}. Saved to Google Calendar${b.cal ? ` (${b.cal})` : ""}.`);
     try { if (b.game && OPS.edits[b.key]) await writeOps(x => { delete x.edits[b.key]; }); await pushG(); await pullAll(); } catch {}
     if (window.QuestMorning && QuestMorning.isOpen()) QuestMorning.redraw();
     planGym(false).catch(e => console.warn("gym", e));
-  }
-  async function setIll(ill){
-    if (illBusy) return;   // a double tap answers once
-    illBusy = true;
-    try { await setIllNow(ill); } finally { illBusy = false; }
-  }
-  async function setIllNow(ill){
-    G.ill = G.ill || {}; const was = G.ill[gameYmd()];
-    G.ill[gameYmd()] = { ill, at:new Date().toISOString(), ...(was && Array.isArray(was.skipped) ? { skipped:was.skipped } : {}) };
-    G.day.plan = G.day.plan || {}; G.day.plan.ill = ill;   // today's plan state says so too (the brief asked for it there; G.ill is what is read)
-    log(ill ? "Ill today: no gym until I'm better" : "Feeling better: gym planned again from the free times"); saveG();
-    if (ill) {
-      // d21: today's sessions are skipped (not moved); each is noted on the day so the week's target drops by it
-      const gone = blocks().filter(x => isGym(x) && x.e > now() && !G.day.closes[gk(x)]);
-      const slotOf = x => (Object.entries(G.gymPlan || {}).find(([, v]) => v && !v.failed && Math.abs(Date.parse(v.s) - +x.s) < 60000) || [])[0] || null;
-      const had = G.ill[gameYmd()].skipped || [];
-      G.ill[gameYmd()].skipped = had.concat(gone.map(x => ({ t:x.t, s:new Date(x.s).toISOString(), key:slotOf(x) }))
-        .filter(x => !had.some(y => Math.abs(Date.parse(y.s) - Date.parse(x.s)) < 60000)));
-      saveG();
-      for (const b of gone) { if (b.id && b.calId) await gymOffCal(b); else await dropBlock(b); }
-    }
-    clearMoveOpts();
-    store.set("quest-gym-at", ""); GYMWK = null;
-    if (questKey() && !DRY) await pushG();
-    planGym(false).catch(e => console.warn("gym", e));
-    render();
-  }
-  // once a day after an ill day: "Still ill?" (an unanswered day stays ill)
-  function askIll(){
-    if (!QG() || !lastPull || $("sheet").classList.contains("open") || (window.QuestMorning && QuestMorning.isOpen())) return;
-    const st = illToday(); if (!st.ask || store.get("quest-ill-asked") === gameYmd()) return;
-    store.set("quest-ill-asked", gameYmd());
-    const since = new Date(st.since + "T12:00:00Z").toLocaleDateString("en-US", { timeZone:"UTC", weekday:"short", month:"short", day:"numeric" });
-    const cal = gymCalToday();
-    openSheet(`<h3>🤒 Still ill?</h3><p>You said you were ill on ${esc(since)}. While you're ill no gym goes on the plan. A session on an ill day is skipped, not moved, and the week's count drops by it.${cal.length ? ` Yes takes today's ${esc(cal.map(x => `${shortName(x)} at ${fmtT(x.s)}`).join(" and "))} off Google Calendar.` : ""}</p>
-      <div class="actions"><button class="btn ghost" id="illYes">Yes, still ill</button><button class="btn primary" id="illNo">I'm better</button></div>`);
-    $("illYes").onclick = () => { closeSheet(); setIll(true); };
-    $("illNo").onclick = () => { closeSheet(); setIll(false); };
   }
   const TRAINING = {
     home: [["jw", "Jack Woods", 3, /Jack Woods/, 60], ["ms", "Matthew I. Smith", 1, /Matthew/, 45]],
@@ -3315,7 +3255,7 @@
      Strength is not suggested and a gym block gets a warning; Matthew I. Smith mobility stays. */
   const STRENGTH = b => isGym(b) && !/matthew|smith|mobility|stretch/i.test(b.t);
   function recoveryReasons(){
-    const why = illToday().ill ? ["ill"] : [], sc = G.day.sleepScore;
+    const why = [], sc = G.day.sleepScore;
     if (typeof sc === "number" && sc < 70) why.push(`sleep score ${sc}`);
     const trip = blocks().find(b => b.e - b.s >= 3600000 && /flight|\bbus\b|\btrain\b|ferry|overnight|\b[A-Z]{2}\d{2,4}\b/.test(b.t.replace(/bus|train|ferry|flight|overnight/gi, m => m.toLowerCase())));
     if (trip) why.push(`travel day (${shortName(trip)})`);
@@ -3339,17 +3279,10 @@
       return { id:"w:" + key, icon: key === "ms" ? "🤸" : "🏋️", label:name, name:`Gym · ${prog.replace(" · ", " ")}`, mins, have, q, need: Math.max(0, q - have),
         at: at ? fmtT(at.s) : "", cal:true, weekly:true };
     });
-    // d21: a session on an ill day is skipped, so this week's target drops by it (no catching up)
-    const wk0 = GYMWK && GYMWK.weeks && GYMWK.weeks[0], exc = wk0 && wk0.week === days[0] ? wk0.excusedBy || { jw:wk0.excused || 0, ms:0 } : null;
-    if (exc) for (const x of items) { const c = Math.min(exc[x.id === "w:ms" ? "ms" : "jw"] || 0, x.q); if (!c) continue; x.q -= c; x.need = Math.max(0, x.q - x.have); x.off = c; }
-    const offNote = xs => xs.map(x => x.off ? { ...x, small:`${x.small} · ${x.off} skipped, ill` } : x);
-    // ill (2026-10-16, d21): no workout today; a session on an ill day is skipped and the week's target drops by it
-    if (illToday().ill) return { home, easy:["ill"], items: pickToday(items, left).map(x => ({ ...x, pick:false, rest:true,
-      small:`${x.have} of ${x.q} this week · ill today, rest up. Today's session is skipped, not moved.` })) };
     const why = recoveryReasons();
-    if (!why.length) return { home, items: offNote(pickToday(items, left)) };
+    if (!why.length) return { home, items: pickToday(items, left) };
     // strength waits for a better day: no star, no button, the reason instead
-    return { home, easy: why, items: offNote(pickToday(items.map(x => x.id === "w:ms" ? x : { ...x, rest:true }), left)).map(x => x.rest
+    return { home, easy: why, items: pickToday(items.map(x => x.id === "w:ms" ? x : { ...x, rest:true }), left).map(x => x.rest
       ? { ...x, pick:false, small:`${x.have} of ${x.q} this week · not today: ${why.join(", ")}. Strength after travel or little sleep can do harm.` } : x) };
   }
   // mark today's picks: the most behind first, and anything that can no longer wait
@@ -3713,7 +3646,7 @@
     log(`Planned Gym · Jack Woods (${p.name}) on the calendar: ${fmtT(slot.s)} to ${fmtT(slot.e)}`); saveG();
     st.msg[id] = `On your calendar at ${fmtT(slot.s)}: Gym · Jack Woods, 1 h.`;
     for (const d in PLANS) delete PLANS[d];
-    store.set("quest-gym-at", "");
+    store.set(GYM_AT, "");
     await pullAll().catch(() => {});
     drawNearby();
   }
@@ -4612,7 +4545,6 @@
   function render(){
     if (PLAN && G.day.date !== dayKey()) rollDay();
     ensureDay();
-    askIll();
     const t = now(), all = blocks();
     const cur = currentOf(all, t), nxt = nextOf(all, t);
 
