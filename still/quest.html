@@ -661,7 +661,7 @@
 <script src="quest-gym.js?v=20261016g"></script>
 <script src="quest-morning.js?v=20261016g"></script>
 <script src="quest-agenda.js?v=20261014c"></script>
-<script src="quest-nearby.js?v=20261016c"></script>
+<script src="quest-nearby.js?v=20261016d"></script>
 </head>
 <body>
 <div id="sky" aria-hidden="true"><div class="sky-stars"></div><div class="sky-orb"></div>
@@ -3486,27 +3486,30 @@
      Places near the stay, each row shut until tapped (quest-nearby.js holds the lists, one per hotel). The stay
      comes from still-api's place line (where.from.place is the hotel's check-in event), then today's hotel events.
      No list for the stay: the widget is hidden (on the dashboard its card leaves the grid). Put on the plan is
-     a today-only block in the next free slot that fits, like the add box. Open rows are kept for this page only. */
+     a today-only block in the next free slot that fits, like the add box. Open rows are kept for this page only.
+     Eat (2026-10-16) is a second tab in the same card; it opens on Eat near meal times until he picks a tab. The
+     stay's check-in and check-out times (in quest-nearby.js) find the hotel on days with no hotel event. */
   function nearbyStay(){
     const QN = window.QuestNearby; if (!QN || !PLAN) return null;
     const w = PLAN.where || {};
-    return QN.stayFor([w.from && w.from.place, w.place].concat(blocks().map(b => b.t), (AG[gameYmd()] || []).map(b => b.t)));
+    return QN.stayFor([w.from && w.from.place, w.place].concat(blocks().map(b => b.t), (AG[gameYmd()] || []).map(b => b.t)), null, now());
   }
   function drawNearby(){
     const QN = window.QuestNearby, el = $("nearby"), h = $("nearbyH"); if (!el || !h) return;
-    const st = drawNearby.st || (drawNearby.st = { open:{}, msg:{} }), stay = nearbyStay(), inner = QN ? QN.html(stay, st) : "";
+    const st = drawNearby.st || (drawNearby.st = { tab:null, open:{}, msg:{} }), stay = nearbyStay(), inner = QN ? QN.html(stay, st, now()) : "";
     if (h.hidden !== !inner || el.hidden !== !inner) { h.hidden = el.hidden = !inner; if (window.QuestDash) QuestDash.sync(); }
     if (!inner) return;
     QN.addCss(document);
     $("nearbyT").textContent = QN.title(stay);
     put("nearby", inner);
     el.onclick = e => {
+      const tb = e.target.closest("[data-nbtab]"); if (tb) { st.tab = tb.dataset.nbtab; return drawNearby(); }
       const pl = e.target.closest("[data-nbplan]"); if (pl) return nearbyPlan(stay, pl.dataset.nbplan);
       const hd = e.target.closest("[data-nb]"); if (hd) { st.open[hd.dataset.nb] = !st.open[hd.dataset.nb]; drawNearby(); }
     };
   }
   async function nearbyPlan(stay, id){
-    const QN = window.QuestNearby, st = drawNearby.st, p = stay && stay.places.find(x => x.id === id);
+    const QN = window.QuestNearby, st = drawNearby.st, p = QN && QN.find(stay, id);
     if (!QN || !p || !window.QuestMorning || nearbyPlan.busy) return;
     nearbyPlan.busy = true;   // a quick double tap: one write at a time
     try { await nearbyPut(QN, st, p, id, stay.id + ":" + id); } finally { nearbyPlan.busy = false; }
