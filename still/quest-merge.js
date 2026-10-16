@@ -126,6 +126,9 @@
     if (o.bestCombo != null || n.bestCombo != null) out.bestCombo = Math.max(+o.bestCombo || 0, +n.bestCombo || 0);
     if (o.days || n.days) out.days = { ...obj(o.days), ...obj(n.days) };
     if (o.pr || n.pr) out.pr = mergePr(o.pr, n.pr);
+    // the weekly gym slots Day Quest placed on the calendar (2026-10-16): kept from both, so a device that never
+    // saw a placement cannot bring a session he deleted back. The newer copy wins a key both have.
+    if (o.gymPlan || n.gymPlan) out.gymPlan = { ...obj(o.gymPlan), ...obj(n.gymPlan) };
     if (o.bag || n.bag) out.bag = mergeBag(o.bag, n.bag);
     if (o.nvc || n.nvc) {   // the NVC words he has used: the higher count of each
       const w = {}, nd = {};

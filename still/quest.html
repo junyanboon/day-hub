@@ -623,12 +623,13 @@
 </style>
 <script src="keeps.js?v=20261009k"></script>
 <script src="bag.js?v=20261009k"></script>
-<script src="quest-merge.js?v=20261010b"></script>
+<script src="quest-merge.js?v=20261016a"></script>
 <script src="nvc-words.js?v=20261010a"></script>
 <script src="quest-fx.js?v=20261009b"></script>
 <script src="quest-night.js?v=20261011a"></script>
 <script src="quest-basics.js?v=20261016d"></script>
-<script src="quest-morning.js?v=20261016c"></script>
+<script src="quest-gym.js?v=20261016c"></script>
+<script src="quest-morning.js?v=20261016g"></script>
 <script src="quest-agenda.js?v=20261014c"></script>
 <script src="quest-nearby.js?v=20261016c"></script>
 </head>
@@ -870,6 +871,7 @@
       lastPull = new Date(); pullErr = null;
       // every day, without him typing (d1): the basics go in on each full pull, once (placeBasics only adds what is missing)
       placeBasics().then(() => { if (window.QuestMorning) QuestMorning.redraw(); }).catch(e => console.warn("basics", e));
+      planGym().catch(e => console.warn("gym", e));   // this week's and next week's gym, on his calendar (at most every 2 hours)
       saveSnap();
       setTimeout(openPending, 0);
     } catch (e) { pullErr = String(e.message || e); }
@@ -2868,7 +2870,102 @@
     for (const [d, hs] of Object.entries(pr.did || {})) { if (d < since) continue; const w = mondayOf(d); for (const h of hs) ((by[w] = by[w] || {})[h] = (by[w][h] || 0) + 1); }
     return Object.values(by).filter(c => ks.every(([h, q]) => (c[h] || 0) >= q)).length;
   }
-  const homeWeek = () => { const f = z => new Date().toLocaleString("en-US", { timeZone:z, hour:"numeric", minute:"numeric", hourCycle:"h23" }); return f(TZ()) === f("America/Toronto"); };
+  /* ---------- the weekly gym plan (Junyan, 2026-10-16: "I want Gym times auto-added in for this and next week
+     based on whether I'm traveling or at home") ----------
+     quest-gym.js decides (d109 counts, d245 go-easy days, GENERATOR-SPEC's Mon/Wed/Fri 19:30 at home). This
+     reads this week and next from the calendar, and writes what is missing as events on his own "Junyan"
+     calendar (the My Plan calendar new Day Quest blocks already go to, never Joint Plans), in Grape, through
+     /cal/event, so they show on the coming days here and in Google Calendar. G.gymPlan keeps the key of every
+     slot it placed (merged across devices by quest-merge.js): a session he moves, drops or deletes is never
+     put back. Runs after a full pull at most every 2 hours, and when the planner opens on a new day. ?dry=1
+     plans and shows the line but writes nothing. */
+  const QG = () => window.QuestGym;
+  let GYMWK = null, gymBusy = false;
+  const PLANS = {};   // date -> { at, p }: the plans of the two weeks, 10 min
+  async function planOfDay(d){
+    const c = PLANS[d]; if (c && Date.now() - c.at < 600000) return c.p;
+    const p = await getPlan(d); PLANS[d] = { at:Date.now(), p }; return p;
+  }
+  const calEv = b => ({ t:b.t, s:+new Date(b.s), e:+new Date(b.e), id:b.id || null, done:false });
+  async function gymWeeks(){
+    const today = gameYmd(), mon = mondayOf(today), from = QG().addDays(mon, -2), days = [];
+    for (let i = 0; i < 18; i++) days.push(QG().addDays(from, i));
+    const plans = {};
+    for (let i = 0; i < days.length; i += 3)   // three at a time: each plan reads Google Calendar
+      await Promise.all(days.slice(i, i + 3).map(d => planOfDay(d).then(p => { plans[d] = p; }).catch(() => {})));
+    // a day's events: today's from the game (his edits, drops and adds count), the others from their plan
+    const evsOf = d => d === today ? blocks().filter(b => b.type === "fixed" || b.extra).map(b => ({ ...calEv(b), done:["in", "late"].includes(G.day.checks[gk(b)]) }))
+      : ((plans[d] || {}).blocks || []).filter(b => b.type === "fixed").map(calEv);
+    // the zone of each day: its plan's, but a day with nothing of its own takes the next day's (the day after landing)
+    const tzOf = {}, own = d => { const z = (plans[d] || {}).tz || TZ(); return evsOf(d).some(x => QG().localYmd(x.s, z) === d); };
+    for (let i = days.length - 1; i >= 0; i--) { const d = days[i];
+      tzOf[d] = own(d) || !tzOf[days[i + 1]] ? (d === today ? TZ() : (plans[d] || {}).tz || TZ()) : tzOf[days[i + 1]]; }
+    // home or travelling per day: his switch for today, else the same calendar guess as the basics (quest-basics.js)
+    const marks = days.flatMap(d => evsOf(d).map(x => ({ t:x.t, day:QG().localYmd(x.s, tzOf[d]) })));
+    const modeOf = d => d === today ? dayMode() : QB() ? QB().guessMode(marks, d).mode : "home";
+    if (questKey() && !(gymInfo.last || []).length) await loadGymInfo();
+    const logs = gymInfo.last || [], placed = Object.fromEntries(Object.entries(G.gymPlan || {}).filter(([, v]) => v && !v.failed).map(([k]) => [k, true]));
+    const out = [];
+    let lastJw = (logs.filter(w => w.date < mon && /Jack Woods/.test(w.program || "")).map(w => QG().sessionOf(w.program)).filter(k => k !== "jw").pop()) || null;
+    for (const wk of [mon, QG().addDays(mon, 7)]) {
+      const week = Array.from({ length:7 }, (_, i) => QG().addDays(wk, i));
+      const info = week.map(d => QG().dayInfo(d, tzOf[d], modeOf(d), evsOf(d), evsOf(QG().addDays(d, -1)), d === today ? G.day.sleepScore : null));
+      const seen = new Set(), sessions = week.flatMap(evsOf).filter(x => isGym(x) && !seen.has(x.id || x.s + "|" + x.t) && seen.add(x.id || x.s + "|" + x.t));
+      const r = QG().planWeek({ week:wk, days:info, sessions, logs, placed, now:+now(), today, lastJw });
+      lastJw = r.lastJw; out.push(r);
+    }
+    return out;
+  }
+  async function planGym(force){
+    if (!QG() || !PLAN || !lastPull || gymBusy) return;
+    const stamp = store.get("quest-gym-at") || "", [day, at] = stamp.split("|");
+    // between runs the last plan's counts come back from this device's saved copy, so the line shows at once
+    if (!GYMWK && day === gameYmd()) try { const w = JSON.parse(store.get("quest-gym-wk") || "null"); if (w && w.length) GYMWK = { weeks:w, at:+at || 0 }; } catch {}
+    if (!force && day === gameYmd() && Date.now() - (+at || 0) < 2 * 3600000) return;
+    if (force && day === gameYmd() && GYMWK && Date.now() - GYMWK.at < 2 * 3600000) return;
+    gymBusy = true;
+    try {
+      let weeks = await gymWeeks();
+      const todo = weeks.flatMap(w => w.place);
+      // test mode (?dry=1) and an unpaired device only say what they would place
+      if (todo.length && (DRY || !questKey())) console.info("Day Quest gym, not written (test mode or not paired):",
+        todo.map(p => `${p.t} ${new Date(p.s).toISOString()} to ${new Date(p.e).toISOString()} (${p.key})`).join("; "));
+      if (todo.length && questKey() && !DRY) {
+        await pullState();   // another device may have placed them a minute ago: its keys come in here
+        weeks = await gymWeeks();
+        const go = weeks.flatMap(w => w.place);
+        G.gymPlan = G.gymPlan || {};
+        go.forEach(p => { G.gymPlan[p.key] = { s:new Date(p.s).toISOString(), t:p.t, at:new Date().toISOString() }; });
+        if (go.length) { saveG(); await pushG(); }   // the keys go up before the events, so a second device skips them
+        for (const p of go) {
+          try {
+            await qfetch("/cal/event", { method:"POST", body:JSON.stringify({ s:new Date(p.s).toISOString(), e:new Date(p.e).toISOString(), title:p.t, color:p.color,
+              desc:"Placed by Day Quest: this week's training (d109). Move it or delete it; it will not be put back." }) });
+            log(`Planned ${p.t}: ${new Date(p.s).toLocaleDateString([], { weekday:"short", month:"short", day:"numeric", timeZone:TZ() })} ${fmtT(new Date(p.s))}`);
+          } catch (err) { G.gymPlan[p.key] = { ...G.gymPlan[p.key], failed:String(err.message || err) }; console.warn("gym", err); }
+        }
+        if (go.length) {
+          saveG(); go.forEach(p => { delete PLANS[p.ymd]; });
+          // the counts stay the planned ones (the far days' plans are cached up to 5 min on the server), less any write that failed
+          weeks.forEach(w => { const bad = w.place.filter(p => (G.gymPlan[p.key] || {}).failed).length;
+            if (bad) { w.have -= bad; w.line = `Gym: ${w.have} of ${w.total} placed this week`; } });
+          pullAgenda().then(render).catch(() => {});
+        }
+      }
+      GYMWK = { weeks, at:Date.now() };
+      store.set("quest-gym-at", gameYmd() + "|" + Date.now());
+      store.set("quest-gym-wk", JSON.stringify(weeks.map(w => ({ week:w.week, mode:w.mode, have:w.have, total:w.total, by:w.by, line:w.line }))));
+    } catch (e) { console.warn("gym plan", e); }
+    finally { gymBusy = false; }
+    if (window.QuestMorning) QuestMorning.redraw();
+  }
+  // "Gym: 2 of 3 placed this week" (and next week's count)
+  const gymLine = () => { const w = GYMWK && GYMWK.weeks; if (!w || w[0].week !== mondayOf(gameYmd())) return "";
+    return `${w[0].line}${w[1] ? ` · next week ${w[1].have} of ${w[1].total}` : ""}`; };
+  // home or travel week: one answer per week, from the same per-day guess the basics use (this replaced comparing
+  // the time zone with Toronto's); before the plan has run, today's answer stands in
+  const homeWeek = () => { const w = GYMWK && GYMWK.weeks && GYMWK.weeks[0];
+    return w && w.week === mondayOf(gameYmd()) ? w.mode === "home" : dayMode() === "home"; };
   const TRAINING = {
     home: [["jw", "Jack Woods", 3, /Jack Woods/, 60], ["ms", "Matthew I. Smith", 1, /Matthew/, 45]],
     travel: [["jw1", "Jack Woods · Day 1", 1, /Jack Woods · Day 1/, 60], ["jw2", "Jack Woods · Day 2", 1, /Jack Woods · Day 2/, 60], ["ms", "Matthew I. Smith", 1, /Matthew/, 45]],
@@ -2893,8 +2990,12 @@
     const all = blocks();
     const items = TRAINING[home ? "home" : "travel"].map(([key, name, q, re, mins]) => {
       let have = logs.filter(w => re.test(w.program || "")).length;
+      // the weekly plan's count (calendar blocks like "Hotel gym" and the sessions it placed), so this list and the
+      // "Gym: 3 of 3 placed this week" line agree
+      const wk = GYMWK && GYMWK.weeks && GYMWK.weeks[0], fromPlan = wk && wk.week === days[0] && wk.mode === (home ? "home" : "travel") ? wk.by[key] || 0 : 0;
       const blk = all.find(b => isGym(b) && re.test(b.t.replace(/ Day/, " · Day")));
       if (blk && ["in", "late"].includes(G.day.checks[gk(blk)]) && !logs.some(w => w.date === today && re.test(w.program || ""))) have++;
+      have = Math.max(have, fromPlan);
       const prog = key === "jw" ? suggestProgram() : key === "ms" ? "Matthew I. Smith" : name;
       const at = all.find(b => b.e > now() && isGym(b) && re.test(b.t.replace(/ Day/, " · Day")));
       return { id:"w:" + key, icon: key === "ms" ? "🤸" : "🏋️", label:name, name:`Gym · ${prog.replace(" · ", " ")}`, mins, have, q, need: Math.max(0, q - have),
@@ -2937,7 +3038,8 @@
       if (t.week && t.week.length) out.push([`${x.name} · this week`, t.week]);
       if (t.some && t.some.length) out.push([`${x.name} · ${t.someTitle || "some days"}`, t.some]); }
     const tw = trainingWeek();
-    out.push([`Training · ${tw.home ? "home" : "travel"} week${tw.easy ? " · go easy today" : ""}`, tw.items]);
+    const gl = gymLine();
+    out.push([`Training · ${tw.home ? "home" : "travel"} week${tw.easy ? " · go easy today" : ""}${gl ? ` · ${gl}` : ""}`, tw.items]);
     return out.concat([["Bryan Johnson", ["early", "bedtime"].map(id => practiceItem(id)).filter(Boolean)]]);
   };
 
@@ -3222,7 +3324,7 @@
           sadhana:isSadhana(b), strength:STRENGTH(b), flight:/flight|\b[A-Z]{2}\d{2,4}\b/.test(b.t) && b.kind === "travel", extra:!!b.extra, taskId:b.taskId || null, basic:b.basic || null,
           cost:energy(b).rate * spendMult() * Math.max(0, (b.e - b.s) / 3600000), badge:badge(b, 30) })),
         tasks: TASKS.map(x => est[x.id] ? { ...x, estimate:`${est[x.id]} min` } : x),
-        practices: moPractices() };
+        practices: moPractices(), gymLine: gymLine() };
     },
     fmtT, save: () => saveG(), log: m => { log(m); saveG(); },
     hour: d => { const p = tzParts(d, { hour:"numeric", minute:"numeric", hourCycle:"h23" }); return (+p.hour % 24) + p.minute / 60; },
@@ -3286,6 +3388,7 @@
       qfetch("/quest/workout").then(j => { gymInfo = j || gymInfo; QuestMorning.redraw(); }).catch(() => {}); }
     QuestMorning.open(MO_CTX);
     placeBasics().then(() => QuestMorning.redraw()).catch(e => console.warn("basics", e));
+    planGym(true).catch(e => console.warn("gym", e));
   }
   function closeMorning(){ if (window.QuestMorning) QuestMorning.close(); }
   document.addEventListener("keydown", e => {
