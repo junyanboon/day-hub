@@ -62,7 +62,7 @@ test("a passed test raises the level by one, never past L7; not yet keeps it", (
   assert.equal(top.tests.length, 0);
 });
 
-test("the quiz levels are saved once and never overwrite real ones", () => {
+test("the quiz levels are his levels until a real one is saved, and never overwrite real ones", () => {
   const a = L.seedLevels({}, "2026-10-16");
   assert.equal(a.changed, true);
   assert.deepEqual(J(Object.fromEntries(CODES.map(c => [c, a.levels[c].level]))), { OAC: 4, SLS: 5, NC: 3, PPU: 3, HSPU: 3, FLR: 2 });
@@ -76,9 +76,9 @@ test("the quiz levels are saved once and never overwrite real ones", () => {
   assert.equal(c.levels.NC.level, 5); assert.equal(c.levels.NC.at, "2026-10-12");
   assert.equal(c.levels.OAC.level, 6);
   assert.equal(c.levels.SLS.level, 5); assert.equal(c.levels.FLR.level, 2);
-  // once the quiz has been applied, a move he never logged is not filled in again later
+  // a move missing later gets its quiz level again
   const d = { ...J(a.levels) }; delete d.FLR;
-  assert.equal(L.seedLevels(d, "2026-11-01").changed, false);
+  const d2 = L.seedLevels(d, "2026-11-01"); assert.equal(d2.changed, true); assert.equal(d2.levels.FLR.level, 2);
   // nothing passed in is changed in place
   const e = {}; L.seedLevels(e, "2026-10-16"); assert.deepEqual(e, {});
 });
@@ -109,13 +109,13 @@ test("an old reps/lbs entry is moved to the new shape without losing a number", 
 test("an old phone draft opens in the new box with its level and best set", () => {
   const draft = { program: "Jack Woods · Day 1", at: "2026-10-16T10:00:00Z",
     e: { NC: { level: 3, start: null, reps: ["5", "5", "4", "3"], lbs: ["", "", "", ""] }, "m:Pike": { done: true } } };
-  const d = L.migrateDraft(draft, { NC: { level: 3 } });
+  const d = L.migrateDraft(draft, { NC: { level: 3, from: "quiz" } });
   assert.equal(d.e.NC.level, 3); assert.equal(d.e.NC.trained, 3); assert.equal(d.e.NC.reps, "4");
   assert.equal(d.e.NC.effort, ""); assert.deepEqual(J(d.e.NC.tests), []);
   assert.deepEqual(J(d.e["m:Pike"]), { done: true });
-  assert.deepEqual(J(L.migrateDraft(d, {})), J(d), "a new draft is left alone");
+  assert.deepEqual(J(L.migrateDraft(d, {})), J(d), "a new draft at his levels is left alone");
   const odd = L.migrateDraft({ program: "x", e: { NC: { start: 3, level: "<b>", trained: 99, effort: "full", reps: "", kg: "" } } }, {});
-  assert.equal(odd.e.NC.level, 1); assert.equal(odd.e.NC.trained, 7); assert.deepEqual(J(odd.e.NC.tests), []);
+  assert.equal(odd.e.NC.level, 3); assert.equal(odd.e.NC.trained, 7); assert.deepEqual(J(odd.e.NC.tests), []);
   const sent = L.toEntry("NC", "Nordic Hamstring Curl", d.e.NC);
   assert.equal(sent.reps, 4);
   assert.deepEqual(J(sent.legacy.reps), ["5", "5", "4", "3"], "the old four sets are saved with it");
@@ -161,4 +161,40 @@ test("body weight: lbs only, a sensible number, one reading a day, the last four
   // readings can also come from saved sessions (a server that has no list yet)
   const fromSessions = L.readingsFrom(null, [{ date: "2026-10-09", bodyWeightLbs: 173.6, entries: [] }, { date: "2026-10-12", entries: [] }]);
   assert.deepEqual(J(fromSessions), [{ date: "2026-10-09", lbs: 173.6 }]);
+});
+
+// Later 2026-10-16, his screenshots: Nordic L1 and One-Arm Chin L1 although the server had his quiz levels.
+// The phone kept a draft from the old log (level 1 by default, start null), and the migration kept that L1.
+test("quiz levels show when no real level is saved, and a migrated or default L1 is ignored", () => {
+  const server = L.seedLevels({}, "2026-10-16").levels;   // what live /quest/workout returns today
+  const old = { program: "Jack Woods · Day 1", at: "2026-10-16T09:00:00Z",
+    e: { NC: { level: 1, start: null, reps: ["", "", "", ""], lbs: ["", "", "", ""] }, OAC: { level: 1, start: null, reps: ["", "", "", ""], lbs: ["", "", "", ""] },
+      SLS: { level: 1, start: null, reps: ["", "", "", ""], lbs: ["", "", "", ""] } } };
+  const d = L.migrateDraft(old, server);
+  assert.deepEqual([d.e.NC.level, d.e.NC.trained, d.e.OAC.level, d.e.OAC.trained, d.e.SLS.level], [3, 3, 4, 4, 5]);
+  // the same draft after the PR 11 page had migrated it and saved it back (start 4, level 1, trained 1)
+  const bad = { program: "Jack Woods · Day 1", e: { OAC: { start: 4, level: 1, trained: 1, effort: "", reps: "", kg: "", tests: [], legacy: { reps: ["", "", "", ""], lbs: ["", "", "", ""] } } } };
+  const b = L.migrateDraft(bad, server);
+  assert.deepEqual([b.e.OAC.start, b.e.OAC.level, b.e.OAC.trained], [4, 4, 4]);
+  assert.equal(L.toEntry("OAC", "One-Arm Chin", b.e.OAC), null, "an untouched move is not logged");
+  // a saved L1 that no Test set is not a real level; one a Test set is
+  assert.equal(L.currentLevel({ NC: { level: 1, at: "2026-10-16" } }, "NC"), 3);
+  assert.equal(L.seedLevels({ NC: { level: 1, at: "2026-10-16" }, _seed: { from: "quiz", at: "2026-10-16" } }, "2026-10-16").levels.NC.level, 3);
+  assert.equal(L.currentLevel({ NC: { level: 4, at: "2026-10-20", from: "test" } }, "NC"), 4);
+  assert.equal(L.currentLevel({}, "HSPU"), 3); assert.equal(L.currentLevel(undefined, "FLR"), 2);
+  // a Test passed in the draft keeps its level; a level he trained on purpose stays
+  let x = L.startMove("NC", 3); x = L.recordTest(x, true); x.trained = 2; x.effort = "help";
+  const t = L.migrateDraft({ program: "Jack Woods", e: { NC: x } }, server);
+  assert.deepEqual([t.e.NC.start, t.e.NC.level, t.e.NC.trained], [3, 4, 2]);
+  // the live levels already seeded by the deployed server are left as they are (no write needed)
+  assert.equal(L.seedLevels({ ...J(server), _seed: { from: "quiz", at: "2026-10-16" } }, "2026-10-17").levels.OAC.level, 4);
+});
+
+test("after a save only a passed Test moves a level, so an old page or draft cannot put a move back to L1", () => {
+  const lv0 = L.seedLevels({}, "2026-10-16").levels;
+  const lv = L.saveLevels(lv0, [{ code: "NC", level: 1, trained: 1, tests: [] }, { code: "OAC", level: 5, tests: [{ level: 5, pass: true }] },
+    { code: "SLS", level: 6, tests: [{ level: 6, pass: false }] }, { name: "Pike", kind: "mobility" }], "2026-10-24");
+  assert.equal(lv.NC.level, 3); assert.equal(lv.OAC.level, 5); assert.equal(lv.OAC.from, "test"); assert.equal(lv.SLS.level, 5);
+  assert.equal(L.currentLevel(lv, "OAC"), 5);
+  assert.equal(lv0.OAC.level, 4, "not changed in place");
 });

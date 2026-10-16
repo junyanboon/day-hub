@@ -19,7 +19,7 @@ const range = (from, n) => Array.from({ length:n }, (_, i) => G.addDays(from, i)
 const HOME = "2026-10-26";   // an empty home week in Toronto, Mon Oct 26 to Sun Nov 1
 const homeWeek = (cal = {}, extra = {}) => range(HOME, 7).map(d => dayOf(d, cal, "home", TOR, extra[d]));
 
-test("the Oct 25 Jack Woods Day 2 he moved by hand (Joint Plans) counts, so no second Day 2 goes in that week", () => {
+test("the Oct 25 Jack Woods Day 2 he moved by hand (Joint Plans) counts as one of the two Jack Woods, so no third goes in that week", () => {
   // the week of Oct 19 as it is now: the Oct 20 hotel gym moved to Sun Oct 25 2:00 PM Toronto and renamed (d15)
   const cal = {
     "2026-10-19": [ev("2026-10-19", "11:00", "12:00", "Hotel gym", MAD), ev("2026-10-19", "18:00", "19:00", "Early dinner", MAD)],
@@ -34,7 +34,7 @@ test("the Oct 25 Jack Woods Day 2 he moved by hand (Joint Plans) counts, so no s
   const r = G.planWeek({ week:"2026-10-19", days, sessions, logs:[], placed:{}, now:G.at("2026-10-16", 15.75, MAD), today:"2026-10-16" });
   assert.equal(r.mode, "travel");
   assert.ok(!r.place.some(p => p.kind !== "ms"), J(r.place).map(p => p.t).join());
-  assert.equal(r.by.jw2, 1);
+  assert.equal(r.by.jw, 2);
   assert.ok(!r.place.some(p => p.ymd === "2026-10-25"), "one session a day");
 });
 
@@ -111,16 +111,46 @@ test("while he is ill nothing new is placed, and the line says ill instead of a 
   assert.doesNotMatch(r.line, /0 of 4 placed/);
 });
 
-test("when he is better the rest of the week is planned from the free slots, missed days are not caught up", () => {
-  // ill Mon and Tue, better on Wed morning: ceil(4 x 2 / 7) = 2 sessions are let off, two go in, one a day
+test("d21: when he is better only the days left are planned, as they would be anyway; the ill day's session is skipped", () => {
+  // ill Mon and Tue, nothing on the plan yet, better on Wed morning. A normal home week has Jack Woods Mon, Wed, Fri:
+  // Monday's is skipped (the target drops to 3), Wed and Fri go in as usual, Matthew I. Smith where it always goes
   const r = G.planWeek({ week:HOME, days:homeWeek(), sessions:[], logs:[], placed:{}, now:G.at("2026-10-28", 9, TOR), today:"2026-10-28",
     ill:["2026-10-26", "2026-10-27"], illNow:false });
-  assert.equal(r.place.length, 2);
   assert.ok(r.place.every(p => p.ymd >= "2026-10-28"));
-  assert.equal(new Set(r.place.map(p => p.ymd)).size, 2);
-  assert.deepEqual(J(r.place.map(p => p.kind === "ms" ? "ms" : "jw")).sort(), ["jw", "ms"]);
-  assert.equal(r.excused, 2);
-  assert.equal(r.line, "Gym: 2 of 4 this week · 2 off, ill");
+  assert.deepEqual(J(r.place.filter(p => p.kind === "jw").map(p => p.ymd)), ["2026-10-28", "2026-10-30"]);
+  assert.equal(r.place.filter(p => p.kind === "ms").length, 1);
+  assert.equal(r.excused, 1); assert.deepEqual(J(r.excusedBy), { jw:1, ms:0 });
+  assert.equal(r.total, 3);
+  assert.equal(r.line, "Gym: 3 of 3 placed this week · 1 skipped, ill");
+  assert.ok(r.skipped.some(x => x.why === "skipped: ill that day"));
+});
+
+test("d21: a session on a day he is ill is skipped, not moved or placed again, and the week's target drops by it", () => {
+  // the planner had placed Mon, Wed, Fri and Matthew I. Smith on Sun; he was ill Wed. It is Thu now.
+  const cal = { "2026-10-26": [ev("2026-10-26", "19:30", "20:30", "Gym · Jack Woods")], "2026-10-28": [ev("2026-10-28", "19:30", "20:30", "Gym · Jack Woods")],
+    "2026-10-30": [ev("2026-10-30", "19:30", "20:30", "Gym · Jack Woods")], "2026-11-01": [ev("2026-11-01", "17:00", "17:45", "Gym · Matthew I. Smith")] };
+  const sessions = Object.values(cal).flat();
+  const placed = { "2026-10-26:jw#1":true, "2026-10-26:jw#2":true, "2026-10-26:jw#3":true, "2026-10-26:ms#1":true };
+  const logs = [{ date:"2026-10-26", program:"Jack Woods" }];
+  const now = G.at("2026-10-29", 9, TOR), base = { week:HOME, days:homeWeek(cal), logs, placed, now, today:"2026-10-29", ill:["2026-10-28"], illNow:false };
+  // the Wed event is still on the calendar
+  const r = G.planWeek({ ...base, sessions });
+  assert.equal(r.place.length, 0, "nothing moved into Thu to Sun");
+  assert.equal(r.total, 3); assert.equal(r.have, 3); assert.equal(r.excused, 1);
+  assert.equal(r.line, "Gym: 3 of 3 placed this week · 1 skipped, ill");
+  // Day Quest took it off Google Calendar on the ill day: the same answer
+  const gone = sessions.filter(x => !(x.s === cal["2026-10-28"][0].s));
+  const r2 = G.planWeek({ ...base, sessions:gone, illSkips:[{ t:"Gym · Jack Woods", s:cal["2026-10-28"][0].s }] });
+  assert.equal(r2.place.length, 0); assert.equal(r2.total, 3); assert.equal(r2.line, "Gym: 3 of 3 placed this week · 1 skipped, ill");
+  // gone with no record, but the planner knows it put that slot on Wednesday
+  const r3 = G.planWeek({ ...base, sessions:gone, placedS:{ "2026-10-26:jw#3":cal["2026-10-28"][0].s } });
+  assert.equal(r3.total, 3); assert.equal(r3.excused, 1);
+  // the record and the slot time are the same session: counted once
+  const r4 = G.planWeek({ ...base, sessions:gone, placedS:{ "2026-10-26:jw#3":cal["2026-10-28"][0].s }, illSkips:[{ t:"Gym · Jack Woods", s:cal["2026-10-28"][0].s }] });
+  assert.equal(r4.excused, 1);
+  // a Matthew I. Smith on an ill day lowers the Matthew I. Smith count, not Jack Woods
+  const ms = G.planWeek({ ...base, ill:["2026-10-28", "2026-11-01"], illNow:false, now:G.at("2026-11-01", 20, TOR), today:"2026-11-01", sessions });
+  assert.deepEqual(J(ms.excusedBy), { jw:1, ms:1 }); assert.equal(ms.total, 2);
 });
 
 test("a session he moved to another week is not put back in its old week", () => {
@@ -139,4 +169,21 @@ test("Matthew I. Smith may share a day with another gym session when no other da
   assert.match(ms.note, /same day as another gym session/);
   const jw = G.moveOptions({ kind:"jw1", s:G.at("2026-10-27", 17, TOR), e:G.at("2026-10-27", 18, TOR), days, week:HOME, gymDays:all, modes:{}, now:G.at("2026-10-26", 9, TOR) });
   assert.equal(jw.options.length, 0, "strength stays one a day");
+});
+
+test("d21 from the page: I'm ill deletes Monday's planned session (its slot key recorded); it is skipped once, not twice", () => {
+  // the planner had put Jack Woods Mon, Wed, Fri and Matthew I. Smith Sun; ill on Monday, it is Monday evening
+  const mon = ev("2026-10-26", "19:30", "20:30", "Gym · Jack Woods");
+  const cal = { "2026-10-28": [ev("2026-10-28", "19:30", "20:30", "Gym · Jack Woods")], "2026-10-30": [ev("2026-10-30", "19:30", "20:30", "Gym · Jack Woods")],
+    "2026-11-01": [ev("2026-11-01", "17:00", "17:45", "Gym · Matthew I. Smith")] };
+  const placed = { "2026-10-26:jw#1":true, "2026-10-26:jw#2":true, "2026-10-26:jw#3":true, "2026-10-26:ms#1":true };
+  const r = G.planWeek({ week:HOME, days:homeWeek(cal), sessions:Object.values(cal).flat(), logs:[], placed, now:G.at("2026-10-26", 18, TOR), today:"2026-10-26",
+    ill:["2026-10-26"], illNow:true, illSkips:[{ t:"Gym · Jack Woods", s:new Date(mon.s).toISOString(), key:"2026-10-26:jw#1" }] });
+  assert.equal(r.excused, 1); assert.equal(r.total, 3); assert.equal(r.have, 3);
+  assert.equal(r.line, "Gym: 3 of 3 this week · ill, nothing new placed");
+  // nothing planned yet: the deleted Monday session (no key) and the as-if Monday slot are the same session
+  const r2 = G.planWeek({ week:HOME, days:homeWeek(), sessions:[], logs:[], placed:{}, now:G.at("2026-10-27", 9, TOR), today:"2026-10-27",
+    ill:["2026-10-26"], illNow:false, illSkips:[{ t:"Gym · Jack Woods", s:mon.s }] });
+  assert.equal(r2.excused, 1);
+  assert.equal(r2.total, 3);
 });

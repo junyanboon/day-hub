@@ -284,6 +284,22 @@
   .glabel { display:block; font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--ink-soft); margin:14px 0 6px; }
   #gProg { width:100%; padding:12px; border-radius:12px; background:rgba(0,0,0,.25); color:var(--ink); border:1px solid var(--glass-border); font:inherit; font-size:15px; }
   .gmove { margin-top:12px; padding:12px; border-radius:14px; background:rgba(255,255,255,.08); }
+  /* compact rows (later 2026-10-16): one shut row per move, one open at a time */
+  .gmoves .gmove { margin-top:6px; padding:0; overflow:hidden; }
+  .gmoves .gmove.open { background:rgba(255,255,255,.13); }
+  .sheet .grow { display:flex; align-items:center; gap:8px; width:100%; min-height:44px; margin:0; padding:10px 12px; text-align:left; color:#fff; font:inherit; background:transparent; border:0; border-radius:0; box-shadow:none; }
+  .gname { flex:1; min-width:0; font-weight:600; font-size:14.5px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .glv { flex:none; font:600 12.5px var(--font); color:rgba(255,255,255,.86); font-variant-numeric:tabular-nums; }
+  .glv.up { color:var(--gold); }
+  .gok { flex:none; width:18px; text-align:center; color:var(--good); font-weight:800; }
+  .grow::after { content:"▾"; flex:none; font-size:12px; color:rgba(255,255,255,.86); transition:transform .15s; }
+  .gmove.open .grow::after { transform:rotate(180deg); }
+  .gbody { padding:0 12px 12px; }
+  .gbody .gtr { margin-top:8px; }
+  .gbody .geff { margin-top:8px; }
+  .gnums .gtb { margin-left:auto; flex:none; }
+  .gtopline { margin-top:10px; }
+  #gProg.small, .gtopline #gProg { padding:9px 10px; font-size:14px; }
   .gtop { display:flex; justify-content:space-between; align-items:center; gap:8px; }
   .gtop b { font-size:15px; }
   .gl { display:flex; align-items:center; gap:6px; flex:none; }
@@ -308,8 +324,9 @@
   .gtest-q { padding:10px; border-radius:12px; background:rgba(0,0,0,.25); font-size:13px; color:#fff; }
   .gtest-q .actions { margin-top:8px; }
   .gtest-h { font-size:12.5px; color:rgba(255,255,255,.86); margin-top:6px; }
-  .gbw { display:flex; align-items:center; gap:10px; }
-  .gbw input.set { width:96px; flex:none; }
+  .gbw { display:flex; align-items:center; gap:8px; margin-top:8px; font-size:13px; color:#fff; }
+  .gbw label { flex:none; }
+  .sheet .gbw input.set { width:72px; flex:none; padding:6px 8px; }
   .gbw small { font-size:12.5px; color:rgba(255,255,255,.86); }
   .sheet input.set { margin:0; padding:10px 4px; text-align:center; font-size:16px; border-radius:10px; min-width:0; }
   .gchips { display:flex; flex-wrap:wrap; gap:6px; }
@@ -321,6 +338,9 @@
   .gmv-os { display:grid; grid-template-columns:1fr 1fr; gap:6px; }
   .gmv-o { padding:11px 10px; border-radius:12px; background:rgba(255,255,255,.16); color:#fff; font:600 14px var(--font); text-align:left; }
   .gmv-o small { display:block; font-weight:400; font-size:11.5px; color:rgba(255,255,255,.86); }
+  .gmv-ask { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin-top:8px; padding:10px; border-radius:12px; background:rgba(0,0,0,.28); color:#fff; font-size:13.5px; }
+  .gmv-ask > span:first-child { flex:1 1 180px; }
+  .gmv-ask-b { display:flex; gap:6px; margin-left:auto; }
   .gmv-o.nx { background:rgba(255,255,255,.1); }
   .gmv-more { margin-top:8px; }
   .gmv-ill { margin-top:8px; width:100%; padding:11px; border-radius:12px; background:rgba(0,0,0,.25); color:#fff; font:600 14px var(--font); }
@@ -678,15 +698,16 @@
 <script src="keeps.js?v=20261009k"></script>
 <script src="bag.js?v=20261009k"></script>
 <script src="quest-merge.js?v=20261016g"></script>
-<script src="quest-levels.js?v=20261016a"></script>
+<script src="quest-levels.js?v=20261016b"></script>
+<script src="quest-gymlog.js?v=20261016a"></script>
 <script src="nvc-words.js?v=20261010a"></script>
 <script src="quest-fx.js?v=20261009b"></script>
 <script src="quest-night.js?v=20261011a"></script>
 <script src="quest-basics.js?v=20261016d"></script>
-<script src="quest-gym.js?v=20261016g"></script>
+<script src="quest-gym.js?v=20261016h"></script>
 <script src="quest-morning.js?v=20261016g"></script>
 <script src="quest-agenda.js?v=20261014c"></script>
-<script src="quest-nearby.js?v=20261016g"></script>
+<script src="quest-nearby.js?v=20261016h"></script>
 </head>
 <body>
 <div id="sky" aria-hidden="true"><div class="sky-stars"></div><div class="sky-orb"></div>
@@ -1929,7 +1950,8 @@
     await pullAll();
   }
   async function addBlockCal(t, s, e, makeRoom){
-    try { await qfetch("/cal/event", { method:"POST", body:JSON.stringify({ s:s.toISOString(), e:e.toISOString(), title:t }) }); }
+    try { await qfetch("/cal/event", { method:"POST", body:JSON.stringify({ s:s.toISOString(), e:e.toISOString(), title:t,
+      ...(isGym({ t }) ? { color:"3", desc:"Added from Day Quest: a gym session. Move it or delete it as you like." } : {}) }) }); }
     catch (err) {
       // today's plan cannot hold another day, so a failed add there is only reported
       if (gameDayOf(s) !== gameYmd()) return calToast(`Could not add ${t} to the calendar (${err.message}). Nothing was added.`, 7000);
@@ -2592,7 +2614,8 @@
     $("aGo").onclick = () => {
       const t = $("aT").value.trim(); if (!t) { $("aT").focus(); return; }
       const s = fromField($("aS").value, other ? t0 : now()), e = new Date(s.getTime() + dur * 60000);
-      const cal = other || $("aCal") && $("aCal").checked;
+      // a gym session always goes on Google Calendar (later 2026-10-16: no more plan-only gym blocks)
+      const cal = other || isGym({ t }) && questKey() && !DRY || $("aCal") && $("aCal").checked;
       closeSheet(); (cal ? addBlockCal : addBlock)(t, s, e, !other && $("aRoom").checked);
     };
     setTimeout(() => $("aT").focus(), 300);
@@ -2601,27 +2624,15 @@
 
   /* ---------- gym log (2026-10-05; by levels 2026-10-16) ----------
      Tapping a gym block opens a logger for Junyan's two programs, from his
-     Notion "Gym" page: Jack Woods rings calisthenics (Day 1 / Day 2, levels
-     1-7 per move) and Matthew I. Smith's Pike & Head to Toe mobility. Since
+     Notion "Gym" page: Jack Woods rings calisthenics (one flexible session with
+     all six moves since later 2026-10-16, levels 1-7 per move) and Matthew I. Smith's Pike & Head to Toe mobility. Since
      2026-10-16 (ticket 15, d16 to d20) each move shows its level, its plain name and
      the next level; he logs the level trained, how the hardest set went and its reps
      (no reps/lbs grid), a weight only on SLS from L4 and NC L7, a Test that moves
      the level up, and his body weight in lbs. The level table is quest-levels.js.
      Saving sends the session to still-api, which keeps it and writes his Workout Tracker rows. */
-  const LV = window.QuestLevels;
-  const MOVE = { NC:"Nordic Hamstring Curl", OAC:"One-Arm Chin", SLS:"Single-Leg Squat", HSPU:"Handstand Push-Up", FLR:"Front Lever Rows", PPU:"Planche Push-Up" };
-  const PROGRAMS = {
-    "Jack Woods · Day 1": { strength:["NC","OAC","SLS"], mobility:["Bridge","Pike","Butterfly","Front Split","Pancake","Handstand"] },
-    "Jack Woods · Day 2": { strength:["HSPU","FLR","PPU"], mobility:["Bridge","Pike","Front Split","Pancake","V-sit"] },
-    "Matthew I. Smith · Phase 1": { mis:[["Rolling Feet","90s per side","1-2"],["Calf Stretch, single-leg standing","90s","2-3"],
-      ["Sciatic Nerve Ankle Joint Floss","8 reps · 3s up / 3s down","2-3"],["Hip Internal Rotation, lying","3 reps · 10s hold","2-3"],
-      ["Pike Hang, standing B-stance","5 reps · contract 5s / relax 5s","2-3"]] },
-    "Matthew I. Smith · Phase 2": { mis:[["Donkey Calf Stretch, single leg","90s","2-3"],["Your Pigeon Variation","30s","2-3"],
-      ["Sciatic Nerve Knee Joint Floss","8 reps · 3-1-3-1","2-3"],["Hip Internal Rotation, seated","8 reps · 3s lift / 3s rest","2-3"],
-      ["Pike Good Morning, standing round back","8 reps · 3-3-1-0","2-3"]] },
-    "Matthew I. Smith · Phase 3": { mis:[["Knee Extension Calf Stretch, single leg","8 reps · 3s","2-3"],["Sciatic Nerve Ankle Joint Glide","6 reps · 3-1-3-1","2-3"],
-      ["Pike Good Morning, leg elevated","8 reps · 2-3-1-0","2-3"],["Pike Active Lifts, seated single leg","5 reps · 1-1-1-5","2-3"]] },
-  };
+  const LV = window.QuestLevels, GL = window.QuestGymLog;
+  const MOVE = GL.MOVE, PROGRAMS = GL.PROGRAMS;
   const isGym = b => !!b && /\bgym\b|workout|calisthenics|rings/i.test(b.t);
   const ymdLocal = () => { const p = tzParts(now(), { year:"numeric", month:"2-digit", day:"2-digit" }); return `${p.year}-${p.month}-${p.day}`; };
   let GYM = null, gymTimer = null, gymInfo = { levels:{}, last:[] };
@@ -2630,99 +2641,81 @@
     if (!questKey()) return;
     try { const j = await qfetch("/quest/workout"); gymInfo = { ...j, last:(j.last || []).map(LV.migrateSession) }; } catch {}
   }
-  // his levels: what the server saved, else his 2026-10-16 quiz answers (the server saves those once too)
+  // his levels: his 2026-10-16 quiz answers unless a passed Test (or a level above the quiz) was saved (quest-levels.js)
   const gymLevels = () => LV.seedLevels(gymInfo.levels || {}, ymdLocal()).levels;
   function gymDraftKey(){ return "quest-gym-" + ymdLocal(); }
-  function newGym(program, bw){
-    const P = PROGRAMS[program], e = {}, lv = gymLevels();
-    (P.strength || []).forEach(c => { e[c] = LV.startMove(c, lv[c] && lv[c].level || LV.START[c] || 1); });
-    (P.mobility || []).forEach(m => { e["m:" + m] = { done:false }; });
-    (P.mis || []).forEach(([m]) => { e["mis:" + m] = { sets:0 }; });
-    return { program, e, bw: bw || "", at: now().toISOString() };
-  }
-  function suggestProgram(){
-    const last = (gymInfo.last || []).slice().reverse().find(w => /Jack Woods/.test(w.program || ""));
-    return last && /Day 1/.test(last.program) ? "Jack Woods · Day 2" : "Jack Woods · Day 1";
-  }
+  const newGym = (program, bw) => GL.newSession(LV, program, gymLevels(), bw, now().toISOString());
+  // Jack Woods is one flexible session now (later 2026-10-16); a Matthew I. Smith block opens his phase
+  const suggestProgram = block => GL.programFor(block && block.t, ymdLocal());
   function saveDraft(){ try { localStorage.setItem(gymDraftKey(), JSON.stringify(GYM)); } catch {} }
   const gymTrend = () => LV.bodyTrend(LV.readingsFrom(gymInfo.body, gymInfo.last));
 
-  let gymShowMove = false, gymTesting = null;
+  let gymShowMove = false, gymTesting = null, gymRow = null;
   async function openGym(block){
-    gymShowMove = false; gymTesting = null;
+    gymShowMove = false; gymTesting = null; gymRow = null; GYMASK = null;
     // opening the log at the gym means you're there; opening it early (to move it, or because you're ill) does not
     if (block && !G.day.checks[gk(block)] && block.s - now() < 30 * 60000) checkIn(block);
     await loadGymInfo();
-    try { GYM = LV.migrateDraft(JSON.parse(localStorage.getItem(gymDraftKey())), gymLevels()); } catch { GYM = null; }
-    if (!GYM || !PROGRAMS[GYM.program]) GYM = newGym(suggestProgram());
+    // a draft from earlier today comes back at his levels now (an old draft's default L1 never wins, quest-levels.js)
+    try { GYM = GL.fromDraft(LV, JSON.parse(localStorage.getItem(gymDraftKey())), gymLevels()); } catch { GYM = null; }
+    if (!GYM) GYM = newGym(suggestProgram(block));
     GYM.blockKey = block ? block.key : null;
+    saveDraft();
     drawGym();
   }
-  function gymMoveBox(c){
-    const x = GYM.e[c], up = x.level > x.start, t = LV.testLevel(x), wb = LV.weightBox(c, x.trained);
-    const lastTest = (x.tests || []).slice(-1)[0];
-    const eff = LV.EFFORT.map(([k, label]) => `<button class="gchip${x.effort === k ? " on" : ""}" data-eff="${c}" data-v="${k}" aria-pressed="${x.effort === k}">${label}</button>`).join("");
-    const diff = x.trained < x.level ? " · easier" : x.trained > x.level ? " · harder" : "";
-    let h = `<div class="gmove" id="gm-${c}"><div class="gtop"><b>${MOVE[c]}</b>${up ? `<span class="gtag">New level</span>` : ""}</div>
-      <div class="gnow">${esc(LV.levelText(c, x.level))}</div>
-      <div class="gnext">${esc(LV.nextText(c, x.level))}</div>
-      <span class="gk">Level trained</span>
-      <div class="gtr"><span class="gl"><button class="lv" data-tr="${c}" data-d="-1" aria-label="Train an easier level">−</button>
-        <span class="lvn">L${x.trained}</span>
-        <button class="lv" data-tr="${c}" data-d="1" aria-label="Train a harder level">+</button></span>
-        <small>${esc(LV.LEVELS[c][x.trained - 1])}${diff}</small></div>
-      <span class="gk">How the hardest set went</span>
-      <div class="geff">${eff}</div>
-      <div class="gnums"><label>Reps <input class="set" data-reps="${c}" inputmode="numeric" placeholder="optional" value="${esc(x.reps)}" aria-label="${MOVE[c]} reps on the hardest set"></label>
-        ${wb ? `<label>Added ${wb.unit} <input class="set" data-kg="${c}" inputmode="decimal" placeholder="${wb.unit}" value="${esc(x.kg)}" aria-label="${MOVE[c]} added weight in ${wb.unit}"></label>` : ""}</div>`;
-    if (t != null) {
-      h += gymTesting === c
-        ? `<div class="gtest"><div class="gtest-q"><b>Test L${t} · ${esc(LV.LEVELS[c][t - 1])}</b><br>Do it on the first fresh rep of a set. Part range counts.
-            <div class="actions"><button class="btn ghost small" data-tcancel="${c}">Back</button><button class="btn" data-tres="${c}" data-v="0">Not yet</button><button class="btn primary" data-tres="${c}" data-v="1">Passed ✓</button></div></div></div>`
-        : `<div class="gtest"><button class="btn" data-test="${c}">Test L${t}</button></div>`;
-    }
-    if (lastTest) h += `<div class="gtest-h">${lastTest.pass ? `Passed L${lastTest.level} today. It saves with Finish and save.` : `Tried L${lastTest.level}: not yet. The try is saved with the session.`}</div>`;
-    return h + `</div>`;
-  }
+  /* Compact (later 2026-10-16, "it needs to be way more compact / collapsible"): each move is one shut row with its
+     level and a ✓ once logged; one row opens at a time (quest-gymlog.js). Body weight is one small line. Every change
+     saves the draft on this phone at once, as before. */
   function drawGym(){
     const P = PROGRAMS[GYM.program];
     const blk = GYM.blockKey && blocks().find(x => x.key === GYM.blockKey);
     const early = blk && blk.s - now() >= 30 * 60000;   // not at the gym yet: the move options come first
     const tr = gymTrend();
-    let h = `<div class="gym-head"><h3>🏋️ Gym log</h3><span class="gym-hb">${blk && !early ? `<button class="btn ghost small" id="gMove">${gymShowMove ? "Hide" : "Reschedule, skip or ill"}</button>` : ""}<button class="btn ghost small" id="gClose">Close</button></span></div>
+    const asking = GYMASK && GYMASK.kind === "skip" && blk && GYMASK.key === blk.key;
+    let h = `<div class="gym-head"><h3>🏋️ Gym log</h3><span class="gym-hb">${blk && !early ? `<button class="btn ghost small" id="gMove">${gymShowMove ? "Hide" : "Reschedule or ill"}</button>` : ""}${blk ? `<button class="btn ghost small" id="gSkip">Skip</button>` : ""}<button class="btn ghost small" id="gClose">Close</button></span></div>
+      ${asking ? `<div class="gmv-ask"><span>Are you sure? ${esc(shortName(blk))} at ${fmtT(blk.s)} comes off your schedule${blk.id && blk.calId ? " and Google Calendar" : ""}.</span>
+        <span class="gmv-ask-b"><button class="btn ghost small" id="gSkipNo">Cancel</button><button class="btn primary small" id="gSkipYes">Yes, skip</button></span></div>` : ""}
       ${blk && (early || gymShowMove) ? gymMoveHTML(blk) : ""}
-      <label class="glabel" for="gProg">Program</label>
-      <select id="gProg">${Object.keys(PROGRAMS).map(k => `<option ${k === GYM.program ? "selected" : ""}>${k}</option>`).join("")}</select>
-      <label class="glabel" for="gBw">Body weight (lbs)</label>
-      <div class="gbw"><input class="set" id="gBw" inputmode="decimal" placeholder="optional" value="${esc(GYM.bw || "")}">
-        <small id="gBwT">${tr ? `Last: ${esc(LV.trendText(tr))}` : "Weigh in at the gym if you like. It saves with today's date."}</small></div>`;
-    (P.strength || []).forEach(c => { h += gymMoveBox(c); });
+      <div class="gtopline"><select id="gProg" aria-label="Program">${Object.keys(PROGRAMS).map(k => `<option ${k === GYM.program ? "selected" : ""}>${k}</option>`).join("")}</select></div>
+      <div class="gbw"><label for="gBw">⚖️ Body weight</label><input class="set" id="gBw" inputmode="decimal" placeholder="lbs" value="${esc(GYM.bw || "")}">
+        <small id="gBwT">${tr ? `Last ${esc(String(tr.last.lbs))}` : "optional"}</small></div>`;
+    if (P.strength) h += `<div class="gmoves">${GL.movesHTML(LV, esc, GYM, gymRow, gymTesting)}</div>
+      <p class="gnote">Tap a move you're doing today. The ones you leave shut aren't logged.</p>`;
     if (P.mobility) h += `<div class="glabel">Mobility</div><div class="gchips">${P.mobility.map(m =>
       `<button class="gchip${GYM.e["m:" + m].done ? " on" : ""}" data-mob="${esc(m)}">${GYM.e["m:" + m].done ? "✓ " : ""}${esc(m)}</button>`).join("")}</div>`;
     (P.mis || []).forEach(([m, how, sets]) => {
       const x = GYM.e["mis:" + m];
-      h += `<div class="gmove"><div class="gtop"><b>${esc(m)}</b><span class="gl">
+      h += `<div class="gmove gmis"><div class="gtop"><b>${esc(m)}</b><span class="gl">
         <button class="lv" data-mis="${esc(m)}" data-d="-1" aria-label="One set fewer">−</button>
         <span class="lvn">${x.sets} sets</span>
         <button class="lv" data-mis="${esc(m)}" data-d="1" aria-label="One more set">+</button></span></div>
         <div class="gsub">${esc(how)} · ${sets} sets</div></div>`;
     });
     h += `<div class="gfoot"><button class="btn" id="gRest">Rest 90s</button><button class="btn primary" id="gSave">Finish and save</button></div>
-      <p class="gnote" id="gMsg">${P.strength ? "Saves to your Workout Tracker in Notion: the level, how the hardest set went and its reps." : "Saves to your Workout Tracker in Notion."}</p>`;
+      <p class="gnote" id="gMsg">${P.strength ? "Saves to your Workout Tracker in Notion. Your log saves on this phone as you go." : "Saves to your Workout Tracker in Notion."}</p>`;
     const keepScroll = $("sheet").classList.contains("open") && $("gProg") ? $("sheet").scrollTop : null;
     openSheet(h, true);
     const sh = $("sheet");
     if (keepScroll != null) sh.scrollTop = keepScroll;
-    $("gClose").onclick = () => { saveDraft(); stopRest(); closeSheet(); };
+    $("gClose").onclick = () => { GYMASK = null; saveDraft(); stopRest(); closeSheet(); };
+    if ($("gSkip")) $("gSkip").onclick = () => { GYMASK = asking ? null : { key:blk.key, kind:"skip" }; drawGym(); };
+    if ($("gSkipNo")) $("gSkipNo").onclick = () => { GYMASK = null; drawGym(); };
+    if ($("gSkipYes")) $("gSkipYes").onclick = () => skipGym(blk, $("gSkipYes"));
     if ($("gMove")) $("gMove").onclick = () => { gymShowMove = !gymShowMove; drawGym(); };
     bindGymMove(sh, () => { if ($("gProg")) drawGym(); });
     $("gProg").onchange = e => {
-      const busy = Object.values(GYM.e).some(x => x && ((x.tests && x.tests.length) || x.effort || x.reps));
+      const busy = Object.values(GYM.e).some(x => x && ((x.tests && x.tests.length) || x.effort || x.reps || x.done || x.sets));
       if (busy && !confirm("Switch program? What you logged for this one today is cleared.")) { e.target.value = GYM.program; return; }
-      GYM = { ...newGym(e.target.value, GYM.bw), blockKey:GYM.blockKey }; gymTesting = null; saveDraft(); drawGym(); };
+      GYM = { ...newGym(e.target.value, GYM.bw), blockKey:GYM.blockKey }; gymTesting = null; gymRow = null; saveDraft(); drawGym(); };
     $("gBw").oninput = () => { GYM.bw = $("gBw").value.trim(); saveDraft(); };
-    sh.querySelectorAll("[data-reps]").forEach(inp => inp.oninput = () => { GYM.e[inp.dataset.reps].reps = inp.value.trim(); saveDraft(); });
-    sh.querySelectorAll("[data-kg]").forEach(inp => inp.oninput = () => { GYM.e[inp.dataset.kg].kg = inp.value.trim(); saveDraft(); });
+    sh.querySelectorAll("[data-gopen]").forEach(b => b.onclick = () => { gymRow = GL.toggle(gymRow, b.dataset.gopen); gymTesting = null; drawGym();
+      const row = gymRow && $("gm-" + gymRow); if (row && row.scrollIntoView) row.scrollIntoView({ block:"nearest" }); });
+    // a typed number marks the row ✓ when the field is left (redrawing on every key would close the phone's keyboard)
+    // a typed number ticks its row in place (a redraw would close the phone's keyboard or eat the next tap)
+    const tick = c => { const row = $("gm-" + c), ok = row && row.querySelector(".gok"), on = GL.logged(LV, GYM.e[c]);
+      if (row) row.classList.toggle("done", on); if (ok) ok.textContent = on ? "✓" : ""; };
+    sh.querySelectorAll("[data-reps]").forEach(inp => inp.oninput = () => { GYM.e[inp.dataset.reps].reps = inp.value.trim(); saveDraft(); tick(inp.dataset.reps); });
+    sh.querySelectorAll("[data-kg]").forEach(inp => inp.oninput = () => { GYM.e[inp.dataset.kg].kg = inp.value.trim(); saveDraft(); tick(inp.dataset.kg); });
     sh.querySelectorAll("[data-tr]").forEach(b => b.onclick = () => { const x = GYM.e[b.dataset.tr]; x.trained = Math.min(LV.TOP, Math.max(1, x.trained + +b.dataset.d)); saveDraft(); drawGym(); });
     sh.querySelectorAll("[data-eff]").forEach(b => b.onclick = () => { const x = GYM.e[b.dataset.eff]; x.effort = x.effort === b.dataset.v ? "" : b.dataset.v; saveDraft(); drawGym(); });
     sh.querySelectorAll("[data-test]").forEach(b => b.onclick = () => { gymTesting = b.dataset.test; drawGym(); });
@@ -2777,7 +2770,7 @@
         // the weekly gym count and the body weight trend read this list (a body-weight-only save is not a session)
         if (entries.length) gymInfo.last = [...(gymInfo.last || []), { ...body, savedAt:now().toISOString() }];
         if (bw != null) gymInfo.body = LV.addReading(LV.readingsFrom(gymInfo.body, gymInfo.last), date, bw, now().toISOString());
-        for (const e of entries) if (e.code) gymInfo.levels = { ...(gymInfo.levels || {}), [e.code]:{ level:e.level, at:date } };
+        gymInfo.levels = LV.saveLevels(gymInfo.levels || {}, entries, date);   // only a passed Test moves a level, as on the server
       } catch (e) { $("gSave").disabled = false; $("gMsg").textContent = "Could not save: " + e.message + ". Your log is still here."; return; }
     }
     const tested = entries.reduce((a, x) => a + (x.tests ? x.tests.length : 0), 0);
@@ -3011,7 +3004,7 @@
      distributed through the week unless I am lucky enough to find a way to do a few in a day", and "set up my
      weeks so that my workouts are also in there so it needs to be a part of my morning planning". A stage
      names a count per week for each spread-out practice; training counts come from d109 (home weeks: 3 gym
-     sessions alternating Jack Woods Day 1 and Day 2, plus Matthew I. Smith; travel weeks at least one of each).
+     Jack Woods sessions (flexible: any of the six moves, later 2026-10-16) plus Matthew I. Smith; travel weeks 2 Jack Woods and 1 Matthew I. Smith).
      Today's pick is whatever is furthest behind for the days left in the week (Monday to Sunday). */
   function weekDays(){ const t = Date.parse(gameYmd() + "T12:00:00Z"), dow = (new Date(t).getUTCDay() + 6) % 7;
     return { days: Array.from({ length:7 }, (_, i) => new Date(t + (i - dow) * 86400000).toISOString().slice(0, 10)), left: 7 - dow }; }
@@ -3082,13 +3075,14 @@
     const movedOut = wk => gymMovesNow().filter(([, m]) => !m.key && wkOf(m.from0 || m.from) === wk && wkOf(m.to) !== wk)
       .map(([, m]) => QG().sessionOf(m.t) === "ms" ? "ms" : "jw");
     const out = [];
-    let lastJw = (logs.filter(w => w.date < mon && /Jack Woods/.test(w.program || "")).map(w => QG().sessionOf(w.program)).filter(k => k !== "jw").pop()) || null;
+    // d21: when each placed slot went in, and the gym sessions Day Quest took off an ill day (G.ill[day].skipped)
+    const placedS = Object.fromEntries(Object.entries(G.gymPlan || {}).filter(([, v]) => v && !v.failed && v.s).map(([k, v]) => [k, Date.parse(v.s)]));
+    const illSkips = Object.values(G.ill || {}).flatMap(v => (v && v.ill && Array.isArray(v.skipped) ? v.skipped : []));
     for (const wk of [mon, QG().addDays(mon, 7)]) {
       const week = Array.from({ length:7 }, (_, i) => QG().addDays(wk, i));
       const info = week.map(d => QG().dayInfo(d, tzOf[d], modeOf(d), evsOf(d), evsOf(QG().addDays(d, -1)), d === today ? G.day.sleepScore : null, illSet.has(d)));
       const seen = new Set(), sessions = week.flatMap(evsOf).filter(x => isGym(x) && !seen.has(x.id || x.s + "|" + x.t) && seen.add(x.id || x.s + "|" + x.t));
-      const r = QG().planWeek({ week:wk, days:info, sessions, logs, placed, now:+now(), today, lastJw, ill:illList, illNow, movedOut:movedOut(wk) });
-      lastJw = r.lastJw; out.push(r);
+      out.push(QG().planWeek({ week:wk, days:info, sessions, logs, placed, placedS, now:+now(), today, ill:illList, illNow, illSkips, movedOut:movedOut(wk) }));
     }
     return out;
   }
@@ -3124,13 +3118,13 @@
           saveG(); go.forEach(p => { delete PLANS[p.ymd]; });
           // the counts stay the planned ones (the far days' plans are cached up to 5 min on the server), less any write that failed
           weeks.forEach(w => { const bad = w.place.filter(p => (G.gymPlan[p.key] || {}).failed).length;
-            if (bad) { w.have -= bad; w.line = w.excused ? `Gym: ${w.have} of ${w.total} this week · ${w.excused} off, ill` : `Gym: ${w.have} of ${w.total} placed this week`; } });
+            if (bad) { w.have -= bad; w.line = `Gym: ${w.have} of ${w.total} placed this week${w.excused ? ` · ${w.excused} skipped, ill` : ""}`; } });
           pullAgenda().then(render).catch(() => {});
         }
       }
       GYMWK = { weeks, at:Date.now() };
       store.set("quest-gym-at", gameYmd() + "|" + Date.now());
-      store.set("quest-gym-wk", JSON.stringify(weeks.map(w => ({ week:w.week, mode:w.mode, have:w.have, total:w.total, by:w.by, excused:w.excused || 0, line:w.line }))));
+      store.set("quest-gym-wk", JSON.stringify(weeks.map(w => ({ week:w.week, mode:w.mode, have:w.have, total:w.total, by:w.by, excused:w.excused || 0, excusedBy:w.excusedBy || null, line:w.line }))));
     } catch (e) { console.warn("gym plan", e); }
     finally { gymBusy = false; }
     if (window.QuestMorning) QuestMorning.redraw();
@@ -3157,7 +3151,7 @@
   // the options shown per block (key -> { at, r }, 2 min), the block each box was drawn for, the reads in flight;
   // MOVEGEN goes up on every move or ill answer, so a read that started before it is thrown away
   const MOVEOPT = {}, GMVB = {}, GMVASK = new Set();
-  let gymMoveBusy = false, illBusy = false, MOVEGEN = 0;
+  let gymMoveBusy = false, illBusy = false, MOVEGEN = 0, GYMASK = null;   // GYMASK: the one-line confirm showing, { key, kind, text, yes }
   const moveOpt = k => { const c = MOVEOPT[k]; return c && Date.now() - c.at < 120000 ? c : null; };
   const clearMoveOpts = () => { MOVEGEN++; for (const x in MOVEOPT) delete MOVEOPT[x]; for (const x in GMVB) delete GMVB[x]; GMVASK.clear(); };
   async function gymMoveChoices(b){
@@ -3179,19 +3173,19 @@
     GMVB[b.key] = b;
     let h = `<div class="gmv" data-gmv="${esc(b.key)}"><div class="glabel">Reschedule</div>`;
     if (st.ill && todayB) h += `<p class="gnote">You're ill today, so no gym. When you feel better, tap I'm better and the rest of the week is planned again.</p>`;
-    else if (!(b.id && b.calId)) h += `<p class="gnote"><b>Only in Day Quest.</b> This one is in today's plan, not in Google Calendar, so it cannot go to another day. ${todayB ? "Put it on Google Calendar to move it to another day, or" : ""} drag it on the calendar to change its time today.</p>`;
+    else if (!(b.id && b.calId)) h += `<p class="gnote">This one is only in today's plan, so it can't go to another day. Drag it on the calendar to change its time today.</p>`;
     else if (!c) h += `<p class="gnote">Finding free times…</p>`;
     else {
       h += c.r.options.length ? `<div class="gmv-os">${c.r.options.map((o, i) => `<button class="gmv-o${o.same ? "" : " nx"}" data-gmvgo="${i}">${esc(o.label)}${o.same ? "" : `<small>${o.later ? "next week" : "week before"}</small>`}</button>`).join("")}</div>` : "";
       if (c.r.note) h += `<p class="gnote">${esc(c.r.note)}</p>`;
     }
-    /* Junyan, 2026-10-16: "right now I'm trying to cancel it so what do I do to get this off my schedule. Also why
-       is it not on my google cal?" Not today drops it like Remove from today (he is not ill); Change time or name
-       is the block's own edit window; a plan-only gym block can go onto his Junyan calendar. */
-    const onCal = !!(b.id && b.calId);
-    h += `<div class="gmv-os gmv-more">${todayB ? `<button class="gmv-o" data-gmvoff>🚫 Not today<small>${onCal ? "hides it today, the event stays" : "takes it off today's plan"}</small></button>` : ""}
-      <button class="gmv-o" data-gmvedit>✏️ Change time or name</button>
-      ${!onCal && todayB ? `<button class="gmv-o" data-gmvcal>📅 Put it on Google Calendar<small>your Junyan calendar</small></button>` : ""}</div>`;
+    /* Later 2026-10-16, Junyan: "Get rid of change time or name and put on google calendar. these are not necessary.
+       Let's just have a simple skip button that is beside close that asks 'are you sure' and then will remove it from
+       the schedule." Skip lives in the Gym log's header (drawGym); here stay the times to move to and ill / better.
+       "I'm ill" asks first when it would delete today's gym from Google Calendar (d22). */
+    const ask = GYMASK && GYMASK.key === b.key && GYMASK.kind === "ill" ? GYMASK : null;
+    if (ask) return h + `<div class="gmv-ask"><span>${esc(ask.text)}</span><span class="gmv-ask-b"><button class="btn ghost small" data-gmvno>Back</button>
+      <button class="btn primary small" data-gmvyes>${esc(ask.yes)}</button></span></div></div>`;
     h += `<button class="gmv-ill" data-gmvill="${st.ill ? 0 : 1}">${st.ill ? "🙂 I'm better" : "🤒 I'm ill, no workout"}</button>`;
     return h + `</div>`;
   }
@@ -3207,31 +3201,41 @@
       }
       el.querySelectorAll("[data-gmvgo]").forEach(bt => bt.onclick = e => { e.stopPropagation();
         const c = moveOpt(k), o = c && c.r.options[+bt.dataset.gmvgo]; if (o) moveGym(b, o); });
-      el.querySelectorAll("[data-gmvill]").forEach(bt => bt.onclick = e => { e.stopPropagation(); setIll(bt.dataset.gmvill === "1").then(redraw); });
-      el.querySelectorAll("[data-gmvoff]").forEach(bt => bt.onclick = e => { e.stopPropagation(); if (GYM && GYM.blockKey === b.key) saveDraft();
-        stopRest(); closeSheet(); dropBlock(b); calToast(b.id && b.calId ? `${shortName(b)} is off today. The event stays in Google Calendar.` : `${shortName(b)} is off today's plan.`, 5000); });
-      el.querySelectorAll("[data-gmvedit]").forEach(bt => bt.onclick = e => { e.stopPropagation(); stopRest(); openEdit(b); });
-      el.querySelectorAll("[data-gmvcal]").forEach(bt => bt.onclick = e => { e.stopPropagation(); gymToCal(b, bt); });
+      el.querySelectorAll("[data-gmvill]").forEach(bt => bt.onclick = e => { e.stopPropagation();
+        const ill = bt.dataset.gmvill === "1", cal = ill ? gymCalToday() : [];
+        if (cal.length) { GYMASK = { key:b.key, kind:"ill", yes:"Yes, I'm ill",
+          text:`You're ill: ${cal.map(x => `${shortName(x)} at ${fmtT(x.s)}`).join(" and ")} comes off Google Calendar too.` }; return redraw(); }
+        setIll(ill).then(redraw); });
+      el.querySelectorAll("[data-gmvno]").forEach(bt => bt.onclick = e => { e.stopPropagation(); GYMASK = null; redraw(); });
+      el.querySelectorAll("[data-gmvyes]").forEach(bt => bt.onclick = async e => { e.stopPropagation();
+        const ask = GYMASK; GYMASK = null; if (ask && ask.kind === "ill") { await setIll(true); redraw(); } });
     });
   }
-  // a gym block that lives only in today's plan goes onto the Junyan calendar (Grape, like the weekly plan), then leaves the plan
-  async function gymToCal(b, bt){
-    const what = shortName(b);
-    if (DRY) { calToast(`Test mode: ${what} would go on Google Calendar. Nothing is saved.`, 6000); return; }
-    if (!questKey()) { calToast("Pair this device in ⚙️ to put it on the calendar."); return; }
-    if (gymMoveBusy) return;
-    gymMoveBusy = true; if (bt) { bt.disabled = true; bt.textContent = "Putting it on the calendar…"; }
-    try {
-      await qfetch("/cal/event", { method:"POST", body:JSON.stringify({ s:new Date(b.s).toISOString(), e:new Date(b.e).toISOString(), title:b.t, color:"3",
-        desc:"Put on the calendar from Day Quest's gym log. Move it or delete it as you like." }) });
-      log(`Put ${b.t} on the calendar: ${fmtT(b.s)} to ${fmtT(b.e)}`);
-      await dropBlock(b);   // the plan-only copy goes, the calendar event takes its place
-      await pullAll();
-      closeSheet(); calToast(`${what} is on your Junyan calendar now. Open it again to move it to another day.`, 6000);
-    } catch (err) {
-      calToast(`Could not put ${what} on the calendar (${err.message}). It stays in today's plan.`, 7000);
-      if (bt) { bt.disabled = false; bt.textContent = "📅 Put it on Google Calendar"; }
-    } finally { gymMoveBusy = false; }
+  // Skip (later 2026-10-16): after "Are you sure?", the session leaves the schedule; a Google Calendar gym event is deleted (d22)
+  async function skipGym(b, bt){
+    GYMASK = null; saveDraft();
+    if (bt) { bt.disabled = true; bt.textContent = "Skipping…"; }
+    const onCal = !!(b.id && b.calId), ok = onCal ? await gymOffCal(b) : (await dropBlock(b), true);
+    stopRest(); closeSheet();
+    if (ok) calToast(ok === "dry" ? `Test mode: ${shortName(b)} would be skipped${onCal ? " and deleted from Google Calendar" : ""}. Nothing is saved.`
+      : `${shortName(b)} is skipped${onCal ? " and deleted from Google Calendar" : ""}.`, 6000);
+  }
+  // today's gym sessions still ahead that are Google Calendar events (what "I'm ill" would delete)
+  const gymCalToday = () => blocks().filter(x => isGym(x) && x.id && x.calId && x.e > now() && !G.day.closes[gk(x)]);
+  /* d22: a gym session Day Quest drops comes off Google Calendar too. still-api's /cal/delete deletes only events it
+     can tell are gym sessions (and refuses anything else). Today's copy leaves the plan either way; a failed delete
+     says so and the event stays. Returns true, "dry" in test mode, or false. */
+  async function gymOffCal(b){
+    if (DRY) { await dropBlock(b); return "dry"; }
+    if (!questKey()) { await dropBlock(b); calToast(`Pair this device in ⚙️ to delete it from Google Calendar. ${shortName(b)} is off today's plan.`, 6000); return false; }
+    try { await qfetch("/cal/delete", { method:"POST", body:JSON.stringify({ id:b.id, calId:b.calId }) }); }
+    catch (err) { await dropBlock(b); calToast(`Could not delete it from Google Calendar (${err.message}). It is off today's plan; the event stays.`, 8000); return false; }
+    log(`Deleted ${b.t} from Google Calendar: ${fmtT(b.s)}`);
+    await dropBlock(b);
+    for (const d in PLANS) delete PLANS[d];
+    store.set("quest-gym-at", "");
+    pullAll().catch(() => {});
+    return true;
   }
   async function moveGym(b, o){
     if (gymMoveBusy) return;   // one move at a time: a second tap waits for the first
@@ -3268,10 +3272,20 @@
     try { await setIllNow(ill); } finally { illBusy = false; }
   }
   async function setIllNow(ill){
-    G.ill = G.ill || {}; G.ill[gameYmd()] = { ill, at:new Date().toISOString() };
+    G.ill = G.ill || {}; const was = G.ill[gameYmd()];
+    G.ill[gameYmd()] = { ill, at:new Date().toISOString(), ...(was && Array.isArray(was.skipped) ? { skipped:was.skipped } : {}) };
     G.day.plan = G.day.plan || {}; G.day.plan.ill = ill;   // today's plan state says so too (the brief asked for it there; G.ill is what is read)
     log(ill ? "Ill today: no gym until I'm better" : "Feeling better: gym planned again from the free times"); saveG();
-    if (ill) for (const b of blocks().filter(x => isGym(x) && x.e > now() && !G.day.closes[gk(x)])) await dropBlock(b);
+    if (ill) {
+      // d21: today's sessions are skipped (not moved); each is noted on the day so the week's target drops by it
+      const gone = blocks().filter(x => isGym(x) && x.e > now() && !G.day.closes[gk(x)]);
+      const slotOf = x => (Object.entries(G.gymPlan || {}).find(([, v]) => v && !v.failed && Math.abs(Date.parse(v.s) - +x.s) < 60000) || [])[0] || null;
+      const had = G.ill[gameYmd()].skipped || [];
+      G.ill[gameYmd()].skipped = had.concat(gone.map(x => ({ t:x.t, s:new Date(x.s).toISOString(), key:slotOf(x) }))
+        .filter(x => !had.some(y => Math.abs(Date.parse(y.s) - Date.parse(x.s)) < 60000)));
+      saveG();
+      for (const b of gone) { if (b.id && b.calId) await gymOffCal(b); else await dropBlock(b); }
+    }
     clearMoveOpts();
     store.set("quest-gym-at", ""); GYMWK = null;
     if (questKey() && !DRY) await pushG();
@@ -3284,14 +3298,15 @@
     const st = illToday(); if (!st.ask || store.get("quest-ill-asked") === gameYmd()) return;
     store.set("quest-ill-asked", gameYmd());
     const since = new Date(st.since + "T12:00:00Z").toLocaleDateString("en-US", { timeZone:"UTC", weekday:"short", month:"short", day:"numeric" });
-    openSheet(`<h3>🤒 Still ill?</h3><p>You said you were ill on ${esc(since)}. While you're ill no gym goes on the plan, and missed sessions don't count against the week.</p>
+    const cal = gymCalToday();
+    openSheet(`<h3>🤒 Still ill?</h3><p>You said you were ill on ${esc(since)}. While you're ill no gym goes on the plan. A session on an ill day is skipped, not moved, and the week's count drops by it.${cal.length ? ` Yes takes today's ${esc(cal.map(x => `${shortName(x)} at ${fmtT(x.s)}`).join(" and "))} off Google Calendar.` : ""}</p>
       <div class="actions"><button class="btn ghost" id="illYes">Yes, still ill</button><button class="btn primary" id="illNo">I'm better</button></div>`);
     $("illYes").onclick = () => { closeSheet(); setIll(true); };
     $("illNo").onclick = () => { closeSheet(); setIll(false); };
   }
   const TRAINING = {
     home: [["jw", "Jack Woods", 3, /Jack Woods/, 60], ["ms", "Matthew I. Smith", 1, /Matthew/, 45]],
-    travel: [["jw1", "Jack Woods · Day 1", 1, /Jack Woods · Day 1/, 60], ["jw2", "Jack Woods · Day 2", 1, /Jack Woods · Day 2/, 60], ["ms", "Matthew I. Smith", 1, /Matthew/, 45]],
+    travel: [["jw", "Jack Woods", 2, /Jack Woods/, 60], ["ms", "Matthew I. Smith", 1, /Matthew/, 45]],
   };
   /* A day to go easy on strength (Junyan, 2026-10-11, d245: "we should always try our best to get everything in,
      but look at the calendar and consider lack of sleep due to travel (especially when changing locations)... in
@@ -3324,14 +3339,13 @@
       return { id:"w:" + key, icon: key === "ms" ? "🤸" : "🏋️", label:name, name:`Gym · ${prog.replace(" · ", " ")}`, mins, have, q, need: Math.max(0, q - have),
         at: at ? fmtT(at.s) : "", cal:true, weekly:true };
     });
-    // ill (2026-10-16): no workout today, and sessions let off this week are not a shortfall
+    // d21: a session on an ill day is skipped, so this week's target drops by it (no catching up)
+    const wk0 = GYMWK && GYMWK.weeks && GYMWK.weeks[0], exc = wk0 && wk0.week === days[0] ? wk0.excusedBy || { jw:wk0.excused || 0, ms:0 } : null;
+    if (exc) for (const x of items) { const c = Math.min(exc[x.id === "w:ms" ? "ms" : "jw"] || 0, x.q); if (!c) continue; x.q -= c; x.need = Math.max(0, x.q - x.have); x.off = c; }
+    const offNote = xs => xs.map(x => x.off ? { ...x, small:`${x.small} · ${x.off} skipped, ill` } : x);
+    // ill (2026-10-16, d21): no workout today; a session on an ill day is skipped and the week's target drops by it
     if (illToday().ill) return { home, easy:["ill"], items: pickToday(items, left).map(x => ({ ...x, pick:false, rest:true,
-      small:`${x.have} of ${x.q} this week · ill today, rest up. Missed sessions don't count.` })) };
-    const wk0 = GYMWK && GYMWK.weeks && GYMWK.weeks[0];
-    let off = wk0 && wk0.week === days[0] ? wk0.excused || 0 : 0;
-    if (off) for (const x of items.filter(i => i.id !== "w:ms").reverse().concat(items.filter(i => i.id === "w:ms"))) {
-      const c = Math.min(off, x.need); if (!c) continue; x.need -= c; x.q -= c; x.off = c; off -= c; }
-    const offNote = xs => xs.map(x => x.off ? { ...x, small:`${x.small} · ${x.off} off, ill` } : x);
+      small:`${x.have} of ${x.q} this week · ill today, rest up. Today's session is skipped, not moved.` })) };
     const why = recoveryReasons();
     if (!why.length) return { home, items: offNote(pickToday(items, left)) };
     // strength waits for a better day: no star, no button, the reason instead
@@ -3605,7 +3619,8 @@
      Places near the stay, each row shut until tapped (quest-nearby.js holds the lists, one per hotel). The stay
      comes from still-api's place line (where.from.place is the hotel's check-in event), then today's hotel events.
      No list for the stay: the widget is hidden (on the dashboard its card leaves the grid). Put on the plan is
-     a today-only block in the next free slot that fits, like the add box. Open rows are kept for this page only.
+     a today-only block in the next free slot that fits, like the add box; for a gym it is a real "Gym · Jack Woods"
+     event on his Junyan calendar instead (d22, later 2026-10-16). Open rows are kept for this page only.
      Eat (2026-10-16) is a second tab in the same card; it opens on Eat near meal times until he picks a tab. The
      stay's check-in and check-out times (in quest-nearby.js) find the hotel on days with no hotel event. */
   function nearbyStay(){
@@ -3657,13 +3672,18 @@
     const QN = window.QuestNearby, st = drawNearby.st, p = QN && QN.find(stay, id);
     if (!QN || !p || !window.QuestMorning || nearbyPlan.busy) return;
     nearbyPlan.busy = true;   // a quick double tap: one write at a time
-    try { await nearbyPut(QN, st, p, id, stay.id + ":" + id); } finally { nearbyPlan.busy = false; }
+    try { await nearbyPut(QN, st, p, id, stay.id + ":" + id, stay); } finally { nearbyPlan.busy = false; }
   }
-  async function nearbyPut(QN, st, p, id, tag){   // tag: stay and place, so two hotels' gyms never count as one
+  async function nearbyPut(QN, st, p, id, tag, stay){   // tag: stay and place, so two hotels' gyms never count as one
     const there = blocks().find(b => b.nearby === tag && b.e > now());   // a second tap does not add a second block
     if (there) { st.msg[id] = `Already on the plan at ${fmtT(there.s)}.`; return drawNearby(); }
-    const min = QN.minFor(p), slot = QN.slotFor(QuestMorning.gapsOf(MO_CTX.data()), min);
+    const gym = QN.isGymPlace(p);
+    // a gym: one strength session a day, so a Jack Woods (or other strength gym) already ahead today is the answer
+    const gymThere = gym && blocks().find(b => STRENGTH(b) && b.e > now() && gameDayOf(b.s) === gameYmd() && !G.day.closes[gk(b)]);
+    if (gymThere) { st.msg[id] = `${shortName(gymThere)} is already on the plan at ${fmtT(gymThere.s)}.`; return drawNearby(); }
+    const min = gym ? 60 : QN.minFor(p), slot = QN.slotFor(QuestMorning.gapsOf(MO_CTX.data()), min);
     if (!slot) { st.msg[id] = `No free slot of ${QN.hm(min)} left today.`; return drawNearby(); }
+    if (gym) return nearbyGym(QN, st, stay, p, id, slot);
     let twice = null;   // checked again against the edit layer writeOps pulls, so another device's add counts too
     await writeOps(o => {
       twice = o.adds.find(a => a.nearby === tag && Date.parse(a.e) > +now());
@@ -3671,6 +3691,23 @@
     });
     if (twice) st.msg[id] = `Already on the plan at ${fmtT(new Date(twice.s))}.`;
     else { st.msg[id] = `On the plan at ${fmtT(slot.s)}, ${QN.hm(min)}.`; log(`Planned ${p.name}: ${fmtT(slot.s)} to ${fmtT(slot.e)}`); saveG(); }
+    drawNearby();
+  }
+
+  // the hotel gym goes on Google Calendar (his Junyan calendar, Grape), like the weekly planner's sessions (d22)
+  async function nearbyGym(QN, st, stay, p, id, slot){
+    const body = QN.gymEvent(stay, p, slot);
+    if (DRY) { console.info("Day Quest Nearby gym, not written (test mode):", JSON.stringify(body));
+      st.msg[id] = `Test mode: Gym · Jack Woods would go on your Junyan calendar at ${fmtT(slot.s)}. Nothing is saved.`; return drawNearby(); }
+    if (!questKey()) { st.msg[id] = "Pair this device in ⚙️ to put the gym on your calendar."; return drawNearby(); }
+    st.msg[id] = "Putting it on your calendar…"; drawNearby();
+    try { await qfetch("/cal/event", { method:"POST", body:JSON.stringify(body) }); }
+    catch (err) { st.msg[id] = `Could not put it on the calendar (${err.message}). Nothing was added.`; return drawNearby(); }
+    log(`Planned Gym · Jack Woods (${p.name}) on the calendar: ${fmtT(slot.s)} to ${fmtT(slot.e)}`); saveG();
+    st.msg[id] = `On your calendar at ${fmtT(slot.s)}: Gym · Jack Woods, 1 h.`;
+    for (const d in PLANS) delete PLANS[d];
+    store.set("quest-gym-at", "");
+    await pullAll().catch(() => {});
     drawNearby();
   }
 
@@ -3698,7 +3735,10 @@
     setTime: (key, s, e) => { const b = blkByKey(key); if (b) return saveBlock(b, s, e, b.t, false); },
     rename: (key, t) => { const b = blkByKey(key); if (b) return saveBlock(b, b.s, b.e, t, false); },
     drop: key => { const b = blkByKey(key); if (b) return dropBlock(b); },
-    add: (t, s, e, extra) => { log(`Planned ${t}: ${fmtT(s)} to ${fmtT(e)}`);
+    add: (t, s, e, extra) => {
+      // a gym session goes on Google Calendar as a real event, never a plan-only block (later 2026-10-16)
+      if (isGym({ t }) && questKey() && !DRY) return addBlockCal(t, s, e, false);
+      log(`Planned ${t}: ${fmtT(s)} to ${fmtT(e)}`);
       return writeOps(o => o.adds.push({ key:newKey(s), s:s.toISOString(), e:e.toISOString(), t, type:"task", cal:"you", ...(extra || {}) })); },
     // done in Notion; the answer carries the status it had, so Undo can put it back (2026-10-10)
     taskDone: async id => {

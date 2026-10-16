@@ -42,9 +42,11 @@ const TZS = { "2026-10-24":TOR, "2026-10-25":TOR };
 const NOW = G.at("2026-10-16", 15.75, MAD);   // Fri Oct 16, 3:45 PM in Madrid
 const sessionsOf = (mon, cal = CAL) => Array.from({ length:7 }, (_, i) => cal[G.addDays(mon, i)] || []).flat().filter(x => G.isGymTitle(x.t));
 
-test("which session a title or a logged program is", () => {
-  assert.equal(G.sessionOf("Jack Woods · Day 1"), "jw1");
-  assert.equal(G.sessionOf("Gym · Jack Woods Day 2"), "jw2");
+test("which session a title or a logged program is: any Jack Woods (old Day 1 and Day 2 too) is one kind", () => {
+  assert.equal(G.sessionOf("Jack Woods · Day 1"), "jw");
+  assert.equal(G.sessionOf("Gym · Jack Woods Day 2"), "jw");
+  assert.equal(G.sessionOf("Gym · Jack Woods"), "jw");
+  assert.equal(G.sessionOf("Jack Woods"), "jw");
   assert.equal(G.sessionOf("Hotel gym"), "jw");
   assert.equal(G.sessionOf("Gym · Matthew I. Smith"), "ms");
   assert.equal(G.sessionOf("Matthew I. Smith"), "ms");
@@ -75,7 +77,7 @@ test("a week is a home week when he is home 4 of its 7 days", () => {
   assert.equal(G.weekMode(d(3)), "travel");
 });
 
-test("this travel week: the two hotel gyms count as Day 1 and Day 2, and Matthew I. Smith goes in a free evening", () => {
+test("this travel week: the two hotel gyms count as the two Jack Woods sessions, and Matthew I. Smith goes in a free evening", () => {
   const days = week("2026-10-12", CAL);
   const r = G.planWeek({ week:"2026-10-12", days, sessions:sessionsOf("2026-10-12"), logs:[], placed:{}, now:NOW, today:"2026-10-16" });
   assert.equal(r.mode, "travel");
@@ -90,7 +92,7 @@ test("this travel week: the two hotel gyms count as Day 1 and Day 2, and Matthew
   assert.equal(r.line, "Gym: 3 of 3 placed this week");
 });
 
-test("next week: Day 1 and Day 2 are on the calendar; Matthew I. Smith goes on the day furthest from them, never a move or flight day", () => {
+test("next week: two Jack Woods are on the calendar; Matthew I. Smith goes on the day furthest from them, never a move or flight day", () => {
   const days = week("2026-10-19", CAL, {}, TZS);
   const r = G.planWeek({ week:"2026-10-19", days, sessions:sessionsOf("2026-10-19"), logs:[], placed:{}, now:NOW, today:"2026-10-16" });
   assert.equal(r.mode, "travel");
@@ -125,7 +127,7 @@ test("a week whose answer flips from travel to home does not bring back a delete
   const again = G.planWeek({ week:"2026-10-19", days:home, sessions:sessionsOf("2026-10-19"), logs:[], placed, now:NOW, today:"2026-10-16" });
   assert.equal(again.mode, "home");
   assert.ok(!again.place.some(p => p.kind === "ms"));
-  assert.deepEqual(J(first.by), { jw:2, jw1:1, jw2:1, ms:1 });
+  assert.deepEqual(J(first.by), { jw:2, ms:1 });
 });
 
 test("finished workouts count, and a logged day's gym block is not counted twice", () => {
@@ -143,12 +145,12 @@ const homeDays = (cal = {}, extra = {}) => week(HOME, cal, Object.fromEntries(Ar
   Object.fromEntries(Array.from({ length:7 }, (_, i) => [G.addDays(HOME, i), TOR])), extra);
 const SUN = G.at("2026-10-25", 21, TOR);
 
-test("a home week: Jack Woods Mon, Wed, Fri 7:30 PM alternating Day 1 and Day 2, Matthew I. Smith on a day without gym", () => {
-  const r = G.planWeek({ week:HOME, days:homeDays(), sessions:[], logs:[], placed:{}, now:SUN, today:"2026-10-25", lastJw:"jw1" });
+test("a home week: Jack Woods Mon, Wed, Fri 7:30 PM, each titled Gym · Jack Woods, Matthew I. Smith on a day without gym", () => {
+  const r = G.planWeek({ week:HOME, days:homeDays(), sessions:[], logs:[], placed:{}, now:SUN, today:"2026-10-25" });
   assert.equal(r.mode, "home");
   const jw = r.place.filter(p => p.kind !== "ms");
   assert.deepEqual(J(jw.map(p => local(p.s, TOR))), ["Mon 26, 19:30", "Wed 28, 19:30", "Fri 30, 19:30"]);
-  assert.deepEqual(J(jw.map(p => p.t)), ["Gym · Jack Woods Day 2", "Gym · Jack Woods Day 1", "Gym · Jack Woods Day 2"]);
+  assert.deepEqual(J(jw.map(p => p.t)), ["Gym · Jack Woods", "Gym · Jack Woods", "Gym · Jack Woods"]);
   const ms = r.place.find(p => p.kind === "ms");
   assert.ok(ms && !["2026-10-26", "2026-10-28", "2026-10-30"].includes(ms.ymd));
   const h = new Date(ms.s).toLocaleString("en-US", { timeZone:TOR, hour:"numeric", hourCycle:"h23" });
@@ -158,11 +160,11 @@ test("a home week: Jack Woods Mon, Wed, Fri 7:30 PM alternating Day 1 and Day 2,
 
 test("no strength on a go-easy day (a long trip, a sleep score under 70); Matthew I. Smith may go there", () => {
   const cal = { "2026-10-28": [ev("2026-10-28", "09:00", "11:00", "Train to Ottawa", TOR)] };
-  const r = G.planWeek({ week:HOME, days:homeDays(cal), sessions:[], logs:[], placed:{}, now:SUN, today:"2026-10-25", lastJw:"jw2" });
+  const r = G.planWeek({ week:HOME, days:homeDays(cal), sessions:[], logs:[], placed:{}, now:SUN, today:"2026-10-25" });
   const jw = r.place.filter(p => p.kind !== "ms");
   assert.equal(jw.length, 3);
   assert.ok(!jw.some(p => p.ymd === "2026-10-28"));
-  assert.equal(jw[0].t, "Gym · Jack Woods Day 1");
+  assert.equal(jw[0].t, "Gym · Jack Woods");
   assert.equal(new Set(r.place.map(p => p.ymd)).size, r.place.length, "one session a day");
   const tired = G.planWeek({ week:HOME, days:homeDays({}, { "2026-10-26":55 }), sessions:[], logs:[], placed:{}, now:SUN, today:"2026-10-25" });
   assert.ok(!tired.place.some(p => p.kind !== "ms" && p.ymd === "2026-10-26"));
@@ -182,4 +184,28 @@ test("today is planned only from half an hour from now; earlier days of the week
   const r = G.planWeek({ week:HOME, days:homeDays(), sessions:[], logs:[], placed:{}, now:G.at("2026-10-28", 19.25, TOR), today:"2026-10-28" });
   assert.ok(r.place.every(p => p.ymd >= "2026-10-28"));
   assert.ok(!r.place.some(p => p.ymd === "2026-10-28" && p.s < G.at("2026-10-28", 19.75, TOR)));
+});
+
+test("any Jack Woods session counts toward the week: old Day 1 / Day 2 events, saved sessions and the new title alike", () => {
+  const cal = {
+    "2026-10-26": [ev("2026-10-26", "19:30", "20:30", "Gym · Jack Woods Day 1", TOR)],
+    "2026-10-27": [ev("2026-10-27", "19:30", "20:30", "Gym · Jack Woods Day 1", TOR)],   // two "Day 1" in a row still count twice
+    "2026-10-29": [ev("2026-10-29", "17:00", "18:00", "Gym · Jack Woods", TOR)],
+  };
+  const sessions = Object.values(cal).flat();
+  const r = G.planWeek({ week:HOME, days:homeDays(cal), sessions, logs:[], placed:{}, now:SUN, today:"2026-10-25" });
+  assert.equal(r.by.jw, 3);
+  assert.ok(!r.place.some(p => p.kind === "jw"), "no fourth Jack Woods");
+  assert.equal(r.place.filter(p => p.kind === "ms").length, 1);
+  // a saved "Jack Woods · Day 2" session and a saved flexible "Jack Woods" one count as well
+  const now = G.at("2026-10-29", 21, TOR);
+  const logs = [{ date:"2026-10-26", program:"Jack Woods · Day 2" }, { date:"2026-10-27", program:"Jack Woods" }];
+  const r2 = G.planWeek({ week:HOME, days:homeDays(cal), sessions, logs, placed:{}, now, today:"2026-10-29" });
+  assert.equal(r2.by.jw, 3); assert.equal(r2.have >= 3, true);
+  // a travel week needs two
+  const tr = G.planWeek({ week:HOME, days:week(HOME, {}, {}, Object.fromEntries(Array.from({ length:7 }, (_, i) => [G.addDays(HOME, i), TOR]))), sessions:[], logs:[], placed:{}, now:SUN, today:"2026-10-25" });
+  assert.equal(tr.mode, "travel");
+  assert.deepEqual(J(tr.slots), ["jw#1", "jw#2", "ms#1"]);
+  assert.equal(tr.place.filter(p => p.kind === "jw").length, 2);
+  assert.ok(tr.place.every(p => p.t === "Gym · Jack Woods" || p.t === "Gym · Matthew I. Smith"));
 });
