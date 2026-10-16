@@ -5,8 +5,10 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import vm from "node:vm";
+import { fileURLToPath } from "node:url";
 
-const here = new URL("..", import.meta.url).pathname;
+// fileURLToPath, not .pathname: the repo sits under "Agent Workspace" and .pathname keeps the %20
+const here = fileURLToPath(new URL("..", import.meta.url));
 function core(file = process.env.QUEST_CORE || here + "quest-core.js") {
   const ctx = {}; ctx.globalThis = ctx;
   vm.runInNewContext(fs.readFileSync(file, "utf8"), ctx);

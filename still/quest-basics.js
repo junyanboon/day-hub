@@ -1,6 +1,8 @@
 /* Day Quest basics: what the plan puts in every day without him typing (Junyan, 2026-10-16, d1 d5 d6 d7),
    plus the Fill it list (d2) and type to add (d3). Pure, so it can be tested (node --test still/test).
-   1. "Go over the day with Caney", 10 min, right after breakfast.
+   1. "Go over the day with Caney", 15 min, right after breakfast: its own block every day, home or travelling,
+      never folded into Domestics (Junyan, 2026-10-16: "make the caney check in one 15 minute block separately
+      then from the domestics"; it was 10 min before that).
    2. "Domestics" right after it: one block, its steps a checklist inside (his Notion skill page). Home Mon to
       Fri 60 min with the day's Plus One, home Sat and Sun 30 min, travelling 25 min.
    3. "Wind-down", ending at bedtime: 45 min at home, 35 travelling (no kitchen). Steps from his Notion page.
@@ -13,7 +15,7 @@
   const WASH = { t:"Shower, face wash, moisturizer with SPF, dress" };
   // Mon to Fri at home: one bigger job a day
   const PLUS = { 1:"Vacuum", 2:"Iron", 3:"Deep-clean the kitchen", 4:"Deep-clean the bathroom", 5:"Deep-clean the bedroom (sheets, surfaces)" };
-  const CANEY = { id:"caney", t:"Go over the day with Caney", min:10 };
+  const CANEY = { id:"caney", t:"Go over the day with Caney", min:15 }, CANEY_OLD = 10;
 
   // wd: 0 Sunday to 6 Saturday, the game day's weekday
   function domestics(mode, wd){
@@ -102,6 +104,29 @@
     return { place: out, notes };
   }
 
+  /* A Caney block placed today at the old 10 min grows to 15 on the next refresh, in place (no second block).
+     Only one that has not started (its start is still ahead and started(a) is false: not ticked, not closed);
+     a length he set himself is his. A Domestics that began right where the old Caney ended (and has not started)
+     moves with it, same length, unless that runs into something fixed in busy ([[s ms, e ms]], not the basics):
+     then it keeps its end and starts 5 min later. adds: today's edit-layer adds, changed in place.
+     Returns how many Caney blocks it grew. */
+  function growCaney(adds, now, started, busy){
+    let n = 0;
+    const ahead = a => Date.parse(a.s) > +now && !started(a), d5 = (CANEY.min - CANEY_OLD) * MIN;
+    (adds || []).forEach(c => {
+      if (c.basic !== "caney" || !ahead(c) || Date.parse(c.e) - Date.parse(c.s) !== CANEY_OLD * MIN) return;
+      const oldE = Date.parse(c.e), newE = oldE + d5;
+      c.e = new Date(newE).toISOString(); n++;
+      const d = adds.find(a => a.basic === "domestics" && Date.parse(a.s) === oldE && ahead(a));
+      if (!d) return;
+      const ds = Date.parse(d.s), de = Date.parse(d.e);
+      const hits = (busy || []).some(([x, y]) => x < de + d5 && y > de);
+      d.s = new Date(ds + d5).toISOString();
+      if (!hits) d.e = new Date(de + d5).toISOString();
+    });
+    return n;
+  }
+
   /* Fill it: what fits a free slot of `min` minutes, in this order: basics not yet on today's plan, practices,
      short tasks, then Rest (the slot, at most 30 min). Each candidate is { id, t, min, ... }. */
   function fitList(min, c){
@@ -119,5 +144,5 @@
     return { t: t[0].toUpperCase() + t.slice(1), min };
   }
 
-  root.QuestBasics = { domestics, windDown, basic, guessMode, placeBasics, fitList, parseQuick, IDS:["caney", "domestics", "winddown"] };
+  root.QuestBasics = { domestics, windDown, basic, guessMode, placeBasics, growCaney, fitList, parseQuick, IDS:["caney", "domestics", "winddown"] };
 })(typeof window !== "undefined" ? window : globalThis);

@@ -3,9 +3,10 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import vm from "node:vm";
+import { fileURLToPath } from "node:url";
 
 const ctx = {}; ctx.globalThis = ctx;
-vm.runInNewContext(fs.readFileSync(new URL("../quest-basics.js", import.meta.url), "utf8"), ctx);
+vm.runInNewContext(fs.readFileSync(fileURLToPath(new URL("../quest-basics.js", import.meta.url)), "utf8"), ctx);
 const B = ctx.QuestBasics;
 const at = (h, m = 0, d = 16) => new Date(Date.UTC(2026, 9, d, h, m));   // Oct d, h:m UTC
 const iso = d => new Date(d).toISOString();
@@ -80,15 +81,65 @@ test("the Wind-down ends at bedtime", () => {
 test("Caney goes right after breakfast, Domestics right after Caney", () => {
   const r = B.placeBasics({ now:at(5), gaps:[gap(at(7), at(11))], breakfastEnd:at(7), bed:null, busy:[], mode:"home", wd:1 });
   const c = r.place.find(x => x.id === "caney"), d = r.place.find(x => x.id === "domestics");
-  assert.equal(iso(c.s), iso(at(7))); assert.equal(iso(c.e), iso(at(7, 10)));
-  assert.equal(iso(d.s), iso(at(7, 10))); assert.equal(iso(d.e), iso(at(8, 10)));
+  assert.equal(iso(c.s), iso(at(7))); assert.equal(iso(c.e), iso(at(7, 15)));
+  assert.equal(iso(d.s), iso(at(7, 15))); assert.equal(iso(d.e), iso(at(8, 15)));
   assert.equal(r.notes.length, 0);
+});
+
+// Junyan, 2026-10-16: "make the caney check in one 15 minute block separately then from the domestics."
+test("Caney is its own 15 min block every day, home and travelling, and never part of Domestics", () => {
+  for (const mode of ["home", "travel"]) for (let wd = 0; wd <= 6; wd++) {
+    const c = B.basic("caney", mode, wd), d = B.basic("domestics", mode, wd);
+    assert.equal(c.min, 15, `${mode} ${wd}`);
+    assert.equal(c.steps.length, 0);   // no checklist of its own, and none of Domestics' steps
+    assert.ok(!d.steps.some(x => /caney/i.test(x.t)));
+    assert.equal(d.min, mode === "travel" ? 25 : wd >= 1 && wd <= 5 ? 60 : 30);   // Domestics keeps its own lengths
+    const r = B.placeBasics({ now:at(5), gaps:[gap(at(7), at(11))], breakfastEnd:at(7), bed:null, busy:[], mode, wd });
+    const cs = r.place.filter(x => x.id === "caney"), ds = r.place.filter(x => x.id === "domestics");
+    assert.equal(cs.length, 1); assert.equal(ds.length, 1);   // two blocks, never one
+    assert.equal(cs[0].min, 15); assert.equal(ds[0].min, d.min);
+    assert.equal(iso(cs[0].e), iso(ds[0].s));   // Caney first, Domestics straight after
+    assert.equal(ds[0].t, "Domestics"); assert.equal(cs[0].t, "Go over the day with Caney");
+  }
+});
+
+test("today's Caney placed at the old 10 min grows to 15 if it has not started, without a second one", () => {
+  const now = +at(6);
+  const add = (basic, s, e, key) => ({ key, basic, s:iso(s), e:iso(e), t:basic });
+  // Caney 7:00 to 7:10, Domestics 7:10 to 8:10 right after it
+  let adds = [add("caney", at(7), at(7, 10), "c"), add("domestics", at(7, 10), at(8, 10), "d")];
+  assert.equal(B.growCaney(adds, now, () => false, []), 1);
+  assert.equal(adds.length, 2);
+  assert.equal(adds[0].e, iso(at(7, 15)));
+  assert.equal(adds[1].s, iso(at(7, 15))); assert.equal(adds[1].e, iso(at(8, 15)));   // Domestics moves with it, same length
+  // a second refresh changes nothing
+  assert.equal(B.growCaney(adds, now, () => false, []), 0);
+  assert.equal(adds[0].e, iso(at(7, 15))); assert.equal(adds[1].s, iso(at(7, 15)));
+  // Domestics is up against something fixed at 8:10: it keeps its end and starts 5 min later
+  adds = [add("caney", at(7), at(7, 10), "c"), add("domestics", at(7, 10), at(8, 10), "d")];
+  B.growCaney(adds, now, () => false, [[+at(8, 10), +at(9)]]);
+  assert.equal(adds[1].s, iso(at(7, 15))); assert.equal(adds[1].e, iso(at(8, 10)));
+  // Domestics somewhere else (he moved it): left alone
+  adds = [add("caney", at(7), at(7, 10), "c"), add("domestics", at(10), at(11), "d")];
+  B.growCaney(adds, now, () => false, []);
+  assert.equal(adds[0].e, iso(at(7, 15))); assert.equal(adds[1].s, iso(at(10)));
+  // started (its time has come), ticked or done: left at 10
+  adds = [add("caney", at(7), at(7, 10), "c")];
+  assert.equal(B.growCaney(adds, +at(7, 5), () => false, []), 0); assert.equal(adds[0].e, iso(at(7, 10)));
+  assert.equal(B.growCaney(adds, now, a => a.key === "c", []), 0); assert.equal(adds[0].e, iso(at(7, 10)));
+  // a length he chose himself (not the old 10) is his
+  adds = [add("caney", at(7), at(7, 30), "c")];
+  assert.equal(B.growCaney(adds, now, () => false, []), 0); assert.equal(adds[0].e, iso(at(7, 30)));
+  // a Domestics already under way does not move
+  adds = [add("caney", at(7), at(7, 10), "c"), add("domestics", at(7, 10), at(8, 10), "d")];
+  B.growCaney(adds, now, a => a.key === "d", []);
+  assert.equal(adds[0].e, iso(at(7, 15))); assert.equal(adds[1].s, iso(at(7, 10)));
 });
 
 test("no breakfast: the first free gap of 25 min or more after waking", () => {
   const r = B.placeBasics({ now:at(5), wake:at(5), gaps:[gap(at(5), at(5, 20)), gap(at(6), at(8))], bed:null, busy:[], mode:"travel", wd:3 });
   const c = r.place.find(x => x.id === "caney"), d = r.place.find(x => x.id === "domestics");
-  assert.equal(iso(c.s), iso(at(6))); assert.equal(iso(d.s), iso(at(6, 10))); assert.equal(iso(d.e), iso(at(6, 35)));
+  assert.equal(iso(c.s), iso(at(6))); assert.equal(iso(d.s), iso(at(6, 15))); assert.equal(iso(d.e), iso(at(6, 40)));
 });
 
 test("a short gap after breakfast: Domestics takes the first gap that fits, else shrinks and says so", () => {
@@ -99,8 +150,8 @@ test("a short gap after breakfast: Domestics takes the first gap that fits, else
   // nothing that fits before the cut-off: shrink to the biggest room after Caney
   r = B.placeBasics({ now:at(5), gaps:[gap(at(8, 30), at(9, 15))], breakfastEnd:at(8, 30), latest:at(11), bed:null, busy:[], mode:"home", wd:2 });
   d = r.place.find(x => x.id === "domestics");
-  assert.equal(iso(d.s), iso(at(8, 40))); assert.equal(d.min, 35); assert.equal(iso(d.e), iso(at(9, 15)));
-  assert.ok(r.notes.some(n => n.id === "domestics" && /35 min/.test(n.t)));
+  assert.equal(iso(d.s), iso(at(8, 45))); assert.equal(d.min, 30); assert.equal(iso(d.e), iso(at(9, 15)));
+  assert.ok(r.notes.some(n => n.id === "domestics" && /30 min/.test(n.t)));
 });
 
 test("a basic he dropped or already has is not put back", () => {
@@ -111,7 +162,7 @@ test("a basic he dropped or already has is not put back", () => {
 
 test("Fill it only offers what fits the slot, and always Rest", () => {
   const list = B.fitList(20, {
-    basics:[{ id:"caney", t:"Go over the day with Caney", min:10 }, { id:"domestics", t:"Domestics", min:60 }],
+    basics:[{ id:"caney", t:"Go over the day with Caney", min:15 }, { id:"domestics", t:"Domestics", min:60 }],
     practices:[{ id:"kriya", t:"Isha Kriya", min:12 }, { id:"angam", t:"Angamardana", min:30 }],
     tasks:[{ id:"T1", t:"Pay the bill", min:15 }, { id:"T2", t:"Write the report", min:90 }] });
   assert.deepEqual([...list.map(x => x.t)], ["Go over the day with Caney", "Isha Kriya", "Pay the bill", "Rest"]);
