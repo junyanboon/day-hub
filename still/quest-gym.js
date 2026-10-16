@@ -124,8 +124,11 @@
     const open = slots.filter(k => !cover[k]), place = [], skipped = [], taken = [];
     const used = have.map(h => h.ymd);
     const today = o.today || localYmd(now, (days[0] || {}).tz || "America/Toronto");
+    // a slot's key is the same whether the week reads as home or travel (the nth Jack Woods, the nth Matthew I. Smith),
+    // so a week whose answer flips cannot bring back a session he deleted
+    const n = { jw: Object.keys(cover).filter(k => !k.startsWith("ms")).length, ms: Object.keys(cover).filter(k => k.startsWith("ms")).length };
     for (const slot of open) {
-      const key = `${o.week}:${slot}`, kind0 = slot.replace(/#\d+$/, "");
+      const kind0 = slot.replace(/#\d+$/, ""), fam = kind0 === "ms" ? "ms" : "jw", key = `${o.week}:${fam}#${++n[fam]}`;
       if (placed[key]) { skipped.push({ key, kind:kind0, why:"placed before; left as he left it" }); continue; }
       const strength = kind0 !== "ms", len = strength ? 60 : 45;
       const spread = d => used.length ? Math.min(...used.map(u => dayGap(u, d.ymd))) : 7;
@@ -153,7 +156,11 @@
     }
     place.forEach(p => { p.t = NAMES[p.kind]; p.color = GRAPE; p.min = LEN[p.kind]; });
     const total = slots.length, onPlan = total - open.length + place.length;
-    return { week:o.week, mode, slots, have:onPlan, total, lastJw:last, place: place.sort((a, b) => a.s - b.s), skipped,
+    // how many of each are done or on the plan (placed ones included), for the Practices list
+    const by = { jw:0, jw1:0, jw2:0, ms:0 };
+    Object.values(cover).concat(place).forEach(x => { by[x.kind] = (by[x.kind] || 0) + 1; if (x.kind !== "ms") by.jw++; });
+    if (mode === "travel") { by.jw1 = cover.jw1 || place.some(p => p.kind === "jw1") ? 1 : 0; by.jw2 = cover.jw2 || place.some(p => p.kind === "jw2") ? 1 : 0; }
+    return { week:o.week, mode, slots, have:onPlan, total, by, lastJw:last, place: place.sort((a, b) => a.s - b.s), skipped,
       line:`Gym: ${onPlan} of ${total} placed this week` };
   }
 

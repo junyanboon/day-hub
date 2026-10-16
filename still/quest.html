@@ -628,7 +628,7 @@
 <script src="quest-fx.js?v=20261009b"></script>
 <script src="quest-night.js?v=20261011a"></script>
 <script src="quest-basics.js?v=20261016d"></script>
-<script src="quest-gym.js?v=20261016a"></script>
+<script src="quest-gym.js?v=20261016b"></script>
 <script src="quest-morning.js?v=20261016g"></script>
 <script src="quest-agenda.js?v=20261014c"></script>
 <script src="quest-nearby.js?v=20261016c"></script>
@@ -2943,7 +2943,7 @@
           } catch (err) { G.gymPlan[p.key] = { ...G.gymPlan[p.key], failed:String(err.message || err) }; console.warn("gym", err); }
         }
         if (go.length) {
-          saveG(); go.forEach(p => { delete PLANS[QG().localYmd(p.s, TZ())]; });
+          saveG(); go.forEach(p => { delete PLANS[p.ymd]; });
           // the counts stay the planned ones (the far days' plans are cached up to 5 min on the server), less any write that failed
           weeks.forEach(w => { const bad = w.place.filter(p => (G.gymPlan[p.key] || {}).failed).length;
             if (bad) { w.have -= bad; w.line = `Gym: ${w.have} of ${w.total} placed this week`; } });
@@ -2987,8 +2987,12 @@
     const all = blocks();
     const items = TRAINING[home ? "home" : "travel"].map(([key, name, q, re, mins]) => {
       let have = logs.filter(w => re.test(w.program || "")).length;
+      // the weekly plan's count (calendar blocks like "Hotel gym" and the sessions it placed), so this list and the
+      // "Gym: 3 of 3 placed this week" line agree
+      const wk = GYMWK && GYMWK.weeks && GYMWK.weeks[0], fromPlan = wk && wk.week === days[0] && wk.mode === (home ? "home" : "travel") ? wk.by[key] || 0 : 0;
       const blk = all.find(b => isGym(b) && re.test(b.t.replace(/ Day/, " · Day")));
       if (blk && ["in", "late"].includes(G.day.checks[gk(blk)]) && !logs.some(w => w.date === today && re.test(w.program || ""))) have++;
+      have = Math.max(have, fromPlan);
       const prog = key === "jw" ? suggestProgram() : key === "ms" ? "Matthew I. Smith" : name;
       const at = all.find(b => b.e > now() && isGym(b) && re.test(b.t.replace(/ Day/, " · Day")));
       return { id:"w:" + key, icon: key === "ms" ? "🤸" : "🏋️", label:name, name:`Gym · ${prog.replace(" · ", " ")}`, mins, have, q, need: Math.max(0, q - have),

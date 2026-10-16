@@ -113,8 +113,19 @@ test("re-running places nothing new: a placed session he moved, deleted or dropp
   // he deleted it
   const gone = G.planWeek({ week:"2026-10-19", days, sessions:sessionsOf("2026-10-19"), logs:[], placed, now:NOW, today:"2026-10-16" });
   assert.equal(gone.place.length, 0);
-  assert.equal(gone.skipped[0].key, "2026-10-19:ms");
+  assert.equal(gone.skipped[0].key, "2026-10-19:ms#1");
   assert.equal(gone.line, "Gym: 2 of 3 placed this week");
+});
+
+test("a week whose answer flips from travel to home does not bring back a deleted Matthew I. Smith", () => {
+  const days = week("2026-10-19", CAL, {}, TZS);
+  const first = G.planWeek({ week:"2026-10-19", days, sessions:sessionsOf("2026-10-19"), logs:[], placed:{}, now:NOW, today:"2026-10-16" });
+  const placed = Object.fromEntries(first.place.map(p => [p.key, true]));
+  const home = days.map(d => ({ ...d, mode:"home" }));
+  const again = G.planWeek({ week:"2026-10-19", days:home, sessions:sessionsOf("2026-10-19"), logs:[], placed, now:NOW, today:"2026-10-16" });
+  assert.equal(again.mode, "home");
+  assert.ok(!again.place.some(p => p.kind === "ms"));
+  assert.equal(J(first.by).jw1, 1); assert.equal(J(first.by).ms, 1);
 });
 
 test("finished workouts count, and a logged day's gym block is not counted twice", () => {
