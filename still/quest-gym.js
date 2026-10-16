@@ -57,8 +57,8 @@
   /* One day of the calendar. evs: [{ t, s, e, free? }] (ms or Dates) that touch the day; prevEvs: the day
      before's. Returns { ymd, tz, mode, blocked: why or "", easy: [why], busy:[[s, e]], meals:[[s, e]], bed }.
      mode comes from the caller (his switch for today, else QuestBasics.guessMode). bed: a Sleep block starting
-     that evening, else 22:30. sleepScore only for today. */
-  function dayInfo(ymd, tz, mode, evs, prevEvs, sleepScore){
+     that evening, else 22:30. sleepScore only for today. ill: he said he is ill that day (a day to go easy, d245). */
+  function dayInfo(ymd, tz, mode, evs, prevEvs, sleepScore, ill){
     const own = (evs || []).map(x => ({ ...x, s:+x.s, e:+x.e })).filter(x => x.e > x.s);
     const onDay = own.filter(x => localYmd(x.s, tz) === ymd);
     const mark = onDay.find(x => MARK(x.t));
@@ -68,6 +68,7 @@
     if (trip) easy.push(`travel day (${trip.t})`);
     const moved = (prevEvs || []).find(x => MARK(x.t));
     if (moved) easy.push(`waking somewhere new (${moved.t})`);
+    if (ill) easy.push("ill");
     const sleep = own.filter(x => /^sleep\b/i.test(x.t) && x.s > at(ymd, 18, tz)).sort((a, b) => a.s - b.s)[0];
     return { ymd, tz, mode: mode === "travel" ? "travel" : "home", blocked: mark ? mark.t : "", easy,
       busy: own.filter(x => !x.free && !/^sleep\b/i.test(x.t)).map(x => [x.s, x.e]),
@@ -98,8 +99,13 @@
 
   /* The plan for one week. o: { week (Monday ymd), days: 7 dayInfo, sessions:[{ t, s, e, done? }] (gym blocks
      on the plan that week), logs:[{ date, program }] (finished workouts), placed:{ key:true }, now (ms), today (the game day's ymd),
-     lastJw: "jw1" | "jw2" | null (the last Jack Woods day before this week) }.
-     Returns { week, mode, slots, have, total, line, place:[{ key, kind, t, s, e, ymd, color }], skipped:[{ key, kind, why }] }. */
+     lastJw: "jw1" | "jw2" | null (the last Jack Woods day before this week),
+     ill: [ymd] (days of this week up to today he was ill, from illDays), illNow: he is ill today (place nothing new),
+     movedOut: ["jw" | "ms"] (sessions he moved from this week to another one: their slots are not filled again) }.
+     Returns { week, mode, slots, have, total, excused, line, place:[{ key, kind, t, s, e, ymd, color }], skipped:[{ key, kind, why }] }.
+     Ill days (2026-10-16): while he is ill nothing new goes in. A week with ill days lets off ceil(slots x ill days / 7)
+     sessions, strength first ("missed a day? don't double up"): the rest of the week is planned from its free slots
+     and the line says "off, ill" instead of a shortfall. */
   function planWeek(o){
     const now = +o.now, days = o.days || [], mode = weekMode(days), placed = o.placed || {};
     const inWeek = d => d >= o.week && d <= addDays(o.week, 6);
@@ -123,16 +129,29 @@
     }
     const open = slots.filter(k => !cover[k]), place = [], skipped = [], taken = [];
     const used = have.map(h => h.ymd);
+    const ill = new Set((o.ill || []).filter(inWeek)), moved = (o.movedOut || []).slice();
     const today = o.today || localYmd(now, (days[0] || {}).tz || "America/Toronto");
     // a slot's key is the same whether the week reads as home or travel (the nth Jack Woods, the nth Matthew I. Smith),
     // so a week whose answer flips cannot bring back a session he deleted
     const n = { jw: Object.keys(cover).filter(k => !k.startsWith("ms")).length, ms: Object.keys(cover).filter(k => k.startsWith("ms")).length };
+    // first the slots that stay empty on purpose: placed before (he moved or deleted it), moved to another week, ill
+    const want = [];
     for (const slot of open) {
       const kind0 = slot.replace(/#\d+$/, ""), fam = kind0 === "ms" ? "ms" : "jw", key = `${o.week}:${fam}#${++n[fam]}`;
       if (placed[key]) { skipped.push({ key, kind:kind0, why:"placed before; left as he left it" }); continue; }
+      const mi = moved.indexOf(fam);
+      if (mi >= 0) { moved.splice(mi, 1); skipped.push({ key, kind:kind0, why:"moved to another week by Junyan" }); continue; }
+      if (o.illNow) { skipped.push({ key, kind:kind0, why:"ill today: nothing new goes in" }); continue; }
+      want.push({ key, kind0 });
+    }
+    const budget = ill.size ? Math.ceil(slots.length * ill.size / 7) : 0;
+    let off = Math.max(0, budget - (open.length - want.length));
+    const letOff = want.filter(w => w.kind0 !== "ms").reverse().concat(want.filter(w => w.kind0 === "ms").reverse()).slice(0, off);
+    letOff.forEach(w => skipped.push({ key:w.key, kind:w.kind0, why:"let off: ill this week" }));
+    for (const { key, kind0 } of want.filter(w => !letOff.includes(w))) {
       const strength = kind0 !== "ms", len = strength ? 60 : 45;
       const spread = d => used.length ? Math.min(...used.map(u => dayGap(u, d.ymd))) : 7;
-      const ok = days.filter(d => d.ymd >= today && !d.blocked && !(strength && d.easy.length));
+      const ok = days.filter(d => d.ymd >= today && !d.blocked && !ill.has(d.ymd) && !(strength && d.easy.length));
       const free = ok.filter(d => !used.includes(d.ymd)), fallback = strength ? [] : ok.filter(d => used.includes(d.ymd));
       const wdOf = d => new Date(Date.parse(d.ymd + "T12:00:00Z")).getUTCDay();
       const rank = xs => xs.slice().sort((a, b) => (mode === "home" && strength ? (![1, 3, 5].includes(wdOf(a))) - (![1, 3, 5].includes(wdOf(b))) : 0)
@@ -160,9 +179,80 @@
     const by = { jw:0, jw1:0, jw2:0, ms:0 };
     Object.values(cover).concat(place).forEach(x => { if (x.kind === "ms") by.ms++; else { by.jw++; if (x.kind !== "jw") by[x.kind]++; } });
     if (mode === "travel") { by.jw1 = cover.jw1 || place.some(p => p.kind === "jw1") ? 1 : 0; by.jw2 = cover.jw2 || place.some(p => p.kind === "jw2") ? 1 : 0; }
-    return { week:o.week, mode, slots, have:onPlan, total, by, lastJw:last, place: place.sort((a, b) => a.s - b.s), skipped,
-      line:`Gym: ${onPlan} of ${total} placed this week` };
+    const excused = Math.min(budget, total - onPlan);
+    const line = o.illNow ? `Gym: ${onPlan} of ${total} this week · ill, nothing new placed`
+      : excused ? `Gym: ${onPlan} of ${total} this week · ${excused} off, ill` : `Gym: ${onPlan} of ${total} placed this week`;
+    return { week:o.week, mode, slots, have:onPlan, total, excused, ill:ill.size, illNow:!!o.illNow, by, lastJw:last,
+      place: place.sort((a, b) => a.s - b.s), skipped, line };
   }
 
-  root.QuestGym = { sessionOf, isGymTitle, dayInfo, weekMode, planWeek, at, localYmd, mondayOf, addDays, NAMES, GRAPE };
+  /* Ill days (Junyan, 2026-10-16: "If I'm ill I can't work out"). map: { ymd: { ill:true|false, at } }, one answer a
+     day (G.ill, synced). A day with no answer carries the answer before it (up to 14 days), so he stays ill until he
+     says "I'm better". Returns the ill days from..to. */
+  function illDays(map, from, to){
+    map = map || {};
+    const out = []; let state = false, since = null;
+    for (let d = addDays(from, -14); d <= to; d = addDays(d, 1)) {
+      const x = map[d];
+      if (x && typeof x === "object") { state = !!x.ill; since = d; }
+      else if (state && dayGap(since, d) > 14) state = false;
+      if (state && d >= from) out.push(d);
+    }
+    return out;
+  }
+  // today: ill or not, whether to ask "Still ill?" (ill carried from an earlier day, no answer yet today), since when
+  function illStatus(map, today){
+    const now = illDays(map, today, today).length > 0;
+    if (!now) return { ill:false, ask:false, since:null };
+    let since = today;
+    while (illDays(map, addDays(since, -1), addDays(since, -1)).length && dayGap(since, today) < 14) since = addDays(since, -1);
+    return { ill:true, ask:!(map || {})[today], since };
+  }
+
+  /* Where a gym session could move to (Junyan, 2026-10-16: "give me the option to reschedule with different
+     days/times I can reschedule to. This way I can stick to it"). o: { kind ("jw1" | "jw2" | "jw" | "ms"), s, e (its
+     time now), days: dayInfo for today and the 6 days after it (its own event left out of busy), week: the Monday of
+     its week, gymDays: [ymd] with another gym session, ill: [ymd], modes: { monday: "home" | "travel" }, now }.
+     The placement rules of planWeek: no move or flight day, no strength on a go-easy or ill day, an hour clear after a
+     meal, 2 hours before bed, one session a day, late afternoon first, home Mon/Wed/Fri 19:30 first for strength.
+     One time a day (a second one only when that leaves fewer than 4), its own week first so the week's count holds; never within an hour of where it is now.
+     Returns { options:[{ ymd, s, e, same, label }] (4 to 6 when the calendar has room), note }. */
+  function moveOptions(o){
+    const strength = o.kind !== "ms", len = Math.round((+o.e - +o.s) / MIN) || (strength ? 60 : 45), now = +o.now;
+    const ill = new Set(o.ill || []), others = new Set(o.gymDays || []);
+    const wdOf = ymd => new Date(Date.parse(ymd + "T12:00:00Z")).getUTCDay();
+    const firsts = [], seconds = [], shared = [];
+    for (const d of o.days || []) {
+      if (d.blocked || ill.has(d.ymd) || (strength && (d.easy.length || others.has(d.ymd)))) continue;
+      const share = others.has(d.ymd);   // only Matthew I. Smith gets here, and only as a last resort
+      const home = (o.modes || {})[mondayOf(d.ymd)] === "home";
+      const hs = starts(home, o.kind, wdOf(d.ymd)).filter(h => { const s = at(d.ymd, h, d.tz); return Math.abs(s - +o.s) >= 60 * MIN && fits(d, s, len, now, []); });
+      if (!hs.length) continue;
+      const mk = h => { const s = at(d.ymd, h, d.tz); return { ymd:d.ymd, s, e:s + len * MIN, same:mondayOf(d.ymd) === o.week, later:mondayOf(d.ymd) > o.week, label:label(s, d.tz), ...(share ? { shared:true } : {}) }; };
+      if (share) { shared.push(mk(hs[0])); continue; }
+      firsts.push(mk(hs[0]));
+      const h2 = hs.find(h => Math.abs(h - hs[0]) >= 2); if (h2 != null) seconds.push(mk(h2));
+    }
+    const pick = (xs, n) => xs.slice().sort((a, b) => a.s - b.s).slice(0, n);
+    let opts = pick(firsts.filter(x => x.same), 6);
+    if (opts.length < 4) opts = opts.concat(pick(seconds.filter(x => x.same), 4 - opts.length));
+    if (opts.length < 4) opts = opts.concat(pick(firsts.filter(x => !x.same), 6 - opts.length));
+    if (opts.length < 4) opts = opts.concat(pick(seconds.filter(x => !x.same), 4 - opts.length));
+    if (opts.length < 4) opts = opts.concat(pick(shared.filter(x => x.same), 4 - opts.length), pick(shared.filter(x => !x.same), 4 - opts.length));
+    opts = opts.slice(0, 6).sort((a, b) => (b.same - a.same) || a.s - b.s);
+    const note = !opts.length ? "No free time in the next 7 days fits the gym rules."
+      : !opts.some(x => x.same) ? (opts.every(x => x.later) ? "Nothing free is left this week, so these are next week. This week will be one short."
+        : "Nothing free is left in its own week, so these are in another week. Its week will be one short.")
+      : opts.some(x => x.shared) ? "Every other day is full, so some of these are on the same day as another gym session." : "";
+    return { options:opts, note };
+  }
+  // "Sun Oct 25 · 2:00 PM" in the day's own zone
+  function label(ms, tz){
+    const d = new Date(ms), o = { timeZone:tz };
+    const day = new Intl.DateTimeFormat("en-US", { ...o, weekday:"short", month:"short", day:"numeric" }).format(d).replace(",", "");
+    const t = new Intl.DateTimeFormat("en-US", { ...o, hour:"numeric", minute:"2-digit" }).format(d);
+    return `${day} · ${t}`.replace(/[\u202f\u00a0]/g, " ");
+  }
+
+  root.QuestGym = { sessionOf, isGymTitle, dayInfo, weekMode, planWeek, illDays, illStatus, moveOptions, label, at, localYmd, mondayOf, addDays, NAMES, GRAPE };
 })(typeof window !== "undefined" ? window : globalThis);
