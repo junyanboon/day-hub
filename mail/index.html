@@ -31,6 +31,7 @@
   --glass:rgba(9,22,50,.58); --glass-2:rgba(9,22,50,.5); --chip:rgba(9,22,50,.5); --line:rgba(255,255,255,.18); --sunk:rgba(9,22,50,.42);
   --gold:#ffd479; --gold-ink:#2a1d4a; --gold-soft:rgba(255,212,121,.2); --mint:#9cefbf; --mint-soft:rgba(143,227,176,.2);
   --warn:#ffcb8a; --warn-soft:rgba(255,194,122,.2); --jev:#d6c8ff; --jev-soft:rgba(201,182,255,.2); --bad:#ff9c9c;
+  --claude:#a9dcff; --claude-soft:rgba(150,210,255,.18);
   --sunset:linear-gradient(100deg,#f7a35c 0%,#e8618c 55%,#a45bc6 100%);
   /* the same sunset under a plum veil, for white button text (the plain sunset's orange end is about 2:1) */
   --sunset-deep:linear-gradient(rgba(58,14,52,.42),rgba(58,14,52,.42)),var(--sunset);
@@ -106,6 +107,13 @@ nav.tabs{display:flex;gap:24px;border-bottom:1px solid var(--line);overflow-x:au
 .jevline{display:flex;gap:10px;align-items:center;flex-wrap:wrap;background:var(--jev-soft);color:var(--jev);border-radius:14px;padding:9px 13px;font:600 13px var(--font)}
 .jevline.money{background:var(--warn-soft);color:var(--warn)}
 .jevline.quiet{background:var(--sunk);color:var(--dim);font-weight:500}
+/* Claude's read of an unfamiliar sender (d361, d362): sky blue, separate from Jev's lavender */
+.claudeline{display:grid;gap:4px;background:var(--claude-soft);border:1px solid rgba(169,220,255,.35);border-radius:14px;padding:10px 13px;color:var(--ink)}
+.claudeline b{font:700 13px var(--font);color:var(--claude);letter-spacing:.02em}
+.claudeline p{margin:0;font-size:14.5px;line-height:1.45;max-width:62ch;overflow-wrap:anywhere}
+.claudeline small{color:var(--dim);font-size:12.5px}
+.pill.claude{background:var(--claude-soft);color:var(--claude);border-color:transparent}
+.dot.claude{background:var(--claude)}
 .jevline .conf{display:inline-block;width:80px;height:6px;background:rgba(9,22,50,.45);border-radius:4px;overflow:hidden;vertical-align:middle}
 .jevline .conf i{display:block;height:100%;background:var(--jev);border-radius:4px}
 .mail{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--sunk);border:1px solid var(--line);border-radius:16px;padding:12px 14px;font-size:14px;line-height:1.55;max-height:360px;overflow:auto;color:var(--ink)}
@@ -121,6 +129,9 @@ nav.tabs{display:flex;gap:24px;border-bottom:1px solid var(--line);overflow-x:au
 .routes button.pick{border-color:var(--gold);background:var(--gold);color:var(--gold-ink);box-shadow:0 0 0 2px rgba(255,212,121,.35)}
 .routes button.jevpick{border-color:var(--jev);color:var(--jev)}
 .routes button.pick.jevpick{color:var(--gold-ink);background:var(--gold);border-color:var(--gold);box-shadow:0 0 0 2px var(--jev)}
+.routes button.claudepick{border-color:var(--claude);color:var(--claude)}
+.routes button.pick.claudepick{color:var(--gold-ink);background:var(--gold);border-color:var(--gold);box-shadow:0 0 0 2px var(--claude)}
+.routes button .by{font:700 10px var(--font);letter-spacing:.06em;text-transform:uppercase;margin-left:6px;opacity:.85}
 .routes button kbd{font:inherit;opacity:.78;margin-right:5px}
 /* the 10-step auto meter, mint like quest.html's done tiles */
 .meter{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--dim);flex-wrap:wrap}
@@ -251,6 +262,7 @@ main>.empty,.pair .summary,.note{color:#fff;text-shadow:0 1px 2px rgba(9,22,50,.
     if (S.done[x.id]) return `<span class="seal stamp" title="${esc(S.done[x.id].label)}">✓</span>`;
     if (x.rule) return `<span class="pill money">${x.rule.stopped ? "Rule stopped" : "Rule did not finish"}</span>`;
     if (x.money) return `<span class="pill money">Money: Claude</span>`;
+    if (x.read) return `<span class="pill claude">New sender · Claude: ${esc(readWhat(x.read, true))}</span>`;
     if (x.jevState === "pending") return `<span class="pill jev">Jev reading…</span>`;
     if (x.jev && x.jev.shown) return `<span class="pill jev">Jev: ${esc(routeName(x.jev.route))}</span>`;
     return `<span class="pill">No guess yet</span>`;
@@ -261,6 +273,19 @@ main>.empty,.pair .summary,.note{color:#fff;text-shadow:0 1px 2px rgba(9,22,50,.
     const r = x.rule;
     if (r.stopped) return `<div class="jevline money">You flagged the standing rule "${esc(r.name)}" for this email, so it is back here. ${r.task ? "Its task is still in your Tasks Inbox: " + taskLink(r.task) + ". " : ""}Claude will check it.</div>`;
     return `<div class="jevline money">The standing rule "${esc(r.name)}" did not finish, so it was not archived: ${esc(r.error || "unknown error")}. ${r.task ? "Task: " + taskLink(r.task) + ". " : ""}Approve it to CRA, or leave it for now.</div>`;
+  }
+  // Claude's suggestion in words: a tray, "Make a task: …", or "Reply needed"
+  function readWhat(r, short){
+    if (r.action === "task") return short ? "make a task" : "Make a task: " + r.task;
+    if (r.action === "reply") return short ? "reply needed" : "Reply needed";
+    return routeName(r.action);
+  }
+  // an unfamiliar sender (no mail from that address in 6 months): Claude read the email on the server.
+  // A suggestion only: nothing is filed until he approves. Nothing shows while it reads (the sender
+  // check comes first and most senders are familiar) or if Claude failed.
+  function claudeLine(x){
+    if (x.read) return `<div class="claudeline"><b>Claude suggests: ${esc(readWhat(x.read))}</b><p>${esc(x.read.summary)}</p>${x.read.reason ? `<small>Why: ${esc(x.read.reason)} You have no mail from this address in the last 6 months.</small>` : ""}</div>`;
+    return "";
   }
   function jevLine(x){
     if (x.rule) return ruleLine(x);
@@ -295,11 +320,11 @@ main>.empty,.pair .summary,.note{color:#fff;text-shadow:0 1px 2px rgba(9,22,50,.
       let body = "";
       if (open){
         const route = S.picks[x.id] || x.suggest || "";
-        body = `<div class="body">${jevLine(x)}
+        body = `<div class="body">${claudeLine(x)}${jevLine(x)}
           ${x.snippet ? `<p class="summary">${esc(x.snippet)}</p>` : ""}
           ${mailBlock(x)}
           <div class="why">Goes to</div>
-          <div class="routes" role="group" aria-label="Where it goes">${S.data.routes.map((r, i) => `<button type="button" class="${r.key===route?"pick":""} ${x.jev && x.jev.shown && r.key===x.jev.route?"jevpick":""}" data-route="${r.key}" data-id="${esc(x.id)}" aria-pressed="${r.key===route}"><kbd>${i+1}</kbd>${esc(r.name)}</button>`).join("")}</div>
+          <div class="routes" role="group" aria-label="Where it goes">${S.data.routes.map((r, i) => `<button type="button" class="${r.key===route?"pick":""} ${x.jev && x.jev.shown && r.key===x.jev.route?"jevpick":""} ${x.read && r.key===x.read.action?"claudepick":""}" data-route="${r.key}" data-id="${esc(x.id)}" aria-pressed="${r.key===route}"><kbd>${i+1}</kbd>${esc(r.name)}${x.read && r.key===x.read.action ? `<span class="by">Claude suggests</span>` : ""}</button>`).join("")}</div>
           ${meter(x, route)}
           <div class="btns"><button class="btn primary" type="button" data-approve="${esc(x.id)}" ${route?"":"disabled"}>Approve</button>
             <button class="btn" type="button" disabled title="Comes in the next build">Make a task</button>
@@ -307,12 +332,12 @@ main>.empty,.pair .summary,.note{color:#fff;text-shadow:0 1px 2px rgba(9,22,50,.
             <a class="btn quiet" href="${esc(x.gmail)}" target="_blank" rel="noopener">Open in Gmail</a></div>
         </div>`;
       }
-      return `<div class="row ${done?"done":""} ${open?"open":""} ${x.skipped?"skipped":""}">${head(x, x.money?"flag":"jev", pillFor(x))}${body}</div>`;
+      return `<div class="row ${done?"done":""} ${open?"open":""} ${x.skipped?"skipped":""}">${head(x, x.money?"flag":x.read?"claude":"jev", pillFor(x))}${body}</div>`;
     }).join("");
     const c = S.data.counts;
     return `<div class="lane"><span>One card per email · nothing moves until you approve</span><span>${c.sort}</span></div>
       <div class="list">${rows || `<div class="empty">Nothing waiting. New mail shows up here within 2 minutes.</div>`}</div>
-      <p class="note">Lavender is Jev's guess (only when it is 80% sure or more). Orange is money or travel: Claude handles it and Jev is never asked. Enter approves, 1 to 8 picks a tray.${c.claude ? ` ${c.claude} waiting for Claude.` : ""}</p>`;
+      <p class="note">Lavender is Jev's guess (only when it is 80% sure or more). Sky blue is Claude: it reads email from a sender you have not heard from in 6 months and suggests one thing; you still approve. Orange is money or travel: Claude handles it and Jev is never asked. Enter approves, 1 to 8 picks a tray.${c.claude ? ` ${c.claude} waiting for Claude.` : ""}</p>`;
   }
 
   function messagesView(){
@@ -356,6 +381,7 @@ main>.empty,.pair .summary,.note{color:#fff;text-shadow:0 1px 2px rgba(9,22,50,.
     }).join("");
     return `<div class="tiles"><div class="tile"><b>${r.auto.length + (r.rules || []).filter(x => !x.error && !x.flagged).length}</b><span>handled by itself, last 14 days</span></div><div class="tile"><b>${pct}</b><span>Jev matched you (${r.jev.agreed} of ${r.jev.shown})</span></div><div class="tile"><b>${r.flagged}</b><span>flagged by you</span></div></div>
       ${rules ? `<div class="lane"><span>Standing rules · rules you set once</span><span>${r.rules.length}</span></div><div class="list">${rules}</div>` : ""}
+      ${r.claude && (r.claude.read || r.claude.failed) ? `<p class="note">Claude read ${r.claude.read} email${r.claude.read===1?"":"s"} from new senders${r.claude.failed ? ` (${r.claude.failed} did not work and showed as normal cards)` : ""}, about $${r.claude.usd.toFixed(4)} in all. Its tray matched your pick ${r.claude.agreed} of ${r.claude.judged} times.</p>` : ""}
       <div class="lane"><span>What Jev learned from you</span><span>${r.learned.length}</span></div>
       <div class="list learned">${r.learned.length ? r.learned.map(l => `<div><b>${esc(l.who)}</b><span>${esc(l.from)} → ${esc(l.to)}</span></div>`).join("") : `<div><span style="color:var(--dim)">Nothing yet. When you pick a different tray than Jev, it shows here and Jev uses it next time.</span></div>`}</div>
       <div class="lane"><span>Handled by itself · flag anything that looks off</span><span>${r.auto.length}</span></div>
