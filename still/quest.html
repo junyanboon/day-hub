@@ -322,6 +322,7 @@
   .gmv-o { padding:11px 10px; border-radius:12px; background:rgba(255,255,255,.16); color:#fff; font:600 14px var(--font); text-align:left; }
   .gmv-o small { display:block; font-weight:400; font-size:11.5px; color:rgba(255,255,255,.86); }
   .gmv-o.nx { background:rgba(255,255,255,.1); }
+  .gmv-more { margin-top:8px; }
   .gmv-ill { margin-top:8px; width:100%; padding:11px; border-radius:12px; background:rgba(0,0,0,.25); color:#fff; font:600 14px var(--font); }
   .gmv .gnote { margin:6px 0 0; color:#fff; }
   .gfoot { display:flex; gap:8px; margin-top:16px; position:sticky; bottom:-20px; padding:10px 0; background:#3d3872; }
@@ -2675,7 +2676,7 @@
     const blk = GYM.blockKey && blocks().find(x => x.key === GYM.blockKey);
     const early = blk && blk.s - now() >= 30 * 60000;   // not at the gym yet: the move options come first
     const tr = gymTrend();
-    let h = `<div class="gym-head"><h3>🏋️ Gym log</h3><span class="gym-hb">${blk && !early ? `<button class="btn ghost small" id="gMove">${gymShowMove ? "Hide" : "Reschedule or ill"}</button>` : ""}<button class="btn ghost small" id="gClose">Close</button></span></div>
+    let h = `<div class="gym-head"><h3>🏋️ Gym log</h3><span class="gym-hb">${blk && !early ? `<button class="btn ghost small" id="gMove">${gymShowMove ? "Hide" : "Reschedule, skip or ill"}</button>` : ""}<button class="btn ghost small" id="gClose">Close</button></span></div>
       ${blk && (early || gymShowMove) ? gymMoveHTML(blk) : ""}
       <label class="glabel" for="gProg">Program</label>
       <select id="gProg">${Object.keys(PROGRAMS).map(k => `<option ${k === GYM.program ? "selected" : ""}>${k}</option>`).join("")}</select>
@@ -3165,12 +3166,19 @@
     GMVB[b.key] = b;
     let h = `<div class="gmv" data-gmv="${esc(b.key)}"><div class="glabel">Reschedule</div>`;
     if (st.ill && todayB) h += `<p class="gnote">You're ill today, so no gym. When you feel better, tap I'm better and the rest of the week is planned again.</p>`;
-    else if (!(b.id && b.calId)) h += `<p class="gnote">This one lives only in today's plan, so it cannot go to another day. Drag it on the calendar to change its time today.</p>`;
+    else if (!(b.id && b.calId)) h += `<p class="gnote"><b>Only in Day Quest.</b> This one is in today's plan, not in Google Calendar, so it cannot go to another day. ${todayB ? "Put it on Google Calendar to move it to another day, or" : ""} drag it on the calendar to change its time today.</p>`;
     else if (!c) h += `<p class="gnote">Finding free times…</p>`;
     else {
       h += c.r.options.length ? `<div class="gmv-os">${c.r.options.map((o, i) => `<button class="gmv-o${o.same ? "" : " nx"}" data-gmvgo="${i}">${esc(o.label)}${o.same ? "" : `<small>${o.later ? "next week" : "week before"}</small>`}</button>`).join("")}</div>` : "";
       if (c.r.note) h += `<p class="gnote">${esc(c.r.note)}</p>`;
     }
+    /* Junyan, 2026-10-16: "right now I'm trying to cancel it so what do I do to get this off my schedule. Also why
+       is it not on my google cal?" Not today drops it like Remove from today (he is not ill); Change time or name
+       is the block's own edit window; a plan-only gym block can go onto his Junyan calendar. */
+    const onCal = !!(b.id && b.calId);
+    h += `<div class="gmv-os gmv-more">${todayB ? `<button class="gmv-o" data-gmvoff>🚫 Not today<small>${onCal ? "hides it today, the event stays" : "takes it off today's plan"}</small></button>` : ""}
+      <button class="gmv-o" data-gmvedit>✏️ Change time or name</button>
+      ${!onCal && todayB ? `<button class="gmv-o" data-gmvcal>📅 Put it on Google Calendar<small>your Junyan calendar</small></button>` : ""}</div>`;
     h += `<button class="gmv-ill" data-gmvill="${st.ill ? 0 : 1}">${st.ill ? "🙂 I'm better" : "🤒 I'm ill, no workout"}</button>`;
     return h + `</div>`;
   }
@@ -3187,7 +3195,30 @@
       el.querySelectorAll("[data-gmvgo]").forEach(bt => bt.onclick = e => { e.stopPropagation();
         const c = moveOpt(k), o = c && c.r.options[+bt.dataset.gmvgo]; if (o) moveGym(b, o); });
       el.querySelectorAll("[data-gmvill]").forEach(bt => bt.onclick = e => { e.stopPropagation(); setIll(bt.dataset.gmvill === "1").then(redraw); });
+      el.querySelectorAll("[data-gmvoff]").forEach(bt => bt.onclick = e => { e.stopPropagation(); if (GYM && GYM.blockKey === b.key) saveDraft();
+        stopRest(); closeSheet(); dropBlock(b); calToast(b.id && b.calId ? `${shortName(b)} is off today. The event stays in Google Calendar.` : `${shortName(b)} is off today's plan.`, 5000); });
+      el.querySelectorAll("[data-gmvedit]").forEach(bt => bt.onclick = e => { e.stopPropagation(); stopRest(); openEdit(b); });
+      el.querySelectorAll("[data-gmvcal]").forEach(bt => bt.onclick = e => { e.stopPropagation(); gymToCal(b, bt); });
     });
+  }
+  // a gym block that lives only in today's plan goes onto the Junyan calendar (Grape, like the weekly plan), then leaves the plan
+  async function gymToCal(b, bt){
+    const what = shortName(b);
+    if (DRY) { calToast(`Test mode: ${what} would go on Google Calendar. Nothing is saved.`, 6000); return; }
+    if (!questKey()) { calToast("Pair this device in ⚙️ to put it on the calendar."); return; }
+    if (gymMoveBusy) return;
+    gymMoveBusy = true; if (bt) { bt.disabled = true; bt.textContent = "Putting it on the calendar…"; }
+    try {
+      await qfetch("/cal/event", { method:"POST", body:JSON.stringify({ s:new Date(b.s).toISOString(), e:new Date(b.e).toISOString(), title:b.t, color:"3",
+        desc:"Put on the calendar from Day Quest's gym log. Move it or delete it as you like." }) });
+      log(`Put ${b.t} on the calendar: ${fmtT(b.s)} to ${fmtT(b.e)}`);
+      await dropBlock(b);   // the plan-only copy goes, the calendar event takes its place
+      await pullAll();
+      closeSheet(); calToast(`${what} is on your Junyan calendar now. Open it again to move it to another day.`, 6000);
+    } catch (err) {
+      calToast(`Could not put ${what} on the calendar (${err.message}). It stays in today's plan.`, 7000);
+      if (bt) { bt.disabled = false; bt.textContent = "📅 Put it on Google Calendar"; }
+    } finally { gymMoveBusy = false; }
   }
   async function moveGym(b, o){
     if (gymMoveBusy) return;   // one move at a time: a second tap waits for the first
