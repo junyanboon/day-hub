@@ -1,4 +1,4 @@
-// node --test still/test   (Junyan 2026-10-16 about the gym window: "drop the illness thing")
+// node --test still/test/*.test.mjs   (Junyan 2026-10-16 about the gym window: "drop the illness thing")
 // The "I'm ill" feature is gone: no button, no "You're ill today" note, no daily "Still ill?" prompt, no "skipped, ill"
 // counts. Skip (beside Close, with "Are you sure?") is how he takes a session off. His saved state can still hold an
 // old ill answer (G.ill, kept by the shared merge file); the page never reads it.
