@@ -138,6 +138,22 @@ nav.tabs{display:flex;gap:24px;border-bottom:1px solid var(--line);overflow-x:au
 .meter .bar{display:grid;grid-template-columns:repeat(10,1fr);gap:3px;width:150px}
 .meter .bar i{height:7px;border-radius:4px;background:rgba(9,22,50,.5)}
 .meter .bar i.on{background:var(--mint);box-shadow:0 0 6px rgba(143,227,176,.5)}
+/* the simple card (ticket 17, 2026-10-16: "I don't know what I'm even deciding"): what it is, one
+   question, two big buttons. Who guessed, the auto meter and the email itself sit behind small links. */
+.gist{margin:0;font:600 17px/1.45 var(--font);color:#fff;max-width:62ch;overflow-wrap:anywhere}
+.ask{background:var(--sunk);border:1px solid var(--line);border-radius:18px;padding:14px;display:grid;gap:12px}
+.ask h3{font:800 21px/1.25 var(--font)}
+.ask .by{margin:-6px 0 0;font-size:13.5px;color:var(--dim)}
+.big{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.big .btn{justify-content:center;min-height:54px;font-size:16px;text-align:center}
+.trays{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.trays button{border:1px solid var(--line);background:var(--chip);border-radius:14px;min-height:50px;padding:10px 14px;font:600 15px var(--font);color:#fff;text-align:left}
+.trays button:active{transform:scale(.97)}
+.trays button.sug{border-color:var(--gold);color:var(--gold)}
+.trays button kbd{font:inherit;opacity:.6;margin-right:6px}
+.links{display:flex;flex-wrap:wrap;gap:4px 18px}
+.links button,.links a{background:none;border:0;padding:8px 0;font:600 14px var(--font);color:var(--dim);text-decoration:underline;text-underline-offset:3px;cursor:pointer}
+.whybox{display:grid;gap:10px}
 /* quest.html .cal-toast */
 .toast{position:fixed;left:50%;bottom:calc(22px + env(safe-area-inset-bottom));transform:translateX(-50%);background:rgba(25,29,60,.94);color:var(--ink);border:1px solid var(--line);border-radius:14px;padding:10px 16px;font:500 13.5px var(--font);max-width:min(440px,92vw);z-index:5;display:flex;gap:12px;align-items:center;box-shadow:0 10px 30px rgba(0,0,0,.4)}
 .toast[hidden]{display:none}
@@ -207,7 +223,7 @@ main>.empty,.pair .summary,.note{color:#fff;text-shadow:0 1px 2px rgba(9,22,50,.
   const when = ms => { const d = new Date(ms), t = new Date();
     return d.toDateString() === t.toDateString() ? `${pad(d.getHours())}:${pad(d.getMinutes())}` : `${pad(d.getMonth()+1)}.${pad(d.getDate())}`; };
 
-  const S = { tab:"sort", open:null, data:null, report:null, picks:{}, done:{}, bodies:{}, busy:false, error:null };
+  const S = { tab:"sort", open:null, data:null, report:null, picks:{}, choose:{}, why:{}, done:{}, bodies:{}, busy:false, error:null };
   const routeName = k => (S.data?.routes || []).find(r => r.key === k)?.name || k;
 
   let toastT;
@@ -262,11 +278,10 @@ main>.empty,.pair .summary,.note{color:#fff;text-shadow:0 1px 2px rgba(9,22,50,.
     if (S.done[x.id]) return `<span class="seal stamp" title="${esc(S.done[x.id].label)}">✓</span>`;
     if (x.rule) return `<span class="pill money">${x.rule.stopped ? "Rule stopped" : "Rule did not finish"}</span>`;
     if (x.ruleUnverified) return `<span class="pill money">Not verified</span>`;
-    if (x.money) return `<span class="pill money">Money: Claude</span>`;
-    if (x.read) return `<span class="pill claude">New sender · Claude: ${esc(readWhat(x.read, true))}</span>`;
-    if (x.jevState === "pending") return `<span class="pill jev">Jev reading…</span>`;
-    if (x.jev && x.jev.shown) return `<span class="pill jev">Jev: ${esc(routeName(x.jev.route))}</span>`;
-    return `<span class="pill">No guess yet</span>`;
+    if (x.money) return `<span class="pill money">Money</span>`;
+    if (x.jevState === "pending") return `<span class="pill jev">Reading…</span>`;
+    if (x.suggest) return `<span class="pill ${x.suggestBy === "claude" ? "claude" : "jev"}">${esc(routeName(x.suggest))}?</span>`;
+    return `<span class="pill">You pick</span>`;
   }
   // a standing rule ran on this email but it is a card again: it did not finish, or he flagged it
   const taskLink = t => t ? `<a href="${esc(t.url)}" target="_blank" rel="noopener">${esc(t.title)}</a>` : "";
@@ -307,7 +322,7 @@ main>.empty,.pair .summary,.note{color:#fff;text-shadow:0 1px 2px rgba(9,22,50,.
   }
   function mailBlock(x){
     const b = S.bodies[x.id];
-    if (!b) return `<button class="btn quiet" type="button" data-read="${esc(x.id)}" style="justify-self:start">Show the email</button>`;
+    if (!b) return `<button class="btn quiet" type="button" data-read="${esc(x.id)}" style="justify-self:start">Show the email</button>`;   // Messages tab
     if (b === "loading") return `<div class="mail">Opening…</div>`;
     if (b.error) return `<div class="mail">Could not open it: ${esc(b.error)}</div>`;
     return `<div class="mail"><small>From ${esc(b.from)}${b.date ? " · " + esc(b.date) : ""}</small>${esc(b.text || "(no text in this email)")}</div>`;
@@ -320,31 +335,51 @@ main>.empty,.pair .summary,.note{color:#fff;text-shadow:0 1px 2px rgba(9,22,50,.
     return `<div class="meter"><span class="bar" aria-hidden="true">${Array.from({length:10},(_,i)=>`<i class="${i<n?"on":""}"></i>`).join("")}</span><span>${n} of 10 approvals in a row for ${esc(x.from)}${target}. At 10 it runs by itself.</span></div>`;
   }
 
+  // the one question a card asks, and who is asking it, in plain words
+  function question(x){
+    const sug = x.suggest, tray = sug ? routeName(sug) : "";
+    const pct = x.jev ? Math.round(x.jev.conf * 100) : 0;
+    if (x.rule || x.ruleUnverified) return { q: sug ? `File it in ${tray}?` : "Where should it go?", by: "" };
+    if (x.money) return { q: "Hand it to Claude?", by: "Money or travel email. Claude always takes these and checks them against YNAB." };
+    if (x.suggestBy === "claude") return { q: `File it in ${tray}?`, by: "Claude's guess. This sender is new to you." };
+    if (x.suggestBy === "jev") return { q: `File it in ${tray}?`, by: `Jev's guess, ${pct}% sure.` };
+    if (x.read) return { q: "Where should it go?", by: `Claude says: ${readWhat(x.read)}.` };
+    return { q: "Where should it go?", by: "No guess for this one. Tap a tray." };
+  }
+  function trayButtons(x){
+    return `<div class="trays" role="group" aria-label="Where it goes">${S.data.routes.map((r, i) =>
+      `<button type="button" class="${r.key===x.suggest?"sug":""}" data-file="${r.key}" data-id="${esc(x.id)}"><kbd>${i+1}</kbd>${esc(r.name)}</button>`).join("")}</div>`;
+  }
   function sortView(){
     const rows = sortList().map(x => {
       const done = S.done[x.id];
       const open = S.open === x.id && !done;
       let body = "";
       if (open){
-        const route = S.picks[x.id] || x.suggest || "";
-        body = `<div class="body">${skippedLine(x)}${claudeLine(x)}${jevLine(x)}
-          ${x.snippet ? `<p class="summary">${esc(x.snippet)}</p>` : ""}
-          ${mailBlock(x)}
-          <div class="why">Goes to</div>
-          <div class="routes" role="group" aria-label="Where it goes">${S.data.routes.map((r, i) => `<button type="button" class="${r.key===route?"pick":""} ${x.jev && x.jev.shown && r.key===x.jev.route?"jevpick":""} ${x.read && r.key===x.read.action?"claudepick":""}" data-route="${r.key}" data-id="${esc(x.id)}" aria-pressed="${r.key===route}"><kbd>${i+1}</kbd>${esc(r.name)}${x.read && r.key===x.read.action ? `<span class="by">Claude suggests</span>` : ""}</button>`).join("")}</div>
-          ${meter(x, route)}
-          <div class="btns"><button class="btn primary" type="button" data-approve="${esc(x.id)}" ${route?"":"disabled"}>Approve</button>
-            <button class="btn" type="button" disabled title="Comes in the next build">Make a task</button>
-            <button class="btn quiet" type="button" data-skip="${esc(x.id)}">Skip</button>
-            <a class="btn quiet" href="${esc(x.gmail)}" target="_blank" rel="noopener">Open in Gmail</a></div>
+        const { q, by } = question(x);
+        const choosing = S.choose[x.id] || !x.suggest;
+        const gist = x.read?.summary || x.snippet || "";
+        body = `<div class="body">
+          ${gist ? `<p class="gist">${esc(gist)}</p>` : ""}
+          ${x.rule ? ruleLine(x) : ""}${skippedLine(x)}
+          <div class="ask"><h3>${esc(choosing && x.suggest ? "Where should it go instead?" : q)}</h3>${by && !(choosing && x.suggest) ? `<p class="by">${esc(by)}</p>` : ""}
+            ${choosing ? trayButtons(x)
+              : `<div class="big"><button class="btn primary" type="button" data-approve="${esc(x.id)}">✓ Yes</button><button class="btn" type="button" data-choose="${esc(x.id)}">Somewhere else</button></div>`}
+          </div>
+          <div class="links"><button type="button" data-read="${esc(x.id)}">${S.bodies[x.id] ? "Hide the email" : "Show the email"}</button>
+            <button type="button" data-skip="${esc(x.id)}">Skip for now</button>
+            <button type="button" data-why="${esc(x.id)}">${S.why[x.id] ? "Hide details" : "Details"}</button>
+            <a href="${esc(x.gmail)}" target="_blank" rel="noopener">Open in Gmail</a></div>
+          ${S.bodies[x.id] ? mailBlock(x) : ""}
+          ${S.why[x.id] ? `<div class="whybox">${claudeLine(x)}${x.rule ? "" : jevLine(x)}${meter(x, S.picks[x.id] || x.suggest || "")}</div>` : ""}
         </div>`;
       }
       return `<div class="row ${done?"done":""} ${open?"open":""} ${x.skipped?"skipped":""}">${head(x, x.money?"flag":x.read?"claude":"jev", pillFor(x))}${body}</div>`;
     }).join("");
     const c = S.data.counts;
-    return `<div class="lane"><span>One card per email · nothing moves until you approve</span><span>${c.sort}</span></div>
+    return `<div class="lane"><span>One card per email · nothing moves until you tap</span><span>${c.sort}</span></div>
       <div class="list">${rows || `<div class="empty">Nothing waiting. New mail shows up here within 2 minutes.</div>`}</div>
-      <p class="note">Lavender is Jev's guess (only when it is 90% sure or more). Sky blue is Claude: it reads email from a sender you have not heard from in 6 months and suggests one thing; you still approve. Orange is money or travel: Claude handles it and Jev is never asked. Enter approves, 1 to 8 picks a tray.${c.claude ? ` ${c.claude} waiting for Claude.` : ""}</p>`;
+      <p class="note">Tap ✓ Yes if the guess is right, or Somewhere else to pick. Every filing can be undone from the message at the bottom.${c.claude ? ` ${c.claude} waiting for Claude.` : ""}</p>`;
   }
 
   function messagesView(){
@@ -443,7 +478,11 @@ main>.empty,.pair .summary,.note{color:#fff;text-shadow:0 1px 2px rgba(9,22,50,.
     const o = e.target.closest("[data-open]"); if (o){ S.open = S.open === o.dataset.open ? null : o.dataset.open; render(); return; }
     const r = e.target.closest("[data-route]"); if (r){ S.picks[r.dataset.id] = r.dataset.route; render(); return; }
     const a = e.target.closest("[data-approve]"); if (a) return approve(a.dataset.approve);
+    const fl = e.target.closest("[data-file]"); if (fl){ S.picks[fl.dataset.id] = fl.dataset.file; return approve(fl.dataset.id); }
+    const ch = e.target.closest("[data-choose]"); if (ch){ S.choose[ch.dataset.choose] = true; render(); return; }
+    const wy = e.target.closest("[data-why]"); if (wy){ S.why[wy.dataset.why] = !S.why[wy.dataset.why]; render(); return; }
     const rd = e.target.closest("[data-read]");
+    if (rd && S.tab === "sort" && S.bodies[rd.dataset.read]){ delete S.bodies[rd.dataset.read]; render(); return; }
     if (rd){ const id = rd.dataset.read; S.bodies[id] = "loading"; render();
       try { S.bodies[id] = await api("/inbox/item?id=" + encodeURIComponent(id)); } catch (err) { S.bodies[id] = { error: err.message }; }
       render(); return; }
@@ -462,7 +501,7 @@ main>.empty,.pair .summary,.note{color:#fff;text-shadow:0 1px 2px rgba(9,22,50,.
     if (e.target.closest("textarea,input") || S.tab !== "sort" || !S.open || !S.data) return;
     if (e.key === "Enter" && e.target.closest("button,a")) return;   // Enter on a focused button presses that button, never Approve
     if (e.key === "Enter"){ const b = document.querySelector(`[data-approve="${CSS.escape(S.open)}"]`); if (b && !b.disabled){ e.preventDefault(); b.click(); } }
-    else if (/^[1-8]$/.test(e.key) && S.data.routes[+e.key - 1]){ S.picks[S.open] = S.data.routes[+e.key - 1].key; render(); }
+    else if (/^[1-8]$/.test(e.key) && S.data.routes[+e.key - 1]){ S.picks[S.open] = S.data.routes[+e.key - 1].key; approve(S.open); }
   });
   document.addEventListener("visibilitychange", () => { if (!document.hidden) load(); });
   setInterval(() => { if (!document.hidden) load(); }, 60000);
