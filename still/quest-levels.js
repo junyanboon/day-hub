@@ -13,16 +13,16 @@
   "use strict";
   const LEVELS = {
     OAC: ["Two-arm hang", "One-arm hang", "Partial two-arm chin", "Full two-arm chin",
-      "Partial one-arm negative", "Full one-arm negative", "Partial one-arm chin"],
+      "Partial one-arm negative", "Full one-arm negative", "Partial one-arm chin, going up"],
     SLS: ["Two-leg squat", "Single-leg negative", "Full single-leg squat, no weight", "10 kg", "20 kg", "30 kg", "40 kg"],
     NC: ["Hands do most of the work", "Hands help the whole way", "Hands help near the bottom", "Partial range, no hands",
       "Full negative, no hands", "No-hands positive", "Weighted"],
     PPU: ["Weight taken off (wall or incline)", "Leaning push-up", "Tuck", "Hips level with shoulders",
-      "Legs out, hips level", "Advanced tuck (90° at the hip)", "Full planche, some range"],
+      "Legs extended, hips level", "Advanced tuck (90° at the hip)", "Full planche, some range"],
     HSPU: ["Weight taken off", "Pike push-up", "Feet-elevated pike", "Shoulder stand on straps",
       "Strap-assisted HSPU", "Some unassisted range", "Side-to-side HSPU"],
     FLR: ["Weight taken off", "Leaning row", "Tuck front lever row", "Hips level with shoulders",
-      "Legs out, hips level", "Advanced tuck", "Full front lever row, some range"],
+      "Legs extended, hips level", "Advanced tuck", "Full front lever row, some range"],
   };
   // his own quiz answers, 2026-10-16 (ticket 15); the Oct 24 to 31 test week confirms or moves them
   const START = { OAC: 4, SLS: 5, NC: 3, PPU: 3, HSPU: 3, FLR: 2 };
@@ -48,7 +48,8 @@
     if (pass) out.level = t;   // the level trained stays what he trained today; the next session starts at the new level
     return out;
   }
-  const num = (v) => { if (v === "" || v == null) return null; const n = +String(v).trim(); return isFinite(n) && String(v).trim() !== "" ? n : null; };
+  // a plain positive number as typed on the phone ("6", "20", "172.4"); anything else is no number
+  const num = (v) => { const t = v == null ? "" : String(v).trim(); return /^\d{1,4}(\.\d+)?$/.test(t) ? +t : null; };
   // what goes to the server for one move, or null when nothing was logged
   function toEntry(code, moveName, x) {
     if (!x) return null;
@@ -90,7 +91,12 @@
     if (!d || !d.e) return d;
     const e = {};
     for (const [k, x] of Object.entries(d.e)) {
-      if (!isOld(x) || !LEVELS[k]) { e[k] = x; continue; }
+      if (!LEVELS[k] || !x || typeof x !== "object") { e[k] = x; continue; }
+      if (!isOld(x)) {   // a draft in the new shape: keep it, with its levels kept in range
+        e[k] = { ...startMove(k, x.start), ...x, start: clamp(x.start), level: clamp(x.level), trained: clamp(x.trained),
+          tests: Array.isArray(x.tests) ? x.tests : [] };
+        continue;
+      }
       const lvl = clamp(x.level), b = best(x.reps.slice(2)) ?? best(x.reps), cur = x.start || (levels && levels[k] && levels[k].level) || lvl;
       e[k] = { start: clamp(cur), level: lvl, trained: lvl, effort: "", reps: b == null ? "" : String(b), kg: "", tests: [],
         legacy: { reps: x.reps.slice(), lbs: (x.lbs || []).slice() } };

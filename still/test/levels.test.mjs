@@ -114,6 +114,8 @@ test("an old phone draft opens in the new box with its level and best set", () =
   assert.equal(d.e.NC.effort, ""); assert.deepEqual(J(d.e.NC.tests), []);
   assert.deepEqual(J(d.e["m:Pike"]), { done: true });
   assert.deepEqual(J(L.migrateDraft(d, {})), J(d), "a new draft is left alone");
+  const odd = L.migrateDraft({ program: "x", e: { NC: { start: 3, level: "<b>", trained: 99, effort: "full", reps: "", kg: "" } } }, {});
+  assert.equal(odd.e.NC.level, 1); assert.equal(odd.e.NC.trained, 7); assert.deepEqual(J(odd.e.NC.tests), []);
   const sent = L.toEntry("NC", "Nordic Hamstring Curl", d.e.NC);
   assert.equal(sent.reps, 4);
   assert.deepEqual(J(sent.legacy.reps), ["5", "5", "4", "3"], "the old four sets are saved with it");
@@ -129,6 +131,11 @@ test("a strength entry for the server: current level, level trained, the hardest
   assert.equal(L.toEntry("NC", "Nordic Hamstring Curl", L.startMove("NC", 3)), null, "nothing logged, nothing sent");
   n = L.recordTest(L.startMove("NC", 3), false);
   assert.ok(L.toEntry("NC", "Nordic Hamstring Curl", n), "a test attempt alone is worth saving");
+  for (const bad of ["-5", "1e3", "0x10", "five", " "]) {
+    const y = L.startMove("SLS", 5); y.effort = "full"; y.reps = bad; y.kg = bad;
+    const e = L.toEntry("SLS", "Single-Leg Squat", y);
+    assert.equal(e.reps, null, bad); assert.equal(e.kg, null, bad);
+  }
 });
 
 test("body weight: lbs only, a sensible number, one reading a day, the last four as a trend", () => {

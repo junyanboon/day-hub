@@ -2702,7 +2702,10 @@
     $("gClose").onclick = () => { saveDraft(); stopRest(); closeSheet(); };
     if ($("gMove")) $("gMove").onclick = () => { gymShowMove = !gymShowMove; drawGym(); };
     bindGymMove(sh, () => { if ($("gProg")) drawGym(); });
-    $("gProg").onchange = e => { GYM = { ...newGym(e.target.value, GYM.bw), blockKey:GYM.blockKey }; gymTesting = null; saveDraft(); drawGym(); };
+    $("gProg").onchange = e => {
+      const busy = Object.values(GYM.e).some(x => x && ((x.tests && x.tests.length) || x.effort || x.reps));
+      if (busy && !confirm("Switch program? What you logged for this one today is cleared.")) { e.target.value = GYM.program; return; }
+      GYM = { ...newGym(e.target.value, GYM.bw), blockKey:GYM.blockKey }; gymTesting = null; saveDraft(); drawGym(); };
     $("gBw").oninput = () => { GYM.bw = $("gBw").value.trim(); saveDraft(); };
     sh.querySelectorAll("[data-reps]").forEach(inp => inp.oninput = () => { GYM.e[inp.dataset.reps].reps = inp.value.trim(); saveDraft(); });
     sh.querySelectorAll("[data-kg]").forEach(inp => inp.oninput = () => { GYM.e[inp.dataset.kg].kg = inp.value.trim(); saveDraft(); });
@@ -2723,8 +2726,8 @@
     GYM.e[c] = LV.recordTest(x, pass); gymTesting = null; saveDraft();
     if (pass) {
       log(`Level up: ${MOVE[c]} L${t} (${LV.LEVELS[c][t - 1]}), test passed`);
-      if (window.QuestFx && rect) QuestFx.tap(rect, { icon:"⭐", full:true });
-      banner("🏆", "LEVEL UP", `${MOVE[c]} L${t} · ${LV.LEVELS[c][t - 1]}`);
+      if (window.QuestFx && rect) QuestFx.tap(rect, { icon:"⭐", color:"#ffd479" });
+      banner("🪢", "LEVEL UP", `${MOVE[c]} L${t} · ${LV.LEVELS[c][t - 1]}`);
     } else log(`Test: ${MOVE[c]} L${t}, not yet`);
     drawGym();
   }
@@ -3701,7 +3704,7 @@
       qfetch("/quest/insights").then(j => { INSIGHTS = j || {}; QuestMorning.redraw(); }).catch(() => {}); }
     loadWeather();
     if (questKey() && !openMorning.gym) { openMorning.gym = true;   // this week's workouts, for Training
-      qfetch("/quest/workout").then(j => { gymInfo = j || gymInfo; QuestMorning.redraw(); }).catch(() => {}); }
+      qfetch("/quest/workout").then(j => { if (j) gymInfo = { ...j, last:(j.last || []).map(LV.migrateSession) }; QuestMorning.redraw(); }).catch(() => {}); }
     QuestMorning.open(MO_CTX);
     placeBasics().then(() => QuestMorning.redraw()).catch(e => console.warn("basics", e));
     planGym(true).catch(e => console.warn("gym", e));
