@@ -86,8 +86,8 @@
   ];
 
   /* Stays the weekly Nearby job adds (d3, 2026-10-16: "we already have brazil trip coming up"): it reads the
-     calendar's stays for the weeks ahead, researches See & do and Eat for any stay not here yet, and writes them to
-     still/nearby-stays.json, same shape as above with match as a string. Added after the hand-made ones; an id
+     calendar's stays for the weeks ahead, researches See & do and Eat for any stay not here yet, and keeps them on the Still
+     server (GET /quest/nearby, behind the pairing code), same shape as above with match as a string. Added after the hand-made ones; an id
      already here is skipped. Returns how many were added. */
   function addStays(list, stays){
     const S = stays || STAYS; let n = 0;

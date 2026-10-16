@@ -680,7 +680,7 @@
 <script src="quest-gym.js?v=20261016g"></script>
 <script src="quest-morning.js?v=20261016g"></script>
 <script src="quest-agenda.js?v=20261014c"></script>
-<script src="quest-nearby.js?v=20261016f"></script>
+<script src="quest-nearby.js?v=20261016g"></script>
 </head>
 <body>
 <div id="sky" aria-hidden="true"><div class="sky-stars"></div><div class="sky-orb"></div>
@@ -3569,11 +3569,13 @@
     const w = PLAN.where || {};
     return QN.stayFor([w.from && w.from.place, w.place].concat(blocks().map(b => b.t), (AG[gameYmd()] || []).map(b => b.t)), null, now());
   }
-  // the stays the weekly Nearby job found on the calendar (d3), fetched once per page
+  /* the stays the weekly Nearby job found on the calendar (d3), fetched once per page. They live on the Still
+     server behind the pairing code, not in this public repo: a stay is an address with the dates they are there. */
   function nearbyLoad(){
-    if (nearbyLoad.done) return; nearbyLoad.done = true;
-    fetch("nearby-stays.json").then(r => r.ok ? r.json() : null)
-      .then(j => { if (j && window.QuestNearby && QuestNearby.addStays(j.stays)) drawNearby(); }).catch(() => {});
+    if (nearbyLoad.done || !questKey() || Date.now() - (nearbyLoad.tried || 0) < 300000) return;   // a failed read: again in 5 min
+    nearbyLoad.tried = Date.now();
+    qfetch("/quest/nearby").then(j => { nearbyLoad.done = true; if (j && window.QuestNearby && QuestNearby.addStays(j.stays)) drawNearby(); })
+      .catch(() => {});
   }
   function drawNearby(){
     nearbyLoad();

@@ -3,8 +3,15 @@
 Junyan, 2026-10-16 (d3): the Nearby card on Day Quest should know every stay on the calendar
 without anyone typing it in ("we already have brazil trip coming up"). This job runs weekly. It
 finds the stays in the next 21 days that the card does not know yet, researches places to see and
-eat near each one, and adds them to `still/nearby-stays.json`. The card reads that file and picks
+eat near each one, and saves them on the Still server. The card reads them from there and picks
 the stay from its check-in and check-out times (`still/quest-nearby.js`, `stayAt`).
+
+The stays never go in this repo: it is public, and a stay is an address with the dates Junyan and
+Caney are there.
+
+Server: `https://still.srv1948070.hstgr.cloud`. Send the pairing code from the environment variable
+`QUEST_KEY` as the header `X-Quest-Key`. Never print it, log it or put it in a URL. If it is empty,
+or a call answers 401, stop and report "QUEST_KEY missing or wrong".
 
 ## 1. Find the stays
 
@@ -24,7 +31,7 @@ For each stay take:
 - `origin`: the street address from the event's location.
 
 Skip a stay the card already has: same address or name as a stay in `STAYS` in
-`still/quest-nearby.js` or in `still/nearby-stays.json`.
+`still/quest-nearby.js` or in `GET /quest/nearby` (its `stays` list).
 
 Two stays booked for the same nights (a backup booking) are both added; list them under
 "Overlaps" in the report so Junyan can say which one is real.
@@ -57,9 +64,10 @@ Times, from the stay's address:
   `https://routing.openstreetmap.de/routed-car/route/v1/driving/{lon},{lat};{lon2},{lat2}?overview=false`.
   Over an hour on foot: leave `walk` out and give `car` only.
 
-## 3. Write the file
+## 3. Save each stay
 
-Append one object per stay to `stays` in `still/nearby-stays.json`:
+Send each stay on its own as `POST /quest/nearby` with the JSON body `{ "stay": { ... } }`. The
+same id replaces the earlier copy. A stay looks like this:
 
 ```json
 { "id": "rio-flat-moderno-flamengo", "name": "Flat Moderno no Flamengo", "short": "Flamengo flat",
@@ -78,13 +86,14 @@ Append one object per stay to `stays` in `still/nearby-stays.json`:
 - Ids are unique within a stay; eat ids start with `e-`.
 - Plain everyday English, short sentences, no em or en dashes.
 
-Then run `node --test still/test/*.test.mjs`. Every test must pass.
+Before sending, check each stay in Python: `in` is before `out`, both look like `2027-01-03T15:00`,
+every place has `id`, `name`, `what`, `lat`, `lng` and at least one of `walk`, `transit` or `car`.
+A 400 answer says what is wrong; fix it and send again.
 
-## 4. Ship it
+## 4. Check
 
-Commit only `still/nearby-stays.json` on a branch, open a pull request on `junyanboon/day-hub` and
-merge it (squash). Message: `Nearby job: add <short names>`. GitHub Pages publishes it within a few
-minutes. If no new stay was found, change nothing and open nothing.
+`GET /quest/nearby` and confirm each stay you sent is there with its places. Change nothing in the
+repo, and never commit or push.
 
 ## 5. Report
 

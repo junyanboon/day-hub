@@ -1,4 +1,0 @@
-{
-  "about": "Stays added by the weekly Nearby job (day-hub/scripts/NEARBY-JOB.md). Same shape as STAYS in quest-nearby.js; match is a case-insensitive regex string. Times are the stay's own wall clock.",
-  "stays": []
-}
