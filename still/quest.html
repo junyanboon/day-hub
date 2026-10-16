@@ -2407,8 +2407,11 @@
     // the insight agent sends what to know (kind "know"), things to pack (kind "pack", or older plain
     // prep items), mindset lines (kind "mind"), how-to links and hype media (kind "hype"). d145: a card
     // of what he needs to know and a packing list come first.
+    // a hotel check-in or check-out is only the booking card and what to do at the desk (Junyan, 2026-10-16:
+    // "we need to focus on just checking in ... the exact things I need to deal with when I'm standing in front of the desk person")
     const bk = I0.items.find(x => x.kind === "booking");
-    const I = { items:I0.items.filter(x => x.kind !== "mind" && x.kind !== "know" && x.kind !== "booking"), mind:I0.items.filter(x => x.kind === "mind"),
+    if (bk) return openDesk(b, bk, I0);
+    const I = { items:I0.items.filter(x => x.kind !== "mind" && x.kind !== "know" && x.kind !== "booking" && x.kind !== "desk"), mind:I0.items.filter(x => x.kind === "mind"),
       know:I0.items.filter(x => x.kind === "know"), packing:I0.items.some(x => x.kind === "pack"),
       links:(I0.links || []).filter(x => x.kind !== "hype"), hype:(I0.links || []).filter(x => x.kind === "hype") };
     const linkRow = l => `<a class="wck" href="${esc(l.url)}" target="_blank" rel="noopener"><span class="bx">▶</span><span>${esc(l.title)}${l.note ? `<br><small style="color:var(--ink-faint)">${esc(l.note)}</small>` : ""}</span></a>`;
@@ -2435,6 +2438,17 @@
       openWork(b);
     });
     if ($("wAsk")) $("wAsk").onclick = () => { (G.research = G.research || []).push({ key:k, title:b.t, s:b.s.toISOString() }); saveG(); openWork(b); };
+    $("wEdit").onclick = () => openEdit(b);
+  }
+
+  function openDesk(b, bk, I0){
+    const k = gk(b), desk = I0.items.filter(x => x.kind === "desk");
+    const W = ((G.day.work = G.day.work || {})[k] = G.day.work[k] || { tick:{}, goal:"" });
+    const done = desk.filter((_, i) => W.tick[i]).length;
+    openSheet(`${winHead(b)}${bookingHtml(bk)}
+      ${desk.length ? `<div class="win-lb">At the desk ${done}/${desk.length}</div>${desk.map((x, i) => `<button class="wck${W.tick[i] ? " on" : ""}" data-tick="${i}"><span class="bx">${W.tick[i] ? "✓" : ""}</span><span>${esc(x.t)}${x.why ? `<br><small style="color:var(--ink-faint)">${esc(x.why)}</small>` : ""}</span></button>`).join("")}` : ""}
+      <div class="actions"><button class="btn ghost" id="wEdit">Change time or name</button></div>`, true);
+    $("sheet").querySelectorAll("[data-tick]").forEach(bn => bn.onclick = () => { W.tick[bn.dataset.tick] = !W.tick[bn.dataset.tick]; saveG(); openDesk(b, bk, I0); });
     $("wEdit").onclick = () => openEdit(b);
   }
 
@@ -3332,14 +3346,15 @@
     } else {
       const I0 = INSIGHTS[k] || { items:[], links:[] };
       const know = I0.items.filter(x => x.kind === "know"), mind = I0.items.filter(x => x.kind === "mind");
-      const items = I0.items.filter(x => x.kind !== "mind" && x.kind !== "know" && x.kind !== "booking");   // same order as the full window's ticks
       const bk = I0.items.find(x => x.kind === "booking");
-      if (bk) h += bookingHtml(bk);
+      // a hotel booking shows only its card and the desk list, same as its window
+      const items = bk ? I0.items.filter(x => x.kind === "desk") : I0.items.filter(x => x.kind !== "mind" && x.kind !== "know" && x.kind !== "booking" && x.kind !== "desk");   // same order as the full window's ticks
+      if (bk) { h += bookingHtml(bk); know.length = 0; mind.length = 0; }
       const W = ((G.day.work = G.day.work || {})[k] = G.day.work[k] || { tick:{}, goal:"" });
       if (mind[0]) h += `<div class="mo-det-quote">${esc(mind[0].t)}</div>`;
       const knowH = know.length ? `<div class="mo-det-lb">What to know</div>${know.map(x => `<div class="mo-det-k"><b>${esc(x.t)}</b>${x.why ? `<span>${esc(x.why)}</span>` : ""}</div>`).join("")}` : "";
       if (!packFirst) h += knowH;
-      if (items.length) h += `<div class="mo-det-lb">${items.some(x => x.kind === "pack") ? "Pack" : "Prep"} ${items.filter((_, i) => W.tick[i]).length}/${items.length}</div>
+      if (items.length) h += `<div class="mo-det-lb">${bk ? "At the desk" : items.some(x => x.kind === "pack") ? "Pack" : "Prep"} ${items.filter((_, i) => W.tick[i]).length}/${items.length}</div>
         ${items.map((x, i) => `<button class="mo-ck${W.tick[i] ? " on" : ""}" data-tick="${i}" data-k="${esc(b.key)}"><span class="bx">${W.tick[i] ? "✓" : ""}</span>${esc(x.t)}</button>`).join("")}`;
       if (packFirst) h += knowH;   // about to go: what to bring comes first
       if (isGym(b)) h += gymMoveHTML(b);
