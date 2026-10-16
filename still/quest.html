@@ -626,7 +626,7 @@
 <script src="nvc-words.js?v=20261010a"></script>
 <script src="quest-fx.js?v=20261009b"></script>
 <script src="quest-night.js?v=20261011a"></script>
-<script src="quest-basics.js?v=20261016c"></script>
+<script src="quest-basics.js?v=20261016d"></script>
 <script src="quest-morning.js?v=20261016c"></script>
 <script src="quest-agenda.js?v=20261014c"></script>
 </head>
@@ -3067,7 +3067,7 @@
      walks him through it; everything it changes is a today-only edit through /ops, the same as
      the stop windows. This side gathers the day and does the writes. */
   /* ---------- the basics (Junyan, 2026-10-16, d1 d5 d6 d7) ----------
-     Every day the plan puts in "Go over the day with Caney" and Domestics after breakfast, and the
+     Every day the plan puts in "Go over the day with Caney" (its own 15 min block) and Domestics after breakfast, and the
      Wind-down ending at bed, without him typing. quest-basics.js decides lengths, steps and where they go;
      this places them as today-only blocks (adds with basic, bmode, wd) when the planner opens. He can move,
      cut or drop them like anything else; one he drops stays off for today (G.day.plan.basicsOff). */
@@ -3099,9 +3099,14 @@
     if (!QB() || !PLAN || !window.QuestMorning || !lastPull) return;   // after the first full pull: the game (and what he dropped) is in
     // one note per basic (what it had to give up today); a basic he dropped takes its note with it
     const keepNotes = r => { const n = (G.day.plan.basicNotes = G.day.plan.basicNotes && !Array.isArray(G.day.plan.basicNotes) ? G.day.plan.basicNotes : {}); r.notes.forEach(x => { n[x.id] = x.t; }); };
+    // a Caney placed at the old 10 min (before 2026-10-16's "one 15 minute block") and not started grows to 15 in place
+    const started = a => !!G.day.closes[gk(a)] || !!G.day.checks[gk(a)];   // growCaney checks the clock itself
+    const fixed = () => MO_CTX.data().items.filter(i => !i.open && !i.brk && !i.sleep && !i.basic).map(i => [+i.s, +i.e]);
+    const grow = QB().growCaney(JSON.parse(JSON.stringify(OPS.adds || [])), now(), started, fixed()) > 0;
     const first = QB().placeBasics(placeArgs());
-    if (!first.place.length) { keepNotes(first); saveG(); return; }
+    if (!first.place.length && !grow) { keepNotes(first); saveG(); return; }
     await writeOps(o => {   // again against the edit layer writeOps just pulled, so two devices place them once
+      if (QB().growCaney(o.adds, now(), started, fixed())) log("Go over the day with Caney is 15 min now");
       const r = QB().placeBasics(placeArgs()); keepNotes(r);
       r.place.forEach(p => { log(`Planned ${p.t}: ${fmtT(p.s)} to ${fmtT(p.e)}`); o.adds.push(basicAdd(p.id, p.s, p.min)); });
     });
