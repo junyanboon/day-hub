@@ -344,7 +344,7 @@ main>.empty,.pair .summary,.note{color:#fff;text-shadow:0 1px 2px rgba(9,22,50,.
     const c = S.data.counts;
     return `<div class="lane"><span>One card per email · nothing moves until you approve</span><span>${c.sort}</span></div>
       <div class="list">${rows || `<div class="empty">Nothing waiting. New mail shows up here within 2 minutes.</div>`}</div>
-      <p class="note">Lavender is Jev's guess (only when it is 80% sure or more). Sky blue is Claude: it reads email from a sender you have not heard from in 6 months and suggests one thing; you still approve. Orange is money or travel: Claude handles it and Jev is never asked. Enter approves, 1 to 8 picks a tray.${c.claude ? ` ${c.claude} waiting for Claude.` : ""}</p>`;
+      <p class="note">Lavender is Jev's guess (only when it is 90% sure or more). Sky blue is Claude: it reads email from a sender you have not heard from in 6 months and suggests one thing; you still approve. Orange is money or travel: Claude handles it and Jev is never asked. Enter approves, 1 to 8 picks a tray.${c.claude ? ` ${c.claude} waiting for Claude.` : ""}</p>`;
   }
 
   function messagesView(){
