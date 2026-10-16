@@ -170,3 +170,20 @@ test("Matthew I. Smith may share a day with another gym session when no other da
   const jw = G.moveOptions({ kind:"jw1", s:G.at("2026-10-27", 17, TOR), e:G.at("2026-10-27", 18, TOR), days, week:HOME, gymDays:all, modes:{}, now:G.at("2026-10-26", 9, TOR) });
   assert.equal(jw.options.length, 0, "strength stays one a day");
 });
+
+test("d21 from the page: I'm ill deletes Monday's planned session (its slot key recorded); it is skipped once, not twice", () => {
+  // the planner had put Jack Woods Mon, Wed, Fri and Matthew I. Smith Sun; ill on Monday, it is Monday evening
+  const mon = ev("2026-10-26", "19:30", "20:30", "Gym · Jack Woods");
+  const cal = { "2026-10-28": [ev("2026-10-28", "19:30", "20:30", "Gym · Jack Woods")], "2026-10-30": [ev("2026-10-30", "19:30", "20:30", "Gym · Jack Woods")],
+    "2026-11-01": [ev("2026-11-01", "17:00", "17:45", "Gym · Matthew I. Smith")] };
+  const placed = { "2026-10-26:jw#1":true, "2026-10-26:jw#2":true, "2026-10-26:jw#3":true, "2026-10-26:ms#1":true };
+  const r = G.planWeek({ week:HOME, days:homeWeek(cal), sessions:Object.values(cal).flat(), logs:[], placed, now:G.at("2026-10-26", 18, TOR), today:"2026-10-26",
+    ill:["2026-10-26"], illNow:true, illSkips:[{ t:"Gym · Jack Woods", s:new Date(mon.s).toISOString(), key:"2026-10-26:jw#1" }] });
+  assert.equal(r.excused, 1); assert.equal(r.total, 3); assert.equal(r.have, 3);
+  assert.equal(r.line, "Gym: 3 of 3 this week · ill, nothing new placed");
+  // nothing planned yet: the deleted Monday session (no key) and the as-if Monday slot are the same session
+  const r2 = G.planWeek({ week:HOME, days:homeWeek(), sessions:[], logs:[], placed:{}, now:G.at("2026-10-27", 9, TOR), today:"2026-10-27",
+    ill:["2026-10-26"], illNow:false, illSkips:[{ t:"Gym · Jack Woods", s:mon.s }] });
+  assert.equal(r2.excused, 1);
+  assert.equal(r2.total, 3);
+});

@@ -139,7 +139,7 @@
       const s = +new Date(x.s); if (!isFinite(s) || !ill.has(ymdAt(s)) || sick.some(k => Math.abs(k.s - s) < 60000)) continue;
       sick.push({ fam:famOf(sessionOf(x.t)), s, key:x.key || null });
     }
-    const excusedBy = { jw:0, ms:0 };
+    const sickDays = sick.map(k => ymdAt(k.s)), excusedBy = { jw:0, ms:0 };
     const skipIll = (key, fam, why) => { skipped.push({ key, kind:fam, why }); excusedBy[fam]++; };
     // a slot's key is the same whether the week reads as home or travel (the nth Jack Woods, the nth Matthew I. Smith),
     // so a week whose answer flips cannot bring back a session he deleted
@@ -147,10 +147,11 @@
     const want = [], keyed = open.map(slot => { const fam = slot.startsWith("ms") ? "ms" : "jw"; return { fam, key:`${o.week}:${fam}#${++n[fam]}` }; });
     const illPlaced = k => placed[k] && placedS[k] != null && ill.has(ymdAt(+placedS[k]));
     // a placed slot whose own time was an ill day accounts for that session itself
-    for (const { key } of keyed) if (illPlaced(key)) for (let i = sick.length - 1; i >= 0; i--) if (sick[i].key === key || Math.abs(sick[i].s - +placedS[key]) < 60000) sick.splice(i, 1);
+    for (const { key } of keyed) if (illPlaced(key)) for (let i = sick.length - 1; i >= 0; i--) if (Math.abs(sick[i].s - +placedS[key]) < 60000) sick.splice(i, 1);
     for (const { fam, key } of keyed) {
       if (illPlaced(key)) { skipIll(key, fam, "skipped: ill that day"); continue; }
-      const si = sick.findIndex(k => k.key === key) >= 0 ? sick.findIndex(k => k.key === key) : sick.findIndex(k => k.fam === fam && !k.key);
+      // slot keys are renumbered from what is covered now, so a skipped session is matched by its kind, not its old key
+      const si = sick.findIndex(k => k.fam === fam);
       if (si >= 0) { sick.splice(si, 1); skipIll(key, fam, "skipped: ill that day"); continue; }
       if (placed[key]) { skipped.push({ key, kind:fam, why:"placed before; left as he left it" }); continue; }
       const mi = moved.indexOf(fam);
@@ -181,7 +182,7 @@
     if (ill.size && want.length) {
       const well = days.map(d => ({ ...d, easy:d.easy.filter(x => x !== "ill") }));
       const start = at(o.week, 0, (days[0] || {}).tz || "America/Toronto");
-      const asIf = placeAll(want, well, o.week, start, all.map(b => b.ymd).concat(logs.map(l => l.ymd)), () => false);
+      const asIf = placeAll(want, well, o.week, start, all.map(b => b.ymd).concat(logs.map(l => l.ymd), sickDays), () => false);
       go = want.filter(w => { const p = asIf[w.key]; if (p && ill.has(p.ymd)) { skipIll(w.key, w.fam, "skipped: ill that day"); return false; } return true; });
     }
     if (o.illNow) { go.forEach(w => skipped.push({ key:w.key, kind:w.fam, why:"ill today: nothing new goes in" })); go = []; }
@@ -222,7 +223,7 @@
   }
 
   /* Where a gym session could move to (Junyan, 2026-10-16: "give me the option to reschedule with different
-     days/times I can reschedule to. This way I can stick to it"). o: { kind ("jw1" | "jw2" | "jw" | "ms"), s, e (its
+     days/times I can reschedule to. This way I can stick to it"). o: { kind ("jw" | "ms"; an old "jw1" / "jw2" reads as "jw"), s, e (its
      time now), days: dayInfo for today and the 6 days after it (its own event left out of busy), week: the Monday of
      its week, gymDays: [ymd] with another gym session, ill: [ymd], modes: { monday: "home" | "travel" }, now }.
      The placement rules of planWeek: no move or flight day, no strength on a go-easy or ill day, an hour clear after a

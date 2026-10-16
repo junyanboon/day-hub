@@ -1950,7 +1950,8 @@
     await pullAll();
   }
   async function addBlockCal(t, s, e, makeRoom){
-    try { await qfetch("/cal/event", { method:"POST", body:JSON.stringify({ s:s.toISOString(), e:e.toISOString(), title:t }) }); }
+    try { await qfetch("/cal/event", { method:"POST", body:JSON.stringify({ s:s.toISOString(), e:e.toISOString(), title:t,
+      ...(isGym({ t }) ? { color:"3", desc:"Added from Day Quest: a gym session. Move it or delete it as you like." } : {}) }) }); }
     catch (err) {
       // today's plan cannot hold another day, so a failed add there is only reported
       if (gameDayOf(s) !== gameYmd()) return calToast(`Could not add ${t} to the calendar (${err.message}). Nothing was added.`, 7000);
@@ -2613,7 +2614,8 @@
     $("aGo").onclick = () => {
       const t = $("aT").value.trim(); if (!t) { $("aT").focus(); return; }
       const s = fromField($("aS").value, other ? t0 : now()), e = new Date(s.getTime() + dur * 60000);
-      const cal = other || $("aCal") && $("aCal").checked;
+      // a gym session always goes on Google Calendar (later 2026-10-16: no more plan-only gym blocks)
+      const cal = other || isGym({ t }) && questKey() && !DRY || $("aCal") && $("aCal").checked;
       closeSheet(); (cal ? addBlockCal : addBlock)(t, s, e, !other && $("aRoom").checked);
     };
     setTimeout(() => $("aT").focus(), 300);
@@ -2650,7 +2652,7 @@
 
   let gymShowMove = false, gymTesting = null, gymRow = null;
   async function openGym(block){
-    gymShowMove = false; gymTesting = null; gymRow = null;
+    gymShowMove = false; gymTesting = null; gymRow = null; GYMASK = null;
     // opening the log at the gym means you're there; opening it early (to move it, or because you're ill) does not
     if (block && !G.day.checks[gk(block)] && block.s - now() < 30 * 60000) checkIn(block);
     await loadGymInfo();
@@ -2669,7 +2671,10 @@
     const blk = GYM.blockKey && blocks().find(x => x.key === GYM.blockKey);
     const early = blk && blk.s - now() >= 30 * 60000;   // not at the gym yet: the move options come first
     const tr = gymTrend();
-    let h = `<div class="gym-head"><h3>🏋️ Gym log</h3><span class="gym-hb">${blk && !early ? `<button class="btn ghost small" id="gMove">${gymShowMove ? "Hide" : "Reschedule, skip or ill"}</button>` : ""}<button class="btn ghost small" id="gClose">Close</button></span></div>
+    const asking = GYMASK && GYMASK.kind === "skip" && blk && GYMASK.key === blk.key;
+    let h = `<div class="gym-head"><h3>🏋️ Gym log</h3><span class="gym-hb">${blk && !early ? `<button class="btn ghost small" id="gMove">${gymShowMove ? "Hide" : "Reschedule or ill"}</button>` : ""}${blk ? `<button class="btn ghost small" id="gSkip">Skip</button>` : ""}<button class="btn ghost small" id="gClose">Close</button></span></div>
+      ${asking ? `<div class="gmv-ask"><span>Are you sure? ${esc(shortName(blk))} at ${fmtT(blk.s)} comes off your schedule${blk.id && blk.calId ? " and Google Calendar" : ""}.</span>
+        <span class="gmv-ask-b"><button class="btn ghost small" id="gSkipNo">Cancel</button><button class="btn primary small" id="gSkipYes">Yes, skip</button></span></div>` : ""}
       ${blk && (early || gymShowMove) ? gymMoveHTML(blk) : ""}
       <div class="gtopline"><select id="gProg" aria-label="Program">${Object.keys(PROGRAMS).map(k => `<option ${k === GYM.program ? "selected" : ""}>${k}</option>`).join("")}</select></div>
       <div class="gbw"><label for="gBw">⚖️ Body weight</label><input class="set" id="gBw" inputmode="decimal" placeholder="lbs" value="${esc(GYM.bw || "")}">
@@ -2692,7 +2697,10 @@
     openSheet(h, true);
     const sh = $("sheet");
     if (keepScroll != null) sh.scrollTop = keepScroll;
-    $("gClose").onclick = () => { saveDraft(); stopRest(); closeSheet(); };
+    $("gClose").onclick = () => { GYMASK = null; saveDraft(); stopRest(); closeSheet(); };
+    if ($("gSkip")) $("gSkip").onclick = () => { GYMASK = asking ? null : { key:blk.key, kind:"skip" }; drawGym(); };
+    if ($("gSkipNo")) $("gSkipNo").onclick = () => { GYMASK = null; drawGym(); };
+    if ($("gSkipYes")) $("gSkipYes").onclick = () => skipGym(blk, $("gSkipYes"));
     if ($("gMove")) $("gMove").onclick = () => { gymShowMove = !gymShowMove; drawGym(); };
     bindGymMove(sh, () => { if ($("gProg")) drawGym(); });
     $("gProg").onchange = e => {
@@ -2703,8 +2711,11 @@
     sh.querySelectorAll("[data-gopen]").forEach(b => b.onclick = () => { gymRow = GL.toggle(gymRow, b.dataset.gopen); gymTesting = null; drawGym();
       const row = gymRow && $("gm-" + gymRow); if (row && row.scrollIntoView) row.scrollIntoView({ block:"nearest" }); });
     // a typed number marks the row ✓ when the field is left (redrawing on every key would close the phone's keyboard)
-    sh.querySelectorAll("[data-reps]").forEach(inp => { inp.oninput = () => { GYM.e[inp.dataset.reps].reps = inp.value.trim(); saveDraft(); }; inp.onchange = () => drawGym(); });
-    sh.querySelectorAll("[data-kg]").forEach(inp => { inp.oninput = () => { GYM.e[inp.dataset.kg].kg = inp.value.trim(); saveDraft(); }; inp.onchange = () => drawGym(); });
+    // a typed number ticks its row in place (a redraw would close the phone's keyboard or eat the next tap)
+    const tick = c => { const row = $("gm-" + c), ok = row && row.querySelector(".gok"), on = GL.logged(LV, GYM.e[c]);
+      if (row) row.classList.toggle("done", on); if (ok) ok.textContent = on ? "✓" : ""; };
+    sh.querySelectorAll("[data-reps]").forEach(inp => inp.oninput = () => { GYM.e[inp.dataset.reps].reps = inp.value.trim(); saveDraft(); tick(inp.dataset.reps); });
+    sh.querySelectorAll("[data-kg]").forEach(inp => inp.oninput = () => { GYM.e[inp.dataset.kg].kg = inp.value.trim(); saveDraft(); tick(inp.dataset.kg); });
     sh.querySelectorAll("[data-tr]").forEach(b => b.onclick = () => { const x = GYM.e[b.dataset.tr]; x.trained = Math.min(LV.TOP, Math.max(1, x.trained + +b.dataset.d)); saveDraft(); drawGym(); });
     sh.querySelectorAll("[data-eff]").forEach(b => b.onclick = () => { const x = GYM.e[b.dataset.eff]; x.effort = x.effort === b.dataset.v ? "" : b.dataset.v; saveDraft(); drawGym(); });
     sh.querySelectorAll("[data-test]").forEach(b => b.onclick = () => { gymTesting = b.dataset.test; drawGym(); });
@@ -3162,24 +3173,19 @@
     GMVB[b.key] = b;
     let h = `<div class="gmv" data-gmv="${esc(b.key)}"><div class="glabel">Reschedule</div>`;
     if (st.ill && todayB) h += `<p class="gnote">You're ill today, so no gym. When you feel better, tap I'm better and the rest of the week is planned again.</p>`;
-    else if (!(b.id && b.calId)) h += `<p class="gnote"><b>Only in Day Quest.</b> This one is in today's plan, not in Google Calendar, so it cannot go to another day. ${todayB ? "Put it on Google Calendar to move it to another day, or" : ""} drag it on the calendar to change its time today.</p>`;
+    else if (!(b.id && b.calId)) h += `<p class="gnote">This one is only in today's plan, so it can't go to another day. Drag it on the calendar to change its time today.</p>`;
     else if (!c) h += `<p class="gnote">Finding free times…</p>`;
     else {
       h += c.r.options.length ? `<div class="gmv-os">${c.r.options.map((o, i) => `<button class="gmv-o${o.same ? "" : " nx"}" data-gmvgo="${i}">${esc(o.label)}${o.same ? "" : `<small>${o.later ? "next week" : "week before"}</small>`}</button>`).join("")}</div>` : "";
       if (c.r.note) h += `<p class="gnote">${esc(c.r.note)}</p>`;
     }
-    /* Junyan, 2026-10-16: "right now I'm trying to cancel it so what do I do to get this off my schedule. Also why
-       is it not on my google cal?" Not today drops it like Remove from today (he is not ill); Change time or name
-       is the block's own edit window; a plan-only gym block can go onto his Junyan calendar. */
-    const onCal = !!(b.id && b.calId);
-    /* d22 (later 2026-10-16, "the calendars need to simply stay synced"): Not today on a calendar gym event deletes
-       the Google event, after a one-line confirm here; "I'm ill" asks the same before it takes today's gym off */
-    const ask = GYMASK && GYMASK.key === b.key ? GYMASK : null;
+    /* Later 2026-10-16, Junyan: "Get rid of change time or name and put on google calendar. these are not necessary.
+       Let's just have a simple skip button that is beside close that asks 'are you sure' and then will remove it from
+       the schedule." Skip lives in the Gym log's header (drawGym); here stay the times to move to and ill / better.
+       "I'm ill" asks first when it would delete today's gym from Google Calendar (d22). */
+    const ask = GYMASK && GYMASK.key === b.key && GYMASK.kind === "ill" ? GYMASK : null;
     if (ask) return h + `<div class="gmv-ask"><span>${esc(ask.text)}</span><span class="gmv-ask-b"><button class="btn ghost small" data-gmvno>Back</button>
       <button class="btn primary small" data-gmvyes>${esc(ask.yes)}</button></span></div></div>`;
-    h += `<div class="gmv-os gmv-more">${todayB ? `<button class="gmv-o" data-gmvoff>🚫 Not today<small>${onCal ? "deletes it from Google Calendar" : "takes it off today's plan"}</small></button>` : ""}
-      <button class="gmv-o" data-gmvedit>✏️ Change time or name</button>
-      ${!onCal && todayB ? `<button class="gmv-o" data-gmvcal>📅 Put it on Google Calendar<small>your Junyan calendar</small></button>` : ""}</div>`;
     h += `<button class="gmv-ill" data-gmvill="${st.ill ? 0 : 1}">${st.ill ? "🙂 I'm better" : "🤒 I'm ill, no workout"}</button>`;
     return h + `</div>`;
   }
@@ -3200,22 +3206,19 @@
         if (cal.length) { GYMASK = { key:b.key, kind:"ill", yes:"Yes, I'm ill",
           text:`You're ill: ${cal.map(x => `${shortName(x)} at ${fmtT(x.s)}`).join(" and ")} comes off Google Calendar too.` }; return redraw(); }
         setIll(ill).then(redraw); });
-      el.querySelectorAll("[data-gmvoff]").forEach(bt => bt.onclick = e => { e.stopPropagation();
-        if (b.id && b.calId) { GYMASK = { key:b.key, kind:"off", yes:"Delete it", text:`Delete ${shortName(b)} at ${fmtT(b.s)} from Google Calendar?` }; return redraw(); }
-        if (GYM && GYM.blockKey === b.key) saveDraft();
-        stopRest(); closeSheet(); dropBlock(b); calToast(`${shortName(b)} is off today's plan.`, 5000); });
       el.querySelectorAll("[data-gmvno]").forEach(bt => bt.onclick = e => { e.stopPropagation(); GYMASK = null; redraw(); });
       el.querySelectorAll("[data-gmvyes]").forEach(bt => bt.onclick = async e => { e.stopPropagation();
-        const ask = GYMASK; GYMASK = null; if (!ask) return;
-        if (ask.kind === "ill") { await setIll(true); return redraw(); }
-        if (GYM && GYM.blockKey === b.key) saveDraft();
-        bt.disabled = true; bt.textContent = "Deleting…";
-        const ok = await gymOffCal(b);
-        stopRest(); closeSheet();
-        if (ok) calToast(ok === "dry" ? `Test mode: ${shortName(b)} would be deleted from Google Calendar. Nothing is changed.` : `${shortName(b)} is deleted from Google Calendar and off today.`, 6000); });
-      el.querySelectorAll("[data-gmvedit]").forEach(bt => bt.onclick = e => { e.stopPropagation(); stopRest(); openEdit(b); });
-      el.querySelectorAll("[data-gmvcal]").forEach(bt => bt.onclick = e => { e.stopPropagation(); gymToCal(b, bt); });
+        const ask = GYMASK; GYMASK = null; if (ask && ask.kind === "ill") { await setIll(true); redraw(); } });
     });
+  }
+  // Skip (later 2026-10-16): after "Are you sure?", the session leaves the schedule; a Google Calendar gym event is deleted (d22)
+  async function skipGym(b, bt){
+    GYMASK = null; saveDraft();
+    if (bt) { bt.disabled = true; bt.textContent = "Skipping…"; }
+    const onCal = !!(b.id && b.calId), ok = onCal ? await gymOffCal(b) : (await dropBlock(b), true);
+    stopRest(); closeSheet();
+    if (ok) calToast(ok === "dry" ? `Test mode: ${shortName(b)} would be skipped${onCal ? " and deleted from Google Calendar" : ""}. Nothing is saved.`
+      : `${shortName(b)} is skipped${onCal ? " and deleted from Google Calendar" : ""}.`, 6000);
   }
   // today's gym sessions still ahead that are Google Calendar events (what "I'm ill" would delete)
   const gymCalToday = () => blocks().filter(x => isGym(x) && x.id && x.calId && x.e > now() && !G.day.closes[gk(x)]);
@@ -3223,9 +3226,9 @@
      can tell are gym sessions (and refuses anything else). Today's copy leaves the plan either way; a failed delete
      says so and the event stays. Returns true, "dry" in test mode, or false. */
   async function gymOffCal(b){
-    if (DRY) return "dry";
+    if (DRY) { await dropBlock(b); return "dry"; }
     if (!questKey()) { await dropBlock(b); calToast(`Pair this device in ⚙️ to delete it from Google Calendar. ${shortName(b)} is off today's plan.`, 6000); return false; }
-    try { await qfetch("/cal/delete", { method:"POST", body:JSON.stringify({ id:b.id, calId:b.calId, title:b.t, s:new Date(b.s).toISOString() }) }); }
+    try { await qfetch("/cal/delete", { method:"POST", body:JSON.stringify({ id:b.id, calId:b.calId }) }); }
     catch (err) { await dropBlock(b); calToast(`Could not delete it from Google Calendar (${err.message}). It is off today's plan; the event stays.`, 8000); return false; }
     log(`Deleted ${b.t} from Google Calendar: ${fmtT(b.s)}`);
     await dropBlock(b);
@@ -3233,25 +3236,6 @@
     store.set("quest-gym-at", "");
     pullAll().catch(() => {});
     return true;
-  }
-  // a gym block that lives only in today's plan goes onto the Junyan calendar (Grape, like the weekly plan), then leaves the plan
-  async function gymToCal(b, bt){
-    const what = shortName(b);
-    if (DRY) { calToast(`Test mode: ${what} would go on Google Calendar. Nothing is saved.`, 6000); return; }
-    if (!questKey()) { calToast("Pair this device in ⚙️ to put it on the calendar."); return; }
-    if (gymMoveBusy) return;
-    gymMoveBusy = true; if (bt) { bt.disabled = true; bt.textContent = "Putting it on the calendar…"; }
-    try {
-      await qfetch("/cal/event", { method:"POST", body:JSON.stringify({ s:new Date(b.s).toISOString(), e:new Date(b.e).toISOString(), title:b.t, color:"3",
-        desc:"Put on the calendar from Day Quest's gym log. Move it or delete it as you like." }) });
-      log(`Put ${b.t} on the calendar: ${fmtT(b.s)} to ${fmtT(b.e)}`);
-      await dropBlock(b);   // the plan-only copy goes, the calendar event takes its place
-      await pullAll();
-      closeSheet(); calToast(`${what} is on your Junyan calendar now. Open it again to move it to another day.`, 6000);
-    } catch (err) {
-      calToast(`Could not put ${what} on the calendar (${err.message}). It stays in today's plan.`, 7000);
-      if (bt) { bt.disabled = false; bt.textContent = "📅 Put it on Google Calendar"; }
-    } finally { gymMoveBusy = false; }
   }
   async function moveGym(b, o){
     if (gymMoveBusy) return;   // one move at a time: a second tap waits for the first
@@ -3314,7 +3298,8 @@
     const st = illToday(); if (!st.ask || store.get("quest-ill-asked") === gameYmd()) return;
     store.set("quest-ill-asked", gameYmd());
     const since = new Date(st.since + "T12:00:00Z").toLocaleDateString("en-US", { timeZone:"UTC", weekday:"short", month:"short", day:"numeric" });
-    openSheet(`<h3>🤒 Still ill?</h3><p>You said you were ill on ${esc(since)}. While you're ill no gym goes on the plan. A session on an ill day is skipped, not moved, and the week's count drops by it.</p>
+    const cal = gymCalToday();
+    openSheet(`<h3>🤒 Still ill?</h3><p>You said you were ill on ${esc(since)}. While you're ill no gym goes on the plan. A session on an ill day is skipped, not moved, and the week's count drops by it.${cal.length ? ` Yes takes today's ${esc(cal.map(x => `${shortName(x)} at ${fmtT(x.s)}`).join(" and "))} off Google Calendar.` : ""}</p>
       <div class="actions"><button class="btn ghost" id="illYes">Yes, still ill</button><button class="btn primary" id="illNo">I'm better</button></div>`);
     $("illYes").onclick = () => { closeSheet(); setIll(true); };
     $("illNo").onclick = () => { closeSheet(); setIll(false); };
@@ -3750,7 +3735,10 @@
     setTime: (key, s, e) => { const b = blkByKey(key); if (b) return saveBlock(b, s, e, b.t, false); },
     rename: (key, t) => { const b = blkByKey(key); if (b) return saveBlock(b, b.s, b.e, t, false); },
     drop: key => { const b = blkByKey(key); if (b) return dropBlock(b); },
-    add: (t, s, e, extra) => { log(`Planned ${t}: ${fmtT(s)} to ${fmtT(e)}`);
+    add: (t, s, e, extra) => {
+      // a gym session goes on Google Calendar as a real event, never a plan-only block (later 2026-10-16)
+      if (isGym({ t }) && questKey() && !DRY) return addBlockCal(t, s, e, false);
+      log(`Planned ${t}: ${fmtT(s)} to ${fmtT(e)}`);
       return writeOps(o => o.adds.push({ key:newKey(s), s:s.toISOString(), e:e.toISOString(), t, type:"task", cal:"you", ...(extra || {}) })); },
     // done in Notion; the answer carries the status it had, so Undo can put it back (2026-10-10)
     taskDone: async id => {
