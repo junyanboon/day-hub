@@ -41,7 +41,7 @@
   ];
 
   const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;" }[c]));
-  const hm = m => m < 60 ? `${m} min` : `${Math.floor(m / 60)} hr${m % 60 ? ` ${m % 60}` : ""}`;
+  const hm = m => m < 60 ? `${m} min` : `${Math.floor(m / 60)} hr${m % 60 ? ` ${m % 60} min` : ""}`;   // the page's own "1 hr 30 min"
 
   // texts: the place line first, then today's hotel events; the first one that names a stay wins
   function stayFor(texts, stays){

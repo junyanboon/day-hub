@@ -6,7 +6,9 @@
    corner; the others make room. The layout is kept per device (localStorage
    quest-dash-v1); "Reset layout" brings back the default. The phone keeps the
    single column. Grid engine: gridstack 10.3.1 (still/vendor/); if it fails to
-   load, the page stays a single column. ?nodash=1 turns it off. */
+   load, the page stays a single column. ?nodash=1 turns it off.
+   A part marked data-dash-optional (Nearby, 2026-10-16) leaves the grid while it is hidden: quest.html calls
+   QuestDash.sync() when it shows or hides one, and its saved place is kept for when it comes back. */
 (function () {
   "use strict";
   const MIN_W = 1100, KEY = "quest-dash-v2", ROWS = 16;   // v2: the calendar column layout (d216, 2026-10-10)
@@ -147,7 +149,8 @@
     window.QuestDash = { sync };
     sync();
     gs.on("change", () => {
-      const out = saved();   // keep the place of a part that is out of the grid right now
+      const was = saved(), out = {};   // keep the place of a part that is out of the grid right now
+      parked.querySelectorAll(":scope > .grid-stack-item").forEach((item) => { const id = item.getAttribute("gs-id"); if (was[id]) out[id] = was[id]; });
       for (const n of gs.save(false)) out[n.id] = { x: n.x, y: n.y, w: n.w, h: n.h };
       try { localStorage.setItem(KEY, JSON.stringify(out)); } catch {}
     });

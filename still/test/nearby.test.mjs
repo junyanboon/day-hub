@@ -35,7 +35,7 @@ test("the mode symbol comes from the minutes: walk up to 25 min, else the quicke
   assert.equal(lbl({ walk:0 }), "🏨 In the hotel");
   assert.equal(lbl({ walk:40, transit:15 }), "🚇 15 min, 🚶 40 min");
   assert.equal(lbl({ walk:40, transit:20, car:12 }), "🚗 12 min, 🚶 40 min");
-  assert.equal(lbl({ walk:90, car:15 }), "🚗 15 min, 🚶 1 hr 30");
+  assert.equal(lbl({ walk:90, car:15 }), "🚗 15 min, 🚶 1 hr 30 min");
   assert.equal(lbl({ transit:18 }), "🚇 18 min");
   assert.equal(N.chips({ walk:40, transit:15 })[0].mode, "transit");
   assert.equal(N.chips({ walk:12 })[0].mode, "walking");
