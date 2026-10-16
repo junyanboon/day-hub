@@ -661,7 +661,7 @@
 <script src="quest-gym.js?v=20261016g"></script>
 <script src="quest-morning.js?v=20261016g"></script>
 <script src="quest-agenda.js?v=20261014c"></script>
-<script src="quest-nearby.js?v=20261016d"></script>
+<script src="quest-nearby.js?v=20261016e"></script>
 </head>
 <body>
 <div id="sky" aria-hidden="true"><div class="sky-stars"></div><div class="sky-orb"></div>
@@ -3499,14 +3499,31 @@
     const st = drawNearby.st || (drawNearby.st = { tab:null, open:{}, msg:{} }), stay = nearbyStay(), inner = QN ? QN.html(stay, st, now()) : "";
     if (h.hidden !== !inner || el.hidden !== !inner) { h.hidden = el.hidden = !inner; if (window.QuestDash) QuestDash.sync(); }
     if (!inner) return;
+    if (st.here && Date.now() - st.here.at > 300000 && !st.locating) nearbyLocate(true);
     QN.addCss(document);
     $("nearbyT").textContent = QN.title(stay);
     put("nearby", inner);
     el.onclick = e => {
       const tb = e.target.closest("[data-nbtab]"); if (tb) { st.tab = tb.dataset.nbtab; return drawNearby(); }
+      if (e.target.closest("[data-nbnear]")) { if (st.here) { st.here = null; st.nearMsg = ""; return drawNearby(); } return nearbyLocate(); }
       const pl = e.target.closest("[data-nbplan]"); if (pl) return nearbyPlan(stay, pl.dataset.nbplan);
       const hd = e.target.closest("[data-nb]"); if (hd) { st.open[hd.dataset.nb] = !st.open[hd.dataset.nb]; drawNearby(); }
     };
+  }
+  /* Near me (2026-10-16): one reading of the phone's position, kept in this page only (never saved or sent), read
+     again quietly when it is over 5 minutes old and the card redraws. */
+  function nearbyLocate(quiet){
+    const st = drawNearby.st; if (!st || st.locating) return;
+    if (!navigator.geolocation) { st.nearMsg = "This browser cannot share where you are."; return drawNearby(); }
+    st.locating = true; if (!quiet) { st.nearMsg = ""; drawNearby(); }
+    navigator.geolocation.getCurrentPosition(pos => {
+      st.locating = false; st.nearMsg = "";
+      st.here = { lat:pos.coords.latitude, lng:pos.coords.longitude, at:Date.now() }; drawNearby();
+    }, err => {
+      st.locating = false;
+      if (!quiet) st.nearMsg = err && err.code === 1 ? "Location is off for this page. Allow it in the browser settings to use Near me." : "Could not find where you are. Try again in a moment.";
+      drawNearby();
+    }, { enableHighAccuracy:true, timeout:15000, maximumAge:60000 });
   }
   async function nearbyPlan(stay, id){
     const QN = window.QuestNearby, st = drawNearby.st, p = QN && QN.find(stay, id);

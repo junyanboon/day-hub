@@ -21,26 +21,26 @@
       tz:"Europe/Madrid", in:"2026-10-16T13:00", out:"2026-10-20T12:00",   // early check-in 13:00; checkout by 12:00
       origin:"Madrid Marriott Hotel Princesa Plaza, Calle de Serrano Jover 3, 28015 Madrid",
       places:[
-        { id:"gym", icon:"🏋️", name:"Hotel gym", walk:0, q:"Madrid Marriott Hotel Princesa Plaza, Madrid",
+        { id:"gym", lat:40.4297, lng:-3.7144, icon:"🏋️", name:"Hotel gym", walk:0, q:"Madrid Marriott Hotel Princesa Plaza, Madrid",
           what:"Free for guests: treadmills, bikes, elliptical, free weights, medicine balls, a bench and weight machines.",
           hint:"Hours are not published: ask the front desk.",
           photo:"https://cache.marriott.com/is/image/marriotts7prod/mc-madpp-fitness-area-35961:Feature-Hor?wid=1400&fit=constrain" },
-        { id:"debod", icon:"🏛️", name:"Templo de Debod", walk:13, q:"Templo de Debod, Madrid",
+        { id:"debod", lat:40.4240689, lng:-3.7176131, icon:"🏛️", name:"Templo de Debod", walk:13, q:"Templo de Debod, Madrid",
           what:"A real ancient Egyptian temple on a hilltop park, with wide views over the city.",
           hint:"Free and outdoors. Lovely at sunset." },
-        { id:"oeste", icon:"🌳", name:"Parque del Oeste", walk:14, q:"Rosaleda Ramón Ortiz, Parque del Oeste, Madrid",
+        { id:"oeste", lat:40.4296961, lng:-3.7251884, icon:"🌳", name:"Parque del Oeste", walk:14, q:"Rosaleda Ramón Ortiz, Parque del Oeste, Madrid",
           what:"A big green park right next to the temple, with a rose garden. An easy walk.",
           hint:"Free and outdoors." },
-        { id:"liria", icon:"🖼️", name:"Palacio de Liria", walk:6, q:"Palacio de Liria, Calle de la Princesa 20, Madrid",
+        { id:"liria", lat:40.4276959, lng:-3.7123479, icon:"🖼️", name:"Palacio de Liria", walk:6, q:"Palacio de Liria, Calle de la Princesa 20, Madrid",
           what:"The House of Alba's 18th-century palace: Goya, Velázquez and Titian on the walls.",
           hint:"Visits are usually booked ahead. Hotel guests get a special rate: ask the desk." },
-        { id:"cerralbo", icon:"🏠", name:"Museo Cerralbo", walk:11, q:"Museo Cerralbo, Madrid",
+        { id:"cerralbo", lat:40.4237115, lng:-3.7145146, icon:"🏠", name:"Museo Cerralbo", walk:11, q:"Museo Cerralbo, Madrid",
           what:"A rich family's 1800s mansion, kept just as they left it. About an hour inside.",
           hint:"Check today's hours before you go (closed Mondays)." },
-        { id:"condeduque", icon:"☕", name:"Conde Duque and Malasaña", walk:10, q:"Centro Cultural Conde Duque, Madrid",
+        { id:"condeduque", lat:40.427015, lng:-3.7108373, icon:"☕", name:"Conde Duque and Malasaña", walk:10, q:"Centro Cultural Conde Duque, Madrid",
           what:"A cultural centre in an old barracks, then the lively café streets of Malasaña. Good for a bite.",
           hint:"Plaza del Dos de Mayo, the heart of Malasaña, is about 16 min on foot." },
-        { id:"palacio", icon:"👑", name:"Royal Palace and Plaza de España", walk:23, q:"Palacio Real de Madrid",
+        { id:"palacio", lat:40.4167403, lng:-3.7136222, icon:"👑", name:"Royal Palace and Plaza de España", walk:23, q:"Palacio Real de Madrid",
           what:"Plaza de España on the way (11 min), then the Royal Palace and its gardens.",
           hint:"Palace tickets are best booked online. The metro is no quicker: walking is about as fast as Line 3 plus the walk from the station." },
       ],
@@ -57,7 +57,7 @@
         { id:"e-thani", icon:"🦐", name:"Thani Cevichería", walk:13, lat:40.42483, lng:-3.71079, q:"Thani Cevicheria, Calle de San Leonardo 7, Madrid", fits:"Seafood soup and ceviche for Caney", what:"Peruvian seafood: Caney gets the chupe (creamy shrimp soup) or parihuela (seafood soup) and a ceviche. Few protein choices for you here.", hint:"Daily noon to 11 pm (Sunday to 5 pm). Book for Friday or Saturday night.", rating:"4.5 Google (1,668 reviews)" },
         { id:"e-sakana", icon:"🍣", name:"Sakana", walk:5, lat:40.43153, lng:-3.71592, q:"Sakana Restaurante, Calle de Gaztambide 11, Madrid", fits:"Sushi and fish for Caney", what:"Japanese two blocks from the hotel, with a good value lunch menu: sushi and sashimi for Caney. Tofu dishes not confirmed, so ask.", hint:"Closed Monday. 1:30 to 4:30 pm and 8:30 to 11:30 pm. Book on their website (it gives a discount).", rating:"4.8 Google (4,330 reviews)" },
       ] },
-    { id:"manzanares-estudio-maeso", match:/maeso|isaac\s+peral/i, name:"ESTUDIO MAESO, Manzanares el Real", short:"La Pedriza",
+    { id:"manzanares-estudio-maeso", match:/maeso|isaac\s+peral/i, name:"ESTUDIO MAESO, Manzanares el Real", short:"La Pedriza", kind:"apartment",
       tz:"Europe/Madrid", in:"2026-10-20T18:00", out:"2026-10-22T13:00",   // check-in from 18:00; checkout by 13:00
       origin:"Calle de Isaac Peral 10, 28410 Manzanares el Real",
       places:[],
@@ -114,19 +114,48 @@
   }
   const title = stay => stay ? `Nearby · ${stay.short || stay.name}` : "Nearby";
 
+  /* Near me (Junyan, 2026-10-16, d2: "yes"): times from where the phone is, not from the stay. Straight-line distance
+     times 1.3 for the streets, walked at 80 m a minute; past a 25 min walk, a ride at about 300 m a minute plus 3 to
+     get going. Estimates, so the chip says "~". The position lives in the page only, never saved or sent. */
+  const rad = d => d * Math.PI / 180;
+  function metres(a, b){
+    const dLa = rad(b.lat - a.lat), dLn = rad(b.lng - a.lng);
+    const h = Math.sin(dLa / 2) ** 2 + Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(dLn / 2) ** 2;
+    return 2 * 6371000 * Math.asin(Math.sqrt(h));
+  }
+  function fromHere(p, here){
+    if (!here || !p || p.lat == null || p.lng == null) return null;
+    const m = metres(here, p), walk = Math.max(1, Math.round(m * 1.3 / 80));
+    return { m, walk, car: walk > WALK_MAX ? Math.round(m * 1.3 / 300) + 3 : null };
+  }
+  // nearest first when he is using Near me; a place with no position keeps its place, after the others
+  function ordered(list, here){
+    if (!here) return list;
+    const d = p => { const f = fromHere(p, here); return f ? f.m : Infinity; };
+    return list.map((p, i) => ({ p, i, d:d(p) })).sort((a, b) => a.d - b.d || a.i - b.i).map(x => x.p);
+  }
+  const canNear = stay => [].concat((stay && stay.places) || [], (stay && stay.eat) || []).some(p => p.lat != null);
+
   /* The travel-time chips for one place, quickest sensible first: walking when it is 25 min or less (0 is the
      hotel itself); else the quicker of transit and car, then the walk. */
   const ICON = { walking:"🚶", transit:"🚇", driving:"🚗" };
-  function chips(p){
+  function chips(p, here){
+    const f = fromHere(p, here);
+    if (f) {   // from where he is: the same rule on estimated minutes, marked "~"
+      if (p.walk === 0 && f.m < 120) return [{ mode:"walking", icon:"🏨", min:0, label:"In the hotel" }];
+      const est = chips({ walk:f.walk, car:f.car });
+      return est.map(c => ({ ...c, label:"~" + c.label }));
+    }
     const c = (mode, min) => ({ mode, icon:ICON[mode], min, label:hm(min) });
     if (p.walk === 0) return [{ mode:"walking", icon:"🏨", min:0, label:"In the hotel" }];
     const rides = [p.transit != null && c("transit", p.transit), p.car != null && c("driving", p.car)].filter(Boolean).sort((a, b) => a.min - b.min);
     if (p.walk != null && (p.walk <= WALK_MAX || !rides.length)) return [c("walking", p.walk)];
     return p.walk != null ? [rides[0], c("walking", p.walk)] : rides.slice(0, 1);
   }
-  function directionsUrl(stay, p){
-    const mode = (chips(p)[0] || {}).mode || "walking";
-    return "https://www.google.com/maps/dir/?api=1&origin=" + encodeURIComponent(stay.origin || stay.name) +
+  // from the stay's door; with Near me on, no origin, so Maps starts from where the phone is
+  function directionsUrl(stay, p, here){
+    const mode = (chips(p, here)[0] || {}).mode || "walking";
+    return "https://www.google.com/maps/dir/?api=1" + (fromHere(p, here) ? "" : "&origin=" + encodeURIComponent(stay.origin || stay.name)) +
       "&destination=" + encodeURIComponent(p.q || p.name) + "&travelmode=" + mode;
   }
   const minFor = p => (p && p.min > 0 ? p.min : 60);
@@ -156,10 +185,15 @@
     const tabs = tabsOf(stay); if (!tabs.length) return "";
     const open = (st && st.open) || {}, msg = (st && st.msg) || {};
     const tab = tabs.some(t => t.id === (st && st.tab)) ? st.tab : defaultTab(stay, at);
-    const bar = tabs.length < 2 ? "" : `<div class="nb-tabs" role="tablist">${tabs.map(t =>
+    const here = (st && st.here) || null, near = canNear(stay);
+    const tabBtns = tabs.length < 2 ? "" : `<div class="nb-tabs" role="tablist">${tabs.map(t =>
       `<button class="nb-tab${t.id === tab ? " on" : ""}" role="tab" aria-selected="${t.id === tab}" data-nbtab="${t.id}">${esc(t.label)}</button>`).join("")}</div>`;
-    return bar + listOf(stay, tab).map(p => {
-      const on = !!open[p.id], cs = chips(p);
+    const nearBtn = near ? `<button class="nb-near${here ? " on" : ""}" data-nbnear aria-pressed="${!!here}">${st && st.locating ? "📍 Finding you…" : "📍 Near me"}</button>` : "";
+    const bar = tabBtns || nearBtn ? `<div class="nb-bar">${tabBtns}${nearBtn}</div>` : "";
+    const note = st && st.nearMsg ? `<div class="nb-from">${esc(st.nearMsg)}</div>`
+      : here ? `<div class="nb-from">Rough times from where you are. Tap Near me again for ${esc(stay.kind || "hotel")} times.</div>` : "";
+    return bar + note + ordered(listOf(stay, tab), here).map(p => {
+      const on = !!open[p.id], cs = chips(p, here);
       const chip = cs.map(c => `<span class="nb-chip">${c.icon} ${esc(c.label)}</span>`).join("");
       const name = p.fits ? `<span class="nb-nm"><span class="nb-n">${esc(p.name)}</span><span class="nb-fit">${esc(p.fits)}</span></span>`
         : `<span class="nb-n">${esc(p.name)}</span>`;
@@ -167,7 +201,7 @@
           ${p.photo ? `<img class="nb-photo" src="${esc(p.photo)}" alt="${esc(p.name)}" loading="lazy">` : ""}
           <div class="nb-what">${esc(p.what)}</div>${p.hint ? `<div class="nb-hint">${esc(p.hint)}</div>` : ""}
           ${p.rating ? `<div class="nb-rate">⭐ ${esc(p.rating)}</div>` : ""}
-          <div class="nb-acts">${p.walk === 0 ? "" : `<a class="nb-btn" href="${esc(directionsUrl(stay, p))}" target="_blank" rel="noopener">Directions</a>`}
+          <div class="nb-acts">${p.walk === 0 ? "" : `<a class="nb-btn" href="${esc(directionsUrl(stay, p, here))}" target="_blank" rel="noopener">Directions</a>`}
           <button class="nb-btn" data-nbplan="${esc(p.id)}">Put on the plan</button></div>
           ${msg[p.id] ? `<div class="nb-msg">${esc(msg[p.id])}</div>` : ""}</div>` : "";
       return `<div class="nb-row${on ? " open" : ""}"><button class="nb-head" data-nb="${esc(p.id)}" aria-expanded="${on}">
@@ -190,7 +224,11 @@
     #nearby .nb-acts { display:flex; gap:8px; margin-top:8px; flex-wrap:wrap; }
     #nearby .nb-btn { font-size:12px; font-weight:600; color:var(--ink); background:rgba(255,255,255,.18); border-radius:999px; padding:6px 12px; text-decoration:none; }
     #nearby .nb-msg { margin-top:6px; color:var(--good); }
-    #nearby .nb-tabs { display:flex; gap:4px; padding:3px; margin:0 0 6px; background:rgba(255,255,255,.08); border-radius:999px; }
+    #nearby .nb-bar { display:flex; gap:6px; align-items:center; margin:0 0 6px; }
+    #nearby .nb-tabs { flex:1; display:flex; gap:4px; padding:3px; background:rgba(255,255,255,.08); border-radius:999px; }
+    #nearby .nb-near { flex:none; margin-left:auto; font-size:12px; font-weight:600; color:var(--ink-soft); background:rgba(255,255,255,.08); border-radius:999px; padding:9px 10px; white-space:nowrap; }
+    #nearby .nb-near.on { color:var(--ink); background:rgba(255,255,255,.22); }
+    #nearby .nb-from { font-size:12px; color:var(--ink-faint); margin:0 4px 4px; }
     #nearby .nb-tab { flex:1; font-size:13px; font-weight:600; color:var(--ink-soft); background:none; border-radius:999px; padding:6px 10px; white-space:nowrap; }
     #nearby .nb-tab.on { color:var(--ink); background:rgba(255,255,255,.2); }
     #nearby .nb-nm { flex:1; min-width:0; display:flex; flex-direction:column; }
@@ -202,5 +240,5 @@
     const s = doc.createElement("style"); s.id = "nb-css"; s.textContent = CSS; doc.head.appendChild(s);
   }
 
-  root.QuestNearby = { STAYS, TABS, stayFor, stayAt, wall, defaultTab, tabsOf, find, title, chips, directionsUrl, minFor, slotFor, html, addCss, hm };
+  root.QuestNearby = { STAYS, TABS, metres, fromHere, ordered, canNear, stayFor, stayAt, wall, defaultTab, tabsOf, find, title, chips, directionsUrl, minFor, slotFor, html, addCss, hm };
 })(typeof window !== "undefined" ? window : globalThis);
