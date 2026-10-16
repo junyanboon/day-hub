@@ -3695,7 +3695,8 @@
         out += `<div class="cal-hr" style="top:${y(h)}px">${Math.abs(h - t) < 15 * 60000 ? "" : `<span>${fmtT(new Date(h)).replace(":00", "")}</span>`}</div>`;
     });
     const ctx = dragCtx();
-    const ev = AGD() ? AGD().lanes(stops.map((st, i) => ({ st, i, s:Math.max(+st.s, a0), e:Math.min(+st.e, z0) })).filter(x => x.e > x.s)) : [];
+    // open space under 15 minutes is left off: drawn at its minimum height it spilled over the block below (Junyan, 2026-10-16)
+    const ev = AGD() ? AGD().lanes(stops.map((st, i) => ({ st, i, s:Math.max(+st.s, a0), e:Math.min(+st.e, z0) })).filter(x => x.e > x.s && !(x.st.free && x.e - x.s < 15 * 60000))) : [];
     for (const { st, i, s, e, lane, n } of ev) {
       const b0 = st.blocks[0], isCur = cur && st.blocks.some(b => b.key === cur.key) && (!st.free || (t >= st.s && t < st.e)), past = st.e <= t && !isCur, game = !!b0.game;
       const c = st.free ? "" : calColor(b0), top = y(s) + 1, h = Math.max(18, y(e) - y(s) - 2);
@@ -3711,7 +3712,7 @@
         `<b>${calIcon(b0, c || "rgba(255,255,255,.45)")}<span>${tick}${esc(st.t)}</span></b><span class="cal-t">${h < 36 ? fmtT(st.s) : time}</span>${ask ? `<span class="cal-pts cal-ask" data-actq="${esc(gk(b0))}">Check ›</span>` : pts ? `<span class="cal-pts${pts < 0 ? " neg" : ""}">${pts > 0 ? "+" : ""}${pts}</span>` : ""}` +
         `${drag ? `${h >= 24 ? `<i class="cal-h top" data-h="top"></i>` : ""}<i class="cal-h bot" data-h="bottom"></i>` : ""}</button>`;
     }
-    if (t >= a0 && t <= z0) out += `<div class="cal-now" style="top:${y(+t)}px"><span>${fmtT(t)}</span></div>`;
+    if (t >= a0 && t <= z0) out += `<div class="cal-now" style="top:${y(+t)}px"><span>${fmtT(t).replace(/\s?[AP]M$/i, "")}</span></div>`;
     return out + `</div>`;
   }
   // the day at the top of the scroll, in the line that stays put
