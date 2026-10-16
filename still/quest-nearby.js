@@ -85,6 +85,20 @@
       ] },
   ];
 
+  /* Stays the weekly Nearby job adds (d3, 2026-10-16: "we already have brazil trip coming up"): it reads the
+     calendar's stays for the weeks ahead, researches See & do and Eat for any stay not here yet, and writes them to
+     still/nearby-stays.json, same shape as above with match as a string. Added after the hand-made ones; an id
+     already here is skipped. Returns how many were added. */
+  function addStays(list, stays){
+    const S = stays || STAYS; let n = 0;
+    for (const x of list || []) {
+      if (!x || !x.id || !x.in || !x.out || S.some(s => s.id === x.id)) continue;
+      let match; try { match = new RegExp(x.match || x.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i"); } catch (e) { continue; }
+      S.push({ ...x, match, places:x.places || [], eat:x.eat || [] }); n++;
+    }
+    return n;
+  }
+
   const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;" }[c]));
   const hm = m => m < 60 ? `${m} min` : `${Math.floor(m / 60)} hr${m % 60 ? ` ${m % 60} min` : ""}`;   // the page's own "1 hr 30 min"
 
@@ -240,5 +254,5 @@
     const s = doc.createElement("style"); s.id = "nb-css"; s.textContent = CSS; doc.head.appendChild(s);
   }
 
-  root.QuestNearby = { STAYS, TABS, metres, fromHere, ordered, canNear, stayFor, stayAt, wall, defaultTab, tabsOf, find, title, chips, directionsUrl, minFor, slotFor, html, addCss, hm };
+  root.QuestNearby = { STAYS, TABS, addStays, metres, fromHere, ordered, canNear, stayFor, stayAt, wall, defaultTab, tabsOf, find, title, chips, directionsUrl, minFor, slotFor, html, addCss, hm };
 })(typeof window !== "undefined" ? window : globalThis);
