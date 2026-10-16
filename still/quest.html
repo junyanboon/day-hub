@@ -636,7 +636,6 @@
 <div id="app">
   <div class="hud">
     <div class="avatar" id="avatar"><img src="sprites/head.webp" alt=""></div>
-    <b id="peakName">Level 1</b>
     <div class="status"><span id="statusL">Loading your day…</span><span id="statusR"></span></div>
     <div class="combo" id="combo" title="Days in a row ending at 70% prana or more"><span class="n" id="comboN">·</span><span class="l" id="comboL">days 70+</span></div>
     <button class="gear" id="bagBtn" aria-label="Bag">🎒</button>
@@ -1115,7 +1114,7 @@
     ["bedtime", "Asleep before 11 PM, read from your Oura ring (paid the next morning)", 5, 1, "🌙", "Asleep by 11", "auto", "Evening"],
   ];
   const DIM = [1, .7, .5, .35, .25, .2];
-  const lvl = () => (G.pr && G.pr.level) || 1;
+  const lvl = () => 1;   // no levels for now (Junyan, 2026-10-16): everyone plays at level 1
   const gainMult = () => 1.5 - (lvl() - 1) * 0.1;      // level 1: x1.5 ... level 10: x0.6
   const spendMult = () => 1 + (lvl() - 1) * 0.06;      // level 1: x1 (d189) ... level 10: x1.54
   function habitGain(id){
@@ -1339,7 +1338,7 @@
   function habitsHTML(){
     const tile = habitTile;
     const hDone = TILES.filter(h => (G.day.habits[h[0]] || 0) > 0).length;
-    return `<div class="hhead"><span class="eyebrow">Prana actions · level ${lvl()} · ${hDone}/${TILES.length}</span>` +
+    return `<div class="hhead"><span class="eyebrow">Prana actions · ${hDone}/${TILES.length}</span>` +
       `<button class="hsnd" data-hsnd aria-label="Tap sounds">${window.QuestFx && QuestFx.soundOn() ? "🔊" : "🔇"}</button></div>` +
       `<div class="hkey"><b class="mp">gold</b> fills prana (Sadhguru) · <b class="mb">teal</b> fills body (Bryan Johnson)</div>` +
       `<div class="hgrp"><div class="hgl">Heart</div><div class="hgrid"><button class="htile" data-nvc="checkin"><span class="hi">🫶</span><span class="hl">How am I?</span><b class="mp">check in</b></button><button class="htile" data-nvc="conflict"><span class="hi">⚡</span><span class="hl">Conflict</span><b class="mp">NVC</b></button><button class="htile" data-nvc="journal"><span class="hi">📓</span><span class="hl">Journal</span><b class="mp">feelings</b></button></div></div>` +
@@ -1438,7 +1437,7 @@
     }
     const carry = prev && prev.prana != null ? Math.round(prev.prana) : (G.pr.ends.length ? G.pr.ends[G.pr.ends.length - 1].p : 60);
     const last = G.pr.ends.slice(-7), since = G.pr.changedAt ? (+now() - +new Date(G.pr.changedAt)) / 86400000 : 99;
-    if (last.length >= 5 && since >= 7) {
+    if (false && last.length >= 5 && since >= 7) {   // levels paused (Junyan, 2026-10-16)
       if (last.filter(e => e.p >= 80).length >= 5 && G.pr.level < 10) { G.pr.level++; G.pr.changedAt = now().toISOString(); setTimeout(() => banner("🌄", `LEVEL ${G.pr.level}`, "It got easy, so it asks a little more now."), 800); }
       else if (last.filter(e => e.p <= 25).length >= 4 && G.pr.level > 1) { G.pr.level--; G.pr.changedAt = now().toISOString(); setTimeout(() => banner("🌱", `LEVEL ${G.pr.level}`, "It got heavy, so it's gentler now."), 800); }
     }
@@ -3918,9 +3917,8 @@
     const t = now(), all = blocks();
     const cur = currentOf(all, t), nxt = nextOf(all, t);
 
-    // HUD: level, pillars and streak only. Prana and body live on the figures alone (Junyan, 2026-10-10: "I don't want two places to look")
+    // HUD: streak only (no levels for now, Junyan 2026-10-16). Prana and body live on the figures alone (Junyan, 2026-10-10: "I don't want two places to look")
     const P = Math.round(prana());
-    $("peakName").textContent = `Level ${lvl()}`;
     drawBeing(P, Math.round(body()));
     // the Sadhana and Training pillars left the top bar (Junyan d219, 2026-10-10): the calendar column shows them
     const sk = streak();
