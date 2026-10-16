@@ -179,6 +179,17 @@
     return g ? { s:new Date(+g.s), e:new Date(+g.s + m * MIN) } : null;
   }
 
+  /* d22 (later 2026-10-16, "the calendars need to simply stay synced"): Put on the plan for a gym makes a real
+     "Gym · Jack Woods" event on his Junyan calendar, Grape (colorId 3) with a Day Quest note, as the weekly planner
+     does. The /cal/event body for a place, or null when the place is not a gym (those stay today-only blocks). */
+  const isGymPlace = p => !!p && (p.id === "gym" || /\bgym\b|fitness/i.test(p.name || ""));
+  function gymEvent(stay, p, slot){
+    if (!isGymPlace(p) || !slot) return null;
+    const where = [p.name, stay && (stay.short || stay.name)].filter(Boolean).join(", ");
+    return { s:new Date(+slot.s).toISOString(), e:new Date(+slot.e).toISOString(), title:"Gym · Jack Woods", color:"3",
+      desc:`Placed by Day Quest from Nearby (${where}): this week's training (d109). Move it or delete it.` };
+  }
+
   const TABS = [{ id:"see", label:"🗺️ See & do", list:"places" }, { id:"eat", label:"🍽️ Eat", list:"eat" }];
   const listOf = (stay, tab) => (stay && stay[(TABS.find(t => t.id === tab) || TABS[0]).list]) || [];
   const tabsOf = stay => TABS.filter(t => listOf(stay, t.id).length);
@@ -254,5 +265,5 @@
     const s = doc.createElement("style"); s.id = "nb-css"; s.textContent = CSS; doc.head.appendChild(s);
   }
 
-  root.QuestNearby = { STAYS, TABS, addStays, metres, fromHere, ordered, canNear, stayFor, stayAt, wall, defaultTab, tabsOf, find, title, chips, directionsUrl, minFor, slotFor, html, addCss, hm };
+  root.QuestNearby = { STAYS, TABS, addStays, metres, fromHere, ordered, canNear, stayFor, stayAt, wall, defaultTab, tabsOf, find, title, chips, directionsUrl, minFor, slotFor, isGymPlace, gymEvent, html, addCss, hm };
 })(typeof window !== "undefined" ? window : globalThis);

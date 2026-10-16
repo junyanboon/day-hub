@@ -229,3 +229,19 @@ test("stays from the job's file join the list, are found by their times, and nev
   assert.match(page, /qfetch\("\/quest\/nearby"\)/);   // private: on the Still server, never in this public repo
   assert.ok(!fs.existsSync(fileURLToPath(new URL("../nearby-stays.json", import.meta.url))), "no stays file in the public repo");
 });
+
+test("d22: Put on the plan for the hotel gym makes a real Gym · Jack Woods event (Junyan calendar, Grape, Day Quest note)", () => {
+  const stay = N.STAYS.find(s => /princesa/i.test(s.name));
+  const gym = stay.places.find(p => p.id === "gym");
+  const slot = { s:new Date("2026-10-17T15:00:00Z"), e:new Date("2026-10-17T16:00:00Z") };
+  const b = N.gymEvent(stay, gym, slot);
+  assert.equal(b.title, "Gym · Jack Woods");
+  assert.equal(b.color, "3");
+  assert.equal(b.s, "2026-10-17T15:00:00.000Z"); assert.equal(b.e, "2026-10-17T16:00:00.000Z");
+  assert.match(b.desc, /Placed by Day Quest from Nearby \(Hotel gym, Marriott Princesa Plaza\)/);
+  assert.equal(b.id, undefined, "a new event, so /cal/event puts it on the Junyan calendar");
+  // anything that is not a gym stays a today-only block
+  const temple = stay.places.find(p => p.id === "debod");
+  assert.equal(N.gymEvent(stay, temple, slot), null);
+  assert.equal(N.isGymPlace({ id:"x", name:"CrossFit gym near the flat" }), true);
+});

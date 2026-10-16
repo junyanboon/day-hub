@@ -2,9 +2,13 @@
    (Junyan, 2026-10-16: "I want Gym times auto-added in for this and next week based on whether I'm traveling or
    at home"). Pure, so it can be tested (node --test still/test).
    The rules were decided before this file and stay as they are:
-   - d109: a home week is 3 Jack Woods sessions alternating Day 1 and Day 2 (60 min) plus 1 to 2 Matthew I. Smith
-     (45 min); a travel week is at least 1 Day 1, 1 Day 2 and 1 Matthew I. Smith. This places the minimum (one
-     Matthew I. Smith at home too).
+   - d109: a home week is 3 Jack Woods sessions (60 min) plus 1 to 2 Matthew I. Smith (45 min); a travel week is at
+     least 2 Jack Woods and 1 Matthew I. Smith. This places the minimum (one Matthew I. Smith at home too).
+     Since later 2026-10-16 Jack Woods is flexible: one "Gym · Jack Woods" session holds all six moves and he picks
+     which ones he feels like, so there is no Day 1 / Day 2 to alternate. Old "Day 1" and "Day 2" events and saved
+     sessions still count as Jack Woods.
+   - d21 (2026-10-16): a session on a day he is ill is skipped. It is not moved or placed again later, and the week's
+     target drops by it.
    - d245: no strength on a day to go easy (sleep score under 70, a trip of an hour or more that day, or waking
      somewhere new). Matthew I. Smith is fine those days.
    - GENERATOR-SPEC.md: at home the gym is Mon/Wed/Fri 19:30 to 20:30; mobility on non-gym days. Gym is Grape
@@ -18,17 +22,14 @@
   "use strict";
   const MIN = 60000, DAY = 86400000;
   const GRAPE = "3";
-  const NAMES = { jw1:"Gym · Jack Woods Day 1", jw2:"Gym · Jack Woods Day 2", ms:"Gym · Matthew I. Smith" };
-  const LEN = { jw1:60, jw2:60, ms:45 };
+  const NAMES = { jw:"Gym · Jack Woods", ms:"Gym · Matthew I. Smith" };
+  const LEN = { jw:60, ms:45 };
 
   const isGymTitle = t => /\bgym\b|workout|calisthenics|rings/i.test(t || "");
-  // which session a title (or a logged program) is: "jw1", "jw2", "jw" (strength, day not named) or "ms"
+  // which session a title (or a logged program) is: "ms" (Matthew I. Smith) or "jw" (any strength session, the old
+  // "Jack Woods Day 1" and "Day 2" included)
   function sessionOf(t){
-    t = String(t || "");
-    if (/matthew|\bsmith\b|mobility|stretch/i.test(t)) return "ms";
-    if (/day\s*1\b/i.test(t)) return "jw1";
-    if (/day\s*2\b/i.test(t)) return "jw2";
-    return "jw";
+    return /matthew|\bsmith\b|mobility|stretch/i.test(String(t || "")) ? "ms" : "jw";
   }
   // a hotel check-in or check-out, or a flight: no session that day ("Hotel gym" and "check in with Ela" are not)
   const MARK = t => { t = String(t || "");
@@ -97,92 +98,103 @@
     return true;
   }
 
-  /* The plan for one week. o: { week (Monday ymd), days: 7 dayInfo, sessions:[{ t, s, e, done? }] (gym blocks
-     on the plan that week), logs:[{ date, program }] (finished workouts), placed:{ key:true }, now (ms), today (the game day's ymd),
-     lastJw: "jw1" | "jw2" | null (the last Jack Woods day before this week),
-     ill: [ymd] (days of this week up to today he was ill, from illDays), illNow: he is ill today (place nothing new),
-     movedOut: ["jw" | "ms"] (sessions he moved from this week to another one: their slots are not filled again) }.
-     Returns { week, mode, slots, have, total, excused, line, place:[{ key, kind, t, s, e, ymd, color }], skipped:[{ key, kind, why }] }.
-     Ill days (2026-10-16): while he is ill nothing new goes in. A week with ill days lets off ceil(slots x ill days / 7)
-     sessions, strength first ("missed a day? don't double up"): the rest of the week is planned from its free slots
-     and the line says "off, ill" instead of a shortfall. */
+  /* The plan for one week. o: { week (Monday ymd), days: 7 dayInfo, sessions:[{ t, s, e, done? }] (gym blocks on the
+     plan that week, past ones too), logs:[{ date, program }] (finished workouts), placed:{ key:true }, placedS:{ key:ms }
+     (the time each placed slot went in, optional), now (ms), today (the game day's ymd), ill: [ymd] (days of this week
+     up to today he was ill, from illDays), illNow: he is ill today (place nothing new), illSkips: [{ t, s, key? }] (gym
+     sessions Day Quest took off a day he was ill), movedOut: ["jw" | "ms"] (sessions he moved from this week to
+     another one: their slots are not filled again) }.
+     Returns { week, mode, slots, have, total, excused, excusedBy:{ jw, ms }, line, by, place:[{ key, kind, t, s, e, ymd,
+     color, min }], skipped:[{ key, kind, why }] }.
+     Ill days (d21, 2026-10-16: "just skip the session altogether if I'm ill"): a session on an ill day is skipped, and
+     the week's target drops by it. That is a gym block on an ill day, one Day Quest took off an ill day, a placed slot
+     whose time was an ill day, and a slot not placed yet whose normal day (the week planned as if he were well, from
+     its Monday) is an ill day. Nothing is moved to the days left and nothing is caught up: the days left get what they
+     would have had anyway. While he is ill nothing new goes in. */
   function planWeek(o){
-    const now = +o.now, days = o.days || [], mode = weekMode(days), placed = o.placed || {};
+    const now = +o.now, days = o.days || [], mode = weekMode(days), placed = o.placed || {}, placedS = o.placedS || {};
     const inWeek = d => d >= o.week && d <= addDays(o.week, 6);
-    // what is done or on the plan: finished workouts, then blocks still ahead (or ticked done) not already logged that day
-    const logs = (o.logs || []).filter(w => inWeek(w.date)).map(w => ({ kind:sessionOf(w.program), ymd:w.date, s:Date.parse(w.date + "T12:00:00Z") }));
-    const blocks = (o.sessions || []).filter(b => isGymTitle(b.t)).map(b => {
-      const s = +b.s, e = +b.e, tz = (days.find(d => d.ymd === localYmd(s, d.tz)) || days[0] || { tz:"America/Toronto" }).tz;
-      return { kind:sessionOf(b.t), ymd:localYmd(s, tz), s, e, done:!!b.done };
-    }).filter(b => inWeek(b.ymd) && (b.e > now || b.done) && !logs.some(l => l.ymd === b.ymd && (l.kind === b.kind || b.kind === "jw" && l.kind !== "ms")));
-    const have = logs.concat(blocks);
-    // the slots this week needs, and which are covered
-    const slots = mode === "home" ? ["jw#1", "jw#2", "jw#3", "ms#1"] : ["jw1", "jw2", "ms"];
-    const cover = {}, pool = have.slice();
-    const take = test => { const i = pool.findIndex(test); if (i < 0) return null; return pool.splice(i, 1)[0]; };
-    if (mode === "travel") {
-      for (const k of ["jw1", "jw2", "ms"]) { const x = take(h => h.kind === k); if (x) cover[k] = x; }
-      for (const k of ["jw1", "jw2"]) if (!cover[k]) { const x = take(h => h.kind === "jw" || h.kind === "jw1" || h.kind === "jw2"); if (x) cover[k] = x; }
-    } else {
-      for (const k of ["jw#1", "jw#2", "jw#3"]) { const x = take(h => h.kind !== "ms"); if (x) cover[k] = x; }
-      const m = take(h => h.kind === "ms"); if (m) cover["ms#1"] = m;
-    }
-    const open = slots.filter(k => !cover[k]), place = [], skipped = [], taken = [];
-    const used = have.map(h => h.ymd);
     const ill = new Set((o.ill || []).filter(inWeek)), moved = (o.movedOut || []).slice();
+    const tzAt = s => (days.find(d => d.ymd === localYmd(s, d.tz)) || days[0] || { tz:"America/Toronto" }).tz;
+    const ymdAt = s => localYmd(s, tzAt(s));
+    const famOf = k => k === "ms" ? "ms" : "jw";
+    // what is done or on the plan: finished workouts, then blocks not already logged that day
+    const logs = (o.logs || []).filter(w => inWeek(w.date)).map(w => ({ kind:sessionOf(w.program), ymd:w.date, s:Date.parse(w.date + "T12:00:00Z") }));
+    const all = (o.sessions || []).filter(b => isGymTitle(b.t)).map(b => ({ kind:sessionOf(b.t), ymd:ymdAt(+b.s), s:+b.s, e:+b.e, done:!!b.done }))
+      .filter(b => inWeek(b.ymd) && !logs.some(l => l.ymd === b.ymd && l.kind === b.kind));
+    // a block on an ill day that was not done is skipped (d21); the others count when still ahead or ticked done
+    const illBlocks = all.filter(b => ill.has(b.ymd) && !b.done);
+    const blocks = all.filter(b => !illBlocks.includes(b) && (b.e > now || b.done));
+    const have = logs.concat(blocks);
+    // the slots this week needs (home 3 Jack Woods, travel 2, plus one Matthew I. Smith), and which are covered
+    const slots = mode === "home" ? ["jw#1", "jw#2", "jw#3", "ms#1"] : ["jw#1", "jw#2", "ms#1"];
+    const cover = {}, pool = have.slice();
+    const take = fam => { const i = pool.findIndex(h => famOf(h.kind) === fam); return i < 0 ? null : pool.splice(i, 1)[0]; };
+    for (const k of slots) { const x = take(k.startsWith("ms") ? "ms" : "jw"); if (x) cover[k] = x; }
+    const open = slots.filter(k => !cover[k]), place = [], skipped = [];
     const today = o.today || localYmd(now, (days[0] || {}).tz || "America/Toronto");
+    // the sessions skipped for being ill: blocks on ill days, and the ones Day Quest took off an ill day (counted once)
+    const sick = illBlocks.map(b => ({ fam:famOf(b.kind), s:b.s, key:null }));
+    for (const x of o.illSkips || []) {
+      const s = +new Date(x.s); if (!isFinite(s) || !ill.has(ymdAt(s)) || sick.some(k => Math.abs(k.s - s) < 60000)) continue;
+      sick.push({ fam:famOf(sessionOf(x.t)), s, key:x.key || null });
+    }
+    const excusedBy = { jw:0, ms:0 };
+    const skipIll = (key, fam, why) => { skipped.push({ key, kind:fam, why }); excusedBy[fam]++; };
     // a slot's key is the same whether the week reads as home or travel (the nth Jack Woods, the nth Matthew I. Smith),
     // so a week whose answer flips cannot bring back a session he deleted
     const n = { jw: Object.keys(cover).filter(k => !k.startsWith("ms")).length, ms: Object.keys(cover).filter(k => k.startsWith("ms")).length };
-    // first the slots that stay empty on purpose: placed before (he moved or deleted it), moved to another week, ill
-    const want = [];
-    for (const slot of open) {
-      const kind0 = slot.replace(/#\d+$/, ""), fam = kind0 === "ms" ? "ms" : "jw", key = `${o.week}:${fam}#${++n[fam]}`;
-      if (placed[key]) { skipped.push({ key, kind:kind0, why:"placed before; left as he left it" }); continue; }
+    const want = [], keyed = open.map(slot => { const fam = slot.startsWith("ms") ? "ms" : "jw"; return { fam, key:`${o.week}:${fam}#${++n[fam]}` }; });
+    const illPlaced = k => placed[k] && placedS[k] != null && ill.has(ymdAt(+placedS[k]));
+    // a placed slot whose own time was an ill day accounts for that session itself
+    for (const { key } of keyed) if (illPlaced(key)) for (let i = sick.length - 1; i >= 0; i--) if (sick[i].key === key || Math.abs(sick[i].s - +placedS[key]) < 60000) sick.splice(i, 1);
+    for (const { fam, key } of keyed) {
+      if (illPlaced(key)) { skipIll(key, fam, "skipped: ill that day"); continue; }
+      const si = sick.findIndex(k => k.key === key) >= 0 ? sick.findIndex(k => k.key === key) : sick.findIndex(k => k.fam === fam && !k.key);
+      if (si >= 0) { sick.splice(si, 1); skipIll(key, fam, "skipped: ill that day"); continue; }
+      if (placed[key]) { skipped.push({ key, kind:fam, why:"placed before; left as he left it" }); continue; }
       const mi = moved.indexOf(fam);
-      if (mi >= 0) { moved.splice(mi, 1); skipped.push({ key, kind:kind0, why:"moved to another week by Junyan" }); continue; }
-      if (o.illNow) { skipped.push({ key, kind:kind0, why:"ill today: nothing new goes in" }); continue; }
-      want.push({ key, kind0 });
+      if (mi >= 0) { moved.splice(mi, 1); skipped.push({ key, kind:fam, why:"moved to another week by Junyan" }); continue; }
+      want.push({ key, fam });
     }
-    const budget = ill.size ? Math.ceil(slots.length * ill.size / 7) : 0;
-    let off = Math.max(0, budget - (open.length - want.length));
-    const letOff = want.filter(w => w.kind0 !== "ms").reverse().concat(want.filter(w => w.kind0 === "ms").reverse()).slice(0, off);
-    letOff.forEach(w => skipped.push({ key:w.key, kind:w.kind0, why:"let off: ill this week" }));
-    for (const { key, kind0 } of want.filter(w => !letOff.includes(w))) {
-      const strength = kind0 !== "ms", len = strength ? 60 : 45;
-      const spread = d => used.length ? Math.min(...used.map(u => dayGap(u, d.ymd))) : 7;
-      const ok = days.filter(d => d.ymd >= today && !d.blocked && !ill.has(d.ymd) && !(strength && d.easy.length));
-      const free = ok.filter(d => !used.includes(d.ymd)), fallback = strength ? [] : ok.filter(d => used.includes(d.ymd));
-      const wdOf = d => new Date(Date.parse(d.ymd + "T12:00:00Z")).getUTCDay();
-      const rank = xs => xs.slice().sort((a, b) => (mode === "home" && strength ? (![1, 3, 5].includes(wdOf(a))) - (![1, 3, 5].includes(wdOf(b))) : 0)
-        || spread(b) - spread(a) || (a.ymd < b.ymd ? -1 : 1));
-      let got = null;
-      for (const d of rank(free).concat(rank(fallback))) {
-        const h = starts(mode === "home", kind0, wdOf(d)).find(h => fits(d, at(d.ymd, h, d.tz), len, now, taken));
-        if (h != null) { const s = at(d.ymd, h, d.tz); got = { key, kind:kind0, ymd:d.ymd, s, e:s + len * MIN }; break; }
+    // where each slot goes: one session a day, Matthew I. Smith shares a day only when no other day has room
+    const wdOf = d => new Date(Date.parse(d.ymd + "T12:00:00Z")).getUTCDay();
+    function placeAll(list, dayList, from, nowMs, used, skipDay){
+      const out = {}, taken = [];
+      used = used.slice();
+      for (const { key, fam } of list) {
+        const strength = fam !== "ms", len = LEN[fam];
+        const spread = d => used.length ? Math.min(...used.map(u => dayGap(u, d.ymd))) : 7;
+        const ok = dayList.filter(d => d.ymd >= from && !d.blocked && !skipDay(d.ymd) && !(strength && d.easy.length));
+        const free = ok.filter(d => !used.includes(d.ymd)), fallback = strength ? [] : ok.filter(d => used.includes(d.ymd));
+        const rank = xs => xs.slice().sort((a, b) => (mode === "home" && strength ? (![1, 3, 5].includes(wdOf(a))) - (![1, 3, 5].includes(wdOf(b))) : 0)
+          || spread(b) - spread(a) || (a.ymd < b.ymd ? -1 : 1));
+        for (const d of rank(free).concat(rank(fallback))) {
+          const h = starts(mode === "home", fam, wdOf(d)).find(h => fits(d, at(d.ymd, h, d.tz), len, nowMs, taken));
+          if (h != null) { const s0 = at(d.ymd, h, d.tz); out[key] = { key, kind:fam, ymd:d.ymd, s:s0, e:s0 + len * MIN }; taken.push([s0, s0 + len * MIN]); used.push(d.ymd); break; }
+        }
       }
-      if (!got) { skipped.push({ key, kind:kind0, why:"no free hour that fits this week" }); continue; }
-      place.push(got); taken.push([got.s, got.e]); used.push(got.ymd);
+      return out;
     }
-    // names: a travel slot says which day it is; at home the Jack Woods days alternate in time order
-    let last = o.lastJw || null;
-    const jwSeq = have.filter(h => h.kind !== "ms").map(h => ({ ...h, mine:false })).concat(place.filter(p => p.kind !== "ms").map(p => ({ ...p, mine:true })))
-      .sort((a, b) => a.s - b.s);
-    for (const x of jwSeq) {
-      const k = x.mine ? (mode === "travel" ? x.kind : (last === "jw1" ? "jw2" : "jw1")) : x.kind === "jw" ? (last === "jw1" ? "jw2" : "jw1") : x.kind;
-      if (x.mine) place.find(p => p.key === x.key).kind = k;
-      last = k;
+    // d21: a slot not placed yet whose normal day is an ill day is skipped, not squeezed into the days left
+    let go = want;
+    if (ill.size && want.length) {
+      const well = days.map(d => ({ ...d, easy:d.easy.filter(x => x !== "ill") }));
+      const start = at(o.week, 0, (days[0] || {}).tz || "America/Toronto");
+      const asIf = placeAll(want, well, o.week, start, all.map(b => b.ymd).concat(logs.map(l => l.ymd)), () => false);
+      go = want.filter(w => { const p = asIf[w.key]; if (p && ill.has(p.ymd)) { skipIll(w.key, w.fam, "skipped: ill that day"); return false; } return true; });
     }
+    if (o.illNow) { go.forEach(w => skipped.push({ key:w.key, kind:w.fam, why:"ill today: nothing new goes in" })); go = []; }
+    const got = placeAll(go, days, today, now, have.map(h => h.ymd), d => ill.has(d));
+    for (const w of go) { if (got[w.key]) place.push(got[w.key]); else skipped.push({ key:w.key, kind:w.fam, why:"no free hour that fits this week" }); }
     place.forEach(p => { p.t = NAMES[p.kind]; p.color = GRAPE; p.min = LEN[p.kind]; });
-    const total = slots.length, onPlan = total - open.length + place.length;
+    const excused = excusedBy.jw + excusedBy.ms, total = slots.length - excused, onPlan = slots.length - open.length + place.length;
     // how many of each are done or on the plan (placed ones included), for the Practices list
-    const by = { jw:0, jw1:0, jw2:0, ms:0 };
-    Object.values(cover).concat(place).forEach(x => { if (x.kind === "ms") by.ms++; else { by.jw++; if (x.kind !== "jw") by[x.kind]++; } });
-    if (mode === "travel") { by.jw1 = cover.jw1 || place.some(p => p.kind === "jw1") ? 1 : 0; by.jw2 = cover.jw2 || place.some(p => p.kind === "jw2") ? 1 : 0; }
-    const excused = Math.min(budget, total - onPlan);
-    const line = o.illNow ? `Gym: ${onPlan} of ${total} this week · ill, nothing new placed`
-      : excused ? `Gym: ${onPlan} of ${total} this week · ${excused} off, ill` : `Gym: ${onPlan} of ${total} placed this week`;
-    return { week:o.week, mode, slots, have:onPlan, total, excused, ill:ill.size, illNow:!!o.illNow, by, lastJw:last,
+    const by = { jw:0, ms:0 };
+    Object.values(cover).concat(place).forEach(x => { by[famOf(x.kind)]++; });
+    const tail = excused ? ` · ${excused} skipped, ill` : "";
+    const line = o.illNow ? `Gym: ${onPlan} of ${total} this week · ill, nothing new placed` : `Gym: ${onPlan} of ${total} placed this week${tail}`;
+    return { week:o.week, mode, slots, have:onPlan, total, excused, excusedBy, ill:ill.size, illNow:!!o.illNow, by,
       place: place.sort((a, b) => a.s - b.s), skipped, line };
   }
 

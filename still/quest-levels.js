@@ -6,7 +6,8 @@
    - d17: a weight box only on SLS from L4 (added kg) and NC at L7;
    - d18: a Test button per move, a pass is one level up;
    - d19, d20: body weight, weighed at the gym, in lbs, with the last few readings as a trend;
-   - his quiz answers are the starting levels, saved once, never over a level he saved himself.
+   - his quiz answers are his levels until he passes a Test (later 2026-10-16: the window showed L1 from an old phone
+     draft's default, so a level only counts as his own when a passed Test set it or it is above the quiz level).
    The SAME file runs in the page (still/quest-levels.js) and on the server
    (still-api/src/quest-levels.js). Edit one, copy it to the other. */
 (function (root) {
@@ -50,25 +51,55 @@
   }
   // a plain positive number as typed on the phone ("6", "20", "172.4"); anything else is no number
   const num = (v) => { const t = v == null ? "" : String(v).trim(); return /^\d{1,4}(\.\d+)?$/.test(t) ? +t : null; };
+  // a move he did something with this session (a tap on how it went, reps, a weight, a Test, a different level trained)
+  const touched = (x) => !!x && (!!x.effort || num(x.reps) != null || num(x.kg) != null || (x.tests || []).length > 0 ||
+    x.level !== x.start || (x.trained != null && x.trained !== x.start));
   // what goes to the server for one move, or null when nothing was logged
   function toEntry(code, moveName, x) {
     if (!x) return null;
     const reps = num(x.reps), tests = x.tests || [];
-    if (!x.effort && reps == null && !tests.length && x.level === x.start) return null;
+    if (!touched(x)) return null;
     const kg = weightBox(code, x.trained) ? num(x.kg) : null;
     return { code, name: moveName, kind: "strength", level: x.level, levelName: name(code, x.level),
       trained: x.trained, trainedName: name(code, x.trained), effort: x.effort || null, reps, kg, tests: tests.map((t) => ({ ...t })),
       ...(x.legacy ? { legacy: x.legacy } : {}) };   // an old draft's four sets travel with it
   }
 
-  /* The quiz levels, saved once. levels: { CODE: { level, at, from? } }. Any level already there is his and stays;
-     missing ones are filled; the mark means it never runs again, so a move is never put back to the quiz level. */
+  /* His level for a move. levels: { CODE: { level, at, from? } } as saved. A saved level is his own only when a passed
+     Test set it (from "test") or it is above his quiz answer; anything else (missing, the old page's default L1, a
+     migrated draft's L1) is the quiz level. Junyan, 2026-10-16: "update the levels to my current abilities based on
+     the quiz I filled out". */
+  function isReal(code, x) {
+    return !!(x && x.level && START[code] != null && (x.from === "test" || clamp(x.level) > START[code]));
+  }
+  function currentLevel(levels, code) {
+    const x = levels && levels[code];
+    return isReal(code, x) ? clamp(x.level) : START[code] != null ? START[code] : 1;
+  }
+  /* The saved levels with the rule above applied: a move without a real level gets the quiz level (marked "quiz").
+     changed says whether anything had to be written. Nothing passed in is changed in place. */
   function seedLevels(levels, at) {
     const lv = { ...(levels && typeof levels === "object" ? levels : {}) };
-    if (lv._seed) return { levels: lv, changed: false };
-    for (const [c, n] of Object.entries(START)) if (!(lv[c] && lv[c].level)) lv[c] = { level: n, at, from: START_FROM };
-    lv._seed = { from: START_FROM, at };
-    return { levels: lv, changed: true };
+    let changed = !(lv._seed && lv._seed.v >= 2);
+    for (const [c, n] of Object.entries(START)) {
+      if (isReal(c, lv[c]) || (lv[c] && lv[c].from === START_FROM && lv[c].level === n)) continue;
+      lv[c] = { level: n, at, from: START_FROM }; changed = true;
+    }
+    if (changed) lv._seed = { from: START_FROM, at, v: 2 };
+    return { levels: lv, changed };
+  }
+  // the highest level a passed Test reached in one move's entry (or draft move), else null
+  const passedLevel = (x) => { const p = ((x && x.tests) || []).filter((t) => t && t.pass).map((t) => clamp(t.level)); return p.length ? Math.max(...p) : null; };
+  /* After a saved session: only a passed Test moves a level (up, from "test"); the level a page sends is not trusted
+     on its own, so an old page or draft can never put a move back to L1. */
+  function saveLevels(levels, entries, at) {
+    const lv = seedLevels(levels, at).levels;
+    for (const x of entries || []) {
+      if (!x || !x.code || !LEVELS[x.code]) continue;
+      const p = passedLevel(x);
+      if (p != null && p > currentLevel(lv, x.code)) lv[x.code] = { level: p, at, from: "test" };
+    }
+    return lv;
   }
 
   /* Old shape (2026-10-05 to 10-16): reps and lbs, four boxes each (warm-up 1, 2, working 1, 2).
@@ -86,19 +117,28 @@
     return { ...rest, trained: lvl, reps, kg, effort: null, tests: [], legacy: { reps: x.reps.slice(), lbs: (x.lbs || []).slice() } };
   }
   const migrateSession = (w) => (w && Array.isArray(w.entries) ? { ...w, entries: w.entries.map(migrateEntry) } : w);
-  // a draft kept on the phone (localStorage) in the old shape
+  /* A draft kept on the phone (localStorage), in either shape, brought up to his levels now (levels as saved).
+     Each move starts at his current level (currentLevel) and is never below it; a Test he passed in the draft keeps
+     its level. The level he trained stays only when he chose it: an untouched move, an old draft's default L1 and a
+     migrated draft's L1 follow his current level. (Later 2026-10-16: an old draft from before the new log showed L1.) */
   function migrateDraft(d, levels) {
     if (!d || !d.e) return d;
     const e = {};
     for (const [k, x] of Object.entries(d.e)) {
       if (!LEVELS[k] || !x || typeof x !== "object") { e[k] = x; continue; }
-      if (!isOld(x)) {   // a draft in the new shape: keep it, with its levels kept in range
-        e[k] = { ...startMove(k, x.start), ...x, start: clamp(x.start), level: clamp(x.level), trained: clamp(x.trained),
-          tests: Array.isArray(x.tests) ? x.tests : [] };
+      const cur = currentLevel(levels, k);
+      if (!isOld(x)) {   // the new shape
+        const tests = Array.isArray(x.tests) ? x.tests : [], p = passedLevel({ tests });
+        const y = { ...startMove(k, cur), ...x, start: cur, level: Math.max(cur, p || 0), tests };
+        const defaultOne = x.legacy && clamp(x.trained) === 1;   // came from an old draft's L1
+        const chose = x.effort || num(x.reps) != null || num(x.kg) != null || tests.length || clamp(x.trained) !== clamp(x.start);
+        y.trained = defaultOne || !chose ? cur : clamp(x.trained);
+        e[k] = y;
         continue;
       }
-      const lvl = clamp(x.level), b = best(x.reps.slice(2)) ?? best(x.reps), cur = x.start || (levels && levels[k] && levels[k].level) || lvl;
-      e[k] = { start: clamp(cur), level: lvl, trained: lvl, effort: "", reps: b == null ? "" : String(b), kg: "", tests: [],
+      // the old shape (reps and lbs grids): its level was the page's default L1 unless he set it
+      const chose = x.start != null || clamp(x.level) !== 1, b = best(x.reps.slice(2)) ?? best(x.reps);
+      e[k] = { start: cur, level: cur, trained: chose ? clamp(x.level) : cur, effort: "", reps: b == null ? "" : String(b), kg: "", tests: [],
         legacy: { reps: x.reps.slice(), lbs: (x.lbs || []).slice() } };
     }
     return { ...d, e };
@@ -137,5 +177,5 @@
   }
 
   root.QuestLevels = { LEVELS, START, TOP, EFFORT, levelText, nextText, weightBox, startMove, testLevel, recordTest, toEntry,
-    seedLevels, migrateEntry, migrateSession, migrateDraft, parseLbs, addReading, readingsFrom, bodyTrend, trendText };
+    seedLevels, currentLevel, isReal, passedLevel, saveLevels, touched, migrateEntry, migrateSession, migrateDraft, parseLbs, addReading, readingsFrom, bodyTrend, trendText };
 })(typeof self !== "undefined" ? self : globalThis);
