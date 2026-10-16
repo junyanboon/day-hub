@@ -142,7 +142,9 @@ nav.tabs{display:flex;gap:22px;border-bottom:1px solid var(--line);overflow-x:au
 <script>
 (() => {
   const qs = new URLSearchParams(location.search);
-  const API = qs.get("api") || "https://still.srv1948070.hstgr.cloud";
+  // ?api= is for the local preview only: any other host would receive the pairing code
+  const apiParam = qs.get("api") || "";
+  const API = /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(apiParam) ? apiParam : "https://still.srv1948070.hstgr.cloud";
   const store = { get(k){ try { return localStorage.getItem(k); } catch { return null; } },
                   set(k, v){ try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch {} } };
   // same pairing as Day Quest: one code per device, kept on this origin ("quest-key"); #pair=CODE pairs in one tap
@@ -373,6 +375,7 @@ nav.tabs{display:flex;gap:22px;border-bottom:1px solid var(--line);overflow-x:au
   });
   document.addEventListener("keydown", e => {
     if (e.target.closest("textarea,input") || S.tab !== "sort" || !S.open || !S.data) return;
+    if (e.key === "Enter" && e.target.closest("button,a")) return;   // Enter on a focused button presses that button, never Approve
     if (e.key === "Enter"){ const b = document.querySelector(`[data-approve="${CSS.escape(S.open)}"]`); if (b && !b.disabled){ e.preventDefault(); b.click(); } }
     else if (/^[1-8]$/.test(e.key) && S.data.routes[+e.key - 1]){ S.picks[S.open] = S.data.routes[+e.key - 1].key; render(); }
   });
