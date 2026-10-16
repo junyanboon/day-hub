@@ -291,8 +291,26 @@
   .lvn { font:700 14px var(--font); min-width:54px; text-align:center; }
   .lvn.up { color:var(--gold); }
   .gsub { font-size:12.5px; color:var(--ink-soft); margin-top:4px; }
-  .grow { display:grid; grid-template-columns:36px repeat(4, 1fr); gap:6px; margin-top:8px; align-items:center; }
-  .gk { font:600 11px var(--font); color:var(--ink-faint); }
+  .gk { display:block; font:600 11px var(--font); letter-spacing:.08em; text-transform:uppercase; color:rgba(255,255,255,.86); margin:10px 0 5px; }
+  .gnow { font-size:13.5px; color:#fff; margin-top:4px; }
+  .gnext { font-size:13.5px; color:var(--gold); font-weight:600; margin-top:3px; }
+  .gtag { font-size:11px; padding:2px 7px; border-radius:10px; background:var(--gold); color:#3a2a00; font-weight:700; margin-left:6px; vertical-align:2px; }
+  .gtr { display:flex; align-items:center; gap:8px; }
+  .gtr small { font-size:12.5px; color:rgba(255,255,255,.86); }
+  .geff { display:grid; grid-template-columns:repeat(3, 1fr); gap:6px; }
+  .geff .gchip { padding:10px 6px; text-align:center; color:#fff; }
+  .geff .gchip.on { color:#173b2a; }
+  .gnums { display:flex; gap:8px; margin-top:8px; }
+  .gnums label { flex:1; display:flex; align-items:center; gap:8px; font-size:13px; color:#fff; }
+  .gnums input.set { width:72px; flex:none; }
+  .gtest { margin-top:10px; }
+  .gtest .btn { width:100%; }
+  .gtest-q { padding:10px; border-radius:12px; background:rgba(0,0,0,.25); font-size:13px; color:#fff; }
+  .gtest-q .actions { margin-top:8px; }
+  .gtest-h { font-size:12.5px; color:rgba(255,255,255,.86); margin-top:6px; }
+  .gbw { display:flex; align-items:center; gap:10px; }
+  .gbw input.set { width:96px; flex:none; }
+  .gbw small { font-size:12.5px; color:rgba(255,255,255,.86); }
   .sheet input.set { margin:0; padding:10px 4px; text-align:center; font-size:16px; border-radius:10px; min-width:0; }
   .gchips { display:flex; flex-wrap:wrap; gap:6px; }
   .gchip { padding:9px 12px; border-radius:20px; background:rgba(255,255,255,.12); font-size:14px; }
@@ -654,6 +672,7 @@
 <script src="keeps.js?v=20261009k"></script>
 <script src="bag.js?v=20261009k"></script>
 <script src="quest-merge.js?v=20261016g"></script>
+<script src="quest-levels.js?v=20261016a"></script>
 <script src="nvc-words.js?v=20261010a"></script>
 <script src="quest-fx.js?v=20261009b"></script>
 <script src="quest-night.js?v=20261011a"></script>
@@ -2566,20 +2585,16 @@
   }
 
 
-  /* ---------- gym log (2026-10-05) ----------
+  /* ---------- gym log (2026-10-05; by levels 2026-10-16) ----------
      Tapping a gym block opens a logger for Junyan's two programs, from his
      Notion "Gym" page: Jack Woods rings calisthenics (Day 1 / Day 2, levels
-     1-7 per move) and Matthew I. Smith's Pike & Head to Toe mobility. Sets are
-     the Two Set Method he logs by hand: 2 warm-up + 2 working. Saving sends the
-     session to still-api, which keeps it and writes his Workout Tracker rows. */
-  const LADDER = {
-    PPU: ["Zero weight","Shoulders distance from rings","Tuck","Hips level with shoulders","Extend hips","Advanced tuck 90°","Full lay"],
-    FLR: ["Zero weight","Shoulders distance from rings","Tuck","Hips level with shoulders","Extend hips","Advanced tuck 90°","Full lay"],
-    HSPU: ["Zero weight","Pike","Elevate feet","Shoulder stand","Partial range strap assisted","Partial range unassisted","Archer push-ups"],
-    NC: ["Support with hands","Support with hands","Support with hands","No hands partial range","No hands negative","No hands positive","Weighted body flat"],
-    OAC: ["2-arm dead hang","One-arm dead hang","2-arm partial range","2-arm full range","Partial range negative OAC","Full range negative OAC","Partial range positive"],
-    SLS: ["Use arms, no weight","Negative only","Positive as well","10 kg","20 kg","30 kg","40 kg"],
-  };
+     1-7 per move) and Matthew I. Smith's Pike & Head to Toe mobility. Since
+     2026-10-16 (ticket 15, d16 to d20) each move shows its level, its plain name and
+     the next level; he logs the level trained, how the hardest set went and its reps
+     (no reps/lbs grid), a weight only on SLS from L4 and NC L7, a Test that moves
+     the level up, and his body weight in lbs. The level table is quest-levels.js.
+     Saving sends the session to still-api, which keeps it and writes his Workout Tracker rows. */
+  const LV = window.QuestLevels;
   const MOVE = { NC:"Nordic Hamstring Curl", OAC:"One-Arm Chin", SLS:"Single-Leg Squat", HSPU:"Handstand Push-Up", FLR:"Front Lever Rows", PPU:"Planche Push-Up" };
   const PROGRAMS = {
     "Jack Woods · Day 1": { strength:["NC","OAC","SLS"], mobility:["Bridge","Pike","Butterfly","Front Split","Pancake","Handstand"] },
@@ -2599,55 +2614,75 @@
 
   async function loadGymInfo(){
     if (!questKey()) return;
-    try { gymInfo = await qfetch("/quest/workout"); } catch {}
+    try { const j = await qfetch("/quest/workout"); gymInfo = { ...j, last:(j.last || []).map(LV.migrateSession) }; } catch {}
   }
+  // his levels: what the server saved, else his 2026-10-16 quiz answers (the server saves those once too)
+  const gymLevels = () => LV.seedLevels(gymInfo.levels || {}, ymdLocal()).levels;
   function gymDraftKey(){ return "quest-gym-" + ymdLocal(); }
-  function newGym(program){
-    const P = PROGRAMS[program], e = {};
-    // start is null until the server knows his level: the first session sets it, it is not a level-up
-    (P.strength || []).forEach(c => { const start = gymInfo.levels?.[c]?.level || null;
-      e[c] = { level:start || 1, start, reps:["","","",""], lbs:["","","",""] }; });
+  function newGym(program, bw){
+    const P = PROGRAMS[program], e = {}, lv = gymLevels();
+    (P.strength || []).forEach(c => { e[c] = LV.startMove(c, lv[c] && lv[c].level || LV.START[c] || 1); });
     (P.mobility || []).forEach(m => { e["m:" + m] = { done:false }; });
     (P.mis || []).forEach(([m]) => { e["mis:" + m] = { sets:0 }; });
-    return { program, e, at: now().toISOString() };
+    return { program, e, bw: bw || "", at: now().toISOString() };
   }
   function suggestProgram(){
     const last = (gymInfo.last || []).slice().reverse().find(w => /Jack Woods/.test(w.program || ""));
     return last && /Day 1/.test(last.program) ? "Jack Woods · Day 2" : "Jack Woods · Day 1";
   }
   function saveDraft(){ try { localStorage.setItem(gymDraftKey(), JSON.stringify(GYM)); } catch {} }
+  const gymTrend = () => LV.bodyTrend(LV.readingsFrom(gymInfo.body, gymInfo.last));
 
-  let gymShowMove = false;
+  let gymShowMove = false, gymTesting = null;
   async function openGym(block){
-    gymShowMove = false;
+    gymShowMove = false; gymTesting = null;
     // opening the log at the gym means you're there; opening it early (to move it, or because you're ill) does not
     if (block && !G.day.checks[gk(block)] && block.s - now() < 30 * 60000) checkIn(block);
     await loadGymInfo();
-    try { GYM = JSON.parse(localStorage.getItem(gymDraftKey())); } catch { GYM = null; }
+    try { GYM = LV.migrateDraft(JSON.parse(localStorage.getItem(gymDraftKey())), gymLevels()); } catch { GYM = null; }
     if (!GYM || !PROGRAMS[GYM.program]) GYM = newGym(suggestProgram());
     GYM.blockKey = block ? block.key : null;
     drawGym();
   }
+  function gymMoveBox(c){
+    const x = GYM.e[c], up = x.level > x.start, t = LV.testLevel(x), wb = LV.weightBox(c, x.trained);
+    const lastTest = (x.tests || []).slice(-1)[0];
+    const eff = LV.EFFORT.map(([k, label]) => `<button class="gchip${x.effort === k ? " on" : ""}" data-eff="${c}" data-v="${k}" aria-pressed="${x.effort === k}">${label}</button>`).join("");
+    const diff = x.trained < x.level ? " · easier" : x.trained > x.level ? " · harder" : "";
+    let h = `<div class="gmove" id="gm-${c}"><div class="gtop"><b>${MOVE[c]}</b>${up ? `<span class="gtag">New level</span>` : ""}</div>
+      <div class="gnow">${esc(LV.levelText(c, x.level))}</div>
+      <div class="gnext">${esc(LV.nextText(c, x.level))}</div>
+      <span class="gk">Level trained</span>
+      <div class="gtr"><span class="gl"><button class="lv" data-tr="${c}" data-d="-1" aria-label="Train an easier level">−</button>
+        <span class="lvn">L${x.trained}</span>
+        <button class="lv" data-tr="${c}" data-d="1" aria-label="Train a harder level">+</button></span>
+        <small>${esc(LV.LEVELS[c][x.trained - 1])}${diff}</small></div>
+      <span class="gk">How the hardest set went</span>
+      <div class="geff">${eff}</div>
+      <div class="gnums"><label>Reps <input class="set" data-reps="${c}" inputmode="numeric" placeholder="optional" value="${esc(x.reps)}" aria-label="${MOVE[c]} reps on the hardest set"></label>
+        ${wb ? `<label>Added ${wb.unit} <input class="set" data-kg="${c}" inputmode="decimal" placeholder="${wb.unit}" value="${esc(x.kg)}" aria-label="${MOVE[c]} added weight in ${wb.unit}"></label>` : ""}</div>`;
+    if (t != null) {
+      h += gymTesting === c
+        ? `<div class="gtest"><div class="gtest-q"><b>Test L${t} · ${esc(LV.LEVELS[c][t - 1])}</b><br>Do it on the first fresh rep of a set. Part range counts.
+            <div class="actions"><button class="btn ghost small" data-tcancel="${c}">Back</button><button class="btn" data-tres="${c}" data-v="0">Not yet</button><button class="btn primary" data-tres="${c}" data-v="1">Passed ✓</button></div></div></div>`
+        : `<div class="gtest"><button class="btn" data-test="${c}">Test L${t}</button></div>`;
+    }
+    if (lastTest) h += `<div class="gtest-h">${lastTest.pass ? `Passed L${lastTest.level} today. It saves with Finish and save.` : `Tried L${lastTest.level}: not yet. The try is saved with the session.`}</div>`;
+    return h + `</div>`;
+  }
   function drawGym(){
     const P = PROGRAMS[GYM.program];
-    const cell = (c, kind, i) => `<input class="set" id="g-${c}-${kind}-${i}" data-c="${c}" data-k="${kind}" data-i="${i}" inputmode="decimal"
-      placeholder="${["W1","W2","S1","S2"][i]}" value="${esc(GYM.e[c][kind][i])}" aria-label="${MOVE[c]} ${kind} ${["warm-up 1","warm-up 2","working set 1","working set 2"][i]}">`;
     const blk = GYM.blockKey && blocks().find(x => x.key === GYM.blockKey);
     const early = blk && blk.s - now() >= 30 * 60000;   // not at the gym yet: the move options come first
+    const tr = gymTrend();
     let h = `<div class="gym-head"><h3>🏋️ Gym log</h3><span class="gym-hb">${blk && !early ? `<button class="btn ghost small" id="gMove">${gymShowMove ? "Hide" : "Reschedule or ill"}</button>` : ""}<button class="btn ghost small" id="gClose">Close</button></span></div>
       ${blk && (early || gymShowMove) ? gymMoveHTML(blk) : ""}
       <label class="glabel" for="gProg">Program</label>
-      <select id="gProg">${Object.keys(PROGRAMS).map(k => `<option ${k === GYM.program ? "selected" : ""}>${k}</option>`).join("")}</select>`;
-    (P.strength || []).forEach(c => {
-      const x = GYM.e[c], up = x.start != null && x.level > x.start;
-      h += `<div class="gmove"><div class="gtop"><b>${MOVE[c]}</b><span class="gl">
-        <button class="lv" data-lv="${c}" data-d="-1" aria-label="Level down">−</button>
-        <span class="lvn${up ? " up" : ""}">L${x.level}</span>
-        <button class="lv" data-lv="${c}" data-d="1" aria-label="Level up">+</button></span></div>
-        <div class="gsub">${esc(LADDER[c][x.level - 1])}${up ? " · new level" : x.start == null ? " · first time: set your current level" : ""}</div>
-        <div class="grow"><span class="gk">reps</span>${[0,1,2,3].map(i => cell(c, "reps", i)).join("")}</div>
-        <div class="grow"><span class="gk">lbs</span>${[0,1,2,3].map(i => cell(c, "lbs", i)).join("")}</div></div>`;
-    });
+      <select id="gProg">${Object.keys(PROGRAMS).map(k => `<option ${k === GYM.program ? "selected" : ""}>${k}</option>`).join("")}</select>
+      <label class="glabel" for="gBw">Body weight (lbs)</label>
+      <div class="gbw"><input class="set" id="gBw" inputmode="decimal" placeholder="optional" value="${esc(GYM.bw || "")}">
+        <small id="gBwT">${tr ? `Last: ${esc(LV.trendText(tr))}` : "Weigh in at the gym if you like. It saves with today's date."}</small></div>`;
+    (P.strength || []).forEach(c => { h += gymMoveBox(c); });
     if (P.mobility) h += `<div class="glabel">Mobility</div><div class="gchips">${P.mobility.map(m =>
       `<button class="gchip${GYM.e["m:" + m].done ? " on" : ""}" data-mob="${esc(m)}">${GYM.e["m:" + m].done ? "✓ " : ""}${esc(m)}</button>`).join("")}</div>`;
     (P.mis || []).forEach(([m, how, sets]) => {
@@ -2659,19 +2694,42 @@
         <div class="gsub">${esc(how)} · ${sets} sets</div></div>`;
     });
     h += `<div class="gfoot"><button class="btn" id="gRest">Rest 90s</button><button class="btn primary" id="gSave">Finish and save</button></div>
-      <p class="gnote" id="gMsg">Sets save to your Workout Tracker in Notion: 2 warm-up, 2 working, reps and lbs. Leave a box empty to skip it.</p>`;
+      <p class="gnote" id="gMsg">${P.strength ? "Saves to your Workout Tracker in Notion: the level, how the hardest set went and its reps." : "Saves to your Workout Tracker in Notion."}</p>`;
+    const keepScroll = $("sheet").classList.contains("open") && $("gProg") ? $("sheet").scrollTop : null;
     openSheet(h, true);
     const sh = $("sheet");
+    if (keepScroll != null) sh.scrollTop = keepScroll;
     $("gClose").onclick = () => { saveDraft(); stopRest(); closeSheet(); };
     if ($("gMove")) $("gMove").onclick = () => { gymShowMove = !gymShowMove; drawGym(); };
     bindGymMove(sh, () => { if ($("gProg")) drawGym(); });
-    $("gProg").onchange = e => { GYM = newGym(e.target.value); saveDraft(); drawGym(); };
-    sh.querySelectorAll("input.set").forEach(inp => inp.oninput = () => { GYM.e[inp.dataset.c][inp.dataset.k][+inp.dataset.i] = inp.value.trim(); saveDraft(); });
-    sh.querySelectorAll("[data-lv]").forEach(b => b.onclick = () => { const x = GYM.e[b.dataset.lv]; x.level = Math.min(7, Math.max(1, x.level + +b.dataset.d)); saveDraft(); drawGym(); });
+    $("gProg").onchange = e => {
+      const busy = Object.values(GYM.e).some(x => x && ((x.tests && x.tests.length) || x.effort || x.reps));
+      if (busy && !confirm("Switch program? What you logged for this one today is cleared.")) { e.target.value = GYM.program; return; }
+      GYM = { ...newGym(e.target.value, GYM.bw), blockKey:GYM.blockKey }; gymTesting = null; saveDraft(); drawGym(); };
+    $("gBw").oninput = () => { GYM.bw = $("gBw").value.trim(); saveDraft(); };
+    sh.querySelectorAll("[data-reps]").forEach(inp => inp.oninput = () => { GYM.e[inp.dataset.reps].reps = inp.value.trim(); saveDraft(); });
+    sh.querySelectorAll("[data-kg]").forEach(inp => inp.oninput = () => { GYM.e[inp.dataset.kg].kg = inp.value.trim(); saveDraft(); });
+    sh.querySelectorAll("[data-tr]").forEach(b => b.onclick = () => { const x = GYM.e[b.dataset.tr]; x.trained = Math.min(LV.TOP, Math.max(1, x.trained + +b.dataset.d)); saveDraft(); drawGym(); });
+    sh.querySelectorAll("[data-eff]").forEach(b => b.onclick = () => { const x = GYM.e[b.dataset.eff]; x.effort = x.effort === b.dataset.v ? "" : b.dataset.v; saveDraft(); drawGym(); });
+    sh.querySelectorAll("[data-test]").forEach(b => b.onclick = () => { gymTesting = b.dataset.test; drawGym(); });
+    sh.querySelectorAll("[data-tcancel]").forEach(b => b.onclick = () => { gymTesting = null; drawGym(); });
+    sh.querySelectorAll("[data-tres]").forEach(b => b.onclick = () => gymTest(b.dataset.tres, b.dataset.v === "1", b.getBoundingClientRect()));
     sh.querySelectorAll("[data-mob]").forEach(b => b.onclick = () => { const x = GYM.e["m:" + b.dataset.mob]; x.done = !x.done; saveDraft(); drawGym(); });
     sh.querySelectorAll("[data-mis]").forEach(b => b.onclick = () => { const x = GYM.e["mis:" + b.dataset.mis]; x.sets = Math.max(0, x.sets + +b.dataset.d); saveDraft(); drawGym(); });
     $("gRest").onclick = startRest;
     $("gSave").onclick = saveGym;
+  }
+  // d18: a pass is one level up and a little party; "not yet" only records the try
+  function gymTest(c, pass, rect){
+    const x = GYM.e[c], t = LV.testLevel(x);
+    if (t == null) return;
+    GYM.e[c] = LV.recordTest(x, pass); gymTesting = null; saveDraft();
+    if (pass) {
+      log(`Level up: ${MOVE[c]} L${t} (${LV.LEVELS[c][t - 1]}), test passed`);
+      if (window.QuestFx && rect) QuestFx.tap(rect, { icon:"⭐", color:"#ffd479" });
+      banner("🪢", "LEVEL UP", `${MOVE[c]} L${t} · ${LV.LEVELS[c][t - 1]}`);
+    } else log(`Test: ${MOVE[c]} L${t}, not yet`);
+    drawGym();
   }
   // the rest timer is the one place seconds make sense
   function startRest(){
@@ -2684,35 +2742,37 @@
 
   async function saveGym(){
     const P = PROGRAMS[GYM.program], entries = [];
-    (P.strength || []).forEach(c => { const x = GYM.e[c];
-      if (x.reps.some(v => v !== "") || (x.start != null && x.level !== x.start))
-        entries.push({ code:c, name:MOVE[c], kind:"strength", level:x.level, levelName:LADDER[c][x.level - 1], reps:x.reps, lbs:x.lbs }); });
+    (P.strength || []).forEach(c => { const e = LV.toEntry(c, MOVE[c], GYM.e[c]); if (e) entries.push(e); });
     (P.mobility || []).forEach(m => { if (GYM.e["m:" + m].done) entries.push({ name:m, kind:"mobility", setsDone:1, note:"mobility" }); });
     (P.mis || []).forEach(([m, how]) => { const x = GYM.e["mis:" + m]; if (x.sets) entries.push({ name:m, kind:"mobility", setsDone:x.sets, note:how }); });
-    if (!entries.length) { $("gMsg").textContent = "Nothing logged yet. Fill in at least one set."; return; }
-    const ups = entries.filter(x => x.code && GYM.e[x.code].start != null && x.level > GYM.e[x.code].start);
-    const working = entries.reduce((a, x) => a + (x.reps ? x.reps.slice(2).filter(v => v !== "").length : (x.setsDone || 0)), 0);
+    const bw = LV.parseLbs(GYM.bw);
+    if (GYM.bw && bw == null) { $("gMsg").textContent = "Body weight looks off. Type it in lbs, like 172.4."; return; }
+    if (!entries.length && bw == null) { $("gMsg").textContent = "Nothing logged yet. Tap how a set went, or add your body weight."; return; }
+    const date = ymdLocal(), body = { date, program:GYM.program, entries };
+    if (bw != null) body.bodyWeightLbs = bw;
     $("gSave").disabled = true; $("gMsg").textContent = "Saving…";
     let msg;
     if (DRY) msg = "Test mode: nothing sent.";
-    else if (!questKey()) msg = "Pair this device in ⚙️ to save to Notion. Your sets are kept on this phone for now.";
+    else if (!questKey()) msg = "Pair this device in ⚙️ to save to Notion. Your log is kept on this phone for now.";
     else {
       try {
-        const r = await qfetch("/quest/workout", { method:"POST", body:JSON.stringify({ date:ymdLocal(), program:GYM.program, entries }) });
-        msg = r.notion && r.notion.rows ? `Saved. ${r.notion.rows} rows added to your Workout Tracker.` : "Saved on the server.";
+        const r = await qfetch("/quest/workout", { method:"POST", body:JSON.stringify(body) });
+        msg = r.notion && r.notion.rows ? `Saved. ${r.notion.rows} rows added to your Workout Tracker.` : entries.length ? "Saved on the server." : "Body weight saved.";
         if (r.notion && r.notion.errors && r.notion.errors.length) msg += ` Notion refused ${r.notion.errors.length}: ${r.notion.errors[0]}`;
         try { localStorage.removeItem(gymDraftKey()); } catch {}
-      } catch (e) { $("gSave").disabled = false; $("gMsg").textContent = "Could not save: " + e.message + ". Your sets are still here."; return; }
+        // the weekly gym count and the body weight trend read this list (a body-weight-only save is not a session)
+        if (entries.length) gymInfo.last = [...(gymInfo.last || []), { ...body, savedAt:now().toISOString() }];
+        if (bw != null) gymInfo.body = LV.addReading(LV.readingsFrom(gymInfo.body, gymInfo.last), date, bw, now().toISOString());
+        for (const e of entries) if (e.code) gymInfo.levels = { ...(gymInfo.levels || {}), [e.code]:{ level:e.level, at:date } };
+      } catch (e) { $("gSave").disabled = false; $("gMsg").textContent = "Could not save: " + e.message + ". Your log is still here."; return; }
     }
-    const warm = entries.reduce((a, x) => a + (x.reps ? x.reps.slice(0, 2).filter(v => v !== "").length : 0), 0);
-    log(`Gym log: ${GYM.program}, ${entries.length} moves (${warm} warm-up, ${working} working sets)`); saveG();
-    ups.forEach((x, i) => setTimeout(() => {
-      log(`Level up: ${x.name} L${x.level} (${x.levelName})`); saveG();
-      banner("🪢", "LEVEL UP", `${x.name} level ${x.level}`); }, 900 * (i + 1)));
+    const tested = entries.reduce((a, x) => a + (x.tests ? x.tests.length : 0), 0);
+    log(`Gym log: ${GYM.program}, ${entries.length} moves${tested ? `, ${tested} tests` : ""}${bw != null ? `, body weight ${bw} lbs` : ""}`); saveG();
     const b = GYM.blockKey && blocks().find(x => x.key === GYM.blockKey);
-    if (b && !G.day.closes[gk(b)]) G.day.closes[gk(b)] = "done";
+    if (entries.length && b && !G.day.closes[gk(b)]) G.day.closes[gk(b)] = "done";
     saveG();
     $("gMsg").textContent = msg; $("gSave").textContent = "Saved";
+    const tEl = $("gBwT"), tr = gymTrend(); if (tEl && tr) tEl.textContent = "Last: " + LV.trendText(tr);
   }
   /* ---------- sheets ---------- */
   function openSheet(html, tall){
@@ -3644,7 +3704,7 @@
       qfetch("/quest/insights").then(j => { INSIGHTS = j || {}; QuestMorning.redraw(); }).catch(() => {}); }
     loadWeather();
     if (questKey() && !openMorning.gym) { openMorning.gym = true;   // this week's workouts, for Training
-      qfetch("/quest/workout").then(j => { gymInfo = j || gymInfo; QuestMorning.redraw(); }).catch(() => {}); }
+      qfetch("/quest/workout").then(j => { if (j) gymInfo = { ...j, last:(j.last || []).map(LV.migrateSession) }; QuestMorning.redraw(); }).catch(() => {}); }
     QuestMorning.open(MO_CTX);
     placeBasics().then(() => QuestMorning.redraw()).catch(e => console.warn("basics", e));
     planGym(true).catch(e => console.warn("gym", e));
