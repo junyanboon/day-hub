@@ -2408,7 +2408,9 @@
     const groups = [
       ["Get something done", tasks.map(x => ["📝", x.task.length > 70 ? x.task.slice(0, 69) + "…" : x.task, x.why || "", x.est, { taskId:x.id, pickId:"task:" + x.id }])],
       ["Practice", [["🌀", "Isha Kriya", "Fills prana", 12], ["🌬️", "Nadi Shuddhi", "Fills prana", 5], ["🙆", "Upa Yoga", "", 20]]],
-      ["Rest and body", [["😴", "NSDR", "Lying down, gives body back", 20], ["🚶", "Walk", "Outside", 30], ["🍽️", meal, "", 45]]],
+      // breakfast comes in two lengths, quick or slow (Junyan, 2026-10-16); one pick, so choosing the other length resizes it
+      ["Rest and body", [["😴", "NSDR", "Lying down, gives body back", 20], ["🚶", "Walk", "Outside", 30],
+        ...(meal === "Breakfast" ? [["🍽️", meal, "Quick, 45 min", 45, { pickId:"breakfast" }], ["🍽️", meal, "Slow, 1 hr 30", 90, { pickId:"breakfast" }]] : [["🍽️", meal, "", 45]])]],
     ];
     const opts = groups.flatMap(g => g[1]).map(o => { const p = o[4] || { pickId:o[1].toLowerCase() };
       const on = (OPS.adds || []).some(a => AGD().samePick(a, { ...p, t:o[1] }) && !pickDone(a));
