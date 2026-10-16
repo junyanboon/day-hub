@@ -6,119 +6,143 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Mail Router">
-<meta name="theme-color" content="#121212">
+<meta name="theme-color" content="#14336a">
 <meta name="robots" content="noindex">
 <title>Mail Router</title>
 <link rel="manifest" href="mail.webmanifest">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icon-180.png">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700&family=Zen+Old+Mincho:wght@500;700;900&display=swap">
 <!--
   Mail Router (ticket 17): Junyan's personal Gmail, one card per email, nothing moves
-  until he approves. Look: the Sumi-e prototype (tickets/17-mail-router-prototype-sumie.html).
-  Data: still-api /inbox/* behind the Day Quest pairing code (same "quest-key" on this origin).
-  This page is public and holds no secret. ?api= points it at another server (local preview).
+  until he approves. Look: Day Quest (d357, 2026-10-16), the same family as still/quest.html:
+  its day sky, frosted glass panels, Figtree, gold, mint and lavender, with the sunset
+  gradient of the "Day Quest" skin in tickets/17-mail-router-prototype-two-looks.html on
+  Approve and the logo. Data: still-api /inbox/* behind the Day Quest pairing code (same
+  "quest-key" on this origin). This page is public and holds no secret. ?api= points it at
+  a local server (preview only).
 -->
 <style>
+/* Figtree (OFL), the Day Quest font, served from this repo so no Google lookup (quest.html d217) */
+@font-face{font-family:"Figtree";font-style:normal;font-weight:300 900;font-display:swap;src:url(../still/fonts/figtree-latin.woff2) format("woff2")}
+/* tokens: quest.html :root, plus the prototype's Day Quest skin */
 :root{
-  --bg:#121212; --panel:#191918; --sunk:#151514; --line:#2b2a27; --ink:#ece6d8; --dim:#a39d90; --faint:#6f6b62;
-  --accent:#ece6d8; --accent-ink:#121212; --accent-soft:#262521;
-  --seal:#d2452f; --go:#9bb08a; --go-soft:#232b1e; --warn:#d8a96a; --warn-soft:#33291b; --jev:#9fb3c4; --jev-soft:#1d252c; --bubble:#22211f;
-  --disp:"Zen Old Mincho","Hiragino Mincho ProN",Georgia,serif; --body:"Zen Kaku Gothic New","Hiragino Sans",ui-sans-serif,system-ui,sans-serif; --mono:"Zen Kaku Gothic New",ui-sans-serif,system-ui,sans-serif;
-  --track:.04em; --radius:2px; color-scheme:dark;
+  --ink:rgba(255,255,255,.95); --dim:rgba(255,255,255,.78); --faint:rgba(255,255,255,.58);
+  --glass:rgba(255,255,255,.12); --glass-2:rgba(255,255,255,.2); --line:rgba(255,255,255,.2); --sunk:rgba(255,255,255,.08);
+  --gold:#ffd479; --gold-soft:rgba(255,212,121,.18); --mint:#8fe3b0; --mint-soft:rgba(143,227,176,.18);
+  --warn:#ffc27a; --warn-soft:rgba(255,194,122,.18); --jev:#c9b6ff; --jev-soft:rgba(201,182,255,.18); --bad:#ff9c9c;
+  --sunset:linear-gradient(100deg,#f7a35c 0%,#e8618c 55%,#a45bc6 100%);
+  --sky:linear-gradient(180deg,#14336a 0%,#23548d 50%,#3f76a6 100%);
+  --font:"Figtree",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  color-scheme:dark;
 }
-*{box-sizing:border-box}
-html{background:var(--bg)}
-body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.65 var(--body);padding:env(safe-area-inset-top) 16px 64px}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html{min-height:100%;background:#23548d}
+/* the sky sits on a fixed layer, as quest.html's #sky (iOS ignores background-attachment:fixed) */
+body::before{content:"";position:fixed;inset:0;z-index:-1;background:var(--sky);pointer-events:none}
+body{margin:0;background:transparent;color:var(--ink);font:15px/1.6 var(--font);-webkit-font-smoothing:antialiased;
+  padding:calc(env(safe-area-inset-top) + 6px) 16px calc(env(safe-area-inset-bottom) + 72px)}
 .wrap{max-width:860px;margin:0 auto}
 button{font:inherit;cursor:pointer;color:inherit}
 button:disabled{cursor:not-allowed;opacity:.45}
-button:focus-visible,textarea:focus-visible,input:focus-visible,a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+button:focus-visible,textarea:focus-visible,input:focus-visible,a:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 a{color:inherit}
 h1,h2,h3{margin:0;text-wrap:balance}
-.seal{width:36px;height:36px;border:2px solid var(--seal);color:var(--seal);border-radius:50%;display:grid;place-items:center;font:700 17px/1 var(--body);transform:rotate(-10deg);opacity:.9;flex:none}
+.when,.tile b,.tab .n,.counter b{font-variant-numeric:tabular-nums}
+/* the gold check seal that stamps an approved card */
+.seal{width:36px;height:36px;border:2px solid var(--gold);color:var(--gold);background:var(--gold-soft);border-radius:50%;display:grid;place-items:center;font:800 17px/1 var(--font);flex:none;box-shadow:0 0 14px rgba(255,212,121,.35)}
 .seal.stamp{animation:stamp .35s ease-out}
-@keyframes stamp{from{transform:rotate(-10deg) scale(1.8);opacity:0}to{transform:rotate(-10deg) scale(1);opacity:.9}}
-.logo{width:40px;height:40px;background:var(--seal);color:#fff;display:grid;place-items:center;font:700 20px/1 var(--body);border-radius:3px;flex:none}
+@keyframes stamp{from{transform:scale(1.8);opacity:0}to{transform:scale(1);opacity:1}}
+.logo{width:42px;height:42px;background:var(--sunset);color:#fff;display:grid;place-items:center;font:800 20px/1 var(--font);border-radius:12px;flex:none;box-shadow:0 6px 18px rgba(232,97,140,.35)}
 
 header{display:flex;align-items:flex-end;gap:12px;padding-block:16px 10px;flex-wrap:wrap}
-.brand{font:500 10px var(--mono);letter-spacing:.2em;text-transform:uppercase;color:var(--dim)}
-.name{font:700 28px/1.1 var(--disp);letter-spacing:.01em}
+.brand{font:600 10px var(--font);letter-spacing:.22em;text-transform:uppercase;color:var(--dim)}
+.name{font:800 28px/1.1 var(--font);letter-spacing:.01em}
 .counter{margin-left:auto;font-size:13px;color:var(--dim);text-align:right;display:grid;gap:4px;justify-items:end}
-.counter b{color:var(--ink)}
-.live{display:inline-flex;align-items:center;gap:6px;font:500 11px var(--mono);color:var(--dim)}
-.live i{width:7px;height:7px;border-radius:50%;background:var(--go);display:inline-block}
-.live.bad i{background:var(--warn)} .live.bad{color:var(--warn)}
+.counter b{color:var(--gold);font-weight:700}
+.live{display:inline-flex;align-items:center;gap:6px;font:500 12px var(--font);color:var(--dim)}
+.live i{width:7px;height:7px;border-radius:50%;background:var(--mint);display:inline-block;box-shadow:0 0 6px var(--mint)}
+.live.bad i{background:var(--warn);box-shadow:none} .live.bad{color:var(--warn)}
 .live.busy i{animation:pulse 1.2s infinite}
 @keyframes pulse{50%{opacity:.25}}
-.toggle{border:1px solid var(--line);background:transparent;border-radius:4px;padding:3px 8px;font:500 11px var(--mono);color:var(--dim)}
-nav.tabs{display:flex;gap:22px;border-bottom:1px solid var(--line);overflow-x:auto}
-.tab{background:none;border:0;border-bottom:2px solid transparent;padding:10px 0 9px;font:500 14px var(--body);letter-spacing:var(--track);color:var(--faint);white-space:nowrap}
-.tab .n{font:400 11px var(--mono);margin-left:6px;letter-spacing:0}
-.tab.on{color:var(--ink);border-bottom-color:var(--seal)}
+.toggle{border:1px solid var(--line);background:var(--glass);border-radius:999px;padding:4px 11px;font:600 12px var(--font);color:var(--ink)}
+nav.tabs{display:flex;gap:24px;border-bottom:1px solid var(--line);overflow-x:auto}
+.tab{background:none;border:0;border-bottom:2px solid transparent;padding:10px 0 9px;font:600 12px var(--font);letter-spacing:.18em;text-transform:uppercase;color:var(--faint);white-space:nowrap}
+.tab .n{font:600 11px var(--font);margin-left:6px;letter-spacing:0}
+.tab.on{color:var(--ink);border-bottom-color:var(--gold)}
+.tab.on .n{color:var(--gold)}
 
-.lane{font:500 10px var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--faint);margin:18px 0 8px;display:flex;justify-content:space-between;gap:8px}
-.list{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden}
-.row{border-top:1px solid var(--line)}
+/* small spaced uppercase labels, as quest.html's h2 and .eyebrow */
+.lane{font:600 11px var(--font);letter-spacing:.14em;text-transform:uppercase;color:var(--dim);margin:20px 4px 8px;display:flex;justify-content:space-between;gap:8px}
+/* glass panels: quest.html .card */
+.list,.tile{background:var(--glass);border:1px solid var(--line);border-radius:22px;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
+.list{overflow:hidden}
+.row{border-top:1px solid rgba(255,255,255,.12)}
 .row:first-child{border-top:0}
 .row>button.head{all:unset;box-sizing:border-box;display:grid;grid-template-columns:52px 8px minmax(0,1fr) auto;gap:10px;align-items:center;padding:14px 16px;width:100%;cursor:pointer}
-.row>button.head:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
-.when{font:500 12px var(--mono);color:var(--dim);font-variant-numeric:tabular-nums}
+.row>button.head:active{background:rgba(255,255,255,.06)}
+.row>button.head:focus-visible{outline:2px solid var(--gold);outline-offset:-2px}
+.row.open{background:rgba(255,255,255,.06)}
+.when{font:600 12px var(--font);color:var(--dim)}
 .dot{width:8px;height:8px;border-radius:50%;background:var(--faint)}
-.dot.people{background:var(--accent)} .dot.auto{background:var(--go)} .dot.flag{background:var(--warn)} .dot.jev{background:var(--jev)}
+.dot.people{background:var(--gold)} .dot.auto{background:var(--mint)} .dot.flag{background:var(--warn)} .dot.jev{background:var(--jev)}
 .who{min-width:0}
-.who .t1{font-weight:500;font-size:15px;display:block;overflow-wrap:anywhere}
+.who .t1{font-weight:600;font-size:15px;display:block;overflow-wrap:anywhere}
 .who .t2{font-size:13px;color:var(--dim);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}
-.pill{font:500 11px/1 var(--mono);padding:6px 9px;border-radius:3px;white-space:nowrap;background:var(--sunk);color:var(--dim);border:1px solid var(--line)}
+.pill{font:600 11.5px/1 var(--font);padding:6px 10px;border-radius:999px;white-space:nowrap;background:var(--sunk);color:var(--dim);border:1px solid var(--line)}
 .pill.jev{background:var(--jev-soft);color:var(--jev);border-color:transparent}
-.pill.auto{background:var(--go-soft);color:var(--go);border-color:transparent}
-.pill.ask{background:var(--accent-soft);color:var(--accent);border-color:transparent}
+.pill.auto{background:var(--mint-soft);color:var(--mint);border-color:transparent}
+.pill.ask{background:var(--gold-soft);color:var(--gold);border-color:transparent}
 .pill.money{background:var(--warn-soft);color:var(--warn);border-color:transparent}
-.row.done{opacity:.55}.row.done .seal{opacity:1}
+.row.done .who,.row.done .when,.row.done .dot{opacity:.5}
 .row.skipped .who .t1::after{content:" · skipped";color:var(--faint);font-weight:400;font-size:12px}
 
-.body{padding:4px 14px 16px 84px;display:grid;gap:12px}
-@media (max-width:560px){.body{padding-left:14px}.row>button.head{grid-template-columns:44px 8px minmax(0,1fr)}.row>button.head .pill,.row>button.head .seal{grid-column:3;justify-self:start}}
-.why{font:500 10px var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--faint);margin-bottom:-6px}
+.body{padding:4px 14px 18px 84px;display:grid;gap:12px}
+@media (max-width:560px){.counter{margin-left:0;justify-items:start;text-align:left;width:100%;grid-template-columns:1fr auto;align-items:center}.body{padding-left:14px}.row>button.head{grid-template-columns:44px 8px minmax(0,1fr)}.row>button.head .pill,.row>button.head .seal{grid-column:3;justify-self:start}}
+.why{font:600 11px var(--font);letter-spacing:.14em;text-transform:uppercase;color:var(--dim);margin-bottom:-6px}
 .summary{margin:0;max-width:62ch;color:var(--dim);overflow-wrap:anywhere}
-.jevline{display:flex;gap:10px;align-items:center;flex-wrap:wrap;background:var(--jev-soft);color:var(--jev);border-radius:4px;padding:8px 12px;font:500 12.5px var(--mono)}
+.jevline{display:flex;gap:10px;align-items:center;flex-wrap:wrap;background:var(--jev-soft);color:var(--jev);border-radius:14px;padding:9px 13px;font:600 13px var(--font)}
 .jevline.money{background:var(--warn-soft);color:var(--warn)}
-.jevline.quiet{background:var(--sunk);color:var(--dim)}
-.jevline .conf{display:inline-block;width:80px;height:5px;background:var(--line);border-radius:3px;overflow:hidden;vertical-align:middle}
-.jevline .conf i{display:block;height:100%;background:var(--jev)}
-.mail{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--sunk);border:1px solid var(--line);border-radius:4px;padding:12px 14px;font-size:14px;line-height:1.55;max-height:360px;overflow:auto;color:var(--ink)}
+.jevline.quiet{background:var(--sunk);color:var(--dim);font-weight:500}
+.jevline .conf{display:inline-block;width:80px;height:6px;background:rgba(0,0,0,.2);border-radius:4px;overflow:hidden;vertical-align:middle}
+.jevline .conf i{display:block;height:100%;background:var(--jev);border-radius:4px}
+.mail{white-space:pre-wrap;overflow-wrap:anywhere;background:rgba(0,0,0,.18);border:1px solid var(--line);border-radius:16px;padding:12px 14px;font-size:14px;line-height:1.55;max-height:360px;overflow:auto;color:var(--ink)}
 .mail small{display:block;color:var(--faint);font-size:12px;margin-bottom:8px;white-space:normal}
 .btns{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
-.btn{border:1px solid var(--line);background:var(--panel);border-radius:var(--radius);padding:9px 16px;font:500 14px var(--body);letter-spacing:var(--track);min-height:42px;text-decoration:none;display:inline-flex;align-items:center}
-.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
-.btn.quiet{border-color:transparent;background:transparent;color:var(--dim)}
+/* buttons: quest.html .btn, with the sunset gradient on the main one */
+.btn{border:0;background:var(--glass-2);border-radius:14px;padding:11px 18px;font:600 15px/1.2 var(--font);min-height:44px;text-decoration:none;display:inline-flex;align-items:center;color:var(--ink)}
+.btn:active{transform:scale(.97)}
+.btn.primary{background:var(--sunset);color:#fff;font-weight:700;text-shadow:0 1px 2px rgba(80,20,60,.45);box-shadow:0 6px 18px rgba(232,97,140,.3)}
+.btn.quiet{background:transparent;border:1px solid var(--line);color:var(--dim);font-weight:500}
 .routes{display:flex;flex-wrap:wrap;gap:6px}
-.routes button{border:1px dashed var(--line);background:transparent;border-radius:3px;padding:6px 10px;font:500 12px var(--mono);color:var(--dim)}
-.routes button.pick{border-style:solid;border-color:var(--ink);color:var(--ink)}
+.routes button{border:1px dashed var(--line);background:transparent;border-radius:999px;padding:7px 12px;font:600 12.5px var(--font);color:var(--dim)}
+.routes button.pick{border-style:solid;border-color:#fff;background:#fff;color:#2a3d6e}
 .routes button.jevpick{border-color:var(--jev);color:var(--jev)}
-.routes button.pick.jevpick{border-style:solid}
-.routes button kbd{font:inherit;color:var(--faint);margin-right:5px}
+.routes button.pick.jevpick{border-style:solid;color:#3b2f7a;background:var(--jev);border-color:var(--jev)}
+.routes button kbd{font:inherit;opacity:.55;margin-right:5px}
+/* the 10-step auto meter, mint like quest.html's done tiles */
 .meter{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--dim);flex-wrap:wrap}
 .meter .bar{display:grid;grid-template-columns:repeat(10,1fr);gap:3px;width:150px}
-.meter .bar i{height:6px;border-radius:1px;background:var(--line)}
-.meter .bar i.on{background:var(--go)}
-.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom));transform:translateX(-50%);background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:4px;padding:10px 14px;font:500 13px var(--mono);max-width:calc(100% - 32px);z-index:5;display:flex;gap:12px;align-items:center}
+.meter .bar i{height:7px;border-radius:4px;background:rgba(0,0,0,.22)}
+.meter .bar i.on{background:var(--mint);box-shadow:0 0 6px rgba(143,227,176,.5)}
+/* quest.html .cal-toast */
+.toast{position:fixed;left:50%;bottom:calc(22px + env(safe-area-inset-bottom));transform:translateX(-50%);background:rgba(25,29,60,.94);color:var(--ink);border:1px solid var(--line);border-radius:14px;padding:10px 16px;font:500 13.5px var(--font);max-width:min(440px,92vw);z-index:5;display:flex;gap:12px;align-items:center;box-shadow:0 10px 30px rgba(0,0,0,.4)}
 .toast[hidden]{display:none}
-.toast.err{border-color:var(--warn);color:var(--warn)}
-.toast button{border:1px solid var(--seal);background:transparent;color:var(--seal);border-radius:3px;padding:4px 10px;font:500 12px var(--mono)}
+.toast.err{border-color:var(--bad);color:var(--bad)}
+.toast button{flex:none;border:0;background:rgba(255,255,255,.14);color:var(--gold);border-radius:10px;padding:5px 12px;font:600 13px var(--font)}
 .tiles{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:16px}
-.tile{background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:12px 14px;min-width:0}
-.tile b{display:block;font:800 26px/1.1 var(--mono);font-variant-numeric:tabular-nums}
+.tile{padding:14px 16px;min-width:0}
+.tile b{display:block;font:800 28px/1.1 var(--font)}
+.tile:nth-child(1) b{color:var(--mint)} .tile:nth-child(2) b{color:var(--jev)} .tile:nth-child(3) b{color:var(--gold)}
 .tile span{font-size:12.5px;color:var(--dim)}
-.learned div{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;padding:9px 14px;border-top:1px solid var(--line);font-size:14px}
+.learned div{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;padding:10px 16px;border-top:1px solid rgba(255,255,255,.12);font-size:14px}
 .learned div:first-child{border-top:0}
-.learned span{font:500 12px var(--mono);color:var(--jev)}
+.learned b{font-weight:600}
+.learned span{font:600 12.5px var(--font);color:var(--jev)}
 .empty{padding:16px;color:var(--dim);font-size:14px}
-.note{font-size:12.5px;color:var(--faint);margin:14px 0 0}
+.note{font-size:12.5px;color:var(--faint);margin:14px 4px 0}
 .pair{max-width:420px;margin:40px auto;display:grid;gap:12px}
-.pair input{background:var(--sunk);border:1px solid var(--line);border-radius:4px;color:var(--ink);font:15px var(--body);padding:10px 12px}
-@media (prefers-reduced-motion:reduce){.seal.stamp,.live.busy i{animation:none}}
+.pair input{background:rgba(0,0,0,.25);border:1px solid var(--line);border-radius:12px;color:var(--ink);font:15px var(--font);padding:12px}
+@media (prefers-reduced-motion:reduce){.seal.stamp,.live.busy i{animation:none}.btn:active{transform:none}}
 </style>
 </head>
 <body>
@@ -268,12 +292,12 @@ nav.tabs{display:flex;gap:22px;border-bottom:1px solid var(--line);overflow-x:au
             <a class="btn quiet" href="${esc(x.gmail)}" target="_blank" rel="noopener">Open in Gmail</a></div>
         </div>`;
       }
-      return `<div class="row ${done?"done":""} ${x.skipped?"skipped":""}">${head(x, x.money?"flag":"jev", pillFor(x))}${body}</div>`;
+      return `<div class="row ${done?"done":""} ${open?"open":""} ${x.skipped?"skipped":""}">${head(x, x.money?"flag":"jev", pillFor(x))}${body}</div>`;
     }).join("");
     const c = S.data.counts;
     return `<div class="lane"><span>One card per email · nothing moves until you approve</span><span>${c.sort}</span></div>
       <div class="list">${rows || `<div class="empty">Nothing waiting. New mail shows up here within 2 minutes.</div>`}</div>
-      <p class="note">Blue is Jev's guess (only when it is 80% sure or more). Orange is money or travel: Claude handles it and Jev is never asked. Enter approves, 1 to 8 picks a tray.${c.claude ? ` ${c.claude} waiting for Claude.` : ""}</p>`;
+      <p class="note">Lavender is Jev's guess (only when it is 80% sure or more). Orange is money or travel: Claude handles it and Jev is never asked. Enter approves, 1 to 8 picks a tray.${c.claude ? ` ${c.claude} waiting for Claude.` : ""}</p>`;
   }
 
   function messagesView(){
@@ -285,7 +309,7 @@ nav.tabs{display:flex;gap:22px;border-bottom:1px solid var(--line);overflow-x:au
           <div class="btns"><a class="btn primary" href="${esc(x.gmail)}" target="_blank" rel="noopener">Open in Gmail</a>
             <button class="btn" type="button" data-tosort="${esc(x.id)}">Sort it instead</button></div>
         </div>` : "";
-      return `<div class="row">${head(x, "people", `<span class="pill ask">From a person</span>`)}${body}</div>`;
+      return `<div class="row ${S.open===x.id?"open":""}">${head(x, "people", `<span class="pill ask">From a person</span>`)}${body}</div>`;
     }).join("");
     return `<div class="lane"><span>From people · summary and reply coming soon</span><span>${S.data.messages.length}</span></div>
       <div class="list">${rows || `<div class="empty">No emails from people right now.</div>`}</div>`;
@@ -301,7 +325,7 @@ nav.tabs{display:flex;gap:22px;border-bottom:1px solid var(--line);overflow-x:au
         <div class="btns">${x.flagged ? `<span class="pill money">Back to asking. Claude will check it.</span>`
           : `<button class="btn primary" type="button" data-flag="${esc(x.id)}">Flag this</button><button class="btn quiet" type="button" data-open="${esc(x.id)}">Looks fine</button>`}
           <a class="btn quiet" href="${esc(x.gmail)}" target="_blank" rel="noopener">Open in Gmail</a></div></div>` : "";
-      return `<div class="row">${head(x, x.flagged?"flag":"auto", pill)}${body}</div>`;
+      return `<div class="row ${S.open===x.id?"open":""}">${head(x, x.flagged?"flag":"auto", pill)}${body}</div>`;
     }).join("");
     return `<div class="tiles"><div class="tile"><b>${r.auto.length}</b><span>handled by itself, last 14 days</span></div><div class="tile"><b>${pct}</b><span>Jev matched you (${r.jev.agreed} of ${r.jev.shown})</span></div><div class="tile"><b>${r.flagged}</b><span>flagged by you</span></div></div>
       <div class="lane"><span>What Jev learned from you</span><span>${r.learned.length}</span></div>
