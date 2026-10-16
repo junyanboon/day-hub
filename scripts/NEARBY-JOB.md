@@ -18,15 +18,17 @@ or a call answers 401, stop and report "QUEST_KEY missing or wrong".
 Read the **Joint Plans** calendar (`fm1c5usrdr4n94qfla41lplg50@group.calendar.google.com`) from
 today to today + 21 days.
 
-A stay is an all-day event with a location that is a place to sleep: a hotel or rental (title ends
-in a `[YYYY.MM.DD]` stamp, or names a hotel, Airbnb, flat, apartment, studio or hostel) **and** has
-a timed check-in event at the same address. An all-day event for a festival, congress or class
-("IZC 2027", "Lambafest 2027") is not a stay, even with a location.
+A stay is an all-day event with a location that is a place to sleep: its title ends in a
+`[YYYY.MM.DD]` stamp, or names a hotel, Airbnb, flat, apartment, studio or hostel, or a timed
+check-in event uses the same address. Any one of these is enough. An all-day event for a festival,
+congress or class ("IZC 2027", "Lambafest 2027") is not a stay, even with a location.
 
 For each stay take:
-- `in`: the check-in event's start, as the stay's own wall clock (`2027-01-03T15:00`). No event:
-  15:00 on the first day.
-- `out`: the check-out event's start, same format. No event: 11:00 on the all-day event's last day.
+- `in`: the check-in event's start, as the stay's own wall clock (`2027-01-03T15:00`). The calendar
+  tool returns times in Toronto time (`13:00-05:00`): convert to the stay's `tz` first, in Python with
+  `zoneinfo`. No check-in event: 15:00 on the first day.
+- `out`: the check-out event's start, converted the same way. No event: 11:00 on the all-day
+  event's last day.
 - `tz`: the check-in event's time zone (Rio and São Paulo are `America/Sao_Paulo`).
 - `origin`: the street address from the event's location.
 
@@ -44,25 +46,32 @@ Who is eating and going out:
 - Both eat healthy and want well rated places: about Google 4.4 or better (or the same on
   TripAdvisor, TheFork or HappyCow) with a decent number of reviews.
 
-**Eat**: 6 to 9 places, mostly within a 20 minute walk. Best for both of them first, then a strong
+**Eat**: 6 to 9 places, mostly within a 20 minute walk. Where the stay has few good places that
+close, go up to 30 minutes on foot or a short ride, and say so in the report. Best for both of them first, then a strong
 vegetarian place and a strong soup or seafood place, a healthy breakfast café, a food market if one
 fits. Say honestly what each person can order.
 
-**See & do**: 5 to 7 sights, parks, markets or walks near the stay. Add the hotel gym as the first
-row (`walk: 0`) if the hotel has one.
+**See & do**: 5 to 7 sights, parks, markets or walks near the stay. A hotel with a gym gets the gym
+as the first row (`walk: 0`). A rental gets no gym row.
 
 Check every place on the web: open now (not permanently closed), exact address, rating with its
 source and review count, opening hours and closing days for the dates of the stay, whether to book.
-Never invent a rating; leave `rating` out if none is found.
+Never invent a rating; leave `rating` out if none is found. Google and TripAdvisor pages usually
+cannot be read directly: Google numbers can come from Wanderlog, Restaurant Guru or Gastroranking
+(name the source in `rating`, e.g. "4.6 Google (1,100 reviews, via Wanderlog)"), plus HappyCow for
+vegetarian places. Restaurant Guru rate-limits after a few pages, so spread the lookups. Leave out a
+place that is closed for good, only does delivery, or has no rating and is far.
 
 Times, from the stay's address:
 - Geocode with Nominatim (`https://nominatim.openstreetmap.org/search?format=json&q=...`, send a
-  User-Agent header, one request a second).
+  User-Agent header, one request a second). A beach or park comes back as its middle point: use the
+  nearest entrance or the nearest stretch of sand instead.
 - Walking: `https://routing.openstreetmap.de/routed-foot/route/v1/foot/{lon},{lat};{lon2},{lat2}?overview=false`,
   `routes[0].duration / 60`, rounded.
 - Over 25 minutes on foot: also `car` from
   `https://routing.openstreetmap.de/routed-car/route/v1/driving/{lon},{lat};{lon2},{lat2}?overview=false`.
-  Over an hour on foot: leave `walk` out and give `car` only.
+  Over an hour on foot: leave `walk` out and give `car` only. The routing service ignores traffic,
+  so add half again to car times in a big city (Rio, São Paulo, Madrid) and round up.
 
 ## 3. Save each stay
 
