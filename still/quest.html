@@ -707,7 +707,7 @@
 <script src="quest-gym.js?v=20261016h"></script>
 <script src="quest-morning.js?v=20261016g"></script>
 <script src="quest-agenda.js?v=20261014c"></script>
-<script src="quest-nearby.js?v=20261016h"></script>
+<script src="quest-nearby.js?v=20261016k"></script>
 </head>
 <body>
 <div id="sky" aria-hidden="true"><div class="sky-stars"></div><div class="sky-orb"></div>
@@ -3622,57 +3622,64 @@
      a today-only block in the next free slot that fits, like the add box; for a gym it is a real "Gym · Jack Woods"
      event on his Junyan calendar instead (d22, later 2026-10-16). Open rows are kept for this page only.
      Eat (2026-10-16) is a second tab in the same card; it opens on Eat near meal times until he picks a tab. The
-     stay's check-in and check-out times (in quest-nearby.js) find the hotel on days with no hotel event. */
+     stay's check-in and check-out times (in quest-nearby.js) find the hotel on days with no hotel event.
+     d7/d8 (later 2026-10-16): no Near me button, rows are always nearest first; the title is a drop-down of the
+     day's places (the stay, then each event the daily Nearby job researched), each with its own lists. */
   function nearbyStay(){
     const QN = window.QuestNearby; if (!QN || !PLAN) return null;
     const w = PLAN.where || {};
     return QN.stayFor([w.from && w.from.place, w.place].concat(blocks().map(b => b.t), (AG[gameYmd()] || []).map(b => b.t)), null, now());
   }
-  /* the stays the weekly Nearby job found on the calendar (d3), fetched once per page. They live on the Still
-     server behind the pairing code, not in this public repo: a stay is an address with the dates they are there. */
+  /* what the daily Nearby job found on the calendar (d3, d8): stays and event places, fetched once per page. They
+     live on the Still server behind the pairing code, not in this public repo: an address with the dates they are there. */
   function nearbyLoad(){
     if (nearbyLoad.done || !questKey() || Date.now() - (nearbyLoad.tried || 0) < 300000) return;   // a failed read: again in 5 min
     nearbyLoad.tried = Date.now();
-    qfetch("/quest/nearby").then(j => { nearbyLoad.done = true; if (j && window.QuestNearby && QuestNearby.addStays(j.stays)) drawNearby(); })
-      .catch(() => {});
+    qfetch("/quest/nearby").then(j => {
+      nearbyLoad.done = true; const QN = window.QuestNearby; if (!j || !QN) return;
+      if (QN.addStays(j.stays) + QN.addSpots(j.spots)) drawNearby();
+    }).catch(() => {});
   }
   function drawNearby(){
-    nearbyLoad();
+    nearbyLoad(); nearbyLocate();
     const QN = window.QuestNearby, el = $("nearby"), h = $("nearbyH"); if (!el || !h) return;
-    const st = drawNearby.st || (drawNearby.st = { tab:null, open:{}, msg:{} }), stay = nearbyStay(), inner = QN ? QN.html(stay, st, now()) : "";
+    const st = drawNearby.st || (drawNearby.st = { tab:null, pick:null, open:{}, msg:{} }), stay = nearbyStay(), inner = QN ? QN.html(stay, st, now()) : "";
     if (h.hidden !== !inner || el.hidden !== !inner) { h.hidden = el.hidden = !inner; if (window.QuestDash) QuestDash.sync(); }
     if (!inner) return;
-    if (st.here && Date.now() - st.here.at > 300000 && !st.locating) nearbyLocate(true);
     QN.addCss(document);
-    $("nearbyT").textContent = QN.title(stay);
+    const when = ev => { const b = blocks().find(x => x.id === ev); return b ? fmtT(b.s) : ""; };
+    put("nearbyT", QN.picker(stay, st, now(), null, when));
+    const sel = h.querySelector("[data-nbpick]");
+    if (sel) {   // the dashboard drags a card by its title: let the drop-down have its taps
+      sel.onpointerdown = sel.onmousedown = sel.ontouchstart = e => e.stopPropagation();
+      sel.onchange = () => { st.pick = sel.value; st.tab = null; st.open = {}; drawNearby(); };
+    }
     put("nearby", inner);
     el.onclick = e => {
       const tb = e.target.closest("[data-nbtab]"); if (tb) { st.tab = tb.dataset.nbtab; return drawNearby(); }
-      if (e.target.closest("[data-nbnear]")) { if (st.here) { st.here = null; st.nearMsg = ""; return drawNearby(); } return nearbyLocate(); }
       const pl = e.target.closest("[data-nbplan]"); if (pl) return nearbyPlan(stay, pl.dataset.nbplan);
       const hd = e.target.closest("[data-nb]"); if (hd) { st.open[hd.dataset.nb] = !st.open[hd.dataset.nb]; drawNearby(); }
     };
   }
-  /* Near me (2026-10-16): one reading of the phone's position, kept in this page only (never saved or sent), read
-     again quietly when it is over 5 minutes old and the card redraws. */
-  function nearbyLocate(quiet){
-    const st = drawNearby.st; if (!st || st.locating) return;
-    if (!navigator.geolocation) { st.nearMsg = "This browser cannot share where you are."; return drawNearby(); }
-    st.locating = true; if (!quiet) { st.nearMsg = ""; drawNearby(); }
-    navigator.geolocation.getCurrentPosition(pos => {
-      st.locating = false; st.nearMsg = "";
-      st.here = { lat:pos.coords.latitude, lng:pos.coords.longitude, at:Date.now() }; drawNearby();
-    }, err => {
-      st.locating = false;
-      if (!quiet) st.nearMsg = err && err.code === 1 ? "Location is off for this page. Allow it in the browser settings to use Near me." : "Could not find where you are. Try again in a moment.";
-      drawNearby();
-    }, { enableHighAccuracy:true, timeout:15000, maximumAge:60000 });
+  /* The phone's position for the distance order (d7): read only when this page may already use location (the
+     weather asked once), so the card never pops a prompt; again when over 5 minutes old. Kept in this page only,
+     never saved or sent. */
+  function nearbyLocate(){
+    const st = drawNearby.st; if (!st || st.locating || (st.here && Date.now() - st.here.at < 300000)) return;
+    if (!navigator.geolocation || !navigator.permissions) return;
+    st.locating = true;
+    navigator.permissions.query({ name:"geolocation" }).then(p => {
+      if (p.state !== "granted") { st.locating = false; st.here = null; return; }
+      navigator.geolocation.getCurrentPosition(pos => {
+        st.locating = false; st.here = { lat:pos.coords.latitude, lng:pos.coords.longitude, at:Date.now() }; drawNearby();
+      }, () => { st.locating = false; }, { enableHighAccuracy:true, timeout:15000, maximumAge:120000 });
+    }).catch(() => { st.locating = false; });
   }
   async function nearbyPlan(stay, id){
-    const QN = window.QuestNearby, st = drawNearby.st, p = QN && QN.find(stay, id);
+    const QN = window.QuestNearby, st = drawNearby.st, v = QN && QN.view(stay, st.pick, now()), p = v && QN.find(v, id);
     if (!QN || !p || !window.QuestMorning || nearbyPlan.busy) return;
     nearbyPlan.busy = true;   // a quick double tap: one write at a time
-    try { await nearbyPut(QN, st, p, id, stay.id + ":" + id, stay); } finally { nearbyPlan.busy = false; }
+    try { await nearbyPut(QN, st, p, id, v.key + ":" + id, stay); } finally { nearbyPlan.busy = false; }
   }
   async function nearbyPut(QN, st, p, id, tag, stay){   // tag: stay and place, so two hotels' gyms never count as one
     const there = blocks().find(b => b.nearby === tag && b.e > now());   // a second tap does not add a second block

@@ -175,40 +175,73 @@ test("Eat is a second tab in the same card; near meal times the card opens on it
   assert.equal(N.find(stay, "nope"), null);
 });
 
-// Near me (Junyan 2026-10-16, d2): times from where the phone is
-test("Near me: rough times from where he is, nearest first, marked ~, Directions from his spot", () => {
+// d7 (2026-10-16): no Near me button; always nearest first, from the phone when it is near
+test("rows are always nearest first: by the stay's minutes, or from the phone when it is near; no Near me button", () => {
   const stay = { id:"t", name:"T", short:"T", origin:"Hotel door", tz:"Europe/Madrid",
     places:[
-      { id:"far", icon:"🏛️", name:"Far", walk:10, lat:40.4167, lng:-3.7136, what:"w" },
+      { id:"far", icon:"🏛️", name:"Far", walk:24, lat:40.4167, lng:-3.7136, what:"w" },
       { id:"gym", icon:"🏋️", name:"Gym", walk:0, lat:40.4297, lng:-3.7144, what:"w" },
       { id:"nopos", icon:"?", name:"No position", walk:7, what:"w" },
       { id:"near", icon:"🌳", name:"Near", walk:14, lat:40.4241, lng:-3.7176, what:"w" },
     ] };
   const here = { lat:40.4240, lng:-3.7176, at:0 };   // at Templo de Debod
   assert.ok(Math.abs(N.metres({ lat:40.4297, lng:-3.7144 }, { lat:40.4240, lng:-3.7176 }) - 690) < 30);
-  assert.equal(N.ordered(stay.places, here).map(p => p.id).join(), "near,gym,far,nopos");
+  assert.equal(N.ordered(stay.places).map(p => p.id).join(), "gym,nopos,near,far");          // the stay's own minutes
+  assert.equal(N.ordered(stay.places, here).map(p => p.id).join(), "near,gym,far,nopos");    // from the phone
   assert.equal(N.chips(stay.places[3], here)[0].label, "~1 min");
-  assert.equal(N.chips(stay.places[1], here)[0].label, "~11 min");          // the hotel gym from out in the city
+  assert.equal(N.chips(stay.places[1], here)[0].label, "~11 min");
   assert.equal(N.chips(stay.places[1], { lat:40.4297, lng:-3.7144 })[0].label, "In the hotel");
-  assert.equal(N.chips(stay.places[2], here)[0].label, "7 min");            // no position: the stay's own time
-  // a long way off: the ride first, then the walk, both rough
   assert.equal(N.chips(stay.places[0], { lat:40.47, lng:-3.57 }).map(c => c.mode).join(), "driving,walking");
-  // Directions start from the phone (no origin) only when he is using Near me
-  assert.ok(!new URL(N.directionsUrl(stay, stay.places[3], here)).searchParams.has("origin"));
-  assert.equal(new URL(N.directionsUrl(stay, stay.places[3])).searchParams.get("origin"), "Hotel door");
-  // the card: a Near me button, and with it on a note and the nearest row first
+  // the card: no button; with the phone near, a note and the nearest row first; the phone far away is ignored
   const off = N.html(stay, { tab:"see" });
-  assert.match(off, /data-nbnear aria-pressed="false">📍 Near me</);
-  assert.ok(!/nb-from/.test(off));
+  assert.ok(!/data-nbnear|Near me/.test(off));
+  assert.ok(off.indexOf(">Gym<") < off.indexOf(">Far<"));
   const on = N.html(stay, { tab:"see", here });
-  assert.match(on, /nb-near on/); assert.match(on, /Rough times from where you are/);
+  assert.match(on, /Rough times from where you are/);
   assert.ok(on.indexOf(">Near<") < on.indexOf(">Far<"));
-  assert.match(N.html(stay, { tab:"see", locating:true }), /Finding you/);
-  assert.match(N.html(stay, { tab:"see", nearMsg:"Location is off for this page." }), /Location is off/);
-  // no positions at all: no button
-  assert.ok(!/data-nbnear/.test(N.html({ ...stay, places:[stay.places[2]] }, {})));
-  // every real place has a position, so Near me can sort them all
+  const toronto = N.html(stay, { tab:"see", here:{ lat:43.65, lng:-79.38 } });
+  assert.ok(!/nb-from/.test(toronto)); assert.match(toronto, /24 min/);
+  // Directions start from the phone (no origin) only when the phone's times are shown
+  assert.ok(!new URL(N.directionsUrl(stay, stay.places[3], { ...here, phone:true })).searchParams.has("origin"));
+  assert.equal(new URL(N.directionsUrl(stay, stay.places[3])).searchParams.get("origin"), "Hotel door");
   for (const s of N.STAYS) for (const p of [].concat(s.places || [], s.eat || [])) assert.ok(p.lat != null && p.lng != null, `${s.id}/${p.id}`);
+});
+
+// d8 (2026-10-16): the title is a drop-down of the day's places
+test("the title drop-down lists the stay and today's event places; picking one shows its lists from there", () => {
+  const stay = { id:"hotel", name:"Hotel", short:"Hotel", origin:"Hotel door", tz:"Europe/Madrid",
+    places:[{ id:"museum", icon:"🏛️", name:"Museum", walk:10, lat:40.42, lng:-3.71, what:"w" }],
+    eat:[{ id:"e-soup", icon:"🍜", name:"Soup", walk:8, lat:40.43, lng:-3.71, what:"w" }] };
+  const spots = [
+    { id:"spot:18:punto", name:"Punto Vegano", date:"2026-10-18", ev:"ev1", tz:"Europe/Madrid", lat:40.4281, lng:-3.7149, loc:"Calle de Luisa Fernanda 27, Madrid",
+      places:[], eat:[{ id:"e-far", icon:"🥗", name:"Far café", walk:3, lat:40.44, lng:-3.70, what:"w" }, { id:"e-close", icon:"☕", name:"Close café", walk:9, lat:40.4282, lng:-3.7150, what:"w" }] },
+    { id:"spot:18:museo", name:"Museo Cerralbo", date:"2026-10-18", ev:"ev2", tz:"Europe/Madrid", lat:40.4237, lng:-3.7145, same:"hotel" },
+    { id:"spot:19:other", name:"Tomorrow", date:"2026-10-19", tz:"Europe/Madrid", lat:40.4, lng:-3.7, eat:[{ id:"e-x", icon:"x", name:"X", walk:1, lat:40.4, lng:-3.7, what:"w" }] },
+  ];
+  const at = mad(18, 12);
+  assert.equal(N.choices(stay, at, spots).map(c => c.id).join(), "stay,spot:18:punto,spot:18:museo");
+  const pick = N.picker(stay, {}, at, spots, ev => ev === "ev1" ? "2:30 PM" : "");
+  assert.match(pick, /<select class="nb-pick" data-nbpick/);
+  assert.match(pick, /<option value="stay" selected>Hotel<\/option>/);
+  assert.match(pick, /<option value="spot:18:punto">Punto Vegano · 2:30 PM<\/option>/);
+  assert.ok(!/Tomorrow/.test(pick));
+  assert.equal(N.picker(stay, {}, mad(20, 12), spots), "Nearby · Hotel", "one place: plain title");
+  // a picked event place: its own lists, nearest to it first, rough times, Directions from its address
+  const h = N.html(stay, { pick:"spot:18:punto", tab:"eat" }, at, spots);
+  assert.match(h, /Rough times from Punto Vegano/);
+  assert.ok(h.indexOf("Close café") < h.indexOf("Far café"));
+  const v = N.view(stay, "spot:18:punto", at, spots);
+  assert.equal(new URL(N.directionsUrl(v, v.eat[0], v.from)).searchParams.get("origin"), "Calle de Luisa Fernanda 27, Madrid");
+  assert.equal(N.find(v, "e-close").name, "Close café");
+  // a place next to the stay borrows the stay's lists, sorted from the place
+  const m = N.view(stay, "spot:18:museo", at, spots, [stay]);
+  assert.equal(m.places[0].id, "museum"); assert.equal(m.from.lat, 40.4237);
+  // a pick from another day falls back to the stay; no stay and one event place still shows a card
+  assert.equal(N.view(stay, "spot:19:other", at, spots).key, "hotel");
+  assert.match(N.html(null, {}, mad(19, 12), spots), /X/);
+  assert.equal(N.picker(null, {}, mad(19, 12), spots), "Nearby · Tomorrow");
+  // spots from the server join once, with what the card needs
+  const S = []; assert.equal(N.addSpots([spots[0], spots[0], { id:"bad" }], S), 1);
 });
 
 // d3 (2026-10-16): stays the weekly job keeps on the Still server (GET /quest/nearby)
@@ -226,7 +259,10 @@ test("stays from the job's file join the list, are found by their times, and nev
   N.addStays([{ id:"n", name:"Hotel (Centro)", in:"2027-02-01T14:00", out:"2027-02-02T12:00", tz:"America/Sao_Paulo" }], S);
   assert.ok(S.find(s => s.id === "n").match.test("Check in: Hotel (Centro)"));
   const page = fs.readFileSync(fileURLToPath(new URL("../quest.html", import.meta.url)), "utf8");
-  assert.match(page, /qfetch\("\/quest\/nearby"\)/);   // private: on the Still server, never in this public repo
+  assert.match(page, /qfetch\("\/quest\/nearby"\)/);
+  assert.match(page, /QN\.addSpots\(j\.spots\)/);
+  assert.match(page, /QN\.picker\(stay, st, now\(\)/);
+  assert.match(page, /permissions\.query\(\{ name:"geolocation" \}\)/);   // never pops a location prompt   // private: on the Still server, never in this public repo
   assert.ok(!fs.existsSync(fileURLToPath(new URL("../nearby-stays.json", import.meta.url))), "no stays file in the public repo");
 });
 
