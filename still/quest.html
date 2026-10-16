@@ -626,7 +626,7 @@
 <script src="nvc-words.js?v=20261010a"></script>
 <script src="quest-fx.js?v=20261009b"></script>
 <script src="quest-night.js?v=20261011a"></script>
-<script src="quest-morning.js?v=20261011d"></script>
+<script src="quest-morning.js?v=20261016a"></script>
 <script src="quest-agenda.js?v=20261014c"></script>
 </head>
 <body>
@@ -926,7 +926,7 @@
     [/sleep|nap\b|nap |wind.?down|\bbed\b|rest\b/i, "rest"],
     [/shambhavi|sadhana|yoga|meditat|pooja|kriya|bhuta|angamardana|surya|nadi shuddhi|breath/i, "practice"],
     [/breakfast|brunch|lunch|dinner|\beat\b|cook|meal|pudding|veggie|snack|groceries/i, "fuel"],
-    [/ride|drive|flight|airport|check.?in|security|transfer|uber|\btrain\b|lounge|board|pack|\b[A-Z]{2}\d{2,4}\b/i, "travel"],
+    [/ride|drive|flight|airport|check.?in|check.?out|security|transfer|uber|taxi|\bcab\b|cabify|bolt|\bbus\b|metro|\btrain\b|lounge|board|pack|\b[A-Z]{2}\d{2,4}\b/i, "travel"],
     [/gym|sauna|\brun\b|walk|mobility|swim|workout|training|stretch/i, "body"],
     [/zouk|dance|class|social|workshop|rehearsal/i, "dance"],
     [/\bcall\b|meet|zoom|chat with/i, "call"],
@@ -3098,6 +3098,15 @@
     habit: id => { logHabit(id, true); saveG(); },
     practiceAction: id => { if (id === "nvc") { closeMorning(); openCheckin(); } },
     detail: key => { const b = blkByKey(key); return b && !b.extra ? moDetail(b) : ""; },
+    // the main page's calendar from this hour to the end of today's plan; keys[i] is the block behind data-stop i (null for open space)
+    calendar: () => {
+      if (!AGD()) return null;
+      const t = now(), stops = stopsOf(agendaBlocks(t)), a0 = +fromField(toField(t).slice(0, 2) + ":00", t);
+      const end = +dayStart(AGD().addDays(gameYmd(), 1)) + 4 * 3600000;
+      const last = stops.filter(st => !st.free && +st.s < end).reduce((m, st) => Math.max(m, +st.e), 0);
+      const z0 = Math.min(end, Math.max(a0 + 3 * 3600000, Math.ceil(last / 3600000) * 3600000));
+      return { html:calendarHTML(stops, currentOf(blocks(), t), t, { a0, z0 }), keys:stops.map(st => st.free ? null : st.blocks[0].key) };
+    },
     bind: (root, redraw) => bindDetail(root, redraw),
     begin: () => { G.day.briefDone = true; log("Planned the day"); saveG(); },
     onClose: () => render(),
@@ -3681,10 +3690,11 @@
     // a block added in Quest uses up the open space under it (Your move, 2026-10-14)
     return AGD().carveFree(AGD().applyPending(AGD().mergeAgenda(game, others), PEND, Date.now()));
   }
-  function calendarHTML(stops, cur, t){
-    const HR = 3600000, today = tzYmd(t), days = AGD() ? AGD().agendaDays(today) : [gameYmd()];
-    const a0 = +dayStart(days[0]), z0 = +dayStart(AGD() ? AGD().addDays(days[days.length - 1], 1) : days[0]) || a0 + 24 * HR;
-    CAL = { stops, a0, z0, days, today };
+  // win { a0, z0 }: just that stretch, to look at only (Plan your day shows the rest of today this way, Junyan 2026-10-16)
+  function calendarHTML(stops, cur, t, win){
+    const HR = 3600000, today = tzYmd(t), days = win ? [] : AGD() ? AGD().agendaDays(today) : [gameYmd()];
+    const a0 = win ? win.a0 : +dayStart(days[0]), z0 = win ? win.z0 : +dayStart(AGD() ? AGD().addDays(days[days.length - 1], 1) : days[0]) || a0 + 24 * HR;
+    if (!win) CAL = { stops, a0, z0, days, today };
     const y = ms => Math.round((ms - a0) / HR * CAL_PX), H = y(z0);
     let out = `<div class="cal" style="height:${H + 8}px">`;
     // each day from its own midnight (a clock change makes a day 23 or 25 hours): a day line with the date, then hour lines;
@@ -3696,6 +3706,8 @@
       for (let h = m0 + HR; h < m1 - 5 * 60000; h += HR)
         out += `<div class="cal-hr" style="top:${y(h)}px">${Math.abs(h - t) < 15 * 60000 ? "" : `<span>${fmtT(new Date(h)).replace(":00", "")}</span>`}</div>`;
     });
+    if (win) for (let h = a0 + HR; h < z0 - 5 * 60000; h += HR)
+      out += `<div class="cal-hr" style="top:${y(h)}px">${Math.abs(h - t) < 15 * 60000 ? "" : `<span>${fmtT(new Date(h)).replace(":00", "")}</span>`}</div>`;
     const ctx = dragCtx();
     // open space under 15 minutes is left off: drawn at its minimum height it spilled over the block below (Junyan, 2026-10-16)
     const ev = AGD() ? AGD().lanes(stops.map((st, i) => ({ st, i, s:Math.max(+st.s, a0), e:Math.min(+st.e, z0) })).filter(x => x.e > x.s && !(x.st.free && x.e - x.s < 15 * 60000))) : [];
@@ -3707,7 +3719,7 @@
       const ask = game && !rq && past && actRatable(b0) && t - st.e < 4 * 3600000;
       // ✓ only when it is complete: closed as done, or checked in and over (not while it is still running)
       const done = game && (!st.free && st.blocks.some(b => G.day.closes[gk(b)] === "done") || (st.lit && past));
-      const dk = st.free ? { kind:"free" } : AGD().dragKind(b0, ctx), drag = dk.kind === "cal" || dk.kind === "day";
+      const dk = st.free ? { kind:"free" } : win ? { kind:"view" } : AGD().dragKind(b0, ctx), drag = dk.kind === "cal" || dk.kind === "day";
       const tick = done ? "✓ " : "", time = `${fmtT(st.s)} to ${fmtT(st.e)}`;
       const cls = `cal-ev${st.free ? " free" : ""}${past ? " past" : ""}${isCur ? " now" : ""}${st.skipped ? " gone" : ""}${h < 36 ? " one" : ""}${drag ? " drag" : dk.kind === "lock" ? " ro" : ""}${b0.pending ? " pend" : ""}${FRESH.key && game && b0.key === FRESH.key && Date.now() - FRESH.at < 6000 ? " fresh" : ""}`;
       out += `<button class="${cls}" data-stop="${i}" style="${c ? `--c:${c};` : ""}top:${top}px;height:${h}px;left:calc(var(--cal-l) + (100% - var(--cal-l)) * ${lane} / ${n});width:calc((100% - var(--cal-l)) / ${n} - 3px)" aria-label="${esc(st.t)}, ${time}">` +

@@ -239,6 +239,9 @@
   #morning .mp-line.task span:last-child::before { content:"📝 "; }
   #morning .mp-wx { display:flex; align-items:center; gap:12px; margin-top:12px; }
   #morning .mp-wx .ic { font-size:40px; line-height:1; }
+  #morning .mp-cal { margin-top:12px; padding:6px 8px 2px; border-radius:16px; background:rgba(20,15,50,.38); }
+  #morning .mp-cal .cal-h { display:none; }
+  #morning .mp-sel { position:sticky; top:0; z-index:8; background:rgba(40,30,80,.92); backdrop-filter:blur(8px); }
   #morning .mp-busy { position:fixed; top:calc(env(safe-area-inset-top) + 20px); left:50%; transform:translateX(-50%); z-index:6; padding:6px 12px; border-radius:12px; background:rgba(0,0,0,.45); font-size:13px; }
   `;
 
@@ -266,7 +269,27 @@
   }
 
   const open = new Set();
+  /* Your schedule is the main page's calendar (Junyan, 2026-10-16: "make this the same calendar as the one on
+     the main page", so he can go through it with Caney). Tap a block for its tools above the calendar, tap
+     open space to fill it. The old list stays as the fallback when the page has no calendar. */
+  let sel = null, cal = null;
   function stepSchedule(D) {
+    cal = C.calendar ? C.calendar() : null;
+    if (!cal) return stepList(D);
+    const gaps = gapsOf(D), free = gaps.reduce((a, g) => a + g.min, 0), i = sel && D.items.find((x) => x.key === sel);
+    if (!i) sel = null;
+    let tools = "";
+    if (i) {
+      const cur = i.s <= D.now && i.e > D.now, c = Math.round((costLeft(D).find((x) => x.i.key === i.key) || { d: 0 }).d);
+      tools = `<div class="mp-it open mp-sel"><button class="mp-row" data-sel="${esc(i.key)}"><span class="mp-t">${cur ? "Now" : T(i.s)}</span>${i.badge}
+        <span class="mp-n">${esc(i.name)}<small>${span(i.s, i.e)}${c ? ` · uses ~${c} body` : ""}${i.taskId ? " · task" : ""}</small></span><span class="mo-row-go">✕</span></button>
+        <div class="mp-tools">${cur ? "" : `<button data-mv="${esc(i.key)}" data-m="-15">−15 min</button>`}<button data-mv="${esc(i.key)}" data-m="15">+15 min</button><button data-mv="${esc(i.key)}" data-m="30">+30 min</button>
+          ${i.e - i.s > 30 * MIN ? `<button data-cut="${esc(i.key)}">End 15 min sooner</button>` : ""}<button class="del" data-drop="${esc(i.key)}">Not today</button></div>${C.detail(i.key)}</div>`;
+    }
+    return `<div class="mp-h">Your schedule</div><p class="mp-lead">Tap anything to move it, cut it or drop it (today only). Tap open space to fill it. ${free ? `${hm(free)} is still free.` : "No free time left."}</p>
+      ${tools}<div class="mp-cal">${cal.html}</div>`;
+  }
+  function stepList(D) {
     const up = upcoming(D), costs = new Map(costLeft(D).map((x) => [x.i.key, Math.round(x.d)]));
     const rows = [];
     const gaps = gapsOf(D);
@@ -370,7 +393,11 @@
     on("[data-open]", (d) => { open.has(d.open) ? open.delete(d.open) : open.add(d.open); draw(true); });
     on("[data-mv]", (d) => act(() => C.move(d.mv, +d.m)));
     on("[data-cut]", (d) => { const i = D.items.find((x) => x.key === d.cut); if (i) act(() => C.setTime(i.key, i.s, new Date(+i.e - 15 * MIN))); });
-    on("[data-drop]", (d) => { open.delete(d.drop); act(() => C.drop(d.drop)); });
+    on("[data-drop]", (d) => { open.delete(d.drop); sel = null; act(() => C.drop(d.drop)); });
+    on("[data-sel]", () => { sel = null; draw(true); });
+    on("[data-stop]", (d) => { const k = cal && cal.keys[+d.stop];
+      if (!k) { D.plan.step = 3; C.save(); draw(); return; }
+      sel = sel === k ? null : k; draw(true); const t = el.querySelector(".mp-sel"); if (t) t.scrollIntoView({ behavior: "smooth", block: "nearest" }); });
     on("[data-task]", (d) => { D.plan.tasks[d.task] = D.plan.tasks[d.task] === d.v ? undefined : d.v; C.save(); draw(true); });
     on("[data-est]", (d) => { const t = D.tasks.find((x) => x.id === d.est); if (t) { t.estimate = `${d.m} min`; (D.plan.est = D.plan.est || {})[d.est] = +d.m; C.save(); } draw(true); });
     on("[data-all]", () => { showAll = !showAll; draw(true); });
@@ -407,7 +434,7 @@
     }
   }
 
-  function close() { if (el) { el.className = ""; el.innerHTML = ""; } el = null; open.clear(); showAll = false; noting = null; draft = ""; C && C.onClose && C.onClose(); }
+  function close() { if (el) { el.className = ""; el.innerHTML = ""; } el = null; open.clear(); sel = null; cal = null; showAll = false; noting = null; draft = ""; C && C.onClose && C.onClose(); }
 
   root.QuestMorning = {
     open(ctx) {
