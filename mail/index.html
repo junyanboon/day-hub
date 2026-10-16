@@ -15,7 +15,7 @@
 <!--
   Mail Router (ticket 17): Junyan's personal Gmail, one card per email, nothing moves
   until he approves. Look: Day Quest (d357, 2026-10-16), the same family as still/quest.html:
-  its day sky, frosted glass panels, Figtree, gold, mint and lavender, with the sunset
+  its day sky, deep navy glass panels (readable palette, 2026-10-16), Figtree, gold, mint and lavender, with the sunset
   gradient of the "Day Quest" skin in tickets/17-mail-router-prototype-two-looks.html on
   Approve and the logo. Data: still-api /inbox/* behind the Day Quest pairing code (same
   "quest-key" on this origin). This page is public and holds no secret. ?api= points it at
@@ -26,11 +26,14 @@
 @font-face{font-family:"Figtree";font-style:normal;font-weight:300 900;font-display:swap;src:url(../still/fonts/figtree-latin.woff2) format("woff2")}
 /* tokens: quest.html :root, plus the prototype's Day Quest skin */
 :root{
-  --ink:rgba(255,255,255,.95); --dim:rgba(255,255,255,.78); --faint:rgba(255,255,255,.58);
-  --glass:rgba(255,255,255,.12); --glass-2:rgba(255,255,255,.2); --line:rgba(255,255,255,.2); --sunk:rgba(255,255,255,.08);
-  --gold:#ffd479; --gold-soft:rgba(255,212,121,.18); --mint:#8fe3b0; --mint-soft:rgba(143,227,176,.18);
-  --warn:#ffc27a; --warn-soft:rgba(255,194,122,.18); --jev:#c9b6ff; --jev-soft:rgba(201,182,255,.18); --bad:#ff9c9c;
+  /* readable palette (ticket 17, 2026-10-16): deep navy glass instead of milky white, so white text keeps 4.5:1 on the sky */
+  --ink:#ffffff; --dim:rgba(255,255,255,.86); --faint:rgba(255,255,255,.68); --tab:rgba(255,255,255,.7);
+  --glass:rgba(9,22,50,.58); --glass-2:rgba(9,22,50,.5); --chip:rgba(9,22,50,.5); --line:rgba(255,255,255,.18); --sunk:rgba(9,22,50,.42);
+  --gold:#ffd479; --gold-ink:#2a1d4a; --gold-soft:rgba(255,212,121,.2); --mint:#9cefbf; --mint-soft:rgba(143,227,176,.2);
+  --warn:#ffcb8a; --warn-soft:rgba(255,194,122,.2); --jev:#d6c8ff; --jev-soft:rgba(201,182,255,.2); --bad:#ff9c9c;
   --sunset:linear-gradient(100deg,#f7a35c 0%,#e8618c 55%,#a45bc6 100%);
+  /* the same sunset under a plum veil, for white button text (the plain sunset's orange end is about 2:1) */
+  --sunset-deep:linear-gradient(rgba(58,14,52,.42),rgba(58,14,52,.42)),var(--sunset);
   --sky:linear-gradient(180deg,#14336a 0%,#23548d 50%,#3f76a6 100%);
   --font:"Figtree",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
   color-scheme:dark;
@@ -66,22 +69,22 @@ header{display:flex;align-items:flex-end;gap:12px;padding-block:16px 10px;flex-w
 @keyframes pulse{50%{opacity:.25}}
 .toggle{border:1px solid var(--line);background:var(--glass);border-radius:999px;padding:4px 11px;font:600 12px var(--font);color:var(--ink)}
 nav.tabs{display:flex;gap:24px;border-bottom:1px solid var(--line);overflow-x:auto}
-.tab{background:none;border:0;border-bottom:2px solid transparent;padding:10px 0 9px;font:600 12px var(--font);letter-spacing:.18em;text-transform:uppercase;color:var(--faint);white-space:nowrap}
+.tab{background:none;border:0;border-bottom:2px solid transparent;padding:10px 0 9px;font:600 12px var(--font);letter-spacing:.18em;text-transform:uppercase;color:var(--tab);white-space:nowrap}
 .tab .n{font:600 11px var(--font);margin-left:6px;letter-spacing:0}
-.tab.on{color:var(--ink);border-bottom-color:var(--gold)}
+.tab.on{color:#fff;border-bottom-color:var(--gold)}
 .tab.on .n{color:var(--gold)}
 
 /* small spaced uppercase labels, as quest.html's h2 and .eyebrow */
-.lane{font:600 11px var(--font);letter-spacing:.14em;text-transform:uppercase;color:var(--dim);margin:20px 4px 8px;display:flex;justify-content:space-between;gap:8px}
+.lane{font:600 11px var(--font);letter-spacing:.14em;text-transform:uppercase;color:#fff;text-shadow:0 1px 2px rgba(9,22,50,.45);margin:20px 4px 8px;display:flex;justify-content:space-between;gap:8px}
 /* glass panels: quest.html .card */
 .list,.tile{background:var(--glass);border:1px solid var(--line);border-radius:22px;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
 .list{overflow:hidden}
-.row{border-top:1px solid rgba(255,255,255,.12)}
+.row{border-top:1px solid rgba(255,255,255,.14)}
 .row:first-child{border-top:0}
 .row>button.head{all:unset;box-sizing:border-box;display:grid;grid-template-columns:52px 8px minmax(0,1fr) auto;gap:10px;align-items:center;padding:14px 16px;width:100%;cursor:pointer}
-.row>button.head:active{background:rgba(255,255,255,.06)}
+.row>button.head:active{background:rgba(9,22,50,.3)}
 .row>button.head:focus-visible{outline:2px solid var(--gold);outline-offset:-2px}
-.row.open{background:rgba(255,255,255,.06)}
+.row.open{background:rgba(9,22,50,.22)}
 .when{font:600 12px var(--font);color:var(--dim)}
 .dot{width:8px;height:8px;border-radius:50%;background:var(--faint)}
 .dot.people{background:var(--gold)} .dot.auto{background:var(--mint)} .dot.flag{background:var(--warn)} .dot.jev{background:var(--jev)}
@@ -93,42 +96,42 @@ nav.tabs{display:flex;gap:24px;border-bottom:1px solid var(--line);overflow-x:au
 .pill.auto{background:var(--mint-soft);color:var(--mint);border-color:transparent}
 .pill.ask{background:var(--gold-soft);color:var(--gold);border-color:transparent}
 .pill.money{background:var(--warn-soft);color:var(--warn);border-color:transparent}
-.row.done .who,.row.done .when,.row.done .dot{opacity:.5}
-.row.skipped .who .t1::after{content:" · skipped";color:var(--faint);font-weight:400;font-size:12px}
+.row.done .who,.row.done .when,.row.done .dot{opacity:.78}
+.row.skipped .who .t1::after{content:" · skipped";color:var(--dim);font-weight:400;font-size:12px}
 
 .body{padding:4px 14px 18px 84px;display:grid;gap:12px}
 @media (max-width:560px){.counter{margin-left:0;justify-items:start;text-align:left;width:100%;grid-template-columns:1fr auto;align-items:center}.body{padding-left:14px}.row>button.head{grid-template-columns:44px 8px minmax(0,1fr)}.row>button.head .pill,.row>button.head .seal{grid-column:3;justify-self:start}}
-.why{font:600 11px var(--font);letter-spacing:.14em;text-transform:uppercase;color:var(--dim);margin-bottom:-6px}
+.why{font:600 11px var(--font);letter-spacing:.14em;text-transform:uppercase;color:var(--faint);margin-bottom:-6px}
 .summary{margin:0;max-width:62ch;color:var(--dim);overflow-wrap:anywhere}
 .jevline{display:flex;gap:10px;align-items:center;flex-wrap:wrap;background:var(--jev-soft);color:var(--jev);border-radius:14px;padding:9px 13px;font:600 13px var(--font)}
 .jevline.money{background:var(--warn-soft);color:var(--warn)}
 .jevline.quiet{background:var(--sunk);color:var(--dim);font-weight:500}
-.jevline .conf{display:inline-block;width:80px;height:6px;background:rgba(0,0,0,.2);border-radius:4px;overflow:hidden;vertical-align:middle}
+.jevline .conf{display:inline-block;width:80px;height:6px;background:rgba(9,22,50,.45);border-radius:4px;overflow:hidden;vertical-align:middle}
 .jevline .conf i{display:block;height:100%;background:var(--jev);border-radius:4px}
-.mail{white-space:pre-wrap;overflow-wrap:anywhere;background:rgba(0,0,0,.18);border:1px solid var(--line);border-radius:16px;padding:12px 14px;font-size:14px;line-height:1.55;max-height:360px;overflow:auto;color:var(--ink)}
+.mail{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--sunk);border:1px solid var(--line);border-radius:16px;padding:12px 14px;font-size:14px;line-height:1.55;max-height:360px;overflow:auto;color:var(--ink)}
 .mail small{display:block;color:var(--faint);font-size:12px;margin-bottom:8px;white-space:normal}
 .btns{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
 /* buttons: quest.html .btn, with the sunset gradient on the main one */
-.btn{border:0;background:var(--glass-2);border-radius:14px;padding:11px 18px;font:600 15px/1.2 var(--font);min-height:44px;text-decoration:none;display:inline-flex;align-items:center;color:var(--ink)}
+.btn{border:1px solid var(--line);background:var(--glass-2);border-radius:14px;padding:11px 18px;font:600 15px/1.2 var(--font);min-height:44px;text-decoration:none;display:inline-flex;align-items:center;color:var(--ink)}
 .btn:active{transform:scale(.97)}
-.btn.primary{background:var(--sunset);color:#fff;font-weight:700;text-shadow:0 1px 2px rgba(80,20,60,.45);box-shadow:0 6px 18px rgba(232,97,140,.3)}
-.btn.quiet{background:transparent;border:1px solid var(--line);color:var(--dim);font-weight:500}
+.btn.primary{border:0;background:var(--sunset-deep);color:#fff;font-weight:700;text-shadow:0 1px 2px rgba(80,20,60,.45);box-shadow:0 6px 18px rgba(232,97,140,.3)}
+.btn.quiet{background:transparent;border:1px solid rgba(255,255,255,.3);color:var(--ink);font-weight:500}
 .routes{display:flex;flex-wrap:wrap;gap:6px}
-.routes button{border:1px dashed var(--line);background:transparent;border-radius:999px;padding:7px 12px;font:600 12.5px var(--font);color:var(--dim)}
-.routes button.pick{border-style:solid;border-color:#fff;background:#fff;color:#2a3d6e}
+.routes button{border:1px solid var(--line);background:var(--chip);border-radius:999px;padding:7px 12px;font:600 12.5px var(--font);color:#fff}
+.routes button.pick{border-color:var(--gold);background:var(--gold);color:var(--gold-ink);box-shadow:0 0 0 2px rgba(255,212,121,.35)}
 .routes button.jevpick{border-color:var(--jev);color:var(--jev)}
-.routes button.pick.jevpick{border-style:solid;color:#3b2f7a;background:var(--jev);border-color:var(--jev)}
-.routes button kbd{font:inherit;opacity:.55;margin-right:5px}
+.routes button.pick.jevpick{color:var(--gold-ink);background:var(--gold);border-color:var(--gold);box-shadow:0 0 0 2px var(--jev)}
+.routes button kbd{font:inherit;opacity:.78;margin-right:5px}
 /* the 10-step auto meter, mint like quest.html's done tiles */
 .meter{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--dim);flex-wrap:wrap}
 .meter .bar{display:grid;grid-template-columns:repeat(10,1fr);gap:3px;width:150px}
-.meter .bar i{height:7px;border-radius:4px;background:rgba(0,0,0,.22)}
+.meter .bar i{height:7px;border-radius:4px;background:rgba(9,22,50,.5)}
 .meter .bar i.on{background:var(--mint);box-shadow:0 0 6px rgba(143,227,176,.5)}
 /* quest.html .cal-toast */
 .toast{position:fixed;left:50%;bottom:calc(22px + env(safe-area-inset-bottom));transform:translateX(-50%);background:rgba(25,29,60,.94);color:var(--ink);border:1px solid var(--line);border-radius:14px;padding:10px 16px;font:500 13.5px var(--font);max-width:min(440px,92vw);z-index:5;display:flex;gap:12px;align-items:center;box-shadow:0 10px 30px rgba(0,0,0,.4)}
 .toast[hidden]{display:none}
 .toast.err{border-color:var(--bad);color:var(--bad)}
-.toast button{flex:none;border:0;background:rgba(255,255,255,.14);color:var(--gold);border-radius:10px;padding:5px 12px;font:600 13px var(--font)}
+.toast button{flex:none;border:0;background:rgba(255,255,255,.12);color:var(--gold);border-radius:10px;padding:5px 12px;font:600 13px var(--font)}
 .tiles{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:16px}
 .tile{padding:14px 16px;min-width:0}
 .tile b{display:block;font:800 28px/1.1 var(--font)}
@@ -139,9 +142,12 @@ nav.tabs{display:flex;gap:24px;border-bottom:1px solid var(--line);overflow-x:au
 .learned b{font-weight:600}
 .learned span{font:600 12.5px var(--font);color:var(--jev)}
 .empty{padding:16px;color:var(--dim);font-size:14px}
-.note{font-size:12.5px;color:var(--faint);margin:14px 4px 0}
+/* text that sits straight on the sky (no panel behind it) is solid white: .86 white on the lower sky is under 4:1 */
+main>.empty,.pair .summary,.note{color:#fff;text-shadow:0 1px 2px rgba(9,22,50,.45)}
+.note{font-size:12.5px;margin:14px 4px 0}
 .pair{max-width:420px;margin:40px auto;display:grid;gap:12px}
-.pair input{background:rgba(0,0,0,.25);border:1px solid var(--line);border-radius:12px;color:var(--ink);font:15px var(--font);padding:12px}
+.pair input::placeholder{color:var(--dim)}
+.pair input{background:rgba(9,22,50,.5);border:1px solid var(--line);border-radius:12px;color:var(--ink);font:15px var(--font);padding:12px}
 @media (prefers-reduced-motion:reduce){.seal.stamp,.live.busy i{animation:none}.btn:active{transform:none}}
 </style>
 </head>
