@@ -303,7 +303,7 @@
     const fg = filling != null && gaps.find((g) => +g.s === filling);
     if (!fg) filling = null;
     if (fg) tools = freeRow(fg, D, true);
-    return `<div class="mp-h">Your schedule</div><p class="mp-lead">Tap anything to move it, cut it or drop it (today only). Tap open space to fill it. ${free ? `${hm(free)} is still free.` : "No free time left."}</p>
+    return `<div class="mp-h">Your schedule</div><p class="mp-lead">Tap anything to move it, cut it or drop it (today only). Tap open space to fill it. ${free ? `${hm(free)} is still free.` : "No free time left."}${D.gymLine ? ` ${esc(D.gymLine)}.` : ""}</p>
       ${addBox(D)}${tools}<div class="mp-cal">${cal.html}</div>`;
   }
   // type to add (d3), and what the basics had to give up today
@@ -324,7 +324,7 @@
     });
     gaps.filter((g) => !g.shown).forEach((g) => rows.push(freeRow(g, D)));
     const free = gaps.reduce((a, g) => a + g.min, 0);
-    return `<div class="mp-h">Your schedule</div><p class="mp-lead">Tap anything to move it, cut it or drop it (today only). ${free ? `${hm(free)} is still free.` : "No free time left."}</p>
+    return `<div class="mp-h">Your schedule</div><p class="mp-lead">Tap anything to move it, cut it or drop it (today only). ${free ? `${hm(free)} is still free.` : "No free time left."}${D.gymLine ? ` ${esc(D.gymLine)}.` : ""}</p>
       ${addBox(D)}
       ${rows.join("") || `<div class="mp-ok">Nothing left on today's plan.</div>`}`;
   }
