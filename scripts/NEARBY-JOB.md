@@ -1,13 +1,23 @@
-# Nearby job: research the stays coming up
+# Nearby job: research the stays and the day's places coming up
 
 Junyan, 2026-10-16 (d3): the Nearby card on Day Quest should know every stay on the calendar
-without anyone typing it in ("we already have brazil trip coming up"). This job runs weekly. It
-finds the stays in the next 21 days that the card does not know yet, researches places to see and
-eat near each one, and saves them on the Still server. The card reads them from there and picks
-the stay from its check-in and check-out times (`still/quest-nearby.js`, `stayAt`).
+without anyone typing it in ("we already have brazil trip coming up"). Later that day (d4, d6, d8)
+he asked for it to run **daily**, to cover **each place of the day** too (the card's title is a
+drop-down of the day's places: the stay, then each event with an address), to have everything
+ready **before he looks** (no live asking), and to **remove** what is cancelled.
 
-The stays never go in this repo: it is public, and a stay is an address with the dates Junyan and
-Caney are there.
+Each run:
+1. finds the stays in the next 21 days and the event places in the next 3 days that the card does
+   not know yet;
+2. researches places to see and eat near each;
+3. saves them on the Still server;
+4. removes stays and event places whose calendar event is gone or has moved.
+
+The card reads them from the server, picks the stay from its check-in and check-out times
+(`still/quest-nearby.js`, `stayAt`) and lists the day's event places in its drop-down (`choices`).
+
+Nothing of this goes in this repo: it is public, and a stay or an event place is an address with
+the dates Junyan and Caney are there.
 
 Server: `https://still.srv1948070.hstgr.cloud`. Send the pairing code from the environment variable
 `QUEST_KEY` as the header `X-Quest-Key`. Never print it, log it or put it in a URL. If it is empty,
@@ -35,10 +45,33 @@ For each stay take:
 Skip a stay the card already has: same address or name as a stay in `STAYS` in
 `still/quest-nearby.js` or in `GET /quest/nearby` (its `stays` list).
 
-Two stays booked for the same nights (a backup booking) are both added; list them under
-"Overlaps" in the report so Junyan can say which one is real.
+Two stays booked for the same nights are both added (Junyan, 2026-10-16: the overlapping Rio
+bookings in February are all real for now; he cancels the extras closer to the date). List them
+under "Overlaps" in the report.
 
-## 2. Research each new stay
+## 1b. Find the event places
+
+Read the **Joint Plans** and **Junyan**
+(`c647a75387b94bd045b4e6ec216b3b42585b37c057c8ec35b54dbc9bf6230f1a@group.calendar.google.com`)
+calendars from today to today + 3 days. An event place is a timed event whose location is a real
+address or a named venue ("Be Banh Mi Es Vietnam, Calle de San Bernardo 25, Madrid"). Skip:
+- a location that is only a city or area ("Madrid", "La Pedriza");
+- the stay's own address (check-in, checkout, hotel gym, breakfast in the hotel);
+- flights, trains and rides (a location with "→", an airport or a station);
+- recurring home events (Toronto) and anything at home.
+
+For each event place take: `ev` (the event id), `title` (the event title), `loc` (its location),
+`date` (the event's day in its own time zone, `2026-10-18`), `tz`, and `lat`/`lng` from geocoding
+`loc`. `name` is the venue in a few words ("Punto Vegano", "Museo del Prado").
+
+The id is `spot:<date>:<short-kebab-name>`. Skip one already on the server with the same `ev` and
+`date` and a `loc` that has not changed.
+
+**Next to something already researched**: if the event place is within 600 m of a stay or another
+event place that has lists (same day or not), do not research it again. Save it with `same` set to
+that stay's or place's id and no lists: the card uses those lists, sorted from the event place.
+
+## 2. Research each new stay and event place
 
 Who is eating and going out:
 - Junyan: vegetarian, egg-free, garlic-light, wants real protein (tofu, legumes, tempeh, cheese).
@@ -62,7 +95,11 @@ cannot be read directly: Google numbers can come from Wanderlog, Restaurant Guru
 vegetarian places. Restaurant Guru rate-limits after a few pages, so spread the lookups. Leave out a
 place that is closed for good, only does delivery, or has no rating and is far.
 
-Times, from the stay's address:
+For an event place, research around its address the same way: Eat 5 to 7, See & do 3 to 5 (what
+is worth doing before or after that event). Mind the event's time: a lunch event wants places open
+at lunch, an evening class wants dinner after.
+
+Times, from the stay's or event place's address:
 - Geocode with Nominatim (`https://nominatim.openstreetmap.org/search?format=json&q=...`, send a
   User-Agent header, one request a second). A beach or park comes back as its middle point: use the
   nearest entrance or the nearest stretch of sand instead.
@@ -73,10 +110,10 @@ Times, from the stay's address:
   Over an hour on foot: leave `walk` out and give `car` only. The routing service ignores traffic,
   so add half again to car times in a big city (Rio, São Paulo, Madrid) and round up.
 
-## 3. Save each stay
+## 3. Save each stay and event place
 
-Send each stay on its own as `POST /quest/nearby` with the JSON body `{ "stay": { ... } }`. The
-same id replaces the earlier copy. A stay looks like this:
+Send each on its own as `POST /quest/nearby` with the JSON body `{ "stay": { ... } }` or
+`{ "spot": { ... } }`. The same id replaces the earlier copy. A stay looks like this:
 
 ```json
 { "id": "rio-flat-moderno-flamengo", "name": "Flat Moderno no Flamengo", "short": "Flamengo flat",
@@ -95,16 +132,40 @@ same id replaces the earlier copy. A stay looks like this:
 - Ids are unique within a stay; eat ids start with `e-`.
 - Plain everyday English, short sentences, no em or en dashes.
 
+An event place looks like this (with its own lists, or `same` and no lists):
+
+```json
+{ "id": "spot:2026-10-18:punto-vegano", "name": "Punto Vegano", "date": "2026-10-18",
+  "ev": "hfvuko366u5rvis0h16f34jhu8", "title": "Lunch at Punto Vegano",
+  "loc": "Calle de Luisa Fernanda 27, Madrid", "tz": "Europe/Madrid", "lat": 40.4281, "lng": -3.7149,
+  "places": [ ... ], "eat": [ ... ] }
+{ "id": "spot:2026-10-17:museo-cerralbo", "name": "Museo Cerralbo", "date": "2026-10-17", "ev": "...",
+  "loc": "Calle de Ventura Rodríguez 17, Madrid", "tz": "Europe/Madrid", "lat": 40.4237, "lng": -3.7145,
+  "same": "madrid-marriott-princesa-plaza" }
+```
+
 Before sending, check each stay in Python: `in` is before `out`, both look like `2027-01-03T15:00`,
 every place has `id`, `name`, `what`, `lat`, `lng` and at least one of `walk`, `transit` or `car`.
 A 400 answer says what is wrong; fix it and send again.
 
-## 4. Check
+## 4. Remove what is gone (d6)
 
-`GET /quest/nearby` and confirm each stay you sent is there with its places. Change nothing in the
-repo, and never commit or push.
+For every stay and event place on the server (`GET /quest/nearby`) whose dates are still ahead or
+today, look for its calendar event again. Remove it when:
+- a stay: no all-day event at that address covers its dates any more (the booking was cancelled);
+- an event place: the event `ev` is gone or cancelled, or its date or location changed (then
+  research the new one in the same run).
+
+Send one `POST /quest/nearby` with `{ "remove": { "stays": [ids], "spots": [ids] } }`. Never remove
+the hand-made stays in `still/quest-nearby.js` (they are not on the server). Past ones drop off the
+server on their own.
+
+## 4b. Check
+
+`GET /quest/nearby` and confirm each one you sent is there with its places and each one you removed
+is gone. Change nothing in the repo, and never commit or push.
 
 ## 5. Report
 
-A few plain lines: stays added (name, dates, how many places), stays skipped and why, overlaps,
-and anything that could not be checked.
+A few plain lines: stays and event places added (name, dates, how many places, or "same as"),
+skipped and why, removed and why, overlaps, and anything that could not be checked.
