@@ -128,9 +128,9 @@
   }
   const title = stay => stay ? `Nearby · ${stay.short || stay.name}` : "Nearby";
 
-  /* Near me (Junyan, 2026-10-16, d2: "yes"): times from where the phone is, not from the stay. Straight-line distance
-     times 1.3 for the streets, walked at 80 m a minute; past a 25 min walk, a ride at about 300 m a minute plus 3 to
-     get going. Estimates, so the chip says "~". The position lives in the page only, never saved or sent. */
+  /* Distances. Straight-line distance times 1.3 for the streets, walked at 80 m a minute; past a 25 min walk, a
+     ride at about 300 m a minute plus 3 to get going. Estimates, so the chip says "~". Used from the phone's position
+     (read quietly when the page already may, kept in the page only, never saved or sent) and from a picked place. */
   const rad = d => d * Math.PI / 180;
   function metres(a, b){
     const dLa = rad(b.lat - a.lat), dLn = rad(b.lng - a.lng);
@@ -142,13 +142,58 @@
     const m = metres(here, p), walk = Math.max(1, Math.round(m * 1.3 / 80));
     return { m, walk, car: walk > WALK_MAX ? Math.round(m * 1.3 / 300) + 3 : null };
   }
-  // nearest first when he is using Near me; a place with no position keeps its place, after the others
+  /* Always nearest first (d7, 2026-10-16: "it should just be ordered by distance automatically"): from the point
+     when there is one, else by the stay's own travel minutes. A place with no position goes last, in its order. */
   function ordered(list, here){
-    if (!here) return list;
-    const d = p => { const f = fromHere(p, here); return f ? f.m : Infinity; };
-    return list.map((p, i) => ({ p, i, d:d(p) })).sort((a, b) => a.d - b.d || a.i - b.i).map(x => x.p);
+    const d = here ? (p => { const f = fromHere(p, here); return f ? f.m : Infinity; })
+      : (p => { const c = chips(p)[0]; return c ? c.min : Infinity; });
+    return (list || []).map((p, i) => ({ p, i, d:d(p) })).sort((a, b) => a.d - b.d || a.i - b.i).map(x => x.p);
   }
-  const canNear = stay => [].concat((stay && stay.places) || [], (stay && stay.eat) || []).some(p => p.lat != null);
+  // the phone counts only when it is near the lists (within 15 km of a place), not from home or the airport
+  const phoneNear = (list, here) => !!here && (list || []).some(p => p.lat != null && metres(here, p) < 15000);
+
+  /* The day's places (d8, 2026-10-16: "a drop down tab where marriott princesa plaza is so I can choose the
+     locations of that specific day"): the stay, then each of today's calendar events the daily Nearby job
+     researched ahead (a spot: the event's address, with places to see and eat near it, kept on the Still server).
+     A spot with `same` sits next to a stay or another spot and borrows its lists, sorted from the spot. */
+  const SPOTS = [];
+  function addSpots(list, spots){
+    const S = spots || SPOTS; let n = 0;
+    for (const x of list || []) {
+      if (!x || !x.id || !x.name || !x.date || x.lat == null || x.lng == null || S.some(s => s.id === x.id)) continue;
+      S.push(x); n++;
+    }
+    return n;
+  }
+  const dayOf = (at, tz) => wall(at, tz).slice(0, 10);
+  function choices(stay, at, spots){
+    const out = stay ? [{ id:"stay", label:stay.short || stay.name }] : [];
+    for (const s of spots || SPOTS) if (s.date === dayOf(at, s.tz) && !out.some(o => o.id === s.id)) out.push({ id:s.id, label:s.name, ev:s.ev || "" });
+    return out;
+  }
+  // what the card shows for a pick: its lists, where times are measured from, and where Directions start
+  function view(stay, pick, at, spots, stays){
+    const S = spots || SPOTS, ch = choices(stay, at, S), id = ch.some(c => c.id === pick) ? pick : (ch[0] || {}).id;
+    const sp = id && id !== "stay" ? S.find(s => s.id === id) : null;
+    if (!sp) return stay ? { key:stay.id, label:stay.short || stay.name, places:stay.places || [], eat:stay.eat || [], tz:stay.tz,
+      from:null, origin:stay.origin || stay.name } : null;
+    const src = sp.same ? ((stays || STAYS).find(x => x.id === sp.same) || S.find(x => x.id === sp.same) || null) : sp;
+    if (!src) return null;
+    return { key:sp.id, label:sp.name, places:src.places || [], eat:src.eat || [], tz:sp.tz || src.tz || (stay && stay.tz),
+      from:{ lat:sp.lat, lng:sp.lng }, origin:sp.loc || sp.name };
+  }
+  /* The title: "Nearby · <the place>", a drop-down when the day has more than one place. when(ev) gives an event's
+     time ("2:30 PM") so each event place says when they are there. */
+  function picker(stay, st, at, spots, when){
+    const ch = choices(stay, at, spots), v = view(stay, st && st.pick, at, spots);
+    if (!v) return "Nearby";
+    if (ch.length < 2) return `Nearby · ${esc(v.label)}`;
+    const cur = v.key === (stay && stay.id) ? "stay" : v.key;
+    return `Nearby · <select class="nb-pick" data-nbpick aria-label="Choose a place of the day">${ch.map(c => {
+      const t = c.ev && when ? when(c.ev) : "";
+      return `<option value="${esc(c.id)}"${c.id === cur ? " selected" : ""}>${esc(c.label)}${t ? ` · ${esc(t)}` : ""}</option>`;
+    }).join("")}</select>`;
+  }
 
   /* The travel-time chips for one place, quickest sensible first: walking when it is 25 min or less (0 is the
      hotel itself); else the quicker of transit and car, then the walk. */
@@ -166,10 +211,11 @@
     if (p.walk != null && (p.walk <= WALK_MAX || !rides.length)) return [c("walking", p.walk)];
     return p.walk != null ? [rides[0], c("walking", p.walk)] : rides.slice(0, 1);
   }
-  // from the stay's door; with Near me on, no origin, so Maps starts from where the phone is
+  /* From the stay's door or the picked place; from the phone (a point marked phone), no origin, so Maps starts from
+     where the phone is. */
   function directionsUrl(stay, p, here){
-    const mode = (chips(p, here)[0] || {}).mode || "walking";
-    return "https://www.google.com/maps/dir/?api=1" + (fromHere(p, here) ? "" : "&origin=" + encodeURIComponent(stay.origin || stay.name)) +
+    const mode = (chips(p, here)[0] || {}).mode || "walking", phone = here && here.phone && fromHere(p, here);
+    return "https://www.google.com/maps/dir/?api=1" + (phone ? "" : "&origin=" + encodeURIComponent(stay.origin || stay.name)) +
       "&destination=" + encodeURIComponent(p.q || p.name) + "&travelmode=" + mode;
   }
   const minFor = p => (p && p.min > 0 ? p.min : 60);
@@ -204,21 +250,21 @@
     return meal ? "eat" : "see";
   }
 
-  /* The widget's inside. st: { tab, open:{ id:true }, msg:{ id:text } }. Empty when the stay has no list.
-     Two tabs (See & do, Eat) when the stay has both lists; a food row shows who it suits under its name. */
-  function html(stay, st, at){
-    const tabs = tabsOf(stay); if (!tabs.length) return "";
+  /* The widget's inside. st: { tab, pick, here, open:{ id:true }, msg:{ id:text } }. Empty when there is no list.
+     Two tabs (See & do, Eat) when the place has both lists; a food row shows who it suits under its name. Rows are
+     nearest first: from the picked event place, else from the phone when it is near, else by the stay's minutes. */
+  function html(stay, st, at, spots){
+    const v = view(stay, st && st.pick, at, spots), tabs = tabsOf(v); if (!v || !tabs.length) return "";
     const open = (st && st.open) || {}, msg = (st && st.msg) || {};
-    const tab = tabs.some(t => t.id === (st && st.tab)) ? st.tab : defaultTab(stay, at);
-    const here = (st && st.here) || null, near = canNear(stay);
-    const tabBtns = tabs.length < 2 ? "" : `<div class="nb-tabs" role="tablist">${tabs.map(t =>
-      `<button class="nb-tab${t.id === tab ? " on" : ""}" role="tab" aria-selected="${t.id === tab}" data-nbtab="${t.id}">${esc(t.label)}</button>`).join("")}</div>`;
-    const nearBtn = near ? `<button class="nb-near${here ? " on" : ""}" data-nbnear aria-pressed="${!!here}">${st && st.locating ? "📍 Finding you…" : "📍 Near me"}</button>` : "";
-    const bar = tabBtns || nearBtn ? `<div class="nb-bar">${tabBtns}${nearBtn}</div>` : "";
-    const note = st && st.nearMsg ? `<div class="nb-from">${esc(st.nearMsg)}</div>`
-      : here ? `<div class="nb-from">Rough times from where you are. Tap Near me again for ${esc(stay.kind || "hotel")} times.</div>` : "";
-    return bar + note + ordered(listOf(stay, tab), here).map(p => {
-      const on = !!open[p.id], cs = chips(p, here);
+    const tab = tabs.some(t => t.id === (st && st.tab)) ? st.tab : defaultTab(v, at);
+    const list = listOf(v, tab), phone = st && st.here ? { ...st.here, phone:true } : null;
+    const pt = v.from || (phoneNear(list, phone) ? phone : null);
+    const bar = tabs.length < 2 ? "" : `<div class="nb-bar"><div class="nb-tabs" role="tablist">${tabs.map(t =>
+      `<button class="nb-tab${t.id === tab ? " on" : ""}" role="tab" aria-selected="${t.id === tab}" data-nbtab="${t.id}">${esc(t.label)}</button>`).join("")}</div></div>`;
+    const note = v.from ? `<div class="nb-from">Rough times from ${esc(v.label)}.</div>`
+      : pt ? `<div class="nb-from">Rough times from where you are.</div>` : "";
+    return bar + note + ordered(list, pt).map(p => {
+      const on = !!open[p.id], cs = chips(p, pt);
       const chip = cs.map(c => `<span class="nb-chip">${c.icon} ${esc(c.label)}</span>`).join("");
       const name = p.fits ? `<span class="nb-nm"><span class="nb-n">${esc(p.name)}</span><span class="nb-fit">${esc(p.fits)}</span></span>`
         : `<span class="nb-n">${esc(p.name)}</span>`;
@@ -226,7 +272,7 @@
           ${p.photo ? `<img class="nb-photo" src="${esc(p.photo)}" alt="${esc(p.name)}" loading="lazy">` : ""}
           <div class="nb-what">${esc(p.what)}</div>${p.hint ? `<div class="nb-hint">${esc(p.hint)}</div>` : ""}
           ${p.rating ? `<div class="nb-rate">⭐ ${esc(p.rating)}</div>` : ""}
-          <div class="nb-acts">${p.walk === 0 ? "" : `<a class="nb-btn" href="${esc(directionsUrl(stay, p, here))}" target="_blank" rel="noopener">Directions</a>`}
+          <div class="nb-acts">${p.walk === 0 && !v.from ? "" : `<a class="nb-btn" href="${esc(directionsUrl(v, p, pt))}" target="_blank" rel="noopener">Directions</a>`}
           <button class="nb-btn" data-nbplan="${esc(p.id)}">Put on the plan</button></div>
           ${msg[p.id] ? `<div class="nb-msg">${esc(msg[p.id])}</div>` : ""}</div>` : "";
       return `<div class="nb-row${on ? " open" : ""}"><button class="nb-head" data-nb="${esc(p.id)}" aria-expanded="${on}">
@@ -251,8 +297,10 @@
     #nearby .nb-msg { margin-top:6px; color:var(--good); }
     #nearby .nb-bar { display:flex; gap:6px; align-items:center; margin:0 0 6px; }
     #nearby .nb-tabs { flex:1; display:flex; gap:4px; padding:3px; background:rgba(255,255,255,.08); border-radius:999px; }
-    #nearby .nb-near { flex:none; margin-left:auto; font-size:12px; font-weight:600; color:var(--ink-soft); background:rgba(255,255,255,.08); border-radius:999px; padding:9px 10px; white-space:nowrap; }
-    #nearby .nb-near.on { color:var(--ink); background:rgba(255,255,255,.22); }
+    #nearbyH .nb-pick { font:inherit; letter-spacing:inherit; text-transform:inherit; color:inherit; max-width:min(70vw, 340px);
+      background:rgba(255,255,255,.12) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23fff' stroke-width='1.6' fill='none'/%3E%3C/svg%3E") no-repeat right 8px center;
+      border:0; border-radius:8px; padding:3px 24px 3px 8px; -webkit-appearance:none; appearance:none; text-overflow:ellipsis; cursor:pointer; }
+    #nearbyH .nb-pick option { color:#111; text-transform:none; letter-spacing:normal; }
     #nearby .nb-from { font-size:12px; color:var(--ink-faint); margin:0 4px 4px; }
     #nearby .nb-tab { flex:1; font-size:13px; font-weight:600; color:var(--ink-soft); background:none; border-radius:999px; padding:6px 10px; white-space:nowrap; }
     #nearby .nb-tab.on { color:var(--ink); background:rgba(255,255,255,.2); }
@@ -265,5 +313,5 @@
     const s = doc.createElement("style"); s.id = "nb-css"; s.textContent = CSS; doc.head.appendChild(s);
   }
 
-  root.QuestNearby = { STAYS, TABS, addStays, metres, fromHere, ordered, canNear, stayFor, stayAt, wall, defaultTab, tabsOf, find, title, chips, directionsUrl, minFor, slotFor, isGymPlace, gymEvent, html, addCss, hm };
+  root.QuestNearby = { STAYS, SPOTS, TABS, addStays, addSpots, choices, view, picker, phoneNear, metres, fromHere, ordered, stayFor, stayAt, wall, defaultTab, tabsOf, find, title, chips, directionsUrl, minFor, slotFor, isGymPlace, gymEvent, html, addCss, hm };
 })(typeof window !== "undefined" ? window : globalThis);
