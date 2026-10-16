@@ -34,6 +34,7 @@
     habits: { x: 9, y: 1, w: 3, h: 10 },
     skills: { x: 9, y: 11, w: 3, h: 5 },
     log: { x: 4, y: 16, w: 5, h: 4 },
+    "w-nearby": { x: 9, y: 16, w: 3, h: 6 },   // Nearby (2026-10-16), only while the stay has a list
   };
   const load = (tag, attrs) => new Promise((ok, fail) => {
     const el = document.createElement(tag);
@@ -130,8 +131,23 @@
     const fit = () => Math.max(36, Math.floor((window.innerHeight - 24) / ROWS));
     const gs = window.GridStack.init({ column: 12, cellHeight: fit(), margin: 6, handle: ".w-head", float: false, animate: true,
       resizable: { handles: "e,se,s,sw,w" } }, grid);
+    // a part marked data-dash-optional (Nearby) leaves the grid while it is hidden and comes back where it was
+    const parked = document.createElement("div"); parked.hidden = true; document.body.appendChild(parked);
+    const sync = () => {
+      grid.querySelectorAll(".grid-stack-item").forEach((item) => {
+        const body = item.querySelector("[data-dash-optional]");
+        if (body && body.hidden) { gs.removeWidget(item, false); parked.appendChild(item); }
+      });
+      parked.querySelectorAll(":scope > .grid-stack-item").forEach((item) => {
+        if (item.querySelector("[data-dash-optional]").hidden) return;
+        const id = item.getAttribute("gs-id"), pos = saved()[id] || DEFAULT[id] || {};
+        grid.appendChild(item); gs.makeWidget(item, pos);
+      });
+    };
+    window.QuestDash = { sync };
+    sync();
     gs.on("change", () => {
-      const out = {};
+      const out = saved();   // keep the place of a part that is out of the grid right now
       for (const n of gs.save(false)) out[n.id] = { x: n.x, y: n.y, w: n.w, h: n.h };
       try { localStorage.setItem(KEY, JSON.stringify(out)); } catch {}
     });

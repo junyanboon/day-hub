@@ -409,6 +409,7 @@
   @keyframes pulse { 50% { box-shadow:0 0 0 10px rgba(255,255,255,.08), 0 0 30px rgba(255,255,255,.6); } }
 
   .log { font-size:13px; color:var(--ink-soft); }
+  #nearbyH[hidden], #nearby[hidden] { display:none; }
   .log div { padding:6px 4px; border-bottom:1px solid rgba(255,255,255,.08); display:flex; gap:8px; }
   .log div span:first-child { color:var(--ink-faint); flex:none; width:58px; font-variant-numeric:tabular-nums; }
   .log div span.xp { margin-left:auto; color:var(--gold); flex:none; }
@@ -629,6 +630,7 @@
 <script src="quest-basics.js?v=20261016d"></script>
 <script src="quest-morning.js?v=20261016c"></script>
 <script src="quest-agenda.js?v=20261014c"></script>
+<script src="quest-nearby.js?v=20261016b"></script>
 </head>
 <body>
 <div id="sky" aria-hidden="true"><div class="sky-stars"></div><div class="sky-orb"></div>
@@ -655,6 +657,9 @@
 
   <h2><span>Skills</span><button class="add-btn" id="skillsBtn">Open</button></h2>
   <div id="skillsRow"></div>
+
+  <h2 id="nearbyH" hidden><span id="nearbyT">Nearby</span></h2>
+  <div id="nearby" data-dash-optional hidden></div>
 
   <h2><span>Quest log</span><span id="dayXp"></span></h2>
   <div class="log" id="log"></div>
@@ -3158,6 +3163,51 @@
     $("bEdit").onclick = () => openEdit(b);
   }
 
+  /* ---------- Nearby (Junyan, 2026-10-16) ----------
+     Places near the stay, each row shut until tapped (quest-nearby.js holds the lists, one per hotel). The stay
+     comes from still-api's place line (where.from.place is the hotel's check-in event), then today's hotel events.
+     No list for the stay: the widget is hidden (on the dashboard its card leaves the grid). Put on the plan is
+     a today-only block in the next free slot that fits, like the add box. Open rows are kept for this page only. */
+  function nearbyStay(){
+    const QN = window.QuestNearby; if (!QN || !PLAN) return null;
+    const w = PLAN.where || {}, hotel = /check.?(in|out)\b|\b(hotel|hostel|airbnb|resort)\b/i;
+    const ev = blocks().concat(AG[gameYmd()] || []).map(b => b.t).filter(t => hotel.test(t || ""));
+    return QN.stayFor([w.from && w.from.place, w.place].concat(ev));
+  }
+  function drawNearby(){
+    const QN = window.QuestNearby, el = $("nearby"), h = $("nearbyH"); if (!el || !h) return;
+    const st = drawNearby.st || (drawNearby.st = { open:{}, msg:{} }), stay = nearbyStay(), inner = QN ? QN.html(stay, st) : "";
+    if (h.hidden !== !inner || el.hidden !== !inner) { h.hidden = el.hidden = !inner; if (window.QuestDash) QuestDash.sync(); }
+    if (!inner) return;
+    QN.addCss(document);
+    $("nearbyT").textContent = QN.title(stay);
+    put("nearby", inner);
+    el.onclick = e => {
+      const pl = e.target.closest("[data-nbplan]"); if (pl) return nearbyPlan(stay, pl.dataset.nbplan);
+      const hd = e.target.closest("[data-nb]"); if (hd) { st.open[hd.dataset.nb] = !st.open[hd.dataset.nb]; drawNearby(); }
+    };
+  }
+  async function nearbyPlan(stay, id){
+    const QN = window.QuestNearby, st = drawNearby.st, p = stay && stay.places.find(x => x.id === id);
+    if (!QN || !p || !window.QuestMorning || nearbyPlan.busy) return;
+    nearbyPlan.busy = true;   // a quick double tap: one write at a time
+    try { await nearbyPut(QN, st, p, id); } finally { nearbyPlan.busy = false; }
+  }
+  async function nearbyPut(QN, st, p, id){
+    const there = blocks().find(b => b.nearby === id && b.e > now());   // a second tap does not add a second block
+    if (there) { st.msg[id] = `Already on the plan at ${fmtT(there.s)}.`; return drawNearby(); }
+    const min = QN.minFor(p), slot = QN.slotFor(QuestMorning.gapsOf(MO_CTX.data()), min);
+    if (!slot) { st.msg[id] = `No free slot of ${QN.hm(min)} left today.`; return drawNearby(); }
+    let twice = null;   // checked again against the edit layer writeOps pulls, so another device's add counts too
+    await writeOps(o => {
+      twice = o.adds.find(a => a.nearby === id && Date.parse(a.e) > +now());
+      if (!twice) o.adds.push({ key:newKey(slot.s), s:slot.s.toISOString(), e:slot.e.toISOString(), t:p.name, type:"task", cal:"you", nearby:p.id });
+    });
+    if (twice) st.msg[id] = `Already on the plan at ${fmtT(new Date(twice.s))}.`;
+    else { st.msg[id] = `On the plan at ${fmtT(slot.s)}, ${QN.hm(min)}.`; log(`Planned ${p.name}: ${fmtT(slot.s)} to ${fmtT(slot.e)}`); saveG(); }
+    drawNearby();
+  }
+
   const blkByKey = key => blocks().find(x => x.key === key);
   const MO_CTX = {
     data: () => {
@@ -4197,6 +4247,7 @@
     $("skillsRow").querySelectorAll("[data-sk]").forEach(b => b.onclick = () => b.dataset.sk ? openSkill(b.dataset.sk) : openSkills());
     $("skillsRow").querySelectorAll("[data-sknext]").forEach(b => b.onclick = () => doNext(b.dataset.sknext));
     practiceDay();
+    drawNearby();
     on("bGym", () => openGym(cur));
     $("main").querySelectorAll("[data-rhabit]").forEach(bn => bn.onclick = () => { logHabit(bn.dataset.rhabit, true); saveG(); render(); });
     $("main").querySelectorAll("[data-side]").forEach(bn => bn.onclick = () => takeSide(bn.dataset.side));
@@ -4280,6 +4331,6 @@
   pullAll();
 })();
 </script>
-<script src="quest-dash.js?v=20261010d"></script>
+<script src="quest-dash.js?v=20261016a"></script>
 </body>
 </html>
