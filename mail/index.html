@@ -1,0 +1,385 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Mail Router">
+<meta name="theme-color" content="#121212">
+<meta name="robots" content="noindex">
+<title>Mail Router</title>
+<link rel="manifest" href="mail.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700&family=Zen+Old+Mincho:wght@500;700;900&display=swap">
+<!--
+  Mail Router (ticket 17): Junyan's personal Gmail, one card per email, nothing moves
+  until he approves. Look: the Sumi-e prototype (tickets/17-mail-router-prototype-sumie.html).
+  Data: still-api /inbox/* behind the Day Quest pairing code (same "quest-key" on this origin).
+  This page is public and holds no secret. ?api= points it at another server (local preview).
+-->
+<style>
+:root{
+  --bg:#121212; --panel:#191918; --sunk:#151514; --line:#2b2a27; --ink:#ece6d8; --dim:#a39d90; --faint:#6f6b62;
+  --accent:#ece6d8; --accent-ink:#121212; --accent-soft:#262521;
+  --seal:#d2452f; --go:#9bb08a; --go-soft:#232b1e; --warn:#d8a96a; --warn-soft:#33291b; --jev:#9fb3c4; --jev-soft:#1d252c; --bubble:#22211f;
+  --disp:"Zen Old Mincho","Hiragino Mincho ProN",Georgia,serif; --body:"Zen Kaku Gothic New","Hiragino Sans",ui-sans-serif,system-ui,sans-serif; --mono:"Zen Kaku Gothic New",ui-sans-serif,system-ui,sans-serif;
+  --track:.04em; --radius:2px; color-scheme:dark;
+}
+*{box-sizing:border-box}
+html{background:var(--bg)}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.65 var(--body);padding:env(safe-area-inset-top) 16px 64px}
+.wrap{max-width:860px;margin:0 auto}
+button{font:inherit;cursor:pointer;color:inherit}
+button:disabled{cursor:not-allowed;opacity:.45}
+button:focus-visible,textarea:focus-visible,input:focus-visible,a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+a{color:inherit}
+h1,h2,h3{margin:0;text-wrap:balance}
+.seal{width:36px;height:36px;border:2px solid var(--seal);color:var(--seal);border-radius:50%;display:grid;place-items:center;font:700 17px/1 var(--body);transform:rotate(-10deg);opacity:.9;flex:none}
+.seal.stamp{animation:stamp .35s ease-out}
+@keyframes stamp{from{transform:rotate(-10deg) scale(1.8);opacity:0}to{transform:rotate(-10deg) scale(1);opacity:.9}}
+.logo{width:40px;height:40px;background:var(--seal);color:#fff;display:grid;place-items:center;font:700 20px/1 var(--body);border-radius:3px;flex:none}
+
+header{display:flex;align-items:flex-end;gap:12px;padding-block:16px 10px;flex-wrap:wrap}
+.brand{font:500 10px var(--mono);letter-spacing:.2em;text-transform:uppercase;color:var(--dim)}
+.name{font:700 28px/1.1 var(--disp);letter-spacing:.01em}
+.counter{margin-left:auto;font-size:13px;color:var(--dim);text-align:right;display:grid;gap:4px;justify-items:end}
+.counter b{color:var(--ink)}
+.live{display:inline-flex;align-items:center;gap:6px;font:500 11px var(--mono);color:var(--dim)}
+.live i{width:7px;height:7px;border-radius:50%;background:var(--go);display:inline-block}
+.live.bad i{background:var(--warn)} .live.bad{color:var(--warn)}
+.live.busy i{animation:pulse 1.2s infinite}
+@keyframes pulse{50%{opacity:.25}}
+.toggle{border:1px solid var(--line);background:transparent;border-radius:4px;padding:3px 8px;font:500 11px var(--mono);color:var(--dim)}
+nav.tabs{display:flex;gap:22px;border-bottom:1px solid var(--line);overflow-x:auto}
+.tab{background:none;border:0;border-bottom:2px solid transparent;padding:10px 0 9px;font:500 14px var(--body);letter-spacing:var(--track);color:var(--faint);white-space:nowrap}
+.tab .n{font:400 11px var(--mono);margin-left:6px;letter-spacing:0}
+.tab.on{color:var(--ink);border-bottom-color:var(--seal)}
+
+.lane{font:500 10px var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--faint);margin:18px 0 8px;display:flex;justify-content:space-between;gap:8px}
+.list{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden}
+.row{border-top:1px solid var(--line)}
+.row:first-child{border-top:0}
+.row>button.head{all:unset;box-sizing:border-box;display:grid;grid-template-columns:52px 8px minmax(0,1fr) auto;gap:10px;align-items:center;padding:14px 16px;width:100%;cursor:pointer}
+.row>button.head:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.when{font:500 12px var(--mono);color:var(--dim);font-variant-numeric:tabular-nums}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--faint)}
+.dot.people{background:var(--accent)} .dot.auto{background:var(--go)} .dot.flag{background:var(--warn)} .dot.jev{background:var(--jev)}
+.who{min-width:0}
+.who .t1{font-weight:500;font-size:15px;display:block;overflow-wrap:anywhere}
+.who .t2{font-size:13px;color:var(--dim);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}
+.pill{font:500 11px/1 var(--mono);padding:6px 9px;border-radius:3px;white-space:nowrap;background:var(--sunk);color:var(--dim);border:1px solid var(--line)}
+.pill.jev{background:var(--jev-soft);color:var(--jev);border-color:transparent}
+.pill.auto{background:var(--go-soft);color:var(--go);border-color:transparent}
+.pill.ask{background:var(--accent-soft);color:var(--accent);border-color:transparent}
+.pill.money{background:var(--warn-soft);color:var(--warn);border-color:transparent}
+.row.done{opacity:.55}.row.done .seal{opacity:1}
+.row.skipped .who .t1::after{content:" · skipped";color:var(--faint);font-weight:400;font-size:12px}
+
+.body{padding:4px 14px 16px 84px;display:grid;gap:12px}
+@media (max-width:560px){.body{padding-left:14px}.row>button.head{grid-template-columns:44px 8px minmax(0,1fr)}.row>button.head .pill,.row>button.head .seal{grid-column:3;justify-self:start}}
+.why{font:500 10px var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--faint);margin-bottom:-6px}
+.summary{margin:0;max-width:62ch;color:var(--dim);overflow-wrap:anywhere}
+.jevline{display:flex;gap:10px;align-items:center;flex-wrap:wrap;background:var(--jev-soft);color:var(--jev);border-radius:4px;padding:8px 12px;font:500 12.5px var(--mono)}
+.jevline.money{background:var(--warn-soft);color:var(--warn)}
+.jevline.quiet{background:var(--sunk);color:var(--dim)}
+.jevline .conf{display:inline-block;width:80px;height:5px;background:var(--line);border-radius:3px;overflow:hidden;vertical-align:middle}
+.jevline .conf i{display:block;height:100%;background:var(--jev)}
+.mail{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--sunk);border:1px solid var(--line);border-radius:4px;padding:12px 14px;font-size:14px;line-height:1.55;max-height:360px;overflow:auto;color:var(--ink)}
+.mail small{display:block;color:var(--faint);font-size:12px;margin-bottom:8px;white-space:normal}
+.btns{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.btn{border:1px solid var(--line);background:var(--panel);border-radius:var(--radius);padding:9px 16px;font:500 14px var(--body);letter-spacing:var(--track);min-height:42px;text-decoration:none;display:inline-flex;align-items:center}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.quiet{border-color:transparent;background:transparent;color:var(--dim)}
+.routes{display:flex;flex-wrap:wrap;gap:6px}
+.routes button{border:1px dashed var(--line);background:transparent;border-radius:3px;padding:6px 10px;font:500 12px var(--mono);color:var(--dim)}
+.routes button.pick{border-style:solid;border-color:var(--ink);color:var(--ink)}
+.routes button.jevpick{border-color:var(--jev);color:var(--jev)}
+.routes button.pick.jevpick{border-style:solid}
+.routes button kbd{font:inherit;color:var(--faint);margin-right:5px}
+.meter{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--dim);flex-wrap:wrap}
+.meter .bar{display:grid;grid-template-columns:repeat(10,1fr);gap:3px;width:150px}
+.meter .bar i{height:6px;border-radius:1px;background:var(--line)}
+.meter .bar i.on{background:var(--go)}
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom));transform:translateX(-50%);background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:4px;padding:10px 14px;font:500 13px var(--mono);max-width:calc(100% - 32px);z-index:5;display:flex;gap:12px;align-items:center}
+.toast[hidden]{display:none}
+.toast.err{border-color:var(--warn);color:var(--warn)}
+.toast button{border:1px solid var(--seal);background:transparent;color:var(--seal);border-radius:3px;padding:4px 10px;font:500 12px var(--mono)}
+.tiles{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:16px}
+.tile{background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:12px 14px;min-width:0}
+.tile b{display:block;font:800 26px/1.1 var(--mono);font-variant-numeric:tabular-nums}
+.tile span{font-size:12.5px;color:var(--dim)}
+.learned div{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;padding:9px 14px;border-top:1px solid var(--line);font-size:14px}
+.learned div:first-child{border-top:0}
+.learned span{font:500 12px var(--mono);color:var(--jev)}
+.empty{padding:16px;color:var(--dim);font-size:14px}
+.note{font-size:12.5px;color:var(--faint);margin:14px 0 0}
+.pair{max-width:420px;margin:40px auto;display:grid;gap:12px}
+.pair input{background:var(--sunk);border:1px solid var(--line);border-radius:4px;color:var(--ink);font:15px var(--body);padding:10px 12px}
+@media (prefers-reduced-motion:reduce){.seal.stamp,.live.busy i{animation:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div style="display:flex;gap:12px;align-items:center"><span class="logo" aria-hidden="true">✓</span><div><div class="brand">junyan.boon@gmail.com</div><h1 class="name">Mail Router</h1></div></div>
+    <div class="counter">
+      <span><span class="live" id="live"><i></i><span id="liveText">Not checked yet</span></span> <button class="toggle" type="button" id="refresh">Check now</button></span>
+      <span><b id="leftCount">0</b> waiting on you</span>
+    </div>
+  </header>
+  <nav class="tabs" role="tablist" aria-label="Sections">
+    <button class="tab on" role="tab" aria-selected="true" data-tab="sort">Sort<span class="n" id="nSort"></span></button>
+    <button class="tab" role="tab" aria-selected="false" data-tab="messages">Messages<span class="n" id="nMessages"></span></button>
+    <button class="tab" role="tab" aria-selected="false" data-tab="report">Report<span class="n" id="nReport"></span></button>
+  </nav>
+  <main id="view"></main>
+</div>
+<div class="toast" id="toast" role="status" hidden></div>
+
+<script>
+(() => {
+  const qs = new URLSearchParams(location.search);
+  const API = qs.get("api") || "https://still.srv1948070.hstgr.cloud";
+  const store = { get(k){ try { return localStorage.getItem(k); } catch { return null; } },
+                  set(k, v){ try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch {} } };
+  // same pairing as Day Quest: one code per device, kept on this origin ("quest-key"); #pair=CODE pairs in one tap
+  const hashPair = /[#&]pair=([^&]+)/.exec(location.hash);
+  if (hashPair) { store.set("quest-key", decodeURIComponent(hashPair[1]).trim()); history.replaceState(null, "", location.pathname + location.search); }
+  const key = () => store.get("quest-key") || "";
+  async function api(path, opts = {}){
+    const r = await fetch(API + path, { ...opts, cache:"no-store",
+      headers:{ "Content-Type":"application/json", "X-Quest-Key":key(), ...(opts.headers || {}) } });
+    const body = await r.json().catch(() => ({}));
+    if (!r.ok) { const e = new Error(body.error || "HTTP " + r.status); e.status = r.status; throw e; }
+    return body;
+  }
+  const post = (path, body) => api(path, { method:"POST", body:JSON.stringify(body || {}) });
+
+  const $ = s => document.querySelector(s);
+  const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+  const pad = n => String(n).padStart(2, "0");
+  const when = ms => { const d = new Date(ms), t = new Date();
+    return d.toDateString() === t.toDateString() ? `${pad(d.getHours())}:${pad(d.getMinutes())}` : `${pad(d.getMonth()+1)}.${pad(d.getDate())}`; };
+
+  const S = { tab:"sort", open:null, data:null, report:null, picks:{}, done:{}, bodies:{}, busy:false, error:null };
+  const routeName = k => (S.data?.routes || []).find(r => r.key === k)?.name || k;
+
+  let toastT;
+  function toast(text, undoId){
+    const el = $("#toast");
+    el.className = "toast";
+    el.innerHTML = `<span>${esc(text)}</span>` + (undoId ? `<button type="button" data-undo="${esc(undoId)}">Undo</button>` : "");
+    el.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => el.hidden = true, undoId ? 8000 : 3500);
+  }
+  function toastErr(text){ toast(text); $("#toast").classList.add("err"); }
+
+  /* ---------- loading ---------- */
+  async function load(){
+    if (!key()) { render(); return; }
+    try { S.data = await api("/inbox/list"); S.error = null; }
+    catch (e) { S.error = e; }
+    if (S.tab === "report") { try { S.report = await api("/inbox/report"); } catch {} }
+    const list = currentList();
+    if (!S.open || !list.some(x => x.id === S.open)) S.open = list.find(x => !S.done[x.id])?.id || null;
+    render();
+  }
+  async function checkNow(){
+    if (S.busy) return;
+    S.busy = true; liveLine();
+    try { await post("/inbox/sync"); } catch (e) { toastErr("Gmail check failed: " + e.message); }
+    S.busy = false; await load();
+  }
+  const currentList = () => !S.data ? [] : S.tab === "sort" ? sortList() : S.tab === "messages" ? S.data.messages : (S.report?.auto || []);
+  // approved cards stay on screen (sealed) until the next reload, so he sees what he just did
+  const sortList = () => [...S.data.sort, ...Object.values(S.done).filter(d => d.card.tab !== "messages" && !S.data.sort.some(c => c.id === d.card.id)).map(d => d.card)];
+
+  /* ---------- rendering ---------- */
+  function liveLine(){
+    const live = $("#live"), s = S.data?.sync || {};
+    live.classList.toggle("busy", S.busy);
+    live.classList.toggle("bad", !!(S.error || s.ok === false));
+    $("#liveText").textContent = S.busy ? "Checking Gmail…"
+      : S.error ? (S.error.status === 401 ? "Pairing code not accepted" : "Server not reachable")
+      : s.ok === false ? "Gmail check failed: " + (s.error || "unknown")
+      : s.at ? `Checked ${when(Date.parse(s.at))} · ${s.inbox} in inbox · every 2 min` : "Not checked yet";
+  }
+  function counts(){
+    const d = S.data?.counts || {};
+    $("#nSort").textContent = d.sort ?? ""; $("#nMessages").textContent = d.messages ?? ""; $("#nReport").textContent = d.report ?? "";
+    $("#leftCount").textContent = (d.sort || 0) + (d.messages || 0);
+  }
+  const head = (x, dot, pill, extra = "") => `<button class="head" type="button" aria-expanded="${S.open===x.id}" data-open="${esc(x.id)}">
+      <span class="when">${esc(when(x.at))}</span><span class="dot ${dot}"></span>
+      <span class="who"><span class="t1">${esc(x.from)}</span><span class="t2">${esc(x.subject)}</span></span>${pill}</button>${extra}`;
+
+  function pillFor(x){
+    if (S.done[x.id]) return `<span class="seal stamp" title="${esc(S.done[x.id].label)}">✓</span>`;
+    if (x.money) return `<span class="pill money">Money: Claude</span>`;
+    if (x.jevState === "pending") return `<span class="pill jev">Jev reading…</span>`;
+    if (x.jev && x.jev.shown) return `<span class="pill jev">Jev: ${esc(routeName(x.jev.route))}</span>`;
+    return `<span class="pill">No guess yet</span>`;
+  }
+  function jevLine(x){
+    if (x.money) return `<div class="jevline money">Money or travel email: Jev is not asked. Claude checks it against YNAB and Cindia.</div>`;
+    if (x.jevState === "pending") return `<div class="jevline">Jev is reading the sender and subject…</div>`;
+    if (x.jevState === "failed") return `<div class="jevline quiet">Jev did not answer this time. Pick a tray.</div>`;
+    if (x.jevState === "off") return `<div class="jevline quiet">Jev is not switched on yet. Pick a tray.</div>`;
+    if (!x.jev) return `<div class="jevline quiet">No guess yet. Pick a tray.</div>`;
+    const pct = Math.round(x.jev.conf * 100);
+    const what = x.jev.route ? routeName(x.jev.route) : x.jev.pick === "people" ? "a person" : "not sure";
+    return `<div class="jevline">Jev: ${esc(what)} <span class="conf" aria-hidden="true"><i style="width:${pct}%"></i></span> ${pct}% sure${x.jev.shown ? "" : " · too unsure to suggest"}</div>`;
+  }
+  function mailBlock(x){
+    const b = S.bodies[x.id];
+    if (!b) return `<button class="btn quiet" type="button" data-read="${esc(x.id)}" style="justify-self:start">Show the email</button>`;
+    if (b === "loading") return `<div class="mail">Opening…</div>`;
+    if (b.error) return `<div class="mail">Could not open it: ${esc(b.error)}</div>`;
+    return `<div class="mail"><small>From ${esc(b.from)}${b.date ? " · " + esc(b.date) : ""}</small>${esc(b.text || "(no text in this email)")}</div>`;
+  }
+  function meter(x, route){
+    if (x.money) return "";
+    if (route === "claude") return `<div class="meter"><span>Claude handles it never runs by itself.</span></div>`;
+    const n = route && x.ladder.route === route ? x.ladder.count : 0;
+    const target = route ? " to " + esc(routeName(route)) : "";
+    return `<div class="meter"><span class="bar" aria-hidden="true">${Array.from({length:10},(_,i)=>`<i class="${i<n?"on":""}"></i>`).join("")}</span><span>${n} of 10 approvals in a row for ${esc(x.from)}${target}. At 10 it runs by itself.</span></div>`;
+  }
+
+  function sortView(){
+    const rows = sortList().map(x => {
+      const done = S.done[x.id];
+      const open = S.open === x.id && !done;
+      let body = "";
+      if (open){
+        const route = S.picks[x.id] || x.suggest || "";
+        body = `<div class="body">${jevLine(x)}
+          ${x.snippet ? `<p class="summary">${esc(x.snippet)}</p>` : ""}
+          ${mailBlock(x)}
+          <div class="why">Goes to</div>
+          <div class="routes" role="group" aria-label="Where it goes">${S.data.routes.map((r, i) => `<button type="button" class="${r.key===route?"pick":""} ${x.jev && x.jev.shown && r.key===x.jev.route?"jevpick":""}" data-route="${r.key}" data-id="${esc(x.id)}" aria-pressed="${r.key===route}"><kbd>${i+1}</kbd>${esc(r.name)}</button>`).join("")}</div>
+          ${meter(x, route)}
+          <div class="btns"><button class="btn primary" type="button" data-approve="${esc(x.id)}" ${route?"":"disabled"}>Approve</button>
+            <button class="btn" type="button" disabled title="Comes in the next build">Make a task</button>
+            <button class="btn quiet" type="button" data-skip="${esc(x.id)}">Skip</button>
+            <a class="btn quiet" href="${esc(x.gmail)}" target="_blank" rel="noopener">Open in Gmail</a></div>
+        </div>`;
+      }
+      return `<div class="row ${done?"done":""} ${x.skipped?"skipped":""}">${head(x, x.money?"flag":"jev", pillFor(x))}${body}</div>`;
+    }).join("");
+    const c = S.data.counts;
+    return `<div class="lane"><span>One card per email · nothing moves until you approve</span><span>${c.sort}</span></div>
+      <div class="list">${rows || `<div class="empty">Nothing waiting. New mail shows up here within 2 minutes.</div>`}</div>
+      <p class="note">Blue is Jev's guess (only when it is 80% sure or more). Orange is money or travel: Claude handles it and Jev is never asked. Enter approves, 1 to 8 picks a tray.${c.claude ? ` ${c.claude} waiting for Claude.` : ""}</p>`;
+  }
+
+  function messagesView(){
+    const rows = S.data.messages.map(x => {
+      const body = S.open === x.id ? `<div class="body">
+          ${x.snippet ? `<p class="summary">${esc(x.snippet)}</p>` : ""}
+          ${mailBlock(x)}
+          <div class="jevline quiet">Claude's "what's going on" and a draft reply come in the next build. Send will only go out when you tap it.</div>
+          <div class="btns"><a class="btn primary" href="${esc(x.gmail)}" target="_blank" rel="noopener">Open in Gmail</a>
+            <button class="btn" type="button" data-tosort="${esc(x.id)}">Sort it instead</button></div>
+        </div>` : "";
+      return `<div class="row">${head(x, "people", `<span class="pill ask">From a person</span>`)}${body}</div>`;
+    }).join("");
+    return `<div class="lane"><span>From people · summary and reply coming soon</span><span>${S.data.messages.length}</span></div>
+      <div class="list">${rows || `<div class="empty">No emails from people right now.</div>`}</div>`;
+  }
+
+  function reportView(){
+    const r = S.report;
+    if (!r) return `<div class="empty">Loading…</div>`;
+    const pct = r.jev.shown ? Math.round(r.jev.agreed / r.jev.shown * 100) + "%" : "n/a";
+    const rows = r.auto.map(x => {
+      const pill = x.flagged ? `<span class="pill money">Flagged</span>` : `<span class="pill auto">${esc(x.filedAs)}</span>`;
+      const body = S.open === x.id ? `<div class="body"><p class="summary">Filed to ${esc(x.filedAs)} by itself, because you approved this sender there 10 times in a row.</p>
+        <div class="btns">${x.flagged ? `<span class="pill money">Back to asking. Claude will check it.</span>`
+          : `<button class="btn primary" type="button" data-flag="${esc(x.id)}">Flag this</button><button class="btn quiet" type="button" data-open="${esc(x.id)}">Looks fine</button>`}
+          <a class="btn quiet" href="${esc(x.gmail)}" target="_blank" rel="noopener">Open in Gmail</a></div></div>` : "";
+      return `<div class="row">${head(x, x.flagged?"flag":"auto", pill)}${body}</div>`;
+    }).join("");
+    return `<div class="tiles"><div class="tile"><b>${r.auto.length}</b><span>handled by itself, last 14 days</span></div><div class="tile"><b>${pct}</b><span>Jev matched you (${r.jev.agreed} of ${r.jev.shown})</span></div><div class="tile"><b>${r.flagged}</b><span>flagged by you</span></div></div>
+      <div class="lane"><span>What Jev learned from you</span><span>${r.learned.length}</span></div>
+      <div class="list learned">${r.learned.length ? r.learned.map(l => `<div><b>${esc(l.who)}</b><span>${esc(l.from)} → ${esc(l.to)}</span></div>`).join("") : `<div><span style="color:var(--dim)">Nothing yet. When you pick a different tray than Jev, it shows here and Jev uses it next time.</span></div>`}</div>
+      <div class="lane"><span>Handled by itself · flag anything that looks off</span><span>${r.auto.length}</span></div>
+      <div class="list">${rows || `<div class="empty">Nothing on auto yet. A sender goes on auto after you approve it to the same tray 10 times in a row.</div>`}</div>`;
+  }
+
+  function pairView(){
+    return `<div class="pair"><h2 class="name" style="font-size:22px">Pair this device</h2>
+      <p class="summary">Use the same pairing code as Day Quest. It stays on this device only.</p>
+      <input id="pairCode" type="password" autocomplete="off" aria-label="Pairing code" placeholder="Pairing code">
+      <button class="btn primary" type="button" id="pairGo">Pair</button></div>`;
+  }
+
+  function render(){
+    document.querySelectorAll(".tab").forEach(t => { const on = t.dataset.tab === S.tab; t.classList.toggle("on", on); t.setAttribute("aria-selected", on); });
+    liveLine(); counts();
+    const v = $("#view");
+    if (!key() || S.error?.status === 401) { v.innerHTML = pairView(); return; }
+    if (!S.data) { v.innerHTML = `<div class="empty">${S.error ? "Server not reachable: " + esc(S.error.message) : "Loading…"}</div>`; return; }
+    if (!S.data.configured.gmail && S.tab !== "report") {
+      v.innerHTML = `<div class="lane"><span>Waiting for the Google sign-in</span></div><div class="list"><div class="empty">The server is not signed in to junyan.boon@gmail.com yet. Run the sign-in script on the Mac once, then this fills in.</div></div>`;
+      return;
+    }
+    v.innerHTML = S.tab === "sort" ? sortView() : S.tab === "messages" ? messagesView() : reportView();
+  }
+
+  /* ---------- actions ---------- */
+  const nextOpen = () => { S.open = currentList().find(x => !S.done[x.id] && x.id !== S.open && !x.skipped)?.id || currentList().find(x => !S.done[x.id] && x.id !== S.open)?.id || null; };
+  async function approve(id){
+    const x = S.data.sort.find(c => c.id === id); if (!x) return;
+    const route = S.picks[id] || x.suggest; if (!route) return;
+    const btn = document.querySelector(`[data-approve="${CSS.escape(id)}"]`); if (btn) btn.disabled = true;
+    try {
+      const r = await post("/inbox/decide", { id, route });
+      S.done[id] = { card:x, label:"Approved: " + r.filedAs };
+      nextOpen(); render();
+      toast(r.verified === false ? `Moved to ${r.filedAs}, but Gmail did not confirm it. Check in Gmail.` : `Filed to ${r.filedAs}.`, id);
+      load();
+    } catch (e) { toastErr("Not filed: " + e.message); if (btn) btn.disabled = false; load(); }
+  }
+  async function undo(id){
+    $("#toast").hidden = true;
+    try { await post("/inbox/undo", { id }); delete S.done[id]; S.open = id; toast("Put back in your inbox."); }
+    catch (e) { toastErr("Undo failed: " + e.message); }
+    load();
+  }
+
+  document.addEventListener("click", async e => {
+    const t = e.target.closest("[data-tab]");
+    if (t){ S.tab = t.dataset.tab; S.open = null; render(); await load(); return; }
+    const u = e.target.closest("[data-undo]"); if (u) return undo(u.dataset.undo);
+    const o = e.target.closest("[data-open]"); if (o){ S.open = S.open === o.dataset.open ? null : o.dataset.open; render(); return; }
+    const r = e.target.closest("[data-route]"); if (r){ S.picks[r.dataset.id] = r.dataset.route; render(); return; }
+    const a = e.target.closest("[data-approve]"); if (a) return approve(a.dataset.approve);
+    const rd = e.target.closest("[data-read]");
+    if (rd){ const id = rd.dataset.read; S.bodies[id] = "loading"; render();
+      try { S.bodies[id] = await api("/inbox/item?id=" + encodeURIComponent(id)); } catch (err) { S.bodies[id] = { error: err.message }; }
+      render(); return; }
+    const sk = e.target.closest("[data-skip]");
+    if (sk){ try { await post("/inbox/decide", { id: sk.dataset.skip, action:"skip" }); nextOpen(); } catch (err) { toastErr(err.message); } return load(); }
+    const ts = e.target.closest("[data-tosort]");
+    if (ts){ try { await post("/inbox/decide", { id: ts.dataset.tosort, action:"to-sort" }); toast("Moved to Sort."); } catch (err) { toastErr(err.message); } return load(); }
+    const f = e.target.closest("[data-flag]");
+    if (f){ try { await post("/inbox/flag", { id: f.dataset.flag }); toast("Flagged. That sender asks you again, and Claude will check this one."); } catch (err) { toastErr(err.message); } return load(); }
+    if (e.target.closest("#refresh")) return checkNow();
+    if (e.target.closest("#pairGo")){ const v = $("#pairCode").value.trim(); if (!v) return;
+      store.set("quest-key", v); S.error = null; await load();
+      if (S.error?.status === 401) { store.set("quest-key", null); toastErr("That code did not work."); render(); } }
+  });
+  document.addEventListener("keydown", e => {
+    if (e.target.closest("textarea,input") || S.tab !== "sort" || !S.open || !S.data) return;
+    if (e.key === "Enter"){ const b = document.querySelector(`[data-approve="${CSS.escape(S.open)}"]`); if (b && !b.disabled){ e.preventDefault(); b.click(); } }
+    else if (/^[1-8]$/.test(e.key) && S.data.routes[+e.key - 1]){ S.picks[S.open] = S.data.routes[+e.key - 1].key; render(); }
+  });
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) load(); });
+  setInterval(() => { if (!document.hidden) load(); }, 60000);
+  load();
+})();
+</script>
+</body>
+</html>
