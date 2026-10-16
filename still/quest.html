@@ -628,7 +628,7 @@
 <script src="quest-fx.js?v=20261009b"></script>
 <script src="quest-night.js?v=20261011a"></script>
 <script src="quest-basics.js?v=20261016d"></script>
-<script src="quest-gym.js?v=20261016b"></script>
+<script src="quest-gym.js?v=20261016c"></script>
 <script src="quest-morning.js?v=20261016g"></script>
 <script src="quest-agenda.js?v=20261014c"></script>
 <script src="quest-nearby.js?v=20261016c"></script>
@@ -2919,8 +2919,10 @@
   async function planGym(force){
     if (!QG() || !PLAN || !lastPull || gymBusy) return;
     const stamp = store.get("quest-gym-at") || "", [day, at] = stamp.split("|");
+    // between runs the last plan's counts come back from this device's saved copy, so the line shows at once
+    if (!GYMWK && day === gameYmd()) try { const w = JSON.parse(store.get("quest-gym-wk") || "null"); if (w && w.length) GYMWK = { weeks:w, at:+at || 0 }; } catch {}
     if (!force && day === gameYmd() && Date.now() - (+at || 0) < 2 * 3600000) return;
-    if (force && day === gameYmd() && GYMWK) return;
+    if (force && day === gameYmd() && GYMWK && Date.now() - GYMWK.at < 2 * 3600000) return;
     gymBusy = true;
     try {
       let weeks = await gymWeeks();
@@ -2952,6 +2954,7 @@
       }
       GYMWK = { weeks, at:Date.now() };
       store.set("quest-gym-at", gameYmd() + "|" + Date.now());
+      store.set("quest-gym-wk", JSON.stringify(weeks.map(w => ({ week:w.week, mode:w.mode, have:w.have, total:w.total, by:w.by, line:w.line }))));
     } catch (e) { console.warn("gym plan", e); }
     finally { gymBusy = false; }
     if (window.QuestMorning) QuestMorning.redraw();

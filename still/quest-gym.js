@@ -158,7 +158,7 @@
     const total = slots.length, onPlan = total - open.length + place.length;
     // how many of each are done or on the plan (placed ones included), for the Practices list
     const by = { jw:0, jw1:0, jw2:0, ms:0 };
-    Object.values(cover).concat(place).forEach(x => { by[x.kind] = (by[x.kind] || 0) + 1; if (x.kind !== "ms") by.jw++; });
+    Object.values(cover).concat(place).forEach(x => { if (x.kind === "ms") by.ms++; else { by.jw++; if (x.kind !== "jw") by[x.kind]++; } });
     if (mode === "travel") { by.jw1 = cover.jw1 || place.some(p => p.kind === "jw1") ? 1 : 0; by.jw2 = cover.jw2 || place.some(p => p.kind === "jw2") ? 1 : 0; }
     return { week:o.week, mode, slots, have:onPlan, total, by, lastJw:last, place: place.sort((a, b) => a.s - b.s), skipped,
       line:`Gym: ${onPlan} of ${total} placed this week` };

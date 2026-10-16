@@ -125,7 +125,7 @@ test("a week whose answer flips from travel to home does not bring back a delete
   const again = G.planWeek({ week:"2026-10-19", days:home, sessions:sessionsOf("2026-10-19"), logs:[], placed, now:NOW, today:"2026-10-16" });
   assert.equal(again.mode, "home");
   assert.ok(!again.place.some(p => p.kind === "ms"));
-  assert.equal(J(first.by).jw1, 1); assert.equal(J(first.by).ms, 1);
+  assert.deepEqual(J(first.by), { jw:2, jw1:1, jw2:1, ms:1 });
 });
 
 test("finished workouts count, and a logged day's gym block is not counted twice", () => {
