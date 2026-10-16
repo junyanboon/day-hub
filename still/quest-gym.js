@@ -228,7 +228,7 @@
       const home = (o.modes || {})[mondayOf(d.ymd)] === "home";
       const hs = starts(home, o.kind, wdOf(d.ymd)).filter(h => { const s = at(d.ymd, h, d.tz); return Math.abs(s - +o.s) >= 60 * MIN && fits(d, s, len, now, []); });
       if (!hs.length) continue;
-      const mk = h => { const s = at(d.ymd, h, d.tz); return { ymd:d.ymd, s, e:s + len * MIN, same:mondayOf(d.ymd) === o.week, label:label(s, d.tz), ...(share ? { shared:true } : {}) }; };
+      const mk = h => { const s = at(d.ymd, h, d.tz); return { ymd:d.ymd, s, e:s + len * MIN, same:mondayOf(d.ymd) === o.week, later:mondayOf(d.ymd) > o.week, label:label(s, d.tz), ...(share ? { shared:true } : {}) }; };
       if (share) { shared.push(mk(hs[0])); continue; }
       firsts.push(mk(hs[0]));
       const h2 = hs.find(h => Math.abs(h - hs[0]) >= 2); if (h2 != null) seconds.push(mk(h2));
@@ -241,7 +241,8 @@
     if (opts.length < 4) opts = opts.concat(pick(shared.filter(x => x.same), 4 - opts.length), pick(shared.filter(x => !x.same), 4 - opts.length));
     opts = opts.slice(0, 6).sort((a, b) => (b.same - a.same) || a.s - b.s);
     const note = !opts.length ? "No free time in the next 7 days fits the gym rules."
-      : !opts.some(x => x.same) ? "Nothing free is left this week, so these are next week. This week will be one short."
+      : !opts.some(x => x.same) ? (opts.every(x => x.later) ? "Nothing free is left this week, so these are next week. This week will be one short."
+        : "Nothing free is left in its own week, so these are in another week. Its week will be one short.")
       : opts.some(x => x.shared) ? "Every other day is full, so some of these are on the same day as another gym session." : "";
     return { options:opts, note };
   }

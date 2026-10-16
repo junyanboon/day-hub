@@ -78,8 +78,13 @@ test("reschedule says so when the only free slots are next week", () => {
   for (const d of range("2026-10-26", 7)) cal[d] = [ev(d, "09:00", "21:00", "Festival")];
   const days = range("2026-10-29", 7).map(d => dayOf(d, cal));
   const r = G.moveOptions({ kind:"jw1", s:G.at("2026-10-30", 19.5, TOR), e:G.at("2026-10-30", 20.5, TOR), days, week:HOME, gymDays:[], modes:{}, now:G.at("2026-10-29", 8, TOR) });
-  assert.ok(r.options.length >= 1 && r.options.every(o => !o.same));
+  assert.ok(r.options.length >= 1 && r.options.every(o => !o.same && o.later));
   assert.match(r.note, /next week/);
+  // a session next week whose only free times are earlier, in this week: not called "next week"
+  const early = G.moveOptions({ kind:"jw1", s:G.at("2026-11-04", 19.5, TOR), e:G.at("2026-11-04", 20.5, TOR), days:range("2026-11-01", 3).map(d => dayOf(d, {})).slice(0, 1),
+    week:"2026-11-02", gymDays:[], modes:{}, now:G.at("2026-11-01", 8, TOR) });
+  assert.ok(early.options.length && early.options.every(o => !o.same && !o.later));
+  assert.doesNotMatch(early.note, /next week/);
   const none = G.moveOptions({ kind:"jw1", s:G.at("2026-10-30", 19.5, TOR), e:G.at("2026-10-30", 20.5, TOR), days:days.slice(0, 3), week:HOME, gymDays:[], modes:{}, now:G.at("2026-10-29", 8, TOR) });
   assert.equal(none.options.length, 0);
   assert.match(none.note, /No free/);

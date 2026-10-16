@@ -2973,7 +2973,7 @@
     for (let i = days.length - 1; i >= 0; i--) { const d = days[i];
       tzOf[d] = own(d) || !tzOf[days[i + 1]] ? (d === today ? TZ() : (plans[d] || {}).tz || TZ()) : tzOf[days[i + 1]]; }
     // a gym session he moved from a gym card shows where it went even while a day's plan is still cached from before the move
-    const mv = gymMovesNow();
+    const mv = gymMovesNow().filter(([, m]) => Date.now() - Date.parse(m.at) < 15 * 60000);   // the server and PLANS caches last minutes, not days
     const evsOf = d => { const z = tzOf[d] || TZ();
       const out = rawEvs(d).filter(x => !(x.id && mv.some(([id, m]) => id === x.id && Math.abs(x.s - Date.parse(m.from)) < 60000 && Math.abs(Date.parse(m.to) - Date.parse(m.from)) >= 60000)));
       for (const [id, m] of mv) { const s0 = Date.parse(m.to);
@@ -3066,8 +3066,12 @@
      go easy (d245) and let sessions off the week's count instead of a shortfall. */
   const illToday = () => QG() ? QG().illStatus(G.ill || {}, gameYmd()) : { ill:false, ask:false, since:null };
   const gymMovesNow = () => { const cut = Date.now() - 21 * 86400000; return Object.entries(G.gymMoves || {}).filter(([, m]) => m && Date.parse(m.to) > cut); };
-  const MOVEOPT = {}, GMVB = {}, GMVASK = new Set();   // block key -> { at, r } (2 min), block key -> the block the box was drawn for
-  let gymMoveBusy = false;
+  // the options shown per block (key -> { at, r }, 2 min), the block each box was drawn for, the reads in flight;
+  // MOVEGEN goes up on every move or ill answer, so a read that started before it is thrown away
+  const MOVEOPT = {}, GMVB = {}, GMVASK = new Set();
+  let gymMoveBusy = false, illBusy = false, MOVEGEN = 0;
+  const moveOpt = k => { const c = MOVEOPT[k]; return c && Date.now() - c.at < 120000 ? c : null; };
+  const clearMoveOpts = () => { MOVEGEN++; for (const x in MOVEOPT) delete MOVEOPT[x]; for (const x in GMVB) delete GMVB[x]; GMVASK.clear(); };
   async function gymMoveChoices(b){
     const Q = QG(), today = gameYmd(), W = await gymWorld({ from:Q.addDays(today, -1), n:9, at:5 });
     const sig = x => x.id ? "id:" + x.id : (+x.s) + "|" + x.t, me = sig(calEv(b));
@@ -3083,14 +3087,14 @@
   }
   function gymMoveHTML(b){
     if (!QG() || !isGym(b)) return "";
-    const st = illToday(), k = gk(b), c = MOVEOPT[k], todayB = gameDayOf(b.s) === gameYmd();
+    const st = illToday(), k = gk(b), c = moveOpt(k), todayB = gameDayOf(b.s) === gameYmd();
     GMVB[b.key] = b;
     let h = `<div class="gmv" data-gmv="${esc(b.key)}"><div class="glabel">Reschedule</div>`;
     if (st.ill && todayB) h += `<p class="gnote">You're ill today, so no gym. When you feel better, tap I'm better and the rest of the week is planned again.</p>`;
     else if (!(b.id && b.calId)) h += `<p class="gnote">This one lives only in today's plan, so it cannot go to another day. Drag it on the calendar to change its time today.</p>`;
     else if (!c) h += `<p class="gnote">Finding free times…</p>`;
     else {
-      h += c.r.options.length ? `<div class="gmv-os">${c.r.options.map((o, i) => `<button class="gmv-o${o.same ? "" : " nx"}" data-gmvgo="${i}">${esc(o.label)}${o.same ? "" : `<small>next week</small>`}</button>`).join("")}</div>` : "";
+      h += c.r.options.length ? `<div class="gmv-os">${c.r.options.map((o, i) => `<button class="gmv-o${o.same ? "" : " nx"}" data-gmvgo="${i}">${esc(o.label)}${o.same ? "" : `<small>${o.later ? "next week" : "week before"}</small>`}</button>`).join("")}</div>` : "";
       if (c.r.note) h += `<p class="gnote">${esc(c.r.note)}</p>`;
     }
     h += `<button class="gmv-ill" data-gmvill="${st.ill ? 0 : 1}">${st.ill ? "🙂 I'm better" : "🤒 I'm ill, no workout"}</button>`;
@@ -3100,14 +3104,14 @@
     root.querySelectorAll("[data-gmv]").forEach(el => {
       const b = GMVB[el.dataset.gmv]; if (!b) return;
       const k = gk(b), st = illToday();
-      if (!MOVEOPT[k] && !GMVASK.has(k) && b.id && b.calId && !(st.ill && gameDayOf(b.s) === gameYmd())) {
-        GMVASK.add(k);
-        gymMoveChoices(b).then(r => { MOVEOPT[k] = { at:Date.now(), r }; }).catch(e => { console.warn("gym move", e);
-          MOVEOPT[k] = { at:Date.now(), r:{ options:[], note:`Could not read the calendar (${e.message}).` } }; })
-          .then(() => { GMVASK.delete(k); setTimeout(() => { delete MOVEOPT[k]; }, 120000); if (el.isConnected) redraw(); });
+      if (!moveOpt(k) && !GMVASK.has(k) && b.id && b.calId && !(st.ill && gameDayOf(b.s) === gameYmd())) {
+        GMVASK.add(k); const gen = MOVEGEN;
+        gymMoveChoices(b).then(r => ({ options:r.options, note:r.note }), e => { console.warn("gym move", e);
+          return { options:[], note:`Could not read the calendar (${e.message}).` }; })
+          .then(r => { if (gen !== MOVEGEN) return; GMVASK.delete(k); MOVEOPT[k] = { at:Date.now(), r }; if (el.isConnected) redraw(); });
       }
       el.querySelectorAll("[data-gmvgo]").forEach(bt => bt.onclick = e => { e.stopPropagation();
-        const o = MOVEOPT[k] && MOVEOPT[k].r.options[+bt.dataset.gmvgo]; if (o) moveGym(b, o); });
+        const c = moveOpt(k), o = c && c.r.options[+bt.dataset.gmvgo]; if (o) moveGym(b, o); });
       el.querySelectorAll("[data-gmvill]").forEach(bt => bt.onclick = e => { e.stopPropagation(); setIll(bt.dataset.gmvill === "1").then(redraw); });
     });
   }
@@ -3118,32 +3122,39 @@
       calToast(`Test mode: ${what} would move to ${o.label}. Nothing is saved.`, 6000); return; }
     if (!questKey()) { calToast("Pair this device in ⚙️ to move it on the calendar."); return; }
     gymMoveBusy = true;
+    try { await moveGymNow(b, o, what, from, k); } finally { gymMoveBusy = false; }
+  }
+  async function moveGymNow(b, o, what, from, k){
     try {
       PEND[k] = { s:+o.s, e:+o.e, at:Date.now() };
       await qfetch("/cal/event", { method:"POST", body:JSON.stringify({ id:b.id, calId:b.calId, raw:b.raw, s:new Date(o.s).toISOString(),
         e:new Date(o.e).toISOString(), title:"", note:`moved by Junyan from ${from}` }) });
-    } catch (err) { delete PEND[k]; gymMoveBusy = false; calToast(`Could not move it (${err.message}). It is still at ${from}.`, 7000); return; }
+    } catch (err) { delete PEND[k]; calToast(`Could not move it (${err.message}). It is still at ${from}.`, 7000); return; }
     const prev = (G.gymMoves = G.gymMoves || {})[b.id], iso = new Date(+b.s).toISOString();
     // a session the planner placed keeps its slot key, so its old week is not filled again either way
     const key = (prev && prev.key) || (Object.entries(G.gymPlan || {}).find(([, v]) => v && !v.failed && Math.abs(Date.parse(v.s) - +b.s) < 60000) || [])[0] || null;
     G.gymMoves[b.id] = { t:b.t, from:iso, from0:(prev && prev.from0) || iso, to:new Date(o.s).toISOString(), len:Math.round((o.e - o.s) / 60000), key, at:new Date().toISOString() };
     log(`Moved ${what} to ${o.label} (was ${from})`); saveG();
-    for (const x in MOVEOPT) delete MOVEOPT[x];
+    clearMoveOpts();
     for (const d in PLANS) delete PLANS[d];
     store.set("quest-gym-at", "");
     closeSheet();
     calToast(`${what}: ${o.label}. Saved to Google Calendar${b.cal ? ` (${b.cal})` : ""}.`);
     try { if (b.game && OPS.edits[b.key]) await writeOps(x => { delete x.edits[b.key]; }); await pushG(); await pullAll(); } catch {}
-    gymMoveBusy = false;
     if (window.QuestMorning && QuestMorning.isOpen()) QuestMorning.redraw();
     planGym(false).catch(e => console.warn("gym", e));
   }
   async function setIll(ill){
+    if (illBusy) return;   // a double tap answers once
+    illBusy = true;
+    try { await setIllNow(ill); } finally { illBusy = false; }
+  }
+  async function setIllNow(ill){
     G.ill = G.ill || {}; G.ill[gameYmd()] = { ill, at:new Date().toISOString() };
-    G.day.plan = G.day.plan || {}; G.day.plan.ill = ill;   // today's plan state says so too
+    G.day.plan = G.day.plan || {}; G.day.plan.ill = ill;   // today's plan state says so too (the brief asked for it there; G.ill is what is read)
     log(ill ? "Ill today: no gym until I'm better" : "Feeling better: gym planned again from the free times"); saveG();
     if (ill) for (const b of blocks().filter(x => isGym(x) && x.e > now() && !G.day.closes[gk(x)])) await dropBlock(b);
-    for (const x in MOVEOPT) delete MOVEOPT[x];
+    clearMoveOpts();
     store.set("quest-gym-at", ""); GYMWK = null;
     if (questKey() && !DRY) await pushG();
     planGym(false).catch(e => console.warn("gym", e));
