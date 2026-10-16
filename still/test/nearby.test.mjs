@@ -44,12 +44,12 @@ test("the mode symbol comes from the minutes: walk up to 25 min, else the quicke
 test("every row is collapsed by default; a tapped row opens with what it is, a hint, Directions and Put on the plan", () => {
   const stay = N.stayFor(["Madrid Marriott Hotel Princesa Plaza"]);
   assert.ok(stay.places.length >= 7);
-  const shut = N.html(stay, {});
+  const shut = N.html(stay, { tab:"see" });
   assert.equal((shut.match(/class="nb-row"/g) || []).length, stay.places.length);
   assert.equal((shut.match(/nb-row open/g) || []).length, 0);
   assert.ok(!/nb-body/.test(shut), "no row body is drawn while collapsed");
   assert.ok(/Nearby · Marriott Princesa Plaza/.test(N.title(stay)));
-  const id = stay.places[1].id, open = N.html(stay, { open:{ [id]:true } });
+  const id = stay.places[1].id, open = N.html(stay, { tab:"see", open:{ [id]:true } });
   assert.equal((open.match(/nb-row open/g) || []).length, 1);
   assert.match(open, /Directions/);
   assert.match(open, /Put on the plan/);
@@ -57,8 +57,8 @@ test("every row is collapsed by default; a tapped row opens with what it is, a h
   // the gym's photo shows only when it is open
   const gym = stay.places.find(p => p.photo);
   assert.ok(gym && !shut.includes("<img"));
-  assert.match(N.html(stay, { open:{ [gym.id]:true } }), /<img [^>]*loading="lazy"/);
-  assert.ok(!/Directions/.test(N.html(stay, { open:{ [gym.id]:true } })), "no Directions to the hotel's own gym");
+  assert.match(N.html(stay, { tab:"see", open:{ [gym.id]:true } }), /<img [^>]*loading="lazy"/);
+  assert.ok(!/Directions/.test(N.html(stay, { tab:"see", open:{ [gym.id]:true } })), "no Directions to the hotel's own gym");
 });
 
 test("Directions go from the hotel with the travel mode of the first chip", () => {
@@ -89,7 +89,7 @@ test("Put on the plan uses the first existing free slot that fits, 60 min by def
 
 test("a row that was put on the plan says when", () => {
   const stay = N.stayFor(["Madrid Marriott Hotel Princesa Plaza"]), id = stay.places[2].id;
-  const h = N.html(stay, { open:{ [id]:true }, msg:{ [id]:"On the plan at 2:00 PM, 1 hr." } });
+  const h = N.html(stay, { tab:"see", open:{ [id]:true }, msg:{ [id]:"On the plan at 2:00 PM, 1 hr." } });
   assert.match(h, /On the plan at 2:00 PM/);
 });
 
@@ -109,4 +109,68 @@ test("quest.html starts the widget hidden, loads quest-nearby.js, and the dashbo
   assert.match(page, /QuestMorning\.gapsOf\(MO_CTX\.data\(\)\)/);
   assert.match(dash, /window\.QuestDash = \{ sync \}/);
   assert.match(dash, /"w-nearby":/);
+});
+
+// Eat tab and stay times (Junyan 2026-10-16: food "in this widget", "updated based on where we are")
+const mad = (d, h, m = 0) => new Date(Date.UTC(2026, 9, d, h - 2, m));   // Madrid wall clock in October (UTC+2)
+
+test("the stay comes from its calendar check-in and check-out times, so days with no hotel event still know it", () => {
+  const S = [
+    { id:"a", match:/alpha/i, tz:"Europe/Madrid", in:"2026-10-16T13:00", out:"2026-10-20T12:00", places:[] },
+    { id:"b", match:/beta/i, tz:"Europe/Madrid", in:"2026-10-20T18:00", out:"2026-10-22T13:00", places:[] },
+  ];
+  assert.equal(N.stayFor(["Madrid novelty slot", "Madrid"], S, mad(17, 10)).id, "a");   // a day between, no hotel text
+  assert.equal(N.stayFor([], S, mad(20, 11, 59)).id, "a");
+  assert.equal(N.stayFor([], S, mad(20, 14)).id, "b");   // moving day, after checkout: the stay he is heading to
+  assert.equal(N.stayFor([], S, mad(16, 9)).id, "a");    // arrival day, before check-in
+  assert.equal(N.stayFor([], S, mad(21, 9)).id, "b");
+  assert.equal(N.stayFor([], S, mad(23, 9)), null);      // after the last checkout, nothing
+  assert.equal(N.stayFor(["beta hotel"], S, mad(23, 9)).id, "b");   // the text still works as the fallback
+  assert.equal(N.wall(mad(17, 10, 5), "Europe/Madrid"), "2026-10-17T10:05");
+});
+
+test("every stay on the trip is found on its days from the real list", () => {
+  assert.equal(N.stayFor([], null, mad(18, 15)).id, "madrid-marriott-princesa-plaza");
+  assert.equal(N.stayFor(["Madrid novelty slot", "Madrid"], null, mad(17, 21)).id, "madrid-marriott-princesa-plaza");
+  assert.equal(N.stayFor(["Drive/park for El Yelmo", "La Pedriza"], null, mad(21, 9)).id, "manzanares-estudio-maeso");
+  assert.equal(N.stayFor(["Provisional · Drive to airport hotel", "MAD"], null, mad(22, 20)).id, "madrid-ac-hotel-airport");
+  assert.equal(N.stayFor(["🏨 Check in — AC Hotel Madrid Airport"]).id, "madrid-ac-hotel-airport");
+  assert.equal(N.stayFor([], null, mad(24, 12)), null);   // home: no card
+  for (const s of N.STAYS) assert.ok((s.eat || []).length >= 4, `${s.id} has an Eat list`);
+  for (const s of N.STAYS) assert.ok(s.in < s.out && s.tz, s.id);
+  const ids = N.STAYS.map(s => s.id);
+  assert.equal(new Set(ids).size, ids.length);
+  for (const s of N.STAYS) {
+    const all = [].concat(s.places || [], s.eat || []).map(p => p.id);
+    assert.equal(new Set(all).size, all.length, `${s.id}: ids unique across See & do and Eat`);
+  }
+});
+
+test("Eat is a second tab in the same card; near meal times the card opens on it", () => {
+  const stay = { id:"t", name:"T", short:"T", origin:"o", tz:"Europe/Madrid",
+    places:[{ id:"museum", icon:"🏛️", name:"Museum", walk:10, what:"w" }],
+    eat:[{ id:"e-soup", icon:"🍜", name:"Soup Bar", fits:"Pho for Caney, tofu for you", walk:8, what:"w", rating:"4.6 Google (900 reviews)" }] };
+  const see = N.html(stay, { tab:"see" });
+  assert.match(see, /class="nb-tabs"/);
+  assert.match(see, /data-nbtab="see"[^>]*>|aria-selected="true" data-nbtab="see"/);
+  assert.match(see, /Museum/); assert.ok(!/Soup Bar/.test(see));
+  const eat = N.html(stay, { tab:"eat" });
+  assert.match(eat, /Soup Bar/); assert.ok(!/Museum/.test(eat));
+  assert.match(eat, /class="nb-fit">Pho for Caney, tofu for you</);
+  assert.ok(!/nb-rate/.test(eat), "the rating shows only when the row is open");
+  assert.match(N.html(stay, { tab:"eat", open:{ "e-soup":true } }), /⭐ 4\.6 Google/);
+  // no tab picked yet: lunch and dinner open on Eat, mid-morning and afternoon on See & do
+  assert.equal(N.defaultTab(stay, mad(17, 14)), "eat");
+  assert.equal(N.defaultTab(stay, mad(17, 21)), "eat");
+  assert.equal(N.defaultTab(stay, mad(17, 11)), "see");
+  assert.equal(N.defaultTab(stay, mad(17, 17)), "see");
+  assert.match(N.html(stay, {}, mad(17, 21)), /Soup Bar/);
+  // a stay with only one list: no tab bar, just that list
+  const only = { ...stay, places:[] };
+  assert.ok(!/nb-tabs/.test(N.html(only, {})));
+  assert.match(N.html(only, { tab:"see" }), /Soup Bar/);
+  // Put on the plan finds a food row too
+  assert.equal(N.find(stay, "e-soup").name, "Soup Bar");
+  assert.equal(N.find(stay, "museum").name, "Museum");
+  assert.equal(N.find(stay, "nope"), null);
 });
