@@ -174,3 +174,39 @@ test("Eat is a second tab in the same card; near meal times the card opens on it
   assert.equal(N.find(stay, "museum").name, "Museum");
   assert.equal(N.find(stay, "nope"), null);
 });
+
+// Near me (Junyan 2026-10-16, d2): times from where the phone is
+test("Near me: rough times from where he is, nearest first, marked ~, Directions from his spot", () => {
+  const stay = { id:"t", name:"T", short:"T", origin:"Hotel door", tz:"Europe/Madrid",
+    places:[
+      { id:"far", icon:"🏛️", name:"Far", walk:10, lat:40.4167, lng:-3.7136, what:"w" },
+      { id:"gym", icon:"🏋️", name:"Gym", walk:0, lat:40.4297, lng:-3.7144, what:"w" },
+      { id:"nopos", icon:"?", name:"No position", walk:7, what:"w" },
+      { id:"near", icon:"🌳", name:"Near", walk:14, lat:40.4241, lng:-3.7176, what:"w" },
+    ] };
+  const here = { lat:40.4240, lng:-3.7176, at:0 };   // at Templo de Debod
+  assert.ok(Math.abs(N.metres({ lat:40.4297, lng:-3.7144 }, { lat:40.4240, lng:-3.7176 }) - 690) < 30);
+  assert.equal(N.ordered(stay.places, here).map(p => p.id).join(), "near,gym,far,nopos");
+  assert.equal(N.chips(stay.places[3], here)[0].label, "~1 min");
+  assert.equal(N.chips(stay.places[1], here)[0].label, "~11 min");          // the hotel gym from out in the city
+  assert.equal(N.chips(stay.places[1], { lat:40.4297, lng:-3.7144 })[0].label, "In the hotel");
+  assert.equal(N.chips(stay.places[2], here)[0].label, "7 min");            // no position: the stay's own time
+  // a long way off: the ride first, then the walk, both rough
+  assert.equal(N.chips(stay.places[0], { lat:40.47, lng:-3.57 }).map(c => c.mode).join(), "driving,walking");
+  // Directions start from the phone (no origin) only when he is using Near me
+  assert.ok(!new URL(N.directionsUrl(stay, stay.places[3], here)).searchParams.has("origin"));
+  assert.equal(new URL(N.directionsUrl(stay, stay.places[3])).searchParams.get("origin"), "Hotel door");
+  // the card: a Near me button, and with it on a note and the nearest row first
+  const off = N.html(stay, { tab:"see" });
+  assert.match(off, /data-nbnear aria-pressed="false">📍 Near me</);
+  assert.ok(!/nb-from/.test(off));
+  const on = N.html(stay, { tab:"see", here });
+  assert.match(on, /nb-near on/); assert.match(on, /Rough times from where you are/);
+  assert.ok(on.indexOf(">Near<") < on.indexOf(">Far<"));
+  assert.match(N.html(stay, { tab:"see", locating:true }), /Finding you/);
+  assert.match(N.html(stay, { tab:"see", nearMsg:"Location is off for this page." }), /Location is off/);
+  // no positions at all: no button
+  assert.ok(!/data-nbnear/.test(N.html({ ...stay, places:[stay.places[2]] }, {})));
+  // every real place has a position, so Near me can sort them all
+  for (const s of N.STAYS) for (const p of [].concat(s.places || [], s.eat || [])) assert.ok(p.lat != null && p.lng != null, `${s.id}/${p.id}`);
+});
