@@ -10,7 +10,9 @@
    5. Practices, logged the same way as Prana actions.
    6. The day as planned, anything still open, and Let's go.
    quest.html gathers the data and does the writes (today only, through /ops); this file decides
-   and draws. Plan state lives on G.day.plan so another device opens on the same step. */
+   and draws. Plan state lives on G.day.plan so another device opens on the same step.
+   2026-10-16 (d1 to d7): the basics (Caney, Domestics, Wind-down) come in by themselves, step 1 has a
+   Home / Travelling switch, Fill it opens what fits under the free slot, and a box adds "shower 15". */
 (function (root) {
   "use strict";
   const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -28,6 +30,8 @@
   const MON = { jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5, jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11 };
 
   let C = null, el = null, busy = false, showAll = false, noting = null, draft = "";
+  let filling = null, quick = "", quickMsg = "";   // the free slot whose Fill it list is open (start ms); the add box
+  const QB = () => root.QuestBasics;
   const P = () => { const d = C.data(); d.plan.ok = d.plan.ok || {}; d.plan.tasks = d.plan.tasks || {}; d.plan.lead = d.plan.lead || {}; return d; };
   const T = (d) => C.fmtT(d);
   const names = (xs) => xs.map((x) => x.name).join(", ");
@@ -242,6 +246,12 @@
   #morning .mp-cal { margin-top:12px; padding:6px 8px 2px; border-radius:16px; background:rgba(20,15,50,.38); }
   #morning .mp-cal .cal-h { display:none; }
   #morning .mp-sel { position:sticky; top:0; z-index:8; background:rgba(40,30,80,.92); backdrop-filter:blur(8px); }
+  #morning .mp-quick { display:flex; gap:8px; margin:4px 0 6px; }
+  #morning .mp-quick input { flex:1; min-width:0; padding:11px 12px; border-radius:12px; border:0; font:inherit; font-size:16px; color:#3b2a6b; background:#fff; }
+  #morning .mp-quick button { padding:10px 14px; border-radius:12px; background:#ffd479; color:#3b2a6b; font-size:15px; font-weight:700; }
+  #morning .mp-fill { display:flex; flex-direction:column; gap:6px; padding:0 12px 12px; }
+  #morning .mp-fill button { display:flex; justify-content:space-between; gap:10px; padding:10px 12px; border-radius:12px; background:rgba(255,255,255,.9); color:#3b2a6b; font-size:14px; font-weight:700; text-align:left; }
+  #morning .mp-fill button small { font-weight:500; opacity:.75; flex:none; }
   #morning .mp-busy { position:fixed; top:calc(env(safe-area-inset-top) + 20px); left:50%; transform:translateX(-50%); z-index:6; padding:6px 12px; border-radius:12px; background:rgba(0,0,0,.45); font-size:13px; }
   `;
 
@@ -257,7 +267,10 @@
       <div class="mp-rings"><div class="mo-ring"><b>${D.prana}%</b><span>prana</span></div><div class="mo-ring"><b>${Math.round(D.body)}%</b><span>body</span></div></div>
       <div class="mo-kicker" style="margin-top:22px">How do you feel right now?</div>
       <div class="mp-chips">${FEEL.map(([n, w]) => `<button class="mp-chip${D.plan.feel === n ? " on" : ""}" data-feel="${n}">${w}</button>`).join("")}</div>
-      <p class="mo-soft">This sets how much I put on your plate today.</p>${wx}`;
+      <p class="mo-soft">This sets how much I put on your plate today.</p>
+      <div class="mo-kicker" style="margin-top:22px">Today you are</div>
+      <div class="mp-chips">${[["home", "🏠 Home"], ["travel", "🧳 Travelling"]].map(([m, w]) => `<button class="mp-chip${D.mode === m ? " on" : ""}" data-mode="${m}">${w}</button>`).join("")}</div>
+      <p class="mo-soft">${D.modeSet ? "You set this for today." : D.modeWhy ? `My guess, from ${esc(D.modeWhy)}.` : "My guess: no hotel or flight within 2 days."} It sets your Domestics and Wind-down.</p>${wx}`;
   }
 
   function stepChecks(D) {
@@ -282,31 +295,71 @@
     if (i) {
       const cur = i.s <= D.now && i.e > D.now, c = Math.round((costLeft(D).find((x) => x.i.key === i.key) || { d: 0 }).d);
       tools = `<div class="mp-it open mp-sel"><button class="mp-row" data-sel="${esc(i.key)}"><span class="mp-t">${cur ? "Now" : T(i.s)}</span>${i.badge}
-        <span class="mp-n">${esc(i.name)}<small>${span(i.s, i.e)}${c ? ` · uses ~${c} body` : ""}${i.taskId ? " · task" : ""}</small></span><span class="mo-row-go">✕</span></button>
+        <span class="mp-n">${esc(i.name)}<small>${span(i.s, i.e)}${c ? ` · uses ~${c} body` : ""}${i.taskId ? " · task" : ""}${i.basic ? " · every day" : ""}</small></span><span class="mo-row-go">✕</span></button>
         <div class="mp-tools">${cur ? "" : `<button data-mv="${esc(i.key)}" data-m="-15">−15 min</button>`}<button data-mv="${esc(i.key)}" data-m="15">+15 min</button><button data-mv="${esc(i.key)}" data-m="30">+30 min</button>
           ${i.e - i.s > 30 * MIN ? `<button data-cut="${esc(i.key)}">End 15 min sooner</button>` : ""}<button class="del" data-drop="${esc(i.key)}">Not today</button></div>${C.detail(i.key)}</div>`;
     }
+    // open space he tapped: what fits it, right there (d2)
+    const fg = filling != null && gaps.find((g) => +g.s === filling);
+    if (!fg) filling = null;
+    if (fg) tools = freeRow(fg, D, true);
     return `<div class="mp-h">Your schedule</div><p class="mp-lead">Tap anything to move it, cut it or drop it (today only). Tap open space to fill it. ${free ? `${hm(free)} is still free.` : "No free time left."}</p>
-      ${tools}<div class="mp-cal">${cal.html}</div>`;
+      ${addBox(D)}${tools}<div class="mp-cal">${cal.html}</div>`;
   }
+  // type to add (d3), and what the basics had to give up today
+  const addBox = (D) => `<div class="mp-quick"><input id="mpQuick" placeholder="Add: shower 15, call mum 20" value="${esc(quick)}" enterkeyhint="go" autocomplete="off"><button data-quick="1">Add</button></div>
+      ${quickMsg ? `<p class="mo-soft" style="margin:0 0 6px">${esc(quickMsg)}</p>` : ""}
+      ${Object.entries(D.plan.basicNotes && !Array.isArray(D.plan.basicNotes) ? D.plan.basicNotes : {}).map(([id, n]) => `<div class="mp-card"><p style="margin:0">${id === "winddown" ? "🌙" : "🧹"} ${esc(n)}</p></div>`).join("")}`;
   function stepList(D) {
     const up = upcoming(D), costs = new Map(costLeft(D).map((x) => [x.i.key, Math.round(x.d)]));
     const rows = [];
     const gaps = gapsOf(D);
     up.filter((i) => !i.open).forEach((i) => {
-      gaps.filter((g) => !g.shown && g.s < i.s).forEach((g) => { g.shown = true; rows.push(freeRow(g)); });
+      gaps.filter((g) => !g.shown && g.s < i.s).forEach((g) => { g.shown = true; rows.push(freeRow(g, D)); });
       const on = open.has(i.key), cur = i.s <= D.now && i.e > D.now, c = costs.get(i.key);
       rows.push(`<div class="mp-it${on ? " open" : ""}${cur ? " now" : ""}"><button class="mp-row" data-open="${esc(i.key)}"><span class="mp-t">${cur ? "Now" : T(i.s)}</span>${i.badge}
-        <span class="mp-n">${esc(i.name)}<small>${span(i.s, i.e)}${c ? ` · uses ~${c} body` : ""}${i.taskId ? " · task" : ""}</small></span><span class="mo-row-go">${on ? "⌃" : "⌄"}</span></button>
+        <span class="mp-n">${esc(i.name)}<small>${span(i.s, i.e)}${c ? ` · uses ~${c} body` : ""}${i.taskId ? " · task" : ""}${i.basic ? " · every day" : ""}</small></span><span class="mo-row-go">${on ? "⌃" : "⌄"}</span></button>
         ${on ? `<div class="mp-tools">${cur ? "" : `<button data-mv="${esc(i.key)}" data-m="-15">−15 min</button>`}<button data-mv="${esc(i.key)}" data-m="15">+15 min</button><button data-mv="${esc(i.key)}" data-m="30">+30 min</button>
           ${i.e - i.s > 30 * MIN ? `<button data-cut="${esc(i.key)}">End 15 min sooner</button>` : ""}<button class="del" data-drop="${esc(i.key)}">Not today</button></div>${C.detail(i.key)}` : ""}</div>`);
     });
-    gaps.filter((g) => !g.shown).forEach((g) => rows.push(freeRow(g)));
+    gaps.filter((g) => !g.shown).forEach((g) => rows.push(freeRow(g, D)));
     const free = gaps.reduce((a, g) => a + g.min, 0);
-    return `<div class="mp-h">Your schedule</div><p class="mp-lead">Tap anything to move it, cut it or drop it (today only). ${free ? `${hm(free)} is still free.` : "No free time left."}</p>${rows.join("") || `<div class="mp-ok">Nothing left on today's plan.</div>`}`;
+    return `<div class="mp-h">Your schedule</div><p class="mp-lead">Tap anything to move it, cut it or drop it (today only). ${free ? `${hm(free)} is still free.` : "No free time left."}</p>
+      ${addBox(D)}
+      ${rows.join("") || `<div class="mp-ok">Nothing left on today's plan.</div>`}`;
   }
-  const freeRow = (g) => `<div class="mp-it free"><div class="mp-row"><span class="mp-t">${T(g.s)}</span><span class="mp-n">Free · ${hm(g.min)}<small>until ${T(g.e)}</small></span>
-    <button class="mp-more" data-go="3" style="margin:0">Fill it ›</button></div></div>`;
+  // what fits a free slot (Junyan, 2026-10-16, d2): basics not on the plan yet, a practice, short tasks, Rest
+  function fillFor(D, g) {
+    const seen = new Set(), placed = new Set(D.items.filter((i) => i.taskId).map((i) => i.taskId));
+    const practices = D.practices.flatMap((x) => x[1]).filter((p) => p && p.mins && !p.done && !p.at && !p.auto && !p.rest && !seen.has(p.id) && seen.add(p.id))
+      .sort((a, b) => (b.pick ? 1 : 0) - (a.pick ? 1 : 0)).map((p) => ({ id: p.id, t: p.name || p.label, min: p.mins }));
+    const tasks = rankTasks(D).filter((t) => !placed.has(t.id) && D.plan.tasks[t.id] !== "later").map((t) => ({ id: t.id, t: t.task, min: (D.plan.est || {})[t.id] || t.est }));
+    const h = C.hour(g.s), eve = h >= 19 || h < 4;   // the Wind-down only in an evening slot
+    return QB().fitList(g.min, { basics: (D.basics || []).filter((b) => b.id !== "winddown" || eve), practices, tasks });
+  }
+  const KIND = { basic: "every day", practice: "practice", task: "task", rest: "" };
+  const freeRow = (g, D, top) => {
+    const on = filling === +g.s, list = on && QB() ? fillFor(D, g) : [];
+    return `<div class="mp-it free${on ? " open" : ""}${top ? " mp-sel" : ""}"><div class="mp-row"><span class="mp-t">${T(g.s)}</span><span class="mp-n">Free · ${hm(g.min)}<small>until ${T(g.e)}</small></span>
+    <button class="mp-more" data-fill="${+g.s}" style="margin:0">${on ? "Close" : "Fill it ›"}</button></div>
+    ${on ? `<div class="mp-fill">${list.map((x) => `<button data-fpick="${esc(x.kind + ":" + x.id)}" data-g="${+g.s}"><span>${esc(x.t.length > 60 ? x.t.slice(0, 59) + "…" : x.t)}</span><small>${hm(x.min)}${KIND[x.kind] ? ` · ${KIND[x.kind]}` : ""}</small></button>`).join("")}</div>` : ""}</div>`;
+  };
+  // put one Fill it pick into its slot, at the slot's start
+  async function fillPick(D, g, x) {
+    const s = g.s, e = new Date(+s + x.min * MIN);
+    if (x.kind === "basic") return C.addBasic(x.id, s);
+    if (x.kind === "task") { D.plan.tasks[x.id] = "today"; C.save(); return C.add(x.t.length > 70 ? x.t.slice(0, 69) + "…" : x.t, s, e, { taskId: x.id }); }
+    return C.add(x.t, s, e);
+  }
+  // the add box: "shower 15" goes into the next free slot that fits
+  function quickAdd() {
+    const D = P(), q = QB() && QB().parseQuick(quick);
+    if (!q) { quickMsg = "Type what and how long, like: shower 15"; return draw(true); }
+    const g = firstGap(D, q.min, D.now);
+    if (!g) { quickMsg = `No free slot of ${hm(q.min)} left today.`; return draw(true); }
+    quick = ""; quickMsg = `${q.t} at ${T(g.s)}, ${hm(q.min)}.`;
+    act(() => C.add(q.t, g.s, new Date(+g.s + q.min * MIN)));
+  }
 
   function stepTasks(D) {
     const ranked = rankTasks(D), { free, left, cap, mine } = pickTasks(D, ranked), st = D.plan.tasks;
@@ -363,7 +416,7 @@
   function draw(keep) {
     if (!el) return;
     const D = P(), step = Math.max(0, Math.min(STEPS.length - 1, D.plan.step || 0)), [, pal] = STEPS[step];
-    const sc = el.querySelector(".mp-scroll"), y = keep && sc ? sc.scrollTop : 0;
+    const sc = el.querySelector(".mp-scroll"), y = keep && sc ? sc.scrollTop : 0, typing = document.activeElement && document.activeElement.id === "mpQuick";
     const body = [stepCheckIn, stepChecks, stepSchedule, stepTasks, stepPractices, stepDay][step](D);
     const last = step === STEPS.length - 1;
     el.innerHTML = `<div class="mp"><div class="mo-bars">${STEPS.map((s, i) => `<i class="${i < step ? "done" : i === step ? "on" : ""}" data-go="${i}" title="${esc(s[0])}"></i>`).join("")}</div>
@@ -372,6 +425,7 @@
       ${busy ? `<div class="mp-busy">Saving…</div>` : ""}</div><button class="mo-x" data-close="1" aria-label="Close">✕</button>`;
     const sc2 = el.querySelector(".mp-scroll"); if (sc2 && y) sc2.scrollTop = y;
     wire(D);
+    const qi = typing && el.querySelector("#mpQuick"); if (qi) { qi.focus(); qi.setSelectionRange(qi.value.length, qi.value.length); }
   }
 
   // run a change, then draw again where he was
@@ -387,6 +441,13 @@
     on("[data-close]", () => close());
     on("[data-go]", (d) => { D.plan.step = +d.go; C.save(); draw(); });
     on("[data-begin]", () => { C.begin(); close(); });
+    on("[data-mode]", (d) => { if (D.mode !== d.mode || !D.modeSet) act(() => C.setMode(d.mode)); });
+    on("[data-fill]", (d) => { filling = filling === +d.fill ? null : +d.fill; draw(true); });
+    on("[data-fpick]", (d) => { const D2 = P(), g = gapsOf(D2).find((x) => +x.s === +d.g), x = g && fillFor(D2, g).find((y) => y.kind + ":" + y.id === d.fpick);
+      filling = null; if (x) act(() => fillPick(D2, g, x)); else draw(true); });
+    on("[data-quick]", () => quickAdd());
+    const qb = el.querySelector("#mpQuick");
+    if (qb) { qb.oninput = () => { quick = qb.value; quickMsg = ""; }; qb.onkeydown = (e) => { if (e.key === "Enter") { e.preventDefault(); quick = qb.value; quickAdd(); } }; }
     on("[data-feel]", (d) => { D.plan.feel = +d.feel; C.log(`Morning check-in: ${FEEL[+d.feel - 1][1].toLowerCase()}`); C.save(); draw(true); });
     on("[data-fix]", (d) => { const c = checks(P()).find((x) => x.id === d.fix); if (c) act(() => c.fixes[+d.i][1]()); });
     on("[data-fine]", (d) => { D.plan.ok[d.fine] = true; C.save(); draw(true); });
@@ -396,8 +457,11 @@
     on("[data-drop]", (d) => { open.delete(d.drop); sel = null; act(() => C.drop(d.drop)); });
     on("[data-sel]", () => { sel = null; draw(true); });
     on("[data-stop]", (d) => { const k = cal && cal.keys[+d.stop];
-      if (!k) { D.plan.step = 3; C.save(); draw(); return; }
-      sel = sel === k ? null : k; draw(true); const t = el.querySelector(".mp-sel"); if (t) t.scrollIntoView({ behavior: "smooth", block: "nearest" }); });
+      if (!k) {   // open space: Fill it under the free slot it belongs to (d2), not the Tasks step
+        const sp = cal && cal.spans && cal.spans[+d.stop], g = sp && gapsOf(D).find((x) => +x.s < sp[1] && +x.e > sp[0]);
+        if (!g) { quickMsg = "That free time has passed."; draw(true); return; }
+        sel = null; filling = +g.s; draw(true); const t = el.querySelector(".mp-sel"); if (t) t.scrollIntoView({ behavior: "smooth", block: "nearest" }); return; }
+      filling = null; sel = sel === k ? null : k; draw(true); const t = el.querySelector(".mp-sel"); if (t) t.scrollIntoView({ behavior: "smooth", block: "nearest" }); });
     on("[data-task]", (d) => { D.plan.tasks[d.task] = D.plan.tasks[d.task] === d.v ? undefined : d.v; C.save(); draw(true); });
     on("[data-est]", (d) => { const t = D.tasks.find((x) => x.id === d.est); if (t) { t.estimate = `${d.m} min`; (D.plan.est = D.plan.est || {})[d.est] = +d.m; C.save(); } draw(true); });
     on("[data-all]", () => { showAll = !showAll; draw(true); });
@@ -434,7 +498,7 @@
     }
   }
 
-  function close() { if (el) { el.className = ""; el.innerHTML = ""; } el = null; open.clear(); sel = null; cal = null; showAll = false; noting = null; draft = ""; C && C.onClose && C.onClose(); }
+  function close() { if (el) { el.className = ""; el.innerHTML = ""; } el = null; open.clear(); sel = null; cal = null; showAll = false; noting = null; draft = ""; filling = null; quick = ""; quickMsg = ""; C && C.onClose && C.onClose(); }
 
   root.QuestMorning = {
     open(ctx) {
@@ -449,10 +513,11 @@
     redraw() { if (el && el.className === "open") draw(true); },
     isOpen: () => !!(el && el.className === "open"),
     rankTasks: (D) => rankTasks(D),   // the Your move box offers the same top tasks
+    gapsOf: (D) => gapsOf(D),         // the basics are placed in the same free gaps (quest.html)
     // how many things the day check would raise right now (the button's subtitle)
     count(ctx) { C = C || ctx; try { return checks(P()).length; } catch { return 0; } },
     close,
     // for checks from the console and tests
-    _t: { checks, rankTasks, pickTasks, gapsOf, dateIn, estOf },
+    _t: { checks, rankTasks, pickTasks, gapsOf, dateIn, estOf, fillFor },
   };
 })(typeof window !== "undefined" ? window : globalThis);

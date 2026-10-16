@@ -626,7 +626,8 @@
 <script src="nvc-words.js?v=20261010a"></script>
 <script src="quest-fx.js?v=20261009b"></script>
 <script src="quest-night.js?v=20261011a"></script>
-<script src="quest-morning.js?v=20261016a"></script>
+<script src="quest-basics.js?v=20261016c"></script>
+<script src="quest-morning.js?v=20261016c"></script>
 <script src="quest-agenda.js?v=20261014c"></script>
 </head>
 <body>
@@ -862,6 +863,8 @@
       pullKeeps();
       nvSend();
       lastPull = new Date(); pullErr = null;
+      // every day, without him typing (d1): the basics go in on each full pull, once (placeBasics only adds what is missing)
+      placeBasics().then(() => { if (window.QuestMorning) QuestMorning.redraw(); }).catch(e => console.warn("basics", e));
       saveSnap();
       setTimeout(openPending, 0);
     } catch (e) { pullErr = String(e.message || e); }
@@ -966,7 +969,7 @@
     [/stretch|mobility/i, "stretching"], [/yoga|shambhavi|meditat|sadhana|kriya|breath/i, "yoga"],
     [/walk|hike|trek/i, "walk"], [/quad|motor|bike/i, "motorbike"],
     [/festival|wedding|birthday|gala|celebrat/i, "confetti"], [/party|dance|zouk|sbk|social|concert/i, "music"],
-    [/\bcall\b|phone/i, "phone"], [/meet|zoom|chat with/i, "users"],
+    [/\bcall\b|phone/i, "phone"], [/meet|zoom|chat with|caney/i, "users"],
     [/flight|airport|✈|\b[A-Z]{2}\d{2,4}\b/, "plane"], [/\bbus\b/i, "bus"], [/\btrain\b/i, "train"],
     [/ferry|boat|cruise/i, "ship"], [/drive|ride|uber|taxi|transfer|car\b/i, "car"],
     [/check.?out|check.?in|pack|luggage|lobby/i, "luggage"], [/work|admin|email|focus|annex|desk/i, "briefcase"],
@@ -1059,7 +1062,7 @@
   const HARD = /swim|cycl|\bbike\b|walk|\btour\b|excursion|safari|snorkel|party|festival|wedding|concert|competition|performance|congress|gala/i;
   const FOCUSED = /\bdrive\b|driving/i;
   function energy(b){                                  // { rate: spent per hour while it runs }
-    if (isSadhana(b) || isRecovery(b) || isMeal(b) || isSleep(b) || b.kind === "open" || b.kind === "break" || /^rest\b|free time/i.test(b.t)) return { rate:0 };
+    if (isSadhana(b) || isRecovery(b) || isMeal(b) || isSleep(b) || b.kind === "open" || b.kind === "break" || /^rest\b|free time/i.test(b.t) || b.basic === "winddown") return { rate:0 };
     if (VERY_HARD.test(b.t)) return { rate:10 };
     if (isGym(b) || b.kind === "body" || b.kind === "dance" || HARD.test(b.t) || groupOf(b) === "major") return { rate:7 };
     if (groupOf(b) === "work" || FOCUSED.test(b.t)) return { rate:5 };
@@ -1627,6 +1630,7 @@
     G.day.started = G.day.started || {};
     list.forEach(b => {
       G.day.checks[gk(b)] = "in"; G.day.started[gk(b)] = b.s.toISOString();
+      if (b.basic === "winddown" && !G.day.windDown) G.day.windDown = b.s.toISOString();
       payBlock(b);
     });
     saveG();
@@ -1877,6 +1881,7 @@
   }
   function dropBlock(b){
     log(`Removed ${b.t} from today`);
+    if (b.basic) { const p = (G.day.plan = G.day.plan || {}); (p.basicsOff = p.basicsOff || {})[b.basic] = true; if (p.basicNotes) delete p.basicNotes[b.basic]; saveG(); }   // not put back today
     return writeOps(o => {
       if (b.extra) o.adds = o.adds.filter(x => x.key !== b.key);
       else { if (!o.drops.includes(b.key)) o.drops.push(b.key); delete o.edits[b.key]; }
@@ -1908,6 +1913,7 @@
      Junyan through 2026-10-06, one situation at a time; anything not built
      yet opens the plain edit box. */
   function openStop(b){
+    if (b.basic) return openBasic(b);
     if (isGym(b)) return openGym(b);
     if (isMeal(b)) return openMeal(b);
     if (isSadhana(b)) return openSadhana(b);
@@ -2767,8 +2773,8 @@
         if (!n) return "Everything coming up already has a prep list.";
         (G.research = G.research || []).push({ key:gk(n), title:n.t, s:n.s.toISOString() }); saveG();
         return `The scout is on ${shortName(n)}. Its list lands on the next run (6 AM or 8 PM).`; },
-      lantern: async () => { G.day.windDown = now().toISOString(); saveG(); const sl = blocks().find(isSleep);
-        return `Wind-down started. Phone on the charger, lights low${sl ? `. Bed at ${fmtT(sl.s)}` : ""}.`; },
+      lantern: async () => { G.day.windDown = now().toISOString(); saveG(); const sl = blocks().find(isSleep), wd = blocks().find(x => x.basic === "winddown" && x.e > now());
+        return `Wind-down started. Phone on the charger, lights low${sl ? `. Bed at ${fmtT(sl.s)}` : ""}${wd ? ". Your Wind-down list is on the plan" : ""}.`; },
       lotus: async (item, o = {}) => { const r = RECOVER.find(x => x[0] === o.choice) || RECOVER[0]; startNow(r[0], r[1]); return `${r[0]} for ${r[1]} min. It's on your plan now.`; },
       bell: async (item, o = {}) => `Focus until ${fmtT(new Date(o.endsAt || +now() + 50 * 60000))}.`,
       relive: item => log(`Relived: ${item.name}`),
@@ -2997,7 +3003,8 @@
   function moDetail(b, packFirst){
     const k = gk(b), mins = Math.round((b.e - b.s) / 60000);
     let h = `<div class="mo-det-time">${fmtT(b.s)} to ${fmtT(b.e)} · ${fmtHM(mins)}</div>`;
-    if (isMeal(b)) {
+    if (b.basic) h += basicHtml(b, "mo-ck", "mo-det-lb");
+    else if (isMeal(b)) {
       const M = ((G.day.meals = G.day.meals || {})[k] = G.day.meals[k] || { plate:{}, phone:false });
       h += `<div class="mo-det-lb">On the plate</div>${PLATE.map(([id, txt]) => `<button class="mo-ck${M.plate[id] ? " on" : ""}" data-plate="${id}" data-k="${esc(b.key)}"><span class="bx">${M.plate[id] ? "✓" : ""}</span>${txt}</button>`).join("")}
         <button class="mo-ck${M.phone ? " on" : ""}" data-phone="${esc(b.key)}"><span class="bx">${M.phone ? "✓" : ""}</span>Phone face down until I'm done</button>
@@ -3043,6 +3050,14 @@
     root.querySelectorAll("[data-tick]").forEach(b => b.onclick = e => { e.stopPropagation();
       const i = b.dataset.tick, blk = blkOf(b.dataset.k); if (!blk) return;
       const W = G.day.work[gk(blk)]; W.tick[i] = !W.tick[i]; saveG(); redraw(); });
+    root.querySelectorAll("[data-bstep]").forEach(b => b.onclick = e => { e.stopPropagation();
+      const blk = blkOf(b.dataset.k), B = basicOf(blk); if (!B) return;
+      const i = b.dataset.bstep, W = G.day.work[gk(blk)], st = B.steps[i] || {}; W.tick[i] = !W.tick[i];
+      if (W.tick[i] && st.h) logHabit(st.h, true);   // Dr Ellie and the lamp tick their Prana actions
+      if (W.tick[i] && st.wind && !G.day.windDown) G.day.windDown = now().toISOString();
+      saveG(); redraw(); });
+    root.querySelectorAll("[data-bdone]").forEach(b => b.onclick = e => { e.stopPropagation();
+      const blk = blkOf(b.dataset.bdone); if (blk) basicDone(blk); redraw(); });
     root.querySelectorAll("[data-ask]").forEach(b => b.onclick = e => { e.stopPropagation();
       const blk = blkOf(b.dataset.ask); if (!blk) return; (G.research = G.research || []).push({ key:gk(blk), title:blk.t, s:blk.s.toISOString() }); saveG(); redraw(); });
   }
@@ -3051,17 +3066,106 @@
      make sure everything makes sense ... including assesing which tasks to do"). quest-morning.js
      walks him through it; everything it changes is a today-only edit through /ops, the same as
      the stop windows. This side gathers the day and does the writes. */
+  /* ---------- the basics (Junyan, 2026-10-16, d1 d5 d6 d7) ----------
+     Every day the plan puts in "Go over the day with Caney" and Domestics after breakfast, and the
+     Wind-down ending at bed, without him typing. quest-basics.js decides lengths, steps and where they go;
+     this places them as today-only blocks (adds with basic, bmode, wd) when the planner opens. He can move,
+     cut or drop them like anything else; one he drops stays off for today (G.day.plan.basicsOff). */
+  const QB = () => window.QuestBasics;
+  const wdToday = () => new Date(gameYmd() + "T12:00:00Z").getUTCDay();
+  // home or travelling: his switch for today (G.day.plan.mode, on every device), else the calendar's guess
+  function travelGuess(){
+    if (!QB()) return { mode:"home", why:"" };
+    const list = (PLAN ? PLAN.blocks : []).map(b => ({ t:b.t, day:tzYmd(new Date(b.s)) }))
+      .concat(...Object.entries(AG).map(([d, bs]) => (bs || []).map(b => ({ t:b.t, day:d }))));
+    return QB().guessMode(list, gameYmd());
+  }
+  const dayMode = () => ((G.day.plan || {}).mode) || travelGuess().mode;
+  const basicOf = b => b && b.basic && QB() ? QB().basic(b.basic, b.bmode || dayMode(), b.wd ?? wdToday()) : null;
+  const basicAdd = (id, s, min) => { const B = QB().basic(id, dayMode(), wdToday());
+    return { key:newKey(s), s:new Date(s).toISOString(), e:new Date(+s + min * 60000).toISOString(), t:B.t, type:"task", cal:"you", basic:id, bmode:dayMode(), wd:wdToday() }; };
+  // the basics not on today's plan (for Fill it)
+  const basicsLeft = all => QB() ? QB().IDS.filter(id => !all.some(b => b.basic === id)).map(id => QB().basic(id, dayMode(), wdToday())) : [];
+  function placeArgs(){
+    const D = MO_CTX.data(), t = D.now, hr = MO_CTX.hour(t), off = G.day.plan.basicsOff || {}, have = { ...off };
+    D.items.forEach(i => { if (i.basic) have[i.basic] = true; });
+    const bf = D.items.find(i => i.meal && /breakfast|brunch/i.test(i.name) && MO_CTX.hour(i.s) < 12);
+    const wake = D.items.filter(i => i.sleep && +i.e <= +t && MO_CTX.hour(i.e) < 12).pop(), bed = D.items.find(i => i.sleep && +i.s > +t);
+    return { now:t, gaps:QuestMorning.gapsOf(D), breakfastEnd:bf && bf.e, wake:wake ? wake.e : t, latest:MO_CTX.at(t, 14),
+      bed:bed && bed.s, busy:D.items.filter(i => !i.open && !i.brk && !i.sleep && i.basic !== "winddown").map(i => [+i.s, +i.e]),
+      mode:dayMode(), wd:wdToday(), have, morning: hr >= 4 && hr < 14 };
+  }
+  async function placeBasics(){
+    if (!QB() || !PLAN || !window.QuestMorning || !lastPull) return;   // after the first full pull: the game (and what he dropped) is in
+    // one note per basic (what it had to give up today); a basic he dropped takes its note with it
+    const keepNotes = r => { const n = (G.day.plan.basicNotes = G.day.plan.basicNotes && !Array.isArray(G.day.plan.basicNotes) ? G.day.plan.basicNotes : {}); r.notes.forEach(x => { n[x.id] = x.t; }); };
+    const first = QB().placeBasics(placeArgs());
+    if (!first.place.length) { keepNotes(first); saveG(); return; }
+    await writeOps(o => {   // again against the edit layer writeOps just pulled, so two devices place them once
+      const r = QB().placeBasics(placeArgs()); keepNotes(r);
+      r.place.forEach(p => { log(`Planned ${p.t}: ${fmtT(p.s)} to ${fmtT(p.e)}`); o.adds.push(basicAdd(p.id, p.s, p.min)); });
+    });
+    saveG();
+  }
+  // ticking a basic done: closes it, and Domestics ticks Dr Ellie AM, the Wind-down Dr Ellie PM. A second tap reopens the block (the Prana action stays ticked).
+  function basicDone(b){
+    const k = gk(b), B = basicOf(b); if (!B) return;
+    if (G.day.closes[k] === "done") { delete G.day.closes[k]; log(`Not done after all: ${B.t}`); saveG(); return; }
+    closeOut(b, "done");
+    if (B.habit) logHabit(B.habit, true);
+    if (b.basic === "winddown" && !G.day.windDown) G.day.windDown = now().toISOString();
+    saveG();
+  }
+  async function setDayMode(m){
+    const was = dayMode(); G.day.plan.mode = m; log(`Today: ${m === "travel" ? "travelling" : "home"}`); saveG();
+    if (was === m) return;   // he confirmed the guess: nothing to change
+    // Domestics and the Wind-down not done yet are placed again with the new length and steps
+    // (Domestics in the first gap that fits after breakfast, the Wind-down still ending at bed)
+    // (only ones that have not started; one he already began keeps its place and ticks). After 2 PM the morning
+    // basics are not placed again, so there they keep their start and only change length.
+    const t = now(), keep = a => !a.basic || a.basic === "caney" || G.day.closes[a.key] === "done" || +new Date(a.s) <= +t;
+    if (MO_CTX.hour(t) >= 14 || MO_CTX.hour(t) < 4) {
+      await writeOps(o => o.adds.forEach(a => { if (keep(a)) return;
+        const B = QB().basic(a.basic, m, a.wd ?? wdToday()); a.bmode = m;
+        if (a.basic === "winddown") a.s = new Date(+new Date(a.e) - B.min * 60000).toISOString();
+        else a.e = new Date(+new Date(a.s) + B.min * 60000).toISOString(); }));
+      return placeBasics();
+    }
+    await writeOps(o => { o.adds = o.adds.filter(keep); });
+    if (G.day.plan.basicNotes && !Array.isArray(G.day.plan.basicNotes)) { delete G.day.plan.basicNotes.domestics; delete G.day.plan.basicNotes.winddown; }
+    return placeBasics();
+  }
+  // a basic's checklist, in the planner (mo-ck) or its own window (wck)
+  function basicHtml(b, ck, lb){
+    const B = basicOf(b), k = gk(b); if (!B) return "";
+    const W = ((G.day.work = G.day.work || {})[k] = G.day.work[k] || { tick:{}, goal:"" }), done = G.day.closes[k] === "done";
+    const hn = B.habit ? (HABITS.find(x => x[0] === B.habit) || [])[5] : "";
+    return `${B.steps.length ? `<div class="${lb}">Steps ${B.steps.filter((_, i) => W.tick[i]).length}/${B.steps.length}</div>` : ""}
+      ${B.steps.map((x, i) => `<button class="${ck}${W.tick[i] ? " on" : ""}" data-bstep="${i}" data-k="${esc(b.key)}"><span class="bx">${W.tick[i] ? "✓" : ""}</span><span>${esc(x.t)}</span></button>`).join("")}
+      <button class="mo-det-btn" data-bdone="${esc(b.key)}">${done ? "✓ Done · tap to undo" : `Done${hn ? ` (ticks ${esc(hn)})` : ""}`}</button>`;
+  }
+  function openBasic(b){
+    openSheet(`${winHead(b)}${basicHtml(b, "wck", "win-lb")}
+      ${b.basic === "winddown" ? `<div class="actions"><button class="btn" id="bNight">🌙 Open the bedtime screen</button></div>` : ""}
+      <div class="actions"><button class="btn ghost" id="bEdit">Change time or name</button></div>`, true);
+    bindDetail($("sheet"), () => { const x = blocks().find(y => y.key === b.key); if (x) openBasic(x); else closeSheet(); });
+    if ($("bNight")) $("bNight").onclick = () => { closeSheet(); openNight(); };
+    $("bEdit").onclick = () => openEdit(b);
+  }
+
   const blkByKey = key => blocks().find(x => x.key === key);
   const MO_CTX = {
     data: () => {
       const t = now(), all = blocks(), d = morningData();
       G.day.plan = G.day.plan || {};
       const est = G.day.plan.est || {};
+      const tg = travelGuess();
       return { now:t, today:tzYmd(t), greet:d.greet, place:d.place, date:d.date, prana:d.prana, body:body(), wx:moWx(), plan:G.day.plan,
+        mode: G.day.plan.mode || tg.mode, modeWhy: tg.why, modeSet: !!G.day.plan.mode, basics: basicsLeft(all),
         recovery: recoveryReasons(),
         practiced: all.some(b => isSadhana(b) && ["in", "late"].includes(G.day.checks[gk(b)])) || HABITS.some(h => h[7] === "Practice" && (G.day.habits || {})[h[0]]),
         items: all.map(b => ({ key:b.key, name:moName(b), s:b.s, e:b.e, kind:b.kind, open:b.kind === "open", brk:b.kind === "break", meal:isMeal(b), sleep:isSleep(b),
-          sadhana:isSadhana(b), strength:STRENGTH(b), flight:/flight|\b[A-Z]{2}\d{2,4}\b/.test(b.t) && b.kind === "travel", extra:!!b.extra, taskId:b.taskId || null,
+          sadhana:isSadhana(b), strength:STRENGTH(b), flight:/flight|\b[A-Z]{2}\d{2,4}\b/.test(b.t) && b.kind === "travel", extra:!!b.extra, taskId:b.taskId || null, basic:b.basic || null,
           cost:energy(b).rate * spendMult() * Math.max(0, (b.e - b.s) / 3600000), badge:badge(b, 30) })),
         tasks: TASKS.map(x => est[x.id] ? { ...x, estimate:`${est[x.id]} min` } : x),
         practices: moPractices() };
@@ -3097,16 +3201,23 @@
     },
     habit: id => { logHabit(id, true); saveG(); },
     practiceAction: id => { if (id === "nvc") { closeMorning(); openCheckin(); } },
-    detail: key => { const b = blkByKey(key); return b && !b.extra ? moDetail(b) : ""; },
-    // the main page's calendar from this hour to the end of today's plan; keys[i] is the block behind data-stop i (null for open space)
+    detail: key => { const b = blkByKey(key); return b && (!b.extra || b.basic) ? moDetail(b) : ""; },
+    // the main page's calendar from this hour to the end of today's plan; keys[i] is the block behind data-stop i (null for open space), spans[i] its [start, end] ms
     calendar: () => {
       if (!AGD()) return null;
       const t = now(), stops = stopsOf(agendaBlocks(t)), a0 = +fromField(toField(t).slice(0, 2) + ":00", t);
       const end = +dayStart(AGD().addDays(gameYmd(), 1)) + 4 * 3600000;
       const last = stops.filter(st => !st.free && +st.s < end).reduce((m, st) => Math.max(m, +st.e), 0);
       const z0 = Math.min(end, Math.max(a0 + 3 * 3600000, Math.ceil(last / 3600000) * 3600000));
-      return { html:calendarHTML(stops, currentOf(blocks(), t), t, { a0, z0 }), keys:stops.map(st => st.free ? null : st.blocks[0].key) };
+      return { html:calendarHTML(stops, currentOf(blocks(), t), t, { a0, z0 }), keys:stops.map(st => st.free ? null : st.blocks[0].key),
+        spans:stops.map(st => [+st.s, +st.e]) };
     },
+    // the basics: one placed at a given start (Fill it), and the day's Home / Travelling switch
+    addBasic: (id, s) => { const B = QB() && QB().basic(id, dayMode(), wdToday()); if (!B) return;
+      const p = G.day.plan; if (p.basicsOff) delete p.basicsOff[id];
+      log(`Planned ${B.t}: ${fmtT(s)} to ${fmtT(new Date(+s + B.min * 60000))}`);
+      return writeOps(o => o.adds.push(basicAdd(id, s, B.min))); },
+    setMode: m => setDayMode(m),
     bind: (root, redraw) => bindDetail(root, redraw),
     begin: () => { G.day.briefDone = true; log("Planned the day"); saveG(); },
     onClose: () => render(),
@@ -3120,6 +3231,7 @@
     if (questKey() && !openMorning.gym) { openMorning.gym = true;   // this week's workouts, for Training
       qfetch("/quest/workout").then(j => { gymInfo = j || gymInfo; QuestMorning.redraw(); }).catch(() => {}); }
     QuestMorning.open(MO_CTX);
+    placeBasics().then(() => QuestMorning.redraw()).catch(e => console.warn("basics", e));
   }
   function closeMorning(){ if (window.QuestMorning) QuestMorning.close(); }
   document.addEventListener("keydown", e => {
