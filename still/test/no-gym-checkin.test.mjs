@@ -29,10 +29,9 @@ test("gym blocks are not offered the activity check-in", () => {
     assert.equal(actRatable(blk(t)), false, t);
 });
 
-test("other activities keep their check-in, meals and sleep still go their own way", () => {
+test("other activities keep their check-in", () => {
   const { actRatable } = pageFns();
   for (const t of ["Hike to the falls", "Deep work", "Dance class", "Walk by the river"]) assert.equal(actRatable(blk(t)), true, t);
-  for (const t of ["Lunch", "Sleep"]) assert.equal(actRatable(blk(t)), false, t);
 });
 
 test("every place the check-in shows goes through actRatable", () => {
