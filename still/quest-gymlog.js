@@ -84,5 +84,48 @@
   // tapping a row: it opens and any other row shuts; tapping the open row shuts it
   const toggle = (openCode, c) => (openCode === c ? null : c);
 
-  root.QuestGymLog = { MOVE, JW, PROGRAMS, programName, programFor, newSession, fromDraft, logged, shortLevel, moveHTML, movesHTML, toggle };
+  /* "How do you feel now?" (Junyan, 2026-10-17, d15 and d16; research: life-wiki answers/2026-10-17-strength-training-
+     prana-and-body.md). One tap at Finish and save, and it is the only thing the gym log pays: "don't give any points for
+     logging it". Body base points; gains are multiplied by the level's gainMult, losses are not. Wiped out also costs 1
+     prana (d16). Good, a healthy tired, is the goal. Paid once per gym block: the answer is kept in G.day.mealq under
+     feelKey with kind "gym", which syncs like a meal rating. */
+  const FEEL = [
+    { id:"energised", icon:"⚡", text:"Energised, light", b:2, p:0 },
+    { id:"good", icon:"🙂", text:"Good, a healthy tired", b:1, p:0, goal:true },
+    { id:"beat", icon:"😮‍💨", text:"Beat, but a good session", b:0, p:0 },
+    { id:"wiped", icon:"🫠", text:"Wiped out, drained or foggy", b:-3, p:-1 },
+  ];
+  const gain = (v, mult) => (v > 0 ? Math.round(v * mult) : v);
+  function feelPoints(id, mult) {
+    const f = FEEL.find((x) => x.id === id);
+    return f ? { b: gain(f.b, mult), p: gain(f.p, mult) } : null;
+  }
+  const feelKey = (blockKey, ymd) => "gym:" + (blockKey || ymd);
+  // the points to pay now, or null: needs a logged move, an answer, and no answer already kept for this block
+  function feelPay(mealq, key, id, moves, mult) {
+    if (!moves || !id || (mealq && mealq[key])) return null;
+    return feelPoints(id, mult);
+  }
+  const feelRecord = (id, pts, at) => ({ kind:"gym", feel:id, at, b:pts.b, p:pts.p });
+  const ptsText = (pts) => [pts.b ? `${pts.b > 0 ? "+" : "−"}${Math.abs(pts.b)} body` : "", pts.p ? `${pts.p > 0 ? "+" : "−"}${Math.abs(pts.p)} prana` : ""].filter(Boolean).join(", ") || "0";
+  function feelHTML(esc, sel, mult) {
+    return `<div class="glabel">How do you feel now?</div><div class="gfeel">${FEEL.map((f) =>
+      `<button class="gchip gf${sel === f.id ? " on" : ""}${f.goal ? " goal" : ""}" data-feel="${f.id}" aria-pressed="${sel === f.id}">${f.icon} ${esc(f.text)}<b>${esc(ptsText(feelPoints(f.id, mult)))}</b>${f.goal ? `<small>🎯 Aim for this most sessions</small>` : ""}</button>`).join("")}</div>`;
+  }
+  /* The existing recovery advice (recoveryReasons) gets one more reason: wiped out twice in 7 days, or once after a
+     night under 70 (today or yesterday). days: G.days style, keyed by a date string, each { wiped, sleep }. */
+  function wipedReason(days, today) {
+    const t = Date.parse(today), recent = [];
+    for (const [k, v] of Object.entries(days || {})) {
+      const ago = Math.round((t - Date.parse(k)) / 86400000);
+      if (v && +v.wiped > 0 && ago >= 0 && ago < 7) recent.push({ ago, n: +v.wiped, sleep: v.sleep });
+    }
+    const n = recent.reduce((a, x) => a + x.n, 0);
+    if (n >= 2) return `wiped out after gym ${n} times this week, so a lighter session, Upa Yoga or rest`;
+    if (recent.some((x) => x.ago <= 1 && typeof x.sleep === "number" && x.sleep < 70)) return "wiped out after gym on short sleep, so a lighter session, Upa Yoga or rest";
+    return null;
+  }
+
+  root.QuestGymLog = { MOVE, JW, PROGRAMS, programName, programFor, newSession, fromDraft, logged, shortLevel, moveHTML, movesHTML, toggle,
+    FEEL, feelPoints, feelKey, feelPay, feelRecord, feelHTML, wipedReason };
 })(typeof window !== "undefined" ? window : globalThis);
