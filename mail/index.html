@@ -70,6 +70,7 @@ header{display:flex;align-items:flex-end;gap:12px;padding-block:16px 10px;flex-w
 @keyframes pulse{50%{opacity:.25}}
 .toggle{border:1px solid var(--line);background:var(--glass);border-radius:999px;padding:4px 11px;font:600 12px var(--font);color:var(--ink)}
 nav.tabs{display:flex;gap:24px;border-bottom:1px solid var(--line);overflow-x:auto}
+@media (max-width:430px){nav.tabs{gap:16px}.tab{letter-spacing:.12em}}
 .tab{background:none;border:0;border-bottom:2px solid transparent;padding:10px 0 9px;font:600 12px var(--font);letter-spacing:.18em;text-transform:uppercase;color:var(--tab);white-space:nowrap}
 .tab .n{font:600 11px var(--font);margin-left:6px;letter-spacing:0}
 .tab.on{color:#fff;border-bottom-color:var(--gold)}
@@ -175,6 +176,47 @@ main>.empty,.pair .summary,.note{color:#fff;text-shadow:0 1px 2px rgba(9,22,50,.
 .pair{max-width:420px;margin:40px auto;display:grid;gap:12px}
 .pair input::placeholder{color:var(--dim)}
 .pair input{background:rgba(9,22,50,.5);border:1px solid var(--line);border-radius:12px;color:var(--ink);font:15px var(--font);padding:12px}
+/* the Digest tab (ticket 17, look C "Headlines" v5, 2026-10-17): one panel of headlines in sections; one item open at a
+   time; a tap never moves the headline he touched (#view has no scroll anchoring; steady() scrolls by the difference) */
+#view{overflow-anchor:none}
+.reach{background:var(--glass);border:1px solid var(--line);border-radius:18px;padding:10px 14px;margin-top:16px;display:grid;grid-template-columns:52px minmax(0,1fr);gap:10px;align-items:center}
+.reach .t{font:600 12px var(--font);color:var(--dim);font-variant-numeric:tabular-nums}
+.reach .q{border-left:3px solid var(--gold);background:var(--gold-soft);border-radius:10px;padding:7px 12px}
+.reach .q b{display:block;font-size:14px} .reach .q span{font-size:12.5px;color:var(--dim)}
+.paper{background:var(--glass);border:1px solid var(--line);border-radius:22px;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);overflow:hidden;margin-top:12px}
+.paper .grp{padding:12px 16px 4px;font:600 11px var(--font);letter-spacing:.14em;text-transform:uppercase;color:var(--dim);border-top:1px solid var(--line)}
+.paper .grp:first-child{border-top:0}
+.paper .grp.look{color:var(--warn)}
+.hl{all:unset;box-sizing:border-box;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;width:100%;padding:11px 16px;cursor:pointer}
+.hl:focus-visible{outline:2px solid var(--gold);outline-offset:-2px}
+.hl b{font-weight:650;font-size:15px;display:block;overflow-wrap:anywhere}
+.hl small{color:var(--faint);font-size:12.5px}
+.hl .arrow{color:var(--faint);font-size:13px}
+.hlbody{padding:0 16px 14px;display:grid;gap:8px}
+.hlbody .gist{font:400 15px/1.55 var(--font);color:var(--dim)}
+.foryou{background:var(--warn-soft);border-radius:12px;padding:8px 12px;font-size:14px}
+.foryou b{color:var(--warn)}
+.act{color:var(--gold);font-weight:700;font-size:14px;margin:0}
+.deal-facts{display:grid;grid-template-columns:auto minmax(0,1fr);gap:2px 12px;font-size:14px;margin:0}
+.deal-facts dt{color:var(--faint)} .deal-facts dd{margin:0;overflow-wrap:anywhere}
+.deep{display:grid;gap:6px;background:var(--glass-2);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+.deep summary{cursor:pointer;padding:2px 0;font:600 11px var(--font);letter-spacing:.14em;text-transform:uppercase;color:var(--dim)}
+.deep ul{margin:0;padding-left:18px;display:grid;gap:3px;font-size:14px}
+.deep p{margin:0;font-size:14px;color:var(--dim)}
+.deep .dlinks{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:13.5px}
+.deep .dlinks a{color:var(--claude)}
+.btn.keep[aria-pressed="true"]{background:var(--mint-soft);border-color:var(--mint);color:var(--mint)}
+.how{font-size:12.5px;color:var(--faint)}
+.notebox{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px}
+.notebox input{min-width:0;background:var(--glass-2);color:var(--ink);border:1px solid var(--line);border-radius:12px;padding:10px 12px;font:14px var(--font)}
+.notebox input::placeholder{color:var(--faint)}
+.noted{font-size:13px;color:var(--mint)} .noted a{color:var(--mint)}
+.tripbox{background:var(--glass);border:1px solid var(--line);border-radius:22px;padding:12px 16px;display:grid;gap:6px;margin-top:12px}
+.tripbox .lbl{font:600 11px var(--font);letter-spacing:.14em;text-transform:uppercase;color:var(--dim)}
+.tripbox ul{margin:0;padding-left:18px;font-size:14px;color:var(--dim);display:grid;gap:3px}
+.fin{text-align:center;display:grid;gap:10px;justify-items:center;padding:30px 10px;background:var(--glass);border:1px solid var(--line);border-radius:22px;margin-top:12px}
+.fin .seal{width:64px;height:64px;font-size:28px}
+.showread{margin-top:10px}
 @media (prefers-reduced-motion:reduce){.seal.stamp,.live.busy i{animation:none}.btn:active{transform:none}}
 </style>
 </head>
@@ -190,6 +232,7 @@ main>.empty,.pair .summary,.note{color:#fff;text-shadow:0 1px 2px rgba(9,22,50,.
   <nav class="tabs" role="tablist" aria-label="Sections">
     <button class="tab on" role="tab" aria-selected="true" data-tab="sort">Sort<span class="n" id="nSort"></span></button>
     <button class="tab" role="tab" aria-selected="false" data-tab="messages">Messages<span class="n" id="nMessages"></span></button>
+    <button class="tab" role="tab" aria-selected="false" data-tab="digest">Digest<span class="n" id="nDigest"></span></button>
     <button class="tab" role="tab" aria-selected="false" data-tab="report">Report<span class="n" id="nReport"></span></button>
   </nav>
   <main id="view"></main>
@@ -206,7 +249,9 @@ main>.empty,.pair .summary,.note{color:#fff;text-shadow:0 1px 2px rgba(9,22,50,.
                   set(k, v){ try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch {} } };
   // same pairing as Day Quest: one code per device, kept on this origin ("quest-key"); #pair=CODE pairs in one tap
   const hashPair = /[#&]pair=([^&]+)/.exec(location.hash);
-  if (hashPair) { store.set("quest-key", decodeURIComponent(hashPair[1]).trim()); history.replaceState(null, "", location.pathname + location.search); }
+  // #digest opens the Digest tab (the evening ping and the calendar event link here)
+  const wantDigest = /^#(.*&)?digest(&|$)/.test(location.hash);
+  if (hashPair) { store.set("quest-key", decodeURIComponent(hashPair[1]).trim()); history.replaceState(null, "", location.pathname + location.search + (wantDigest ? "#digest" : "")); }
   const key = () => store.get("quest-key") || "";
   async function api(path, opts = {}){
     const r = await fetch(API + path, { ...opts, cache:"no-store",
@@ -223,7 +268,9 @@ main>.empty,.pair .summary,.note{color:#fff;text-shadow:0 1px 2px rgba(9,22,50,.
   const when = ms => { const d = new Date(ms), t = new Date();
     return d.toDateString() === t.toDateString() ? `${pad(d.getHours())}:${pad(d.getMinutes())}` : `${pad(d.getMonth()+1)}.${pad(d.getDate())}`; };
 
-  const S = { tab:"sort", open:null, data:null, report:null, picks:{}, choose:{}, why:{}, done:{}, bodies:{}, busy:false, error:null };
+  const S = { tab: wantDigest ? "digest" : "sort", open:null, data:null, report:null, picks:{}, choose:{}, why:{}, done:{}, bodies:{}, busy:false, error:null,
+    // the Digest: its data, the one open item, read ones shown, typed notes, open deeper dives, local reads not yet confirmed
+    dig:null, dOpen:null, dShowRead:false, drafts:{}, deepOpen:{}, dLocal:{} };
   const routeName = k => (S.data?.routes || []).find(r => r.key === k)?.name || k;
 
   let toastT;
@@ -241,6 +288,15 @@ main>.empty,.pair .summary,.note{color:#fff;text-shadow:0 1px 2px rgba(9,22,50,.
     try { S.data = await api("/inbox/list"); S.error = null; }
     catch (e) { S.error = e; }
     if (S.tab === "report") { try { S.report = await api("/inbox/report"); } catch {} }
+    if (S.tab === "digest" || S.tab === "report") { try { S.dig = await api("/inbox/digest"); } catch {} }
+    if (S.tab === "digest") {
+      // never re-draw under his fingers while he types a note; keep the open headline where it is
+      if (document.activeElement && document.activeElement.closest("#view .notebox")) { counts(); liveLine(); return; }
+      if (S.dOpen === null && !S.dTouched) S.dOpen = digestOrder()[0] || null;
+      // the open item was read on another device: open the next one instead of nothing
+      else if (S.dOpen && !digestOrder().includes(S.dOpen)) S.dOpen = digestOrder().find(n => { const y = dItem(n); return y && !isRead(y); }) || null;
+      return steady(S.dOpen, S.dOpen);
+    }
     const list = currentList();
     if (!S.open || !list.some(x => x.id === S.open)) S.open = list.find(x => !S.done[x.id])?.id || null;
     render();
@@ -268,6 +324,7 @@ main>.empty,.pair .summary,.note{color:#fff;text-shadow:0 1px 2px rgba(9,22,50,.
   function counts(){
     const d = S.data?.counts || {};
     $("#nSort").textContent = d.sort ?? ""; $("#nMessages").textContent = d.messages ?? ""; $("#nReport").textContent = d.report ?? "";
+    $("#nDigest").textContent = S.dig ? digestUnread().length : (d.digest ?? "");
     $("#leftCount").textContent = (d.sort || 0) + (d.messages || 0);
   }
   const head = (x, dot, pill, extra = "") => `<button class="head" type="button" aria-expanded="${S.open===x.id}" data-open="${esc(x.id)}">
@@ -430,6 +487,110 @@ main>.empty,.pair .summary,.note{color:#fff;text-shadow:0 1px 2px rgba(9,22,50,.
       <div class="list">${rows || `<div class="empty">Nothing on auto yet. A sender goes on auto after you approve it to the same tray 10 times in a row.</div>`}</div>`;
   }
 
+  /* ---------- the Digest (ticket 17, build spec 2026-10-17) ---------- */
+  const KIND_ORDER = ["look", "terms", "deal", "newsletter"];
+  const digestUnread = () => (S.dig?.items || []).filter(x => !S.dLocal[x.id]);
+  const digestRead = () => [...(S.dig?.items || []).filter(x => S.dLocal[x.id]), ...(S.dig?.read || []).filter(x => !(S.dig.items || []).some(y => y.id === x.id))];
+  const shownDigest = () => { const u = digestUnread(), r = S.dShowRead ? digestRead() : [];
+    return KIND_ORDER.flatMap(k => [...u, ...r].filter(x => x.kind === k)); };
+  const digestOrder = () => shownDigest().map(x => x.id);
+  const dItem = id => [...(S.dig?.items || []), ...(S.dig?.read || [])].find(x => x.id === id);
+  const isRead = x => !!S.dLocal[x.id] || x.state !== "waiting";
+  const hdr = id => id && document.querySelector(`[data-dopen="${CSS.escape(id)}"]`);
+  // re-draw without moving the screen: the headline he touched (or the one that takes its place) stays put
+  // (Junyan, 2026-10-17: "it jumps around as I interact with it")
+  function steady(fromId, toId){
+    const a = hdr(fromId), top = a ? a.getBoundingClientRect().top : null;
+    render();
+    const b = hdr(toId);
+    if (top != null && b) window.scrollBy(0, b.getBoundingClientRect().top - top);
+  }
+  const hm = ms => { const d = new Date(ms); return `${pad(d.getHours())}:${pad(d.getMinutes())}`; };
+  function deepBlock(x){
+    const d = x.deep; if (!d) return "";
+    // collapsed by default, no research notes (Junyan, 2026-10-16: "too many words")
+    return `<details class="deep" data-deep="${esc(x.id)}" ${S.deepOpen[x.id] ? "open" : ""}><summary>Deeper dive</summary>
+      ${d.whatChanges?.length ? `<ul>${d.whatChanges.map(w => `<li>${esc(w)}</li>`).join("")}</ul>` : ""}
+      ${d.effective ? `<p><b style="color:#fff">Starts:</b> ${esc(d.effective)}</p>` : ""}
+      ${d.optOut ? `<p><b style="color:#fff">Opt out:</b> ${esc(d.optOut)}</p>` : ""}
+      ${d.links?.length ? `<div class="dlinks">${d.links.map(l => `<a href="${esc(l.url)}" target="_blank" rel="noopener">${esc(l.label)}</a>`).join("")}</div>` : ""}</details>`;
+  }
+  function digestDetails(x){
+    let h = `<p class="gist">${esc(x.gist)}</p>`;
+    if (x.kind === "deal" && x.deal) h += `<dl class="deal-facts">${[["Route",x.deal.route],["Cabin",x.deal.cabin],["Cost",x.deal.cost],["Points",x.deal.program],["When",x.deal.when],["Book by",x.deal.bookBy],["From",x.deal.from]]
+      .filter(r => r[1]).map(r => `<dt>${r[0]}</dt><dd>${esc(r[1])}</dd>`).join("")}</dl>`;
+    const forYou = (x.deep && x.deep.forYou) || x.forYou;
+    if (x.kind === "terms") { if (forYou) h += `<div class="foryou"><b>For you:</b> ${esc(forYou)}</div>`; h += deepBlock(x); }
+    else if (forYou) h += `<p class="gist"><b style="color:#fff">Why it matters:</b> ${esc(forYou)}</p>`;
+    if (x.action) h += `<p class="act">${esc(x.action)}</p>`;
+    return h;
+  }
+  function digestButtons(x){
+    if (isRead(x)) {
+      const back = x.state === "read" && x.putBackUntil && x.putBackUntil > Date.now() && !S.dLocal[x.id];
+      const what = x.stop ? (x.stop.how === "unsubscribe" ? "Unsubscribed and archived." : "Muted and archived.") : "Read and archived.";
+      return `<div class="btns"><span class="how">${what}</span>${back ? `<button class="btn" type="button" data-dputback="${esc(x.id)}">Put back</button>` : ""}
+        <a class="btn quiet" href="${esc(x.gmail)}" target="_blank" rel="noopener">Open in Gmail</a></div>`;
+    }
+    const look = x.kind === "look";
+    const stop = x.canUnsubscribe ? "Unsubscribe" : "Mute";
+    const how = look ? "" : x.canUnsubscribe ? "Unsubscribe asks the sender to stop, with the one-click link in the email. No email is sent. Their mail also skips your digest from now on."
+      : "No one-click unsubscribe here. Mute keeps this sender out of your digest and archives their mail when it arrives. Undo in Report.";
+    const notes = (x.notes || []).map(n => `<span class="noted">Task made: ${n.task ? `<a href="${esc(n.task.url)}" target="_blank" rel="noopener">${esc(n.task.title)}</a>` : esc(n.text)}</span>`).join("");
+    return `<div class="btns"><button class="btn primary" type="button" data-dread="${esc(x.id)}">✓ Read</button>
+      ${look ? "" : `<button class="btn keep" type="button" data-dkeep="${esc(x.id)}" aria-pressed="${!!x.keep}">Keep getting these</button>
+      <button class="btn" type="button" data-dstop="${esc(x.id)}">${stop}</button>`}
+      <a class="btn quiet" href="${esc(x.gmail)}" target="_blank" rel="noopener">Open in Gmail</a></div>
+      ${how ? `<span class="how">${how}</span>` : ""}
+      ${x.kind === "newsletter" ? `<div class="links"><button type="button" data-ddeal="${esc(x.id)}">This is a flight deal</button></div>` : ""}
+      <div class="notebox"><input id="note-${esc(x.id)}" data-draft="${esc(x.id)}" type="text" placeholder="Note for Claude, e.g. make this a task" aria-label="Note for Claude" value="${esc(S.drafts[x.id] || "")}"><button class="btn" type="button" data-dnote="${esc(x.id)}">Send</button></div>
+      ${notes}`;
+  }
+  function digestView(){
+    const d = S.dig;
+    if (!d) return `<div class="empty">Loading…</div>`;
+    const unread = digestUnread(), nRead = digestRead().length, list = shownDigest();
+    const ev = d.event ? `<div class="reach"><span class="t">${hm(d.event.s)}</span><div class="q"><b>Read today's digest</b><span>On your calendar tonight, ${Math.round((d.event.e - d.event.s) / 60000)} min. You get a ping when it starts.</span></div></div>`
+      : unread.length ? `<div class="reach"><span class="t">19:00+</span><div class="q"><b>Read today's digest</b><span>Goes in your first free evening slot on the calendar.</span></div></div>` : "";
+    const paper = list.length ? `<div class="paper">${KIND_ORDER.map(k => {
+      const rows = list.filter(x => x.kind === k); if (!rows.length) return "";
+      return `<div class="grp ${k}">${esc(d.kinds[k])} · ${rows.filter(x => !isRead(x)).length}</div>` + rows.map(x => {
+        const open = S.dOpen === x.id;
+        const tag = x.keep ? " · keep" : "";
+        return `<button class="hl" type="button" data-dopen="${esc(x.id)}" aria-expanded="${open}"><span><b>${esc(x.headline)}</b><small>${isRead(x) ? "read · " : ""}${esc(x.from)} · ${esc(when(x.at))}${tag}${(x.notes || []).length ? " · note" : ""}</small></span><span class="arrow" aria-hidden="true">${open ? "▲" : "▼"}</span></button>
+          ${open ? `<div class="hlbody">${digestDetails(x)}${digestButtons(x)}</div>` : ""}`;
+      }).join("");
+    }).join("")}</div>` : "";
+    const done = unread.length ? "" : `<div class="fin"><span class="seal">✓</span><h3>Digest done</h3><p class="summary">Everything is read and archived.${d.pending ? " Claude is still writing up " + d.pending + " new one" + (d.pending === 1 ? "" : "s") + "." : ""}</p></div>`;
+    const toggle = nRead ? `<button class="btn quiet showread" type="button" data-dshowread>${S.dShowRead ? "Hide" : "Show"} ${nRead} read</button>` : "";
+    const trip = d.trip?.length ? `<div class="tripbox"><span class="lbl">Not in your digest · went to your trip</span>
+      <p class="summary">${d.trip.length} trip email${d.trip.length === 1 ? "" : "s"}. Later these update the matching trip in your Travel Planner. They stay in your inbox for now.</p>
+      <ul>${d.trip.map(t => `<li><a href="${esc(t.gmail)}" target="_blank" rel="noopener">${esc(t.headline)}</a></li>`).join("")}</ul></div>` : "";
+    return ev + (unread.length || S.dShowRead ? paper : done) + toggle + trip;
+  }
+  // Report tab: senders he muted from the digest, with Unmute
+  function mutedView(){
+    const m = S.dig?.muted || [];
+    if (!m.length) return "";
+    return `<div class="lane"><span>Muted in your digest · their mail is archived when it arrives</span><span>${m.length}</span></div>
+      <div class="list learned">${m.map(x => `<div><b>${esc(x.name)}</b><button class="btn quiet" type="button" data-unmute="${esc(x.addr)}" style="min-height:36px;padding:6px 12px">Unmute</button></div>`).join("")}</div>`;
+  }
+  async function reloadDigest(fromId, toId){ try { S.dig = await api("/inbox/digest"); } catch {} counts(); steady(fromId, toId); }
+  // the next unread item after this one (or the nearest one above it when this was the last)
+  function nextUnread(id){
+    const order = digestOrder(), i = order.indexOf(id), unread = n => { const y = dItem(n); return y && !isRead(y) && n !== id; };
+    return order.slice(i + 1).find(unread) || order.slice(0, Math.max(i, 0)).reverse().find(unread) || null;
+  }
+  async function digestRead1(id){
+    // the next unread one opens in the same spot, so he can keep tapping without hunting
+    const next = nextUnread(id);
+    S.dLocal[id] = "read"; S.dOpen = next; S.dTouched = true; steady(id, next);
+    try { await post("/inbox/digest/read", { id }); }
+    catch (e) { delete S.dLocal[id]; S.dOpen = id; steady(next, id); toastErr("Not archived: " + e.message); return; }
+    try { S.dig = await api("/inbox/digest"); delete S.dLocal[id]; } catch {}
+    counts(); steady(S.dOpen, S.dOpen);
+  }
+
   function pairView(){
     return `<div class="pair"><h2 class="name" style="font-size:22px">Pair this device</h2>
       <p class="summary">Use the same pairing code as Day Quest. It stays on this device only.</p>
@@ -447,7 +608,7 @@ main>.empty,.pair .summary,.note{color:#fff;text-shadow:0 1px 2px rgba(9,22,50,.
       v.innerHTML = `<div class="lane"><span>Waiting for the Google sign-in</span></div><div class="list"><div class="empty">The server is not signed in to junyan.boon@gmail.com yet. Run the sign-in script on the Mac once, then this fills in.</div></div>`;
       return;
     }
-    v.innerHTML = S.tab === "sort" ? sortView() : S.tab === "messages" ? messagesView() : reportView();
+    v.innerHTML = S.tab === "sort" ? sortView() : S.tab === "messages" ? messagesView() : S.tab === "digest" ? digestView() : reportView() + mutedView();
   }
 
   /* ---------- actions ---------- */
@@ -473,8 +634,39 @@ main>.empty,.pair .summary,.note{color:#fff;text-shadow:0 1px 2px rgba(9,22,50,.
 
   document.addEventListener("click", async e => {
     const t = e.target.closest("[data-tab]");
-    if (t){ S.tab = t.dataset.tab; S.open = null; render(); await load(); return; }
+    if (t){ S.tab = t.dataset.tab; S.open = null;
+      history.replaceState(null, "", location.pathname + location.search + (S.tab === "digest" ? "#digest" : "")); render(); await load(); return; }
     const u = e.target.closest("[data-undo]"); if (u) return undo(u.dataset.undo);
+    const dop = e.target.closest("[data-dopen]");
+    if (dop){ const id = dop.dataset.dopen; S.dOpen = S.dOpen === id ? null : id; S.dTouched = true; steady(id, id); return; }
+    const drd = e.target.closest("[data-dread]"); if (drd) return digestRead1(drd.dataset.dread);
+    const dpb = e.target.closest("[data-dputback]");
+    if (dpb){ const id = dpb.dataset.dputback; try { await post("/inbox/digest/putback", { id }); toast("Put back in your inbox and your digest."); } catch (err) { toastErr("Put back failed: " + err.message); }
+      return reloadDigest(id, id); }
+    const dst = e.target.closest("[data-dstop]");
+    if (dst){ const id = dst.dataset.dstop, next = nextUnread(id);
+      dst.disabled = true;
+      try { const r = await post("/inbox/digest/stop", { id });
+        const arch = r.archived === false ? " Gmail kept this one in your inbox; archive it there." : "";
+        toast((r.how === "unsubscribe" ? "Unsubscribed with one click." : `Muted${r.why ? " (" + r.why + ")" : ""}. Their mail skips your digest now.`) + (arch || (r.how === "unsubscribe" ? " Archived." : "")));
+        S.dLocal[id] = "read"; S.dOpen = next; steady(id, next); delete S.dLocal[id]; return reloadDigest(S.dOpen, S.dOpen); }
+      catch (err) { toastErr(err.message); dst.disabled = false; return; } }
+    const dk = e.target.closest("[data-dkeep]");
+    if (dk){ const id = dk.dataset.dkeep, x = dItem(id); if (!x) return;
+      try { const r = await post("/inbox/digest/keep", { id, on: !x.keep }); x.keep = r.keep; } catch (err) { toastErr(err.message); }
+      return steady(id, id); }
+    const dd = e.target.closest("[data-ddeal]");
+    if (dd){ const id = dd.dataset.ddeal; try { await post("/inbox/digest/deal", { id }); toast("Moved to Flight deals. Mail from this sender goes there from now on."); } catch (err) { toastErr(err.message); }
+      return reloadDigest(id, id); }
+    const dn = e.target.closest("[data-dnote]");
+    if (dn){ const id = dn.dataset.dnote, note = (document.getElementById("note-" + id)?.value || "").trim(); if (!note) return;
+      dn.disabled = true;
+      try { const r = await post("/inbox/digest/note", { id, note }); delete S.drafts[id];
+        toast(`Task made for Claude: ${r.task.title}`); return reloadDigest(id, id); }
+      catch (err) { toastErr("No task made: " + err.message); dn.disabled = false; return; } }
+    if (e.target.closest("[data-dshowread]")){ S.dShowRead = !S.dShowRead; return steady(S.dOpen, S.dOpen); }
+    const um = e.target.closest("[data-unmute]");
+    if (um){ try { await post("/inbox/digest/unmute", { addr: um.dataset.unmute }); toast("Unmuted. Their mail reaches your digest again."); } catch (err) { toastErr(err.message); } return load(); }
     const o = e.target.closest("[data-open]"); if (o){ S.open = S.open === o.dataset.open ? null : o.dataset.open; render(); return; }
     const r = e.target.closest("[data-route]"); if (r){ S.picks[r.dataset.id] = r.dataset.route; render(); return; }
     const a = e.target.closest("[data-approve]"); if (a) return approve(a.dataset.approve);
@@ -497,7 +689,11 @@ main>.empty,.pair .summary,.note{color:#fff;text-shadow:0 1px 2px rgba(9,22,50,.
       store.set("quest-key", v); S.error = null; await load();
       if (S.error?.status === 401) { store.set("quest-key", null); toastErr("That code did not work."); render(); } }
   });
+  // the note box: typed text survives a re-draw; Enter sends
+  document.addEventListener("input", e => { const d = e.target.closest("[data-draft]"); if (d) S.drafts[d.dataset.draft] = d.value; });
+  document.addEventListener("toggle", e => { const d = e.target.closest && e.target.closest("[data-deep]"); if (d) S.deepOpen[d.dataset.deep] = d.open; }, true);
   document.addEventListener("keydown", e => {
+    if (e.key === "Enter" && e.target.matches(".notebox input")) { e.preventDefault(); e.target.nextElementSibling.click(); return; }
     if (e.target.closest("textarea,input") || S.tab !== "sort" || !S.open || !S.data) return;
     if (e.key === "Enter" && e.target.closest("button,a")) return;   // Enter on a focused button presses that button, never Approve
     if (e.key === "Enter"){ const b = document.querySelector(`[data-approve="${CSS.escape(S.open)}"]`); if (b && !b.disabled){ e.preventDefault(); b.click(); } }
