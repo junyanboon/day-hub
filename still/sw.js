@@ -13,30 +13,87 @@
       Everything else (YouTube, weather) is left alone.
    3. Faster opens on slow internet (Junyan, 2026-10-11, Egypt, about 65 KB/s: "it takes way too long for my
       app to load"). Before this, every open downloaded the whole page (95 KB) and fetched every script and
-      sprite again behind the saved copy, which crowded out the plan. Now an open sends almost nothing. */
-const SHELL = "dq-shell-v2", DATA = "dq-data-v1";   // v2: the smaller sprites (2026-10-11)
+      sprite again behind the saved copy, which crowded out the plan. Now an open sends almost nothing.
+   4. No internet at all (Junyan, 2026-10-17, Madrid: "when the internet is down it doesn't work"):
+      - installing saves the whole page at once: quest.html, every ?v= script and style it names, the sprites and
+        fonts. Before, only quest.html was saved up front and the rest only once used under this worker, so a
+        phone could open offline to a page with a script missing;
+      - his data is saved with the time it was fetched, and an answer from the saved copy says so (x-dq-saved),
+        so the page can say it is offline and how old the calendar is. */
+const SHELL = "dq-shell-v3", DATA = "dq-data-v1";   // v3: the whole page is saved on install (2026-10-17)
+// files the page loads by name at run time (sprites by pose, fonts from the styles), saved on install as well
+const EXTRA = ["quest.webmanifest", "quest-icon.svg", "quest-icon-180.png", "quest-icon-512.png",
+  "fonts/figtree-latin.woff2", "fonts/cinzel-latin.woff2", "fonts/pixelify-sans-latin.woff2",
+  ...["gem", "head", "palms", "radiant", "robe", "seat", "seat-low", "stand", "stand-low", "strong"]
+    .flatMap((n) => n === "head" ? [n] : [n, n + "-glow"]).map((n) => `sprites/${n}.webp`)];
 const API = "https://still.srv1948070.hstgr.cloud";
+// a test still-api on this computer (quest.html?api=http://localhost:…) is saved like the real one, so offline can be tested
+const TEST_API = (() => { try { const a = new URL(new URL(self.location.href).searchParams.get("api") || "");
+  return /^(localhost|127\.0\.0\.1)$/.test(a.hostname) ? a.origin : null; } catch { return null; } })();
 const DATA_PATHS = /^\/(plan|ops|tasks|steps|bedtime|sleep)(\/|$)|^\/quest\/(state|insights|skills|content|wiki|keeps|practice)(\/|$)/;
 
+// the page's own ?v= scripts and styles, as quest.html names them
+const shellFiles = (html) => [...new Set([...html.matchAll(/<(?:script|link)\b[^>]*?(?:src|href)="([^":?#]+\.(?:js|css)\?v=[^"]+)"/g)].map((m) => m[1]))];
+async function precache() {
+  const c = await caches.open(SHELL);
+  const res = await fetch("quest.html", { cache: "no-cache" });
+  if (!res.ok) throw new Error("quest.html HTTP " + res.status);
+  const html = await res.clone().text();
+  // a file already saved by the older worker is copied, not downloaded again (slow links, d211)
+  const save = async (f) => {
+    const url = new URL(f, self.registration.scope).href, had = await caches.match(url, { ignoreVary: true });
+    if (had) return c.put(url, had);
+    const r = await fetch(url);
+    if (!r.ok) throw new Error(f + " HTTP " + r.status);
+    return c.put(url, r);
+  };
+  // a page that cannot open offline is not worth switching to: if any of these fail, the old worker stays
+  await Promise.all(shellFiles(html).map(save));
+  await c.put(new URL("quest.html", self.registration.scope).href, res);
+  await Promise.all(EXTRA.map((f) => save(f).catch(() => {})));   // nice to have
+}
 self.addEventListener("install", (e) => {
   self.skipWaiting();
-  e.waitUntil(caches.open(SHELL).then((c) => c.add("quest.html")).catch(() => {}));
+  e.waitUntil(precache());
 });
 self.addEventListener("activate", (e) => e.waitUntil((async () => {
-  for (const k of await caches.keys()) if (![SHELL, DATA].includes(k)) await caches.delete(k);
+  const shell = await caches.open(SHELL);
+  for (const k of await caches.keys()) {
+    if ([SHELL, DATA].includes(k)) continue;
+    // keep what an older page cache held that this one lacks (Stillness and its files), then drop it
+    if (k.startsWith("dq-shell-")) try {
+      const old = await caches.open(k);
+      for (const req of await old.keys()) if (!(await shell.match(req, { ignoreVary: true }))) await shell.put(req, await old.match(req));
+    } catch {}
+    await caches.delete(k);
+  }
   await self.clients.claim();
 })()));
 
 const within = (ms, p) => Promise.race([p, new Promise((_, no) => setTimeout(() => no(new Error("slow")), ms))]);
 
+// a copy to save, stamped with when it was fetched (x-dq-at)
+async function stamped(res) {
+  const h = new Headers(res.headers);
+  h.set("x-dq-at", String(Date.now()));
+  return new Response(await res.blob(), { status: res.status, statusText: res.statusText, headers: h });
+}
+// the saved copy, marked as one: x-dq-saved is when it was fetched (0 when saved before the stamp existed)
+function marked(hit) {
+  const h = new Headers(hit.headers);
+  h.set("x-dq-saved", hit.headers.get("x-dq-at") || "0");
+  return new Response(hit.body, { status: hit.status, statusText: hit.statusText, headers: h });
+}
 // the network first, at most `ms`; keep a good answer; otherwise the saved one
 async function networkFirst(req, cacheName, ms, key) {
   const cache = await caches.open(cacheName);
-  const net = fetch(req).then((res) => { if (res && res.ok) cache.put(key || req, res.clone()).catch(() => {}); return res; });
+  const net = fetch(req).then((res) => {
+    if (res && res.ok) stamped(res.clone()).then((s) => cache.put(key || req, s)).catch(() => {});
+    return res; });
   try { return await within(ms, net); }
   catch (err) {
     const hit = await cache.match(key || req, { ignoreSearch: !!key, ignoreVary: true });
-    if (hit) return hit;
+    if (hit) return marked(hit);
     return net;   // nothing saved yet: wait for the network after all
   }
 }
@@ -71,7 +128,7 @@ self.addEventListener("fetch", (e) => {
     e.respondWith(savedFirst(req, url.search.includes("v=") ? Infinity : 86400000));
     return;
   }
-  if (url.origin === API && DATA_PATHS.test(url.pathname)) e.respondWith(networkFirst(req, DATA, 4000));
+  if ((url.origin === API || url.origin === TEST_API) && DATA_PATHS.test(url.pathname)) e.respondWith(networkFirst(req, DATA, 4000));
 });
 
 self.addEventListener("push", (e) => {
