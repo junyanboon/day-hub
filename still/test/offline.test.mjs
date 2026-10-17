@@ -93,7 +93,7 @@ test("install also saves every sprite and font, and each listed file exists", ()
   assert.equal(sw.TEST_API, null, "the live page saves only the real still-api's answers");
 });
 
-test("every script the page loads up front is one the service worker saves, and none come from another site", () => {
+test("no script or style the page loads up front comes from another site", () => {
   const html = read("quest.html");
   for (const m of html.matchAll(/<script\b[^>]*src="([^"]+)"/g)) assert.ok(!/^https?:|^\/\//.test(m[1]), `${m[1]} loads from another site`);
   for (const m of html.matchAll(/<link\b[^>]*rel="stylesheet"[^>]*href="([^"]+)"/g)) assert.ok(!/^https?:|^\/\//.test(m[1]), `${m[1]} loads from another site`);

@@ -78,10 +78,15 @@ async function stamped(res) {
   h.set("x-dq-at", String(Date.now()));
   return new Response(await res.blob(), { status: res.status, statusText: res.statusText, headers: h });
 }
-// the saved copy, marked as one: x-dq-saved is when it was fetched (0 when saved before the stamp existed)
-function marked(hit) {
+/* the saved copy, marked as one: x-dq-saved is when it was fetched (0 when saved before the stamp existed);
+   x-dq-slow when the network is there but slower than the wait (then the page carries on as online, as before).
+   The page reads these across origins, so the copy allows that itself. */
+function marked(hit, slow) {
   const h = new Headers(hit.headers);
   h.set("x-dq-saved", hit.headers.get("x-dq-at") || "0");
+  if (slow) h.set("x-dq-slow", "1");
+  h.set("Access-Control-Allow-Origin", self.location.origin);
+  h.set("Access-Control-Expose-Headers", "x-dq-saved, x-dq-slow");
   return new Response(hit.body, { status: hit.status, statusText: hit.statusText, headers: h });
 }
 // the network first, at most `ms`; keep a good answer; otherwise the saved one
@@ -93,7 +98,7 @@ async function networkFirst(req, cacheName, ms, key) {
   try { return await within(ms, net); }
   catch (err) {
     const hit = await cache.match(key || req, { ignoreSearch: !!key, ignoreVary: true });
-    if (hit) return marked(hit);
+    if (hit) return marked(hit, err && err.message === "slow");
     return net;   // nothing saved yet: wait for the network after all
   }
 }

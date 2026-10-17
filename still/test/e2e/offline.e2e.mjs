@@ -17,7 +17,7 @@ const API = `http://localhost:${API_PORT}`, PAGE = `http://localhost:${PAGE_PORT
 const TZ = "Europe/Madrid";
 
 /* ---------- the fake still-api ---------- */
-const api = { ops:{}, posts:[], state:{ xp:0, day:null } };
+const api = { ops:{}, posts:[], state:{ xp:0, day:null }, delay:0 };
 const madrid = (ymd, hm) => {   // ymd + "HH:MM" in Madrid (CEST, +02:00, in October before the 25th)
   return `${ymd}T${hm}:00+02:00`;
 };
@@ -34,7 +34,7 @@ function apiHandler(req, res){
   const send = (code, body) => { res.writeHead(code, { "Content-Type":"application/json", "Access-Control-Allow-Origin":"*",
     "Access-Control-Allow-Headers":"Content-Type, X-Quest-Key", "Access-Control-Allow-Methods":"GET, POST, OPTIONS" }); res.end(JSON.stringify(body)); };
   if (req.method === "OPTIONS") return send(204, {});
-  let raw = ""; req.on("data", c => raw += c); req.on("end", () => {
+  let raw = ""; req.on("data", c => raw += c); req.on("end", () => setTimeout(() => {
     const body = raw ? (() => { try { return JSON.parse(raw); } catch { return null; } })() : null;
     if (req.method === "POST") api.posts.push({ path:url.pathname, body, at:Date.now() });
     if (url.pathname === "/plan") return send(200, planFor(url.searchParams.get("date")));
@@ -49,7 +49,7 @@ function apiHandler(req, res){
     if (url.pathname === "/quest/state" && req.method === "POST") { api.state = { ...body }; return send(200, { ok:true, state:api.state }); }
     if (url.pathname === "/tasks/done") return send(200, { ok:true, was:"Not started" });
     return send(200, {});
-  });
+  }, req.method === "GET" ? api.delay : 0));
 }
 
 /* ---------- the page's files ---------- */
@@ -160,6 +160,18 @@ const S = {
       check("says it is offline", /offline/i.test(st), st);
       check("the old page cache is gone", !(await page.evaluate(async () => (await caches.keys()).includes("dq-shell-v2"))));
     } finally { serveRoot = ROOT; await browser.close(); await up().catch(() => {}); }
+  },
+  async "a slow line (answers after 5 s) is not called offline"(){
+    const { browser, ctx, page } = await fresh(`${TODAY}T15:00:00+02:00`);
+    try {
+      await onlineVisit(page, TODAY);
+      api.delay = 5000;
+      await page.reload();
+      await waitFor(() => bodyHas(page, "Pages 10-17"), 8000);
+      await sleep(7000);
+      const st = await statusText(page);
+      check("status is the normal one, not offline", !/offline/i.test(st) && /Madrid/.test(st), st);
+    } finally { api.delay = 0; await browser.close(); await up().catch(() => {}); }
   },
   async "offline right after an online visit"(){
     const { browser, ctx, page } = await fresh(`${TODAY}T15:00:00+02:00`);

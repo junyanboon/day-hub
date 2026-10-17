@@ -764,7 +764,7 @@
   // saved before could still carry the ill line and would hold the planner off for 2 hours
   const GYM_AT = "quest-gym-at2", GYM_WK = "quest-gym-wk2";
   async function qfetch(path, opts = {}){
-    const r = await fetch(API + path, { ...opts, cache:"no-store",
+    const r = await fetch(API + path, { ...opts, signal:opts.signal || (opts.method ? undefined : quick()), cache:"no-store",
       headers:{ "Content-Type":"application/json", "X-Quest-Key":questKey(), ...(opts.headers || {}) } });
     const body = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(body.error || "HTTP " + r.status);
@@ -864,20 +864,30 @@
      that an offline phone sat on "Loading your day…". A saved day for another date is used only when the agenda
      saved with it holds today (QuestOffline.savedDay). SAVED_AT: when the calendar on screen came from still-api;
      null while it is fresh. */
-  const SNAP = "quest-snap" + (qs.get("api") ? ":" + qs.get("api") : ""), SNAP_OK = !AT;
+  const ON_API = qs.get("api") ? ":" + qs.get("api") : "";   // a test server keeps its own copies
+  const SNAP = "quest-snap" + ON_API, SNAP_OK = !AT;
   // calendar edits made offline, waiting for /ops (one per day), and Notion task ticks waiting for /tasks
-  const OPS_OUT = "quest-ops-out" + (qs.get("api") ? ":" + qs.get("api") : ""), TASK_OUT = "quest-task-out" + (qs.get("api") ? ":" + qs.get("api") : "");
+  const OPS_OUT = "quest-ops-out" + ON_API, TASK_OUT = "quest-task-out" + ON_API;
   let PLAN_AT = 0, SAVED_AT = null;
-  const readSnap = () => { try { return SNAP_OK ? JSON.parse(localStorage.getItem(SNAP)) : null; } catch { return null; } };
   const readJSON = (k, d) => { try { return JSON.parse(store.get(k) || "null") || d; } catch { return d; } };
+  const readSnap = () => SNAP_OK ? readJSON(SNAP, null) : null;
+  // a GET that gives up on a network that never answers (captive Wi-Fi), so the pull can fall back to the saved day
+  const quick = () => typeof AbortSignal !== "undefined" && AbortSignal.timeout ? AbortSignal.timeout(15000) : undefined;
+  // Notion tasks ticked done offline and not sent yet: they stay off the list, wherever the list came from
+  function dropWaiting(list){
+    const waiting = {};
+    for (const x of readJSON(TASK_OUT, [])) if (x.path === "/tasks/done") waiting[x.body.id] = x.body.done;
+    return list.filter(t => waiting[t.id] !== true);
+  }
   // the saved day for the day it is now, if there is one: true when it was put on screen
   function useSaved(){
     const s = readSnap();
     if (!s || !s.plan) return false;
-    PLAN_TZ = s.plan.tz || null;
+    const tzWas = PLAN_TZ;
+    PLAN_TZ = s.plan.tz || null;   // the saved zone decides which day it is there
     const day = QuestOffline.savedDay(s, tzYmd(new Date(now() - 4 * 3600000)));
-    if (!day) { if (!PLAN) PLAN_TZ = null; return false; }
-    PLAN = day.plan; GAME_YMD = day.ymd; TASKS = day.tasks; AG = day.ag; PLAN_AT = day.at;
+    if (!day) { PLAN_TZ = tzWas; return false; }
+    PLAN = day.plan; GAME_YMD = day.ymd; TASKS = dropWaiting(day.tasks); AG = day.ag; PLAN_AT = day.at;
     OPS = day.ops || { edits:{}, drops:[], adds:[], ts:0 };
     const out = QuestOffline.pendingOps(readJSON(OPS_OUT, {}), dayKey());
     if (out && out.ts > (OPS.ts || 0)) OPS = out;
@@ -886,9 +896,10 @@
   if (SNAP_OK) useSaved();   // shown as "updating…" until the first pull says whether it is offline
 
   // the service worker marks an answer from its saved copy (x-dq-saved: when it was fetched, 0 if unknown)
-  const savedAtOf = r => { const v = r.headers.get("x-dq-saved"); return v == null ? null : +v || 0; };
+  // a slow but working line is not offline: it goes on as before (2026-10-11 Egypt), with the saved answer
+  const savedAtOf = r => { const v = r.headers.get("x-dq-saved"); return v == null || r.headers.get("x-dq-slow") ? null : +v || 0; };
   async function getPlan(date){
-    const r = await fetch(API + "/plan?date=" + date, { cache:"no-store" });
+    const r = await fetch(API + "/plan?date=" + date, { cache:"no-store", signal:quick() });
     if (!r.ok) throw new Error("plan HTTP " + r.status);
     const p = await r.json();
     if (!p || !Array.isArray(p.blocks)) throw new Error("plan has no blocks");
@@ -949,23 +960,25 @@
   }
   /* Calendar edits made offline wait in OPS_OUT and go up here, on the next pull or edit (2026-10-17). /ops keeps
      the newer copy by ts, as it always has; a copy the server already has newer is dropped from the outbox. */
-  let flushing = null;
+  // one pass at a time, and each call gets its own pass, so an edit queued during a slow send still goes now
+  let flushing = Promise.resolve();
   function flushOps(){
     if (DRY) return Promise.resolve();
-    return flushing || (flushing = (async () => {
+    return (flushing = flushing.then(async () => {
       for (const body of Object.values(readJSON(OPS_OUT, {}))) {
-        try { const r = await postJSON("/ops", body); if (!r.ok) continue; }
+        try { const r = await postJSON("/ops", body); if (r.status >= 500) break; }   // a server fault: try again later
         catch { break; }   // still offline
+        // taken, or kept the server's newer copy, or refused as malformed: either way it leaves the outbox
         store.set(OPS_OUT, JSON.stringify(QuestOffline.settleOps(readJSON(OPS_OUT, {}), body)));
       }
-    })().finally(() => { flushing = null; }));
+    }).catch(() => {}));
   }
   async function pullOps(){
     await flushOps();
     // an edit made on this phone that has not gone up yet stands over the server's copy and the saved one
     const out = QuestOffline.pendingOps(readJSON(OPS_OUT, {}), dayKey());
     if (out) { OPS = out; return; }
-    const r = await fetch(API + "/ops?d=" + encodeURIComponent(dayKey()), { cache:"no-store" });
+    const r = await fetch(API + "/ops?d=" + encodeURIComponent(dayKey()), { cache:"no-store", signal:quick() });
     if (!r.ok) return;
     const d = await r.json();
     if (d && d.date === dayKey()) OPS = { edits:d.edits||{}, drops:d.drops||[], adds:d.adds||[], ts:d.ts||0 };
@@ -973,9 +986,18 @@
   /* Notion task ticks made offline (done, undo, note) wait here in order and go up on the next pull (2026-10-17).
      Only a network failure queues; an answer from still-api that says no is shown as before. */
   async function taskPost(path, body){
-    if (readJSON(TASK_OUT, []).length) { queueTask(path, body); return { queued:true }; }   // keep the order
+    const q = readJSON(TASK_OUT, []);
+    // reopening a task whose "done" never left the phone: take the "done" back instead of sending both
+    const i = q.findIndex(x => x.path === "/tasks/done" && x.body.id === body.id && x.body.done === true);
+    if (path === "/tasks/done" && body.done === false && i >= 0) {
+      store.set(TASK_OUT, JSON.stringify(q.filter((_, j) => j !== i))); return { queued:true }; }
+    if (q.length) { queueTask(path, body); return { queued:true }; }   // keep the order
     try { return await postJSON(path, body); }
-    catch { queueTask(path, body); return { queued:true }; }
+    catch (e) {
+      // no answer in 8 s may still have been saved: a note sent again would show twice, so say so instead
+      if (e.name === "AbortError" && path !== "/tasks/done") return { ok:false, status:"no answer, it may not have saved" };
+      queueTask(path, body); return { queued:true };
+    }
   }
   const queueTask = (path, body) => store.set(TASK_OUT, JSON.stringify(readJSON(TASK_OUT, []).concat([{ path, body }])));
   let flushingTasks = false;
@@ -986,19 +1008,18 @@
       for (;;) {
         const q = readJSON(TASK_OUT, []);
         if (!q.length) break;
-        try { await postJSON(q[0].path, q[0].body); } catch { break; }   // still offline
+        try { const r = await postJSON(q[0].path, q[0].body); if (r.status >= 500) break; }   // a server fault: later
+        catch { break; }   // still offline
+        // refused (4xx) is dropped like the alert used to: the next /tasks pull shows the real state
         store.set(TASK_OUT, JSON.stringify(readJSON(TASK_OUT, []).slice(1)));
       }
     } finally { flushingTasks = false; }
   }
   async function pullTasks(){
-    const r = await fetch(API + "/tasks", { cache:"no-store" });
+    const r = await fetch(API + "/tasks", { cache:"no-store", signal:quick() });
     if (!r.ok) return;
     const d = await r.json();
-    // a tick still waiting to go up (offline) wins over the list, which may be the saved one
-    const waiting = {};
-    for (const x of readJSON(TASK_OUT, [])) if (x.path === "/tasks/done") waiting[x.body.id] = x.body.done;
-    TASKS = (d.tasks || []).filter(t => !t.done && waiting[t.id] !== true);
+    TASKS = dropWaiting((d.tasks || []).filter(t => !t.done));
   }
   async function pullAll(){
     try {
@@ -4625,7 +4646,7 @@
     if (mo.children.length !== n) mo.innerHTML = Array.from({ length:n }, (_, i) => `<i style="left:${12 + (i * 37) % 32}%;animation-duration:${4 + (i % 4)}s;animation-delay:${(i * .9) % 5}s"></i>`).join("");
   }
   // the status line while the calendar on screen is a saved one (2026-10-17): offline, and how old it is
-  function offlineNote(){
+  function offlineStatus(){
     const at = SAVED_AT || 0, d = new Date(at), sameDay = at && tzYmd(d) === tzYmd(now());
     const time = at ? (sameDay ? "" : d.toLocaleDateString([], { weekday:"short", timeZone:TZ() }) + " ") + fmtT(d) : "";
     return QuestOffline.offlineNote(!!PLAN, at, time, fmtAgo((+now() - at) / 1000));
@@ -4645,7 +4666,7 @@
     $("comboL").textContent = sk === 1 ? "day at 70%+" : "days at 70%+";
     $("combo").classList.toggle("hot", P >= 70);
     const where = PLAN && PLAN.where && PLAN.where.place;
-    $("statusL").innerHTML = SAVED_AT != null || (pullErr && !PLAN) ? `<span class="dry">${esc(offlineNote())}</span>`
+    $("statusL").innerHTML = SAVED_AT != null || (pullErr && !PLAN) ? `<span class="dry">${esc(offlineStatus())}</span>`
       : pullErr ? `<span class="dry">Offline: ${esc(pullErr)}</span>`
       : PLAN ? `<span class="place">📍 ${esc(where || "Home")}</span> ${fmtT(t)}${lastPull ? "" : " · updating…"}` : "Loading your day…";
     $("statusR").innerHTML = [DRY ? `<a class="dry" href="${location.pathname}" title="Nothing is saved here. Tap for the real game">Test mode</a>` : "", AT ? `<span class="dry">clock ${fmtT(t)}</span>` : ""].filter(Boolean).join(" · ");
