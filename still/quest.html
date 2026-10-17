@@ -2230,7 +2230,8 @@
     ["sat", "🛋️", "Sat still over an hour without a break", -2],
   ];
   const AQ_ONEOF = { spine:"slump", slump:"spine", invol:"auto", auto:"invol", moved:"sat", sat:"moved" };
-  const actRatable = b => !!b && !isMeal(b) && !isSleep(b) && !["rest", "open", "break"].includes(b.kind)
+  // no check-in for gym: the gym log already records how it went (Junyan, 2026-10-17: "I already recorded the details")
+  const actRatable = b => !!b && !isMeal(b) && !isSleep(b) && !isGym(b) && !["rest", "open", "break"].includes(b.kind)
     && !blockHabits(b).length && b.e - b.s >= 20 * 60000;
   // an activity that ended in the last 4 hours and has not been checked
   function unratedActivity(){
