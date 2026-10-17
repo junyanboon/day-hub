@@ -706,6 +706,7 @@
 <script src="quest-gym.js?v=20261016i"></script>
 <script src="quest-morning.js?v=20261016g"></script>
 <script src="quest-agenda.js?v=20261014c"></script>
+<script src="quest-offline.js?v=20261017a"></script>
 <script src="quest-nearby.js?v=20261016k"></script>
 </head>
 <body>
@@ -763,7 +764,7 @@
   // saved before could still carry the ill line and would hold the planner off for 2 hours
   const GYM_AT = "quest-gym-at2", GYM_WK = "quest-gym-wk2";
   async function qfetch(path, opts = {}){
-    const r = await fetch(API + path, { ...opts, cache:"no-store",
+    const r = await fetch(API + path, { ...opts, signal:opts.signal || (opts.method ? undefined : quick()), cache:"no-store",
       headers:{ "Content-Type":"application/json", "X-Quest-Key":questKey(), ...(opts.headers || {}) } });
     const body = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(body.error || "HTTP " + r.status);
@@ -856,26 +857,53 @@
   let PLAN = null, OPS = { edits:{}, drops:[], adds:[], ts:0 }, TASKS = [], lastPull = null, pullErr = null, INSIGHTS = {};
   // the agenda's other days (yesterday to 3 ahead, not the game's own day): date -> that day's plan blocks
   let AG = {};
-  /* Open with the last day this device saw, if it is under 3 hours old and the same game day (Junyan,
-     2026-10-11, slow internet in Egypt: "it takes way too long for my app to load"). The page showed
-     "Reading your calendars" until the plan, edits, tasks and game had all come in; now it shows the
-     saved day at once and swaps in the fresh one when pullAll finishes. Not with a test clock (?at=); a test
-     server (?api=) keeps its own saved day. */
-  const SNAP = "quest-snap" + (qs.get("api") ? ":" + qs.get("api") : ""), SNAP_OK = !AT;
-  if (SNAP_OK) try {
-    const s = JSON.parse(localStorage.getItem(SNAP));
-    if (s && s.plan && Array.isArray(s.plan.blocks) && Date.now() - s.at < 3 * 3600000) {
-      PLAN_TZ = s.plan.tz || null;
-      if (s.ymd === tzYmd(new Date(now() - 4 * 3600000))) { PLAN = s.plan; GAME_YMD = s.ymd; OPS = s.ops || OPS; TASKS = s.tasks || []; AG = s.ag || {}; }
-      else PLAN_TZ = null;
-    }
-  } catch {}
+  /* Open with the last day this device saw (Junyan, 2026-10-11, slow internet in Egypt: "it takes way too long
+     for my app to load"): the saved day shows at once and the fresh one replaces it when pullAll finishes. Not with
+     a test clock (?at=); a test server (?api=) keeps its own saved day.
+     No age limit since 2026-10-17 (Madrid, "when the internet is down it doesn't work"): it was 3 hours, and after
+     that an offline phone sat on "Loading your day…". A saved day for another date is used only when the agenda
+     saved with it holds today (QuestOffline.savedDay). SAVED_AT: when the calendar on screen came from still-api;
+     null while it is fresh. */
+  const ON_API = qs.get("api") ? ":" + qs.get("api") : "";   // a test server keeps its own copies
+  const SNAP = "quest-snap" + ON_API, SNAP_OK = !AT;
+  // calendar edits made offline, waiting for /ops (one per day), and Notion task ticks waiting for /tasks
+  const OPS_OUT = "quest-ops-out" + ON_API, TASK_OUT = "quest-task-out" + ON_API;
+  let PLAN_AT = 0, SAVED_AT = null;
+  const readJSON = (k, d) => { try { return JSON.parse(store.get(k) || "null") || d; } catch { return d; } };
+  const readSnap = () => SNAP_OK ? readJSON(SNAP, null) : null;
+  // a GET that gives up on a network that never answers (captive Wi-Fi), so the pull can fall back to the saved day
+  const quick = () => typeof AbortSignal !== "undefined" && AbortSignal.timeout ? AbortSignal.timeout(15000) : undefined;
+  // Notion tasks ticked done offline and not sent yet: they stay off the list, wherever the list came from
+  function dropWaiting(list){
+    const waiting = {};
+    for (const x of readJSON(TASK_OUT, [])) if (x.path === "/tasks/done") waiting[x.body.id] = x.body.done;
+    return list.filter(t => waiting[t.id] !== true);
+  }
+  // the saved day for the day it is now, if there is one: true when it was put on screen
+  function useSaved(){
+    const s = readSnap();
+    if (!s || !s.plan) return false;
+    const tzWas = PLAN_TZ;
+    PLAN_TZ = s.plan.tz || null;   // the saved zone decides which day it is there
+    const day = QuestOffline.savedDay(s, tzYmd(new Date(now() - 4 * 3600000)));
+    if (!day) { PLAN_TZ = tzWas; return false; }
+    PLAN = day.plan; GAME_YMD = day.ymd; TASKS = dropWaiting(day.tasks); AG = day.ag; PLAN_AT = day.at;
+    OPS = day.ops || { edits:{}, drops:[], adds:[], ts:0 };
+    const out = QuestOffline.pendingOps(readJSON(OPS_OUT, {}), dayKey());
+    if (out && out.ts > (OPS.ts || 0)) OPS = out;
+    return true;
+  }
+  if (SNAP_OK) useSaved();   // shown as "updating…" until the first pull says whether it is offline
 
+  // the service worker marks an answer from its saved copy (x-dq-saved: when it was fetched, 0 if unknown)
+  // a slow but working line is not offline: it goes on as before (2026-10-11 Egypt), with the saved answer
+  const savedAtOf = r => { const v = r.headers.get("x-dq-saved"); return v == null || r.headers.get("x-dq-slow") ? null : +v || 0; };
   async function getPlan(date){
-    const r = await fetch(API + "/plan?date=" + date, { cache:"no-store" });
+    const r = await fetch(API + "/plan?date=" + date, { cache:"no-store", signal:quick() });
     if (!r.ok) throw new Error("plan HTTP " + r.status);
     const p = await r.json();
     if (!p || !Array.isArray(p.blocks)) throw new Error("plan has no blocks");
+    Object.defineProperty(p, "savedAt", { value:savedAtOf(r) });   // not saved with the plan
     return p;
   }
   async function pullPlan(){
@@ -884,6 +912,7 @@
     const early = +tzParts(t, { hour:"numeric", hourCycle:"h23" }).hour < 12, prevY = tzYmd(new Date(t - 86400000));
     const prevP = early ? getPlan(prevY).catch(() => null) : null;
     let p = await getPlan(today);
+    const saved = p.savedAt;
     PLAN_TZ = p.tz || null;
     let day = today;
     const hour = +tzParts(t, { hour:"numeric", hourCycle:"h23" }).hour;
@@ -907,6 +936,9 @@
     PLAN = p;
     PLAN_TZ = p.tz || null;
     GAME_YMD = day;
+    // from the service worker's saved copy: offline (or too slow), and the calendar is as old as that copy
+    SAVED_AT = saved == null ? null : (saved || PLAN_AT || 0);
+    if (saved == null) PLAN_AT = Date.now(); else if (saved) PLAN_AT = saved;
   }
   /* The agenda's other days, each its own /plan (cached a minute on the server). Not awaited by
      pullAll, so a slow line never holds up today; a day that fails keeps what it had. */
@@ -918,24 +950,89 @@
     for (const [d, b] of got) if (b) next[d] = b;
     AG = next;
   }
-  const saveSnap = () => { if (SNAP_OK) try { localStorage.setItem(SNAP, JSON.stringify({ at:Date.now(), ymd:GAME_YMD, plan:PLAN, ops:OPS, tasks:TASKS, ag:AG })); } catch {} };
+  // at: when this calendar came from still-api, so an offline open can say how old it is
+  const saveSnap = () => { if (SNAP_OK && PLAN) try { localStorage.setItem(SNAP, JSON.stringify({ at:PLAN_AT || Date.now(), ymd:GAME_YMD, plan:PLAN, ops:OPS, tasks:TASKS, ag:AG })); } catch {} };
+  // a save that cannot hang the page on a network that never answers
+  function postJSON(path, body, ms = 8000){
+    const ac = new AbortController(), t = setTimeout(() => ac.abort(), ms);
+    return fetch(API + path, { method:"POST", headers:{ "Content-Type":"application/json" }, body:JSON.stringify(body), signal:ac.signal })
+      .finally(() => clearTimeout(t));
+  }
+  /* Calendar edits made offline wait in OPS_OUT and go up here, on the next pull or edit (2026-10-17). /ops keeps
+     the newer copy by ts, as it always has; a copy the server already has newer is dropped from the outbox. */
+  // one pass at a time, and each call gets its own pass, so an edit queued during a slow send still goes now
+  let flushing = Promise.resolve();
+  function flushOps(){
+    if (DRY) return Promise.resolve();
+    return (flushing = flushing.then(async () => {
+      for (const body of Object.values(readJSON(OPS_OUT, {}))) {
+        try { const r = await postJSON("/ops", body); if (r.status >= 500) break; }   // a server fault: try again later
+        catch { break; }   // still offline
+        // taken, or kept the server's newer copy, or refused as malformed: either way it leaves the outbox
+        store.set(OPS_OUT, JSON.stringify(QuestOffline.settleOps(readJSON(OPS_OUT, {}), body)));
+      }
+    }).catch(() => {}));
+  }
   async function pullOps(){
-    const r = await fetch(API + "/ops?d=" + encodeURIComponent(dayKey()), { cache:"no-store" });
+    await flushOps();
+    // an edit made on this phone that has not gone up yet stands over the server's copy and the saved one
+    const out = QuestOffline.pendingOps(readJSON(OPS_OUT, {}), dayKey());
+    if (out) { OPS = out; return; }
+    const r = await fetch(API + "/ops?d=" + encodeURIComponent(dayKey()), { cache:"no-store", signal:quick() });
     if (!r.ok) return;
     const d = await r.json();
     if (d && d.date === dayKey()) OPS = { edits:d.edits||{}, drops:d.drops||[], adds:d.adds||[], ts:d.ts||0 };
   }
+  /* Notion task ticks made offline (done, undo, note) wait here in order and go up on the next pull (2026-10-17).
+     Only a network failure queues; an answer from still-api that says no is shown as before. */
+  async function taskPost(path, body){
+    const q = readJSON(TASK_OUT, []);
+    // reopening a task whose "done" never left the phone: take the "done" back instead of sending both
+    const i = q.findIndex(x => x.path === "/tasks/done" && x.body.id === body.id && x.body.done === true);
+    if (path === "/tasks/done" && body.done === false && i >= 0) {
+      store.set(TASK_OUT, JSON.stringify(q.filter((_, j) => j !== i))); return { queued:true }; }
+    if (q.length) { queueTask(path, body); return { queued:true }; }   // keep the order
+    try { return await postJSON(path, body); }
+    catch (e) {
+      // no answer in 8 s may still have been saved: a note sent again would show twice, so say so instead
+      if (e.name === "AbortError" && path !== "/tasks/done") return { ok:false, status:"no answer, it may not have saved" };
+      queueTask(path, body); return { queued:true };
+    }
+  }
+  const queueTask = (path, body) => store.set(TASK_OUT, JSON.stringify(readJSON(TASK_OUT, []).concat([{ path, body }])));
+  let flushingTasks = false;
+  async function flushTasks(){
+    if (DRY || flushingTasks) return;
+    flushingTasks = true;
+    try {
+      for (;;) {
+        const q = readJSON(TASK_OUT, []);
+        if (!q.length) break;
+        try { const r = await postJSON(q[0].path, q[0].body); if (r.status >= 500) break; }   // a server fault: later
+        catch { break; }   // still offline
+        // refused (4xx) is dropped like the alert used to: the next /tasks pull shows the real state
+        store.set(TASK_OUT, JSON.stringify(readJSON(TASK_OUT, []).slice(1)));
+      }
+    } finally { flushingTasks = false; }
+  }
   async function pullTasks(){
-    const r = await fetch(API + "/tasks", { cache:"no-store" });
+    const r = await fetch(API + "/tasks", { cache:"no-store", signal:quick() });
     if (!r.ok) return;
     const d = await r.json();
-    TASKS = (d.tasks || []).filter(t => !t.done);
+    TASKS = dropWaiting((d.tasks || []).filter(t => !t.done));
   }
   async function pullAll(){
     try {
-      await pullPlan();   // first: it sets the zone, which decides today's date key
+      flushTasks();
+      try { await pullPlan(); }   // first: it sets the zone, which decides today's date key
+      catch (e) {
+        // offline with nothing saved for this date by the service worker: the last day this phone saw (2026-10-17)
+        if (!useSaved()) { SAVED_AT = PLAN ? PLAN_AT || 0 : null; throw e; }
+        SAVED_AT = PLAN_AT || 0;
+      }
       pullAgenda().then(() => { saveSnap(); if (!$("sheet").classList.contains("open")) render(); }).catch(() => {});
-      await Promise.all([pullOps(), pullTasks().catch(() => {}), pullState()]);
+      // one answer missing offline no longer blanks the rest (2026-10-17)
+      await Promise.all([pullOps().catch(() => {}), pullTasks().catch(() => {}), pullState()]);
       seedFromOura();
       pullSteps();
       pullBedtime();
@@ -946,10 +1043,13 @@
       pullSkills().then(() => { if (!$("sheet").classList.contains("open")) render(); }).catch(() => {});
       pullKeeps();
       nvSend();
-      lastPull = new Date(); pullErr = null;
-      // every day, without him typing (d1): the basics go in on each full pull, once (placeBasics only adds what is missing)
-      placeBasics().then(() => { if (window.QuestMorning) QuestMorning.redraw(); }).catch(e => console.warn("basics", e));
-      planGym().catch(e => console.warn("gym", e));   // this week's and next week's gym, on his calendar (at most every 2 hours)
+      pullErr = null;
+      if (SAVED_AT == null) {
+        lastPull = new Date();
+        // every day, without him typing (d1): the basics go in on each full pull, once (placeBasics only adds what is missing)
+        placeBasics().then(() => { if (window.QuestMorning) QuestMorning.redraw(); }).catch(e => console.warn("basics", e));
+        planGym().catch(e => console.warn("gym", e));   // this week's and next week's gym, on his calendar (at most every 2 hours)
+      }   // offline: both wait for a fresh calendar, so nothing is placed twice or against an old day
       saveSnap();
       setTimeout(openPending, 0);
     } catch (e) { pullErr = String(e.message || e); }
@@ -962,8 +1062,10 @@
     mutate(OPS);
     OPS.ts = Date.now();
     if (DRY) { render(); return; }
-    await fetch(API + "/ops", { method:"POST", headers:{ "Content-Type":"application/json" },
-      body: JSON.stringify({ date:dayKey(), ...OPS }) }).catch(() => {});
+    // kept on the phone first, then sent: offline it waits in the outbox and goes up when the internet is back
+    store.set(OPS_OUT, JSON.stringify(QuestOffline.queueOps(readJSON(OPS_OUT, {}), dayKey(), OPS)));
+    saveSnap();
+    await flushOps();
     render();
   }
 
@@ -1875,9 +1977,8 @@
     const s = G.day.side; if (!s) return;
     if (!DRY) {
       try {
-        const r = await fetch(API + "/tasks/done", { method:"POST", headers:{ "Content-Type":"application/json" },
-          body: JSON.stringify({ id:s.id, done:true }) });
-        if (!r.ok) throw new Error("HTTP " + r.status);
+        const r = await taskPost("/tasks/done", { id:s.id, done:true });
+        if (!r.queued && !r.ok) throw new Error("HTTP " + r.status);
       } catch (e) { alert("Could not mark it done in Notion: " + e.message); return; }
     }
     TASKS = TASKS.filter(t => t.id !== s.id);
@@ -2839,7 +2940,9 @@
   const standalone = () => window.matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
   const b64u = s => { s = s.replace(/-/g, "+").replace(/_/g, "/"); s += "=".repeat((4 - s.length % 4) % 4);
     return Uint8Array.from(atob(s), c => c.charCodeAt(0)); };
-  if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
+  // a test still-api on this computer (?api=http://localhost:…) is handed to the service worker so it saves its answers too
+  const localApi = (() => { try { const u = new URL(API); return /^(localhost|127\.0\.0\.1)$/.test(u.hostname) ? u.origin : ""; } catch { return ""; } })();
+  if ("serviceWorker" in navigator) navigator.serviceWorker.register(localApi ? "sw.js?api=" + encodeURIComponent(localApi) : "sw.js").catch(() => {});
   /* a tapped phone ping opens that block's window straight away (2026-10-09): the ping carries
      ?open=<block key>; an already-open Quest gets the same key from the service worker */
   let OPEN_KEY = qs.get("open");
@@ -3683,21 +3786,21 @@
     // done in Notion; the answer carries the status it had, so Undo can put it back (2026-10-10)
     taskDone: async id => {
       let was = "";
-      if (!DRY) { const r = await fetch(API + "/tasks/done", { method:"POST", headers:{ "Content-Type":"application/json" }, body:JSON.stringify({ id, done:true }) });
-        if (!r.ok) { alert("Could not mark it done in Notion: HTTP " + r.status); return null; }
-        was = ((await r.json().catch(() => ({}))).was) || ""; }
+      if (!DRY) { const r = await taskPost("/tasks/done", { id, done:true });
+        if (!r.queued && !r.ok) { alert("Could not mark it done in Notion: HTTP " + r.status); return null; }
+        was = r.queued ? "" : ((await r.json().catch(() => ({}))).was) || ""; }
       const x = TASKS.find(y => y.id === id); TASKS = TASKS.filter(y => y.id !== id); if (x) log(`Done: ${x.task}`); saveG();
       return { was };
     },
     taskUndo: async (task, was) => {
-      if (!DRY) { const r = await fetch(API + "/tasks/done", { method:"POST", headers:{ "Content-Type":"application/json" }, body:JSON.stringify({ id:task.id, done:false, status:was || "" }) });
-        if (!r.ok) { alert("Could not reopen it in Notion: HTTP " + r.status); return false; } }
+      if (!DRY) { const r = await taskPost("/tasks/done", { id:task.id, done:false, status:was || "" });
+        if (!r.queued && !r.ok) { alert("Could not reopen it in Notion: HTTP " + r.status); return false; } }
       if (!TASKS.some(y => y.id === task.id)) TASKS.push(task);
       log(`Undone, open again: ${task.task}`); saveG(); return true;
     },
     taskNote: async (task, note) => {
-      if (!DRY) { const r = await fetch(API + "/tasks/note", { method:"POST", headers:{ "Content-Type":"application/json" }, body:JSON.stringify({ id:task.id, note }) });
-        if (!r.ok) { alert("Could not save the note in Notion: HTTP " + r.status); return false; } }
+      if (!DRY) { const r = await taskPost("/tasks/note", { id:task.id, note });
+        if (!r.queued && !r.ok) { alert("Could not save the note in Notion: HTTP " + r.status); return false; } }
       log(`Note on ${task.task}: ${note}`); saveG(); return true;
     },
     habit: id => { logHabit(id, true); saveG(); },
@@ -4542,6 +4645,12 @@
     const n = Math.round(P / 8), mo = st.querySelector(".bg-motes");
     if (mo.children.length !== n) mo.innerHTML = Array.from({ length:n }, (_, i) => `<i style="left:${12 + (i * 37) % 32}%;animation-duration:${4 + (i % 4)}s;animation-delay:${(i * .9) % 5}s"></i>`).join("");
   }
+  // the status line while the calendar on screen is a saved one (2026-10-17): offline, and how old it is
+  function offlineStatus(){
+    const at = SAVED_AT || 0, d = new Date(at), sameDay = at && tzYmd(d) === tzYmd(now());
+    const time = at ? (sameDay ? "" : d.toLocaleDateString([], { weekday:"short", timeZone:TZ() }) + " ") + fmtT(d) : "";
+    return QuestOffline.offlineNote(!!PLAN, at, time, fmtAgo((+now() - at) / 1000));
+  }
   function render(){
     if (PLAN && G.day.date !== dayKey()) rollDay();
     ensureDay();
@@ -4557,7 +4666,8 @@
     $("comboL").textContent = sk === 1 ? "day at 70%+" : "days at 70%+";
     $("combo").classList.toggle("hot", P >= 70);
     const where = PLAN && PLAN.where && PLAN.where.place;
-    $("statusL").innerHTML = pullErr ? `<span class="dry">Offline: ${esc(pullErr)}</span>`
+    $("statusL").innerHTML = SAVED_AT != null || (pullErr && !PLAN) ? `<span class="dry">${esc(offlineStatus())}</span>`
+      : pullErr ? `<span class="dry">Offline: ${esc(pullErr)}</span>`
       : PLAN ? `<span class="place">📍 ${esc(where || "Home")}</span> ${fmtT(t)}${lastPull ? "" : " · updating…"}` : "Loading your day…";
     $("statusR").innerHTML = [DRY ? `<a class="dry" href="${location.pathname}" title="Nothing is saved here. Tap for the real game">Test mode</a>` : "", AT ? `<span class="dry">clock ${fmtT(t)}</span>` : ""].filter(Boolean).join(" · ");
 
@@ -4752,7 +4862,9 @@
   async function checkFresh(){
     if ($("sheet").classList.contains("open")) return false;
     try {
-      const r = await fetch(location.pathname, { method:"HEAD", cache:"no-store" });
+      // at most 3 s: on a network that never answers, the pull after it must not wait (2026-10-17)
+      const ac = new AbortController(); setTimeout(() => ac.abort(), 3000);
+      const r = await fetch(location.pathname, { method:"HEAD", cache:"no-store", signal:ac.signal });
       const lm = Date.parse(r.headers.get("last-modified") || ""), mine = Date.parse(document.lastModified);
       if (!(lm - mine > 5000) || sessionStorage.getItem("quest-reloaded") === String(lm)) return false;
       // the service worker opens the saved copy, so fetch the new page into it first (2026-10-11)
@@ -4775,6 +4887,8 @@
   addEventListener("pageshow", e => { if (e.persisted) wake(); });
   addEventListener("focus", wake);
   addEventListener("pagehide", () => { if (syncTimer) pushG(true); });
+  // the internet is back: pull at once, which also sends what waited (edits, ticks, the game) (2026-10-17)
+  addEventListener("online", () => { lastWake = 0; wake(); });
   render();   // the saved day, if there is one, before the network answers
   checkFresh();
   pullAll();
