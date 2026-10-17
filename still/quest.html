@@ -1684,7 +1684,7 @@
     saveG();
   }
   // how many gym sessions today ended "wiped out", and last night's sleep, kept per day for the recovery advice
-  function wipedToday(){ return Object.entries(G.day.mealq || {}).filter(([k, v]) => /^gym:/.test(k) && v && v.feel === "wiped").length; }
+  function wipedToday(){ return GL.wipedCount(G.day.mealq); }
   function gymDayStamp(){ const n = wipedToday(); return n ? { wiped:n, sleep:G.day.sleepScore ?? null } : {}; }
   function addPrana(d, msg, label, noFloat, extra){ addEnergy("p", d, msg, label, noFloat, extra); }
   function addBody(d, msg, label, noFloat, extra){ addEnergy("b", d, msg, label, noFloat, extra); }
@@ -2760,6 +2760,8 @@
   const newGym = (program, bw) => GL.newSession(LV, program, gymLevels(), bw, now().toISOString());
   // Jack Woods is one flexible session now (later 2026-10-16); a Matthew I. Smith block opens his phase
   const suggestProgram = block => GL.programFor(block && block.t, ymdLocal());
+  // "How do you feel now?" is kept per gym block, by its calendar event like other ratings (gk), else per game day
+  const gymFeelKey = () => { const blk = GYM.blockKey && blocks().find(x => x.key === GYM.blockKey); return GL.feelKey(blk ? gk(blk) : null, gameYmd()); };
   function saveDraft(){ try { localStorage.setItem(gymDraftKey(), JSON.stringify(GYM)); } catch {} }
   const gymTrend = () => LV.bodyTrend(LV.readingsFrom(gymInfo.body, gymInfo.last));
 
@@ -2772,6 +2774,7 @@
     // a draft from earlier today comes back at his levels now (an old draft's default L1 never wins, quest-levels.js)
     try { GYM = GL.fromDraft(LV, JSON.parse(localStorage.getItem(gymDraftKey())), gymLevels()); } catch { GYM = null; }
     if (!GYM) GYM = newGym(suggestProgram(block));
+    if ((GYM.blockKey || null) !== (block ? block.key : null)) GYM.feel = null;   // an answer belongs to the block it was given for
     GYM.blockKey = block ? block.key : null;
     saveDraft();
     drawGym();
@@ -2804,8 +2807,8 @@
         <button class="lv" data-mis="${esc(m)}" data-d="1" aria-label="One more set">+</button></span></div>
         <div class="gsub">${esc(how)} · ${sets} sets</div></div>`;
     });
-    const fk = GL.feelKey(GYM.blockKey, ymdLocal()), felt = (G.day.mealq || {})[fk];
-    h += felt ? `<div class="glabel">How do you feel now?</div><p class="gnote">Saved: ${esc((GL.FEEL.find(f => f.id === felt.feel) || {}).text || felt.feel)}.</p>`
+    const fk = gymFeelKey(), felt = (G.day.mealq || {})[fk];
+    h += felt ? `<div class="glabel">How do you feel now?</div><p class="gnote">Saved: ${esc((GL.feelById(felt.feel) || {}).text || felt.feel)}.</p>`
       : GL.feelHTML(esc, GYM.feel, gainMult());
     h += `<div class="gfoot"><button class="btn" id="gRest">Rest 90s</button><button class="btn primary" id="gSave">Finish and save</button></div>
       <p class="gnote" id="gMsg">${P.strength ? "Saves to your Workout Tracker in Notion. Your log saves on this phone as you go." : "Saves to your Workout Tracker in Notion."}</p>`;
@@ -2822,7 +2825,7 @@
     $("gProg").onchange = e => {
       const busy = Object.values(GYM.e).some(x => x && ((x.tests && x.tests.length) || x.effort || x.reps || x.done || x.sets));
       if (busy && !confirm("Switch program? What you logged for this one today is cleared.")) { e.target.value = GYM.program; return; }
-      GYM = { ...newGym(e.target.value, GYM.bw), blockKey:GYM.blockKey }; gymTesting = null; gymRow = null; saveDraft(); drawGym(); };
+      GYM = { ...newGym(e.target.value, GYM.bw), blockKey:GYM.blockKey, feel:GYM.feel }; gymTesting = null; gymRow = null; saveDraft(); drawGym(); };
     $("gBw").oninput = () => { GYM.bw = $("gBw").value.trim(); saveDraft(); };
     sh.querySelectorAll("[data-gopen]").forEach(b => b.onclick = () => { gymRow = GL.toggle(gymRow, b.dataset.gopen); gymTesting = null; drawGym();
       const row = gymRow && $("gm-" + gymRow); if (row && row.scrollIntoView) row.scrollIntoView({ block:"nearest" }); });
@@ -2872,7 +2875,7 @@
     const bw = LV.parseLbs(GYM.bw);
     if (GYM.bw && bw == null) { $("gMsg").textContent = "Body weight looks off. Type it in lbs, like 172.4."; return; }
     if (!entries.length && bw == null) { $("gMsg").textContent = "Nothing logged yet. Tap how a set went, or add your body weight."; return; }
-    const fk = GL.feelKey(GYM.blockKey, ymdLocal());
+    const fk = gymFeelKey();
     if (entries.length && !GYM.feel && !(G.day.mealq || {})[fk]) { $("gMsg").textContent = "How do you feel now? Tap one above, then save."; return; }
     const date = ymdLocal(), body = { date, program:GYM.program, entries };
     if (bw != null) body.bodyWeightLbs = bw;
@@ -2899,11 +2902,11 @@
     // the answer to "How do you feel now?" is what pays, once per gym block (logging alone earns nothing, d15)
     const pay = GL.feelPay(G.day.mealq, fk, GYM.feel, entries.length, gainMult());
     if (pay) {
-      const f = GL.FEEL.find(x => x.id === GYM.feel);
+      const said = `Gym: ${GL.feelById(GYM.feel).text.toLowerCase()}`;
       (G.day.mealq = G.day.mealq || {})[fk] = GL.feelRecord(GYM.feel, pay, now().toISOString());
-      if (pay.b) addBody(pay.b, `Gym: ${f.text.toLowerCase()}`, "gym");
-      if (pay.p) addPrana(pay.p, `Gym: ${f.text.toLowerCase()}`, "gym");
-      if (!pay.b && !pay.p) log(`Gym: ${f.text.toLowerCase()}`);
+      if (pay.b) addBody(pay.b, said, "gym");
+      if (pay.p) addPrana(pay.p, said, "gym");
+      if (!pay.b && !pay.p) log(said);
     }
     saveG();
     $("gMsg").textContent = msg; $("gSave").textContent = "Saved";

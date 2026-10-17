@@ -52,6 +52,16 @@ test("pays once per gym block, only with a move logged and an answer", () => {
   assert.equal(mealq[key].feel, "good");
 });
 
+test("wipedCount reads only gym answers", () => {
+  assert.equal(GL.wipedCount({ "gym:a":{ kind:"gym", feel:"wiped" }, "gym:b":{ kind:"gym", feel:"good" }, "id:x":{ feel:"wiped" } }), 1);
+  assert.equal(GL.wipedCount(undefined), 0);
+});
+
+test("the answer is keyed by the calendar event and cleared for another block", () => {
+  assert.match(html, /const gymFeelKey = \(\) => [^\n]*gk\(blk\)/);
+  assert.match(html, /!== \(block \? block\.key : null\)\) GYM\.feel = null/);
+});
+
 test("wiped out twice in 7 days suggests going lighter", () => {
   const days = { "Mon Oct 12 2026":{ wiped:1, sleep:82 }, "Sat Oct 17 2026":{ wiped:1, sleep:80 } };
   assert.match(GL.wipedReason(days, "Sat Oct 17 2026"), /lighter session, Upa Yoga or rest/);

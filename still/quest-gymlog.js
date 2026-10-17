@@ -96,11 +96,14 @@
     { id:"wiped", icon:"🫠", text:"Wiped out, drained or foggy", b:-3, p:-1 },
   ];
   const gain = (v, mult) => (v > 0 ? Math.round(v * mult) : v);
+  const feelById = (id) => FEEL.find((x) => x.id === id) || null;
   function feelPoints(id, mult) {
-    const f = FEEL.find((x) => x.id === id);
+    const f = feelById(id);
     return f ? { b: gain(f.b, mult), p: gain(f.p, mult) } : null;
   }
   const feelKey = (blockKey, ymd) => "gym:" + (blockKey || ymd);
+  // how many gym answers in one day's mealq were "wiped out"
+  const wipedCount = (mealq) => Object.entries(mealq || {}).filter(([k, v]) => k.startsWith("gym:") && v && v.feel === "wiped").length;
   // the points to pay now, or null: needs a logged move, an answer, and no answer already kept for this block
   function feelPay(mealq, key, id, moves, mult) {
     if (!moves || !id || (mealq && mealq[key])) return null;
@@ -127,5 +130,5 @@
   }
 
   root.QuestGymLog = { MOVE, JW, PROGRAMS, programName, programFor, newSession, fromDraft, logged, shortLevel, moveHTML, movesHTML, toggle,
-    FEEL, feelPoints, feelKey, feelPay, feelRecord, feelHTML, wipedReason };
+    FEEL, feelById, feelPoints, feelKey, feelPay, feelRecord, feelHTML, wipedCount, wipedReason };
 })(typeof window !== "undefined" ? window : globalThis);
