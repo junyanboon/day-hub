@@ -19,7 +19,12 @@
         fonts. Before, only quest.html was saved up front and the rest only once used under this worker, so a
         phone could open offline to a page with a script missing;
       - his data is saved with the time it was fetched, and an answer from the saved copy says so (x-dq-saved),
-        so the page can say it is offline and how old the calendar is. */
+        so the page can say it is offline and how old the calendar is.
+   5. A ping refreshes the saved calendar (Junyan, 2026-10-17, "yes" to pings refreshing the calendar in the
+      background; an iPhone web app gets no other background time). Each ping fetches today's plan and edits
+      into the saved copy, under the same addresses the page asks for, so Quest opens on a fresh calendar even
+      if the internet is gone by then. The ping is shown first and never waits for this (iOS takes push away
+      from a web app whose push shows no notification). */
 const SHELL = "dq-shell-v3", DATA = "dq-data-v1";   // v3: the whole page is saved on install (2026-10-17)
 // files the page loads by name at run time (sprites by pose, fonts from the styles), saved on install as well
 const EXTRA = ["quest.webmanifest", "quest-icon.svg", "quest-icon-180.png", "quest-icon-512.png",
@@ -136,13 +141,32 @@ self.addEventListener("fetch", (e) => {
   if ((url.origin === API || url.origin === TEST_API) && DATA_PATHS.test(url.pathname)) e.respondWith(networkFirst(req, DATA, 4000));
 });
 
+// today's /plan and /ops as the page asks for them: the game's day runs to 4 AM (d67), in the phone's own zone;
+// the /ops key has the shape of Date.toDateString() (dayKey in quest.html)
+function todayUrls(now = Date.now()) {
+  const ymd = new Date(now - 4 * 3600000).toLocaleDateString("en-CA");
+  const key = new Date(ymd + "T12:00:00Z").toLocaleDateString("en-US", { timeZone: "UTC", weekday: "short", month: "short", day: "2-digit", year: "numeric" }).replace(/,/g, "");
+  return [API + "/plan?date=" + ymd, API + "/ops?d=" + encodeURIComponent(key)];
+}
+// fetch them into the saved copy, stamped like the page's own fetches; any failure keeps the old copy
+async function refreshSaved() {
+  const cache = await caches.open(DATA);
+  await Promise.all(todayUrls().map((u) => within(15000, fetch(u, { cache: "no-store" }))
+    .then(async (res) => { if (res && res.ok) await cache.put(u, await stamped(res)); })
+    .catch(() => {})));
+}
+
 self.addEventListener("push", (e) => {
   let d = {};
-  try { d = e.data.json(); } catch { d = { title: "Day Quest", body: e.data ? e.data.text() : "" }; }
-  e.waitUntil(self.registration.showNotification(d.title || "Day Quest", {
+  try { d = (e.data && e.data.json()) || {}; } catch { d = { title: "Day Quest", body: e.data ? e.data.text() : "" }; }
+  // the notification is asked for first; the refresh runs beside it and its errors are swallowed
+  const shown = self.registration.showNotification(d.title || "Day Quest", {
     body: d.body || "", tag: d.tag, icon: "quest-icon-180.png", badge: "quest-icon-180.png",
     data: { url: d.url || "quest.html" },
-  }));
+  });
+  let fresh = Promise.resolve();
+  try { fresh = refreshSaved().catch(() => {}); } catch {}
+  e.waitUntil(Promise.all([shown, fresh]));
 });
 
 self.addEventListener("notificationclick", (e) => {
