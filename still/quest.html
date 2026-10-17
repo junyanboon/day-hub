@@ -332,6 +332,12 @@
   .gchips { display:flex; flex-wrap:wrap; gap:6px; }
   .gchip { padding:9px 12px; border-radius:20px; background:rgba(255,255,255,.12); font-size:14px; }
   .gchip.on { background:var(--good); color:#173b2a; font-weight:600; }
+  .gfeel { display:grid; grid-template-columns:1fr 1fr; gap:6px; }
+  .gfeel .gf { border-radius:14px; text-align:left; color:#fff; line-height:1.3; }
+  .gfeel .gf b { display:block; font-size:12px; font-weight:600; margin-top:2px; }
+  .gfeel .gf small { display:block; font-size:11.5px; margin-top:2px; }
+  .gfeel .gf.goal { box-shadow:inset 0 0 0 1.5px var(--good); }
+  .gfeel .gf.on { color:#173b2a; }
   .gym-hb { display:flex; gap:6px; }
   .gmv { margin-top:10px; padding:12px; border-radius:14px; background:rgba(255,255,255,.08); }
   .gmv .glabel { margin-top:0; }
@@ -698,7 +704,7 @@
 <script src="bag.js?v=20261009k"></script>
 <script src="quest-merge.js?v=20261016g"></script>
 <script src="quest-levels.js?v=20261016b"></script>
-<script src="quest-gymlog.js?v=20261016a"></script>
+<script src="quest-gymlog.js?v=20261017a"></script>
 <script src="nvc-words.js?v=20261010a"></script>
 <script src="quest-fx.js?v=20261009b"></script>
 <script src="quest-night.js?v=20261011a"></script>
@@ -1673,10 +1679,13 @@
       G.day.prana = Math.max(0, Math.min(100, prana() + d));
       (G.day.pl = G.day.pl || []).push([now().toISOString(), G.day.prana]);
     }
-    (G.days = G.days || {})[G.day.date] = { place:placeNow(), prana:G.day.prana, body:G.day.body, level:lvl() };
+    (G.days = G.days || {})[G.day.date] = { place:placeNow(), prana:G.day.prana, body:G.day.body, level:lvl(), ...gymDayStamp() };
     log(msg, d, m === "b" ? { ...(extra || {}), m:"b" } : extra); if (d && !noFloat) floatXp(d, (label || "") + (m === "b" ? " · body" : ""));
     saveG();
   }
+  // how many gym sessions today ended "wiped out", and last night's sleep, kept per day for the recovery advice
+  function wipedToday(){ return GL.wipedCount(G.day.mealq); }
+  function gymDayStamp(){ const n = wipedToday(); return n ? { wiped:n, sleep:G.day.sleepScore ?? null } : {}; }
   function addPrana(d, msg, label, noFloat, extra){ addEnergy("p", d, msg, label, noFloat, extra); }
   function addBody(d, msg, label, noFloat, extra){ addEnergy("b", d, msg, label, noFloat, extra); }
   // which meter a Prana action fills: Sadhguru's (practices, neem, the lamp) fill Prana, Bryan Johnson's fill Body
@@ -2230,7 +2239,8 @@
     ["sat", "🛋️", "Sat still over an hour without a break", -2],
   ];
   const AQ_ONEOF = { spine:"slump", slump:"spine", invol:"auto", auto:"invol", moved:"sat", sat:"moved" };
-  const actRatable = b => !!b && !isMeal(b) && !isSleep(b) && !["rest", "open", "break"].includes(b.kind)
+  // no check-in for gym: the gym log already records how it went (Junyan, 2026-10-17: "I already recorded the details")
+  const actRatable = b => !!b && !isMeal(b) && !isSleep(b) && !isGym(b) && !["rest", "open", "break"].includes(b.kind)
     && !blockHabits(b).length && b.e - b.s >= 20 * 60000;
   // an activity that ended in the last 4 hours and has not been checked
   function unratedActivity(){
@@ -2750,6 +2760,8 @@
   const newGym = (program, bw) => GL.newSession(LV, program, gymLevels(), bw, now().toISOString());
   // Jack Woods is one flexible session now (later 2026-10-16); a Matthew I. Smith block opens his phase
   const suggestProgram = block => GL.programFor(block && block.t, ymdLocal());
+  // "How do you feel now?" is kept per gym block, by its calendar event like other ratings (gk), else per game day
+  const gymFeelKey = () => { const blk = GYM.blockKey && blocks().find(x => x.key === GYM.blockKey); return GL.feelKey(blk ? gk(blk) : null, gameYmd()); };
   function saveDraft(){ try { localStorage.setItem(gymDraftKey(), JSON.stringify(GYM)); } catch {} }
   const gymTrend = () => LV.bodyTrend(LV.readingsFrom(gymInfo.body, gymInfo.last));
 
@@ -2762,6 +2774,7 @@
     // a draft from earlier today comes back at his levels now (an old draft's default L1 never wins, quest-levels.js)
     try { GYM = GL.fromDraft(LV, JSON.parse(localStorage.getItem(gymDraftKey())), gymLevels()); } catch { GYM = null; }
     if (!GYM) GYM = newGym(suggestProgram(block));
+    if ((GYM.blockKey || null) !== (block ? block.key : null)) GYM.feel = null;   // an answer belongs to the block it was given for
     GYM.blockKey = block ? block.key : null;
     saveDraft();
     drawGym();
@@ -2794,6 +2807,9 @@
         <button class="lv" data-mis="${esc(m)}" data-d="1" aria-label="One more set">+</button></span></div>
         <div class="gsub">${esc(how)} · ${sets} sets</div></div>`;
     });
+    const fk = gymFeelKey(), felt = (G.day.mealq || {})[fk];
+    h += felt ? `<div class="glabel">How do you feel now?</div><p class="gnote">Saved: ${esc((GL.feelById(felt.feel) || {}).text || felt.feel)}.</p>`
+      : GL.feelHTML(esc, GYM.feel, gainMult());
     h += `<div class="gfoot"><button class="btn" id="gRest">Rest 90s</button><button class="btn primary" id="gSave">Finish and save</button></div>
       <p class="gnote" id="gMsg">${P.strength ? "Saves to your Workout Tracker in Notion. Your log saves on this phone as you go." : "Saves to your Workout Tracker in Notion."}</p>`;
     const keepScroll = $("sheet").classList.contains("open") && $("gProg") ? $("sheet").scrollTop : null;
@@ -2809,7 +2825,7 @@
     $("gProg").onchange = e => {
       const busy = Object.values(GYM.e).some(x => x && ((x.tests && x.tests.length) || x.effort || x.reps || x.done || x.sets));
       if (busy && !confirm("Switch program? What you logged for this one today is cleared.")) { e.target.value = GYM.program; return; }
-      GYM = { ...newGym(e.target.value, GYM.bw), blockKey:GYM.blockKey }; gymTesting = null; gymRow = null; saveDraft(); drawGym(); };
+      GYM = { ...newGym(e.target.value, GYM.bw), blockKey:GYM.blockKey, feel:GYM.feel }; gymTesting = null; gymRow = null; saveDraft(); drawGym(); };
     $("gBw").oninput = () => { GYM.bw = $("gBw").value.trim(); saveDraft(); };
     sh.querySelectorAll("[data-gopen]").forEach(b => b.onclick = () => { gymRow = GL.toggle(gymRow, b.dataset.gopen); gymTesting = null; drawGym();
       const row = gymRow && $("gm-" + gymRow); if (row && row.scrollIntoView) row.scrollIntoView({ block:"nearest" }); });
@@ -2826,6 +2842,7 @@
     sh.querySelectorAll("[data-tres]").forEach(b => b.onclick = () => gymTest(b.dataset.tres, b.dataset.v === "1", b.getBoundingClientRect()));
     sh.querySelectorAll("[data-mob]").forEach(b => b.onclick = () => { const x = GYM.e["m:" + b.dataset.mob]; x.done = !x.done; saveDraft(); drawGym(); });
     sh.querySelectorAll("[data-mis]").forEach(b => b.onclick = () => { const x = GYM.e["mis:" + b.dataset.mis]; x.sets = Math.max(0, x.sets + +b.dataset.d); saveDraft(); drawGym(); });
+    sh.querySelectorAll("[data-feel]").forEach(b => b.onclick = () => { GYM.feel = GYM.feel === b.dataset.feel ? null : b.dataset.feel; saveDraft(); drawGym(); });
     $("gRest").onclick = startRest;
     $("gSave").onclick = saveGym;
   }
@@ -2858,6 +2875,8 @@
     const bw = LV.parseLbs(GYM.bw);
     if (GYM.bw && bw == null) { $("gMsg").textContent = "Body weight looks off. Type it in lbs, like 172.4."; return; }
     if (!entries.length && bw == null) { $("gMsg").textContent = "Nothing logged yet. Tap how a set went, or add your body weight."; return; }
+    const fk = gymFeelKey();
+    if (entries.length && !GYM.feel && !(G.day.mealq || {})[fk]) { $("gMsg").textContent = "How do you feel now? Tap one above, then save."; return; }
     const date = ymdLocal(), body = { date, program:GYM.program, entries };
     if (bw != null) body.bodyWeightLbs = bw;
     $("gSave").disabled = true; $("gMsg").textContent = "Saving…";
@@ -2880,6 +2899,15 @@
     log(`Gym log: ${GYM.program}, ${entries.length} moves${tested ? `, ${tested} tests` : ""}${bw != null ? `, body weight ${bw} lbs` : ""}`); saveG();
     const b = GYM.blockKey && blocks().find(x => x.key === GYM.blockKey);
     if (entries.length && b && !G.day.closes[gk(b)]) G.day.closes[gk(b)] = "done";
+    // the answer to "How do you feel now?" is what pays, once per gym block (logging alone earns nothing, d15)
+    const pay = GL.feelPay(G.day.mealq, fk, GYM.feel, entries.length, gainMult());
+    if (pay) {
+      const said = `Gym: ${GL.feelById(GYM.feel).text.toLowerCase()}`;
+      (G.day.mealq = G.day.mealq || {})[fk] = GL.feelRecord(GYM.feel, pay, now().toISOString());
+      if (pay.b) addBody(pay.b, said, "gym");
+      if (pay.p) addPrana(pay.p, said, "gym");
+      if (!pay.b && !pay.p) log(said);
+    }
     saveG();
     $("gMsg").textContent = msg; $("gSave").textContent = "Saved";
     const tEl = $("gBwT"), tr = gymTrend(); if (tEl && tr) tEl.textContent = "Last: " + LV.trendText(tr);
@@ -3364,6 +3392,9 @@
     if (trip) why.push(`travel day (${shortName(trip)})`);
     const prev = Object.entries(G.days || {}).filter(([k]) => k !== G.day.date).sort((a, b) => Date.parse(b[0]) - Date.parse(a[0]))[0];
     if (prev && prev[1].place && PLAN && PLAN.where && PLAN.where.place && prev[1].place !== PLAN.where.place) why.push(`new place (${PLAN.where.place})`);
+    // "How do you feel now?" in the gym log (2026-10-17): wiped out twice in 7 days, or once after sleep under 70
+    const wiped = GL.wipedReason({ ...(G.days || {}), [G.day.date]:{ wiped:wipedToday(), sleep:sc } }, G.day.date);
+    if (wiped) why.push(wiped);
     return why;
   }
   function trainingWeek(){
