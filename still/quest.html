@@ -734,7 +734,8 @@
 </style>
 <script src="keeps.js?v=20261009k"></script>
 <script src="bag.js?v=20261009k"></script>
-<script src="quest-merge.js?v=20261019y"></script>
+<script src="quest-merge.js?v=20261019z"></script>
+<script src="quest-oura.js?v=20261019a"></script>
 <script src="quest-levels.js?v=20261016b"></script>
 <script src="quest-gymlog.js?v=20261019a"></script>
 <script src="quest-meals.js?v=20261019f"></script>
@@ -1753,7 +1754,7 @@
   function refillSleep(level, why, sleepScore = level){
     if (G.day.slept) return;
     G.day.slept = true; G.day.sleepScore = sleepScore == null ? null : Math.round(sleepScore);   // the Oura sleep score, or hours x 10
-    addBody(Math.max(0, Math.min(100, level)) - body(), why, "sleep");
+    addBody(Math.max(0, Math.min(100, level)) - body(), why, "sleep", false, { sl:1 });
     render();
   }
   const energyTag = b => { const id = basicId(b);
@@ -1816,16 +1817,27 @@
   }
   /* Where body starts the day (d79): the Oura readiness score (Junyan, 2026-10-19, d1), else last night's
      sleep score, else the old fallback (yesterday's body, or the "how long did you sleep?" question). */
+  let ouraAsk = 0, ouraBusy = false;
   async function seedFromOura(){
-    if (!G.day || G.day.ouraTried || G.day.slept) return;
-    G.day.ouraTried = true;
-    const today = j => j && j.day === gameYmd() && typeof j.score === "number" ? j.score : null;
-    const read = path => fetch(API + path, { cache:"no-store" }).then(r => r.ok ? r.json() : null).catch(() => null);
-    const [rd, sl] = await Promise.all([read("/readiness"), read("/sleep")]);
-    const ready = today(rd), slept = today(sl);
-    // the sleep score stays the sleep score: the gym's go-easy check reads it (G.day.sleepScore)
-    if (ready != null) { G.day.readiness = ready; refillSleep(ready, `Readiness ${ready} (Oura)`, slept); }
-    else if (slept != null) refillSleep(slept, `Slept ${slept} (Oura)`);
+    const QO = window.QuestOura;
+    if (!G.day || ouraBusy || !QO.shouldAsk(G.day, ouraAsk, Date.now())) return;
+    // asked again on each load and on coming back to the page until today's readiness is in (d58)
+    ouraBusy = true; ouraAsk = Date.now();
+    try {
+      const today = j => j && j.day === gameYmd() && typeof j.score === "number" ? j.score : null;
+      const read = path => fetch(API + path, { cache:"no-store" }).then(r => r.ok ? r.json() : null).catch(() => null);
+      const [rd, sl] = await Promise.all([read("/readiness"), read("/sleep")]);
+      const ready = today(rd), slept = today(sl);
+      if (!G.day || G.day.ouraReady) return;
+      if (ready != null) {
+        // readiness wins, even over a "N h" tap or the sleep score, once; the Body used or filled today stays
+        G.day.readiness = ready; G.day.ouraReady = true; G.day.ouraTried = true; G.day.slept = true;
+        if (slept != null) G.day.sleepScore = slept;   // the gym's go-easy check reads it
+        else if (G.day.sleepScore == null) G.day.sleepScore = ready;
+        addBody(QO.bodyFrom(ready, G.day.log) - body(), `Readiness ${ready} (Oura)`, "sleep", false, { sl:1 });
+        render();
+      } else if (slept != null && !G.day.slept) refillSleep(slept, `Slept ${slept} (Oura)`);
+    } finally { ouraBusy = false; }
   }
   /* ---------- Last night (Junyan, 2026-10-19, d2 and d5) ----------
      Resting heart rate (lowest overnight), HRV average and sleep score, each beside its 7-day average with an
