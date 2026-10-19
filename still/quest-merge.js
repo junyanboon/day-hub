@@ -4,7 +4,8 @@
    older version of the page, wipe check-ins, habits and prana the other one had
    saved. This folds two copies into one instead:
    - check-ins, closes, starts, log lines, zaps, bag events: kept from both;
-   - habit counts, XP: the higher number;
+   - habit counts, their take-backs (voided), XP: the higher number;
+   - a block's checklist: step by step, the later change winning (mergeWork);
    - prana: the newer copy's number plus the log changes only the older copy saw
      (a block's spend and the sleep refill count once even if both devices did them);
    - body (2026-10-09, d201): the same as prana, from the log lines marked m:"b";
@@ -43,17 +44,40 @@
     return { log: out.slice(0, LOG_MAX), extra, extraB };
   }
 
+  /* A block's checklist (G.day.work[key], 2026-10-19, d28): a block both copies have merges step by step when its
+     steps carry change times (t), the later change of each step winning its tick and paid record, so an untick on
+     one device and a tick on the other both survive. A block without step times (an old page) is the newer copy's. */
+  function mergeWork(ow, nw) {
+    const out = { ...obj(ow), ...obj(nw) };
+    for (const [k, b] of Object.entries(obj(nw))) {
+      const a = obj(ow)[k];
+      if (!a || !b || !(a.t || b.t)) continue;
+      const tick = { ...obj(b.tick) }, paid = { ...obj(b.paid) }, t = { ...obj(b.t) };
+      for (const [i, at] of Object.entries(obj(a.t))) {
+        if (ms(at) <= ms(t[i])) continue;   // the older copy changed this step later
+        if (obj(a.tick)[i]) tick[i] = a.tick[i]; else delete tick[i];
+        if (obj(a.paid)[i]) paid[i] = a.paid[i]; else delete paid[i];
+        t[i] = at;
+      }
+      out[k] = { ...a, ...b, tick, paid, t };
+    }
+    return out;
+  }
+
   function mergeDay(o, n) {
     if (!o || !o.date) return n;
     if (!n || !n.date) return o;
     if (o.date !== n.date) return ms(o.date) > ms(n.date) ? o : n;
     const out = { ...o, ...n };
-    for (const k of ["checks", "closes", "missed", "caches", "started", "spent", "work", "meals", "mealq"])
+    for (const k of ["checks", "closes", "missed", "caches", "started", "spent", "meals", "mealq"])
       if (o[k] || n[k]) out[k] = { ...obj(o[k]), ...obj(n[k]) };
-    if (o.habits || n.habits) {
-      const h = { ...obj(o.habits) };
-      for (const [k, v] of Object.entries(obj(n.habits))) h[k] = Math.max(+h[k] || 0, +v || 0);
-      out.habits = h;
+    if (o.work || n.work) out.work = mergeWork(o.work, n.work);
+    // habit counts and their take-backs (voided, 2026-10-19, d28) only go up: the higher number from either copy,
+    // so a take-back on one device is never undone by the other device's newer copy
+    for (const f of ["habits", "voided"]) if (o[f] || n[f]) {
+      const h = { ...obj(o[f]) };
+      for (const [k, v] of Object.entries(obj(n[f]))) h[k] = Math.max(+h[k] || 0, +v || 0);
+      out[f] = h;
     }
     // water glasses (2026-10-19, d23): kept from both; a glass undone on either device stays undone
     if (o.glasses || n.glasses) {

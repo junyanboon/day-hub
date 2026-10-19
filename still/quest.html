@@ -223,7 +223,7 @@
   .fx-p.spark { width:6px; height:6px; border-radius:50%; }
   .fx-ring { position:absolute; width:40px; height:40px; border-radius:50%; border:2px solid rgba(127,208,255,.85); }
   .fx-tag { position:absolute; font-weight:800; font-size:17px; color:var(--gold); text-shadow:0 2px 8px rgba(0,0,0,.45); white-space:nowrap; }
-  .fx-tag.combo { color:#ff9ad5; font-size:14px; } .fx-tag.full { color:#fff; font-size:12px; }
+  .fx-tag.combo { color:#ff9ad5; font-size:14px; } .fx-tag.full { color:#fff; font-size:12px; } .fx-tag.back { color:#ff9b8a; }
   .warnline { margin-top:10px; font-size:13px; color:#ffcf8a; }
   .gear { flex:none; width:36px; height:36px; border-radius:50%; background:var(--glass); font-size:17px; }
   .gear.warn { box-shadow:0 0 0 2px var(--warn); }
@@ -731,15 +731,15 @@
 </style>
 <script src="keeps.js?v=20261009k"></script>
 <script src="bag.js?v=20261009k"></script>
-<script src="quest-merge.js?v=20261019w"></script>
+<script src="quest-merge.js?v=20261019u"></script>
 <script src="quest-levels.js?v=20261016b"></script>
 <script src="quest-gymlog.js?v=20261017a"></script>
 <script src="quest-meals.js?v=20261019f"></script>
 <script src="quest-trends.js?v=20261019c"></script>
 <script src="nvc-words.js?v=20261010a"></script>
-<script src="quest-fx.js?v=20261009b"></script>
+<script src="quest-fx.js?v=20261019u"></script>
 <script src="quest-night.js?v=20261019w"></script>
-<script src="quest-basics.js?v=20261019f"></script>
+<script src="quest-basics.js?v=20261019u"></script>
 <script src="quest-suggest.js?v=20261019a"></script>
 <script src="quest-water.js?v=20261019a"></script>
 <script src="quest-gym.js?v=20261016i"></script>
@@ -2331,9 +2331,12 @@
       (G.day.mealq = G.day.mealq || {})[k] = { ...r.rec, at:now().toISOString() };
       stampDay(); saveG();
       openMeal(b); $("sheet").scrollTop = top; render();
-      const on = r.ops.find(op => op.id === id && op.on);
+      const on = r.ops.find(op => op.id === id && op.on), off = r.ops.find(op => op.id === id && !op.on && op.d);
       if (fx && on) {
         fx.tap(rect, { icon:bn.dataset.icon, gain:on.d, color:on.d < 0 ? "#ff9b8a" : on.m === "b" ? "#8fe3b0" : "#ffd479" });
+        fx.pop($("sheet").querySelector(`[data-q="${id}"]`));
+      } else if (fx && off) {   // a second tap took it back: the same take-back animation as a checklist tile (d28)
+        fx.back(rect, { gain:-off.d });
         fx.pop($("sheet").querySelector(`[data-q="${id}"]`));
       }
     });
@@ -2377,16 +2380,31 @@
     AQ_BODY.forEach(([id, , , v]) => { if (sel[id]) b += aqVal(v); });
     return { p, b };
   }
+  /* After a walk, hike or other outdoor block (Junyan, 2026-10-19, d27): the barefoot walk is a habit tile at the top
+     of the check-in. It pays as he taps it (the barefoot habit's value, once a day, into prana) and a second tap takes
+     it back, the same as a checklist tile (tapStep). It is saved on the block's checklist (G.day.work), not the quiz. */
+  const BAREFOOT_I = "bf";   // its own key in the block's ticks, apart from any prep list
+  function barefootHTML(b){
+    if (!QB() || !QB().outdoorBlock(b.t)) return "";
+    const W = ((G.day.work = G.day.work || {})[gk(b)] = G.day.work[gk(b)] || { tick:{}, goal:"" }); W.tick = W.tick || {};
+    return `<div class="win-lb">Barefoot</div><div class="hgrid btiles">${stepTile(b, W, QB().barefootStep(), BAREFOOT_I, MO_CTX.hour(now()), "outdoor")}</div>`;
+  }
+  function bindBarefoot(b, redraw){
+    $("sheet").querySelectorAll("[data-bstep]").forEach(bn => bn.onclick = e => { e.stopPropagation();
+      const top = $("sheet").scrollTop;
+      tapStep(bn, b, "outdoor", BAREFOOT_I, QB().barefootStep(), () => { redraw(); $("sheet").scrollTop = top; render(); }); });
+  }
   function openActQuiz(b, sel = {}){
     const k = gk(b), done = (G.day.mealq || {})[k], name = shortName(b);
     if (done) {
-      openSheet(`${winHead(b)}<h3>${esc(name)}: checked</h3><p>${esc(mqSum(done))}.</p>
+      openSheet(`${winHead(b)}<h3>${esc(name)}: checked</h3><p>${esc(mqSum(done))}.</p>${barefootHTML(b)}
         <div class="actions"><button class="btn ghost" id="aqX">Done</button></div>`);
-      $("aqX").onclick = closeSheet; return;
+      $("aqX").onclick = closeSheet; bindBarefoot(b, () => openActQuiz(b, sel)); return;
     }
     const sc = aqScore(sel), sign = v => v > 0 ? `+${v}` : `${v}`;
     const row = ([id, icon, txt, v], cls) => `<button class="wck${sel[id] ? " on" : ""}" data-q="${id}"><span class="bx">${sel[id] ? "✓" : ""}</span><span>${icon} ${esc(txt)}</span><b class="${cls}" style="margin-left:auto;font-size:12px">${sign(aqVal(v))}</b></button>`;
     openSheet(`${winHead(b)}<h3>How was ${esc(name)}?</h3>
+      ${barefootHTML(b)}
       <p>Tap what fits, then confirm.</p>
       <div class="win-lb">Prana (Sadhguru)</div>
       ${AQ_PRANA.map(x => row(x, "mp")).join("")}
@@ -2400,6 +2418,7 @@
       openActQuiz(b, sel); $("sheet").scrollTop = top;
     });
     $("aqX").onclick = closeSheet;
+    bindBarefoot(b, () => openActQuiz(b, sel));
     $("aqOk").onclick = () => {
       const q = aqScore(sel);
       (G.day.mealq = G.day.mealq || {})[k] = { kind:"act", at:now().toISOString(), sel:Object.keys(sel).filter(x => sel[x]), p:q.p, b:q.b };
@@ -3681,6 +3700,30 @@
       <div class="mo-sched soon-det">${moDetail(b, true)}</div>
       <div class="actions"><button class="btn ghost" data-soonfull="1">Open the full window</button></div></div>`;
   }
+  /* One tap on a checklist tile (a basic's step, or the barefoot walk in an outdoor check-in). A tick pays its Prana
+     action once (quest-basics.js tickStep); an untick takes back exactly what that tick paid (Junyan, 2026-10-19, d28),
+     the way a meal tile does. Habits only go up when devices merge, so the take-back is counted in G.day.voided, and
+     its log line carries a key so two devices that both take it back count it once. */
+  function tapStep(b, blk, kind, i, st, redraw){
+    const k = gk(blk), W = ((G.day.work = G.day.work || {})[k] = G.day.work[k] || { tick:{}, goal:"" });
+    const r = QB().tickStep(W, G.day.work, kind, i, st, MO_CTX.hour(now()), habitGain), at = now().toISOString();
+    QB().applyTick(W, i, r, at);
+    const fx = window.QuestFx, rect = b.getBoundingClientRect(), tile = b.classList.contains("htile");
+    if (r.pay) { const h = HABITS.find(x => x[0] === r.pay.h);
+      G.day.habits = G.day.habits || {}; G.day.habits[r.pay.h] = (G.day.habits[r.pay.h] || 0) + 1;
+      addHabit(r.pay.h, r.pay.d, `${h[1].replace(/ \(.*$/, "")} (${shortName(blk)})`, h[5], !!fx);
+      // the habit tile burst, sound and float, as the old Prana action tiles did (d23)
+      if (fx) fx.tap(rect, { icon:h[4], gain:r.pay.d, full:habitGain(r.pay.h) === 0, color:HCOL[h[7]] }); }
+    else if (r.back) { const h = HABITS.find(x => x[0] === r.back.h) || [];
+      (G.day.voided = G.day.voided || {})[r.back.h] = (G.day.voided[r.back.h] || 0) + 1;
+      addEnergy(meterOf(r.back.h), -r.back.d, `${(h[1] || r.back.h).replace(/ \(.*$/, "")} (${shortName(blk)}, taken back)`, h[5], !!fx,
+        { k:QB().backKey(k, i, r.back) });
+      if (fx) fx.back(rect, { gain:r.back.d }); }
+    else if (r.on && tile && fx && r.why) fx.nope(b);   // already paid today: the little shake
+    if (W.tick[i] && st.wind && !G.day.windDown) G.day.windDown = now().toISOString();
+    saveG(); redraw();
+    if (fx && (r.on || r.back)) fx.pop(document.querySelector(`[data-bstep="${i}"][data-k="${CSS.escape(b.dataset.k)}"]`));
+  }
   // checklists and folds inside a detail block (the morning's schedule and the coming-up card)
   function bindDetail(root, redraw){
     const blkOf = key => blocks().find(x => x.key === key);
@@ -3693,21 +3736,7 @@
       const W = G.day.work[gk(blk)]; W.tick[i] = !W.tick[i]; saveG(); redraw(); });
     root.querySelectorAll("[data-bstep]").forEach(b => b.onclick = e => { e.stopPropagation();
       const blk = blkOf(b.dataset.k), B = basicOf(blk); if (!B) return;
-      const i = b.dataset.bstep, W = G.day.work[gk(blk)], st = B.steps[i] || {};
-      // each ticked step pays its Prana action once (quest-basics.js tickStep); unticking takes nothing back
-      const r = QB().tickStep(W, G.day.work, basicId(blk), i, st, MO_CTX.hour(now()), habitGain);
-      W.tick[i] = r.on; if (W.tick[i] === false) delete W.tick[i];
-      const fx = window.QuestFx, rect = b.getBoundingClientRect(), tile = b.classList.contains("htile");
-      if (r.pay) { const h = HABITS.find(x => x[0] === r.pay.h);
-        G.day.habits = G.day.habits || {}; G.day.habits[r.pay.h] = (G.day.habits[r.pay.h] || 0) + 1;
-        (W.paid = W.paid || {})[i] = r.pay;
-        addHabit(r.pay.h, r.pay.d, `${h[1].replace(/ \(.*$/, "")} (${shortName(blk)})`, h[5], !!fx);
-        // the habit tile burst, sound and float, as the old Prana action tiles did (d23)
-        if (fx) fx.tap(rect, { icon:h[4], gain:r.pay.d, full:G.day.habits[r.pay.h] >= h[3], color:HCOL[h[7]] }); }
-      else if (r.on && tile && fx && r.why) fx.nope(b);   // already paid today: the little shake
-      if (W.tick[i] && st.wind && !G.day.windDown) G.day.windDown = now().toISOString();
-      saveG(); redraw();
-      if (fx && r.on) fx.pop(document.querySelector(`[data-bstep="${i}"][data-k="${CSS.escape(b.dataset.k)}"]`)); });
+      tapStep(b, blk, basicId(blk), b.dataset.bstep, B.steps[b.dataset.bstep] || {}, redraw); });
     root.querySelectorAll("[data-bskip]").forEach(b => b.onclick = e => { e.stopPropagation();   // "travelling, skip" on a home-only step
       const blk = blkOf(b.dataset.k); if (!blk) return; const W = G.day.work[gk(blk)];
       (W.skip = W.skip || {})[b.dataset.bskip] = true; log(`Skipped today (travelling): ${b.dataset.t || "a home step"}`); saveG(); redraw(); });
