@@ -742,7 +742,7 @@
 <script src="quest-levels.js?v=20261016b"></script>
 <script src="quest-gymlog.js?v=20261019a"></script>
 <script src="quest-meals.js?v=20261019f"></script>
-<script src="quest-trends.js?v=20261019end1"></script>
+<script src="quest-trends.js?v=20261019end2"></script>
 <script src="nvc-words.js?v=20261010a"></script>
 <script src="quest-fx.js?v=20261019x"></script>
 <script src="quest-night.js?v=20261019end1"></script>
@@ -1536,7 +1536,7 @@
     const practiced = b => { const W = (G.day.work || {})[gk(b)] || {};
       return Object.keys(W.tick || {}).some(i => W.tick[i] && PRACTICES.includes((ysteps[+i] || {}).h)) || Object.values(W.paid || {}).some(p => p && PRACTICES.includes(p.h)); };
     const done = TR.topDone(all.filter(b => G.day.closes[gk(b)] === "done" || ["in", "late"].includes(G.day.checks[gk(b)])).filter(b => !isSleep(b))
-      .map(b => ({ name:`✓ ${shortName(b)}`, rank:isSadhana(b) ? 0 : isHealth(b) ? 1 : 2, mins:(b.e - b.s) / 60000,
+      .map(b => ({ name:`✓ ${shortName(b)}`, rank:isSadhana(b) ? 0 : isHealth(b) && b.kind !== "rest" ? 1 : isMeal(b) || b.kind === "rest" ? 3 : 2, mins:(b.e - b.s) / 60000,
         yoga:QuestBasics.blockBasic(b.t, b.kind) === "yoga", practiced:practiced(b) })));
     // the two automatic ones left Right now (d35) and still show here by name, above the 3 blocks
     const auto = [(G.day.earn || {}).early ? "✓ Last meal 3 hr before bed, paid tomorrow morning" : null,
@@ -4934,7 +4934,7 @@
           <div class="quest-title"><span class="em">${P2 >= 70 ? "🌕" : P2 >= 40 ? "🌗" : "🌑"}</span><span>Your day so far</span></div>
           ${pranaLine()}
           <div class="summary"><div><b>${all.filter(isSadhana).some(b => ["in","late"].includes(G.day.checks[gk(b)])) ? "✓" : "·"}</b><span>sadhana</span></div>
-          <div><b>${health.filter(b => ["in","late"].includes(G.day.checks[gk(b)])).length}/${health.length}</b><span>fires lit</span></div>
+          <div><b>${health.filter(b => ["in","late"].includes(G.day.checks[gk(b)])).length}/${health.length}</b><span>health blocks done</span></div>
           <div><b>${sk2}</b><span>days at 70+</span></div></div>
           <div class="quest-time" style="margin-top:8px">${P2 >= 70 ? "A 70+ day. The streak grows." : `Finish at 70% or more to grow the streak.`}</div></div>`;
       } else {

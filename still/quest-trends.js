@@ -140,20 +140,21 @@
     if (t.water) add("wt", t.water.today, t.water.avg, t.water.good);
     if (!cand.length) return "You came to the end of your day and looked at it honestly. That is how better days begin.";
     const c = cand.sort((a, b) => b.gain - a.gain)[0];
-    return CHEER[c.k]({ ...c, avg: Number.isInteger(c.avg) ? c.avg : c.avg.toFixed(1) });
+    return CHEER[c.k]({ ...c, avg: Number.isInteger(c.avg) || Math.abs(c.avg) >= 10 ? Math.round(c.avg) : c.avg.toFixed(1) });
   }
   // the names of what he picked in today's meals, from a list of [id, icon, label]: "Fresh vegetables, raw..." reads "Fresh vegetables"
+  const SHORT = { heavy: "Heavy meal", stale: "Leftovers" };
   function namesOf(ids, rows) {
     const out = [];
     for (const id of ids || []) {
       const row = (rows || []).find((x) => x[0] === id);
-      const name = row ? String(row[2]).split(/,| \(/)[0] : id === "pos" ? "Pranic food" : null;
+      const name = SHORT[id] || (row ? String(row[2]).split(/,| \(/)[0] : id === "pos" ? "Pranic food" : null);
       if (name && !out.includes(name)) out.push(name);
     }
     return out;
   }
   /* The done list at the bottom of Day's end (d67): the 3 that mattered most. Sadhana first, then health blocks,
-     then the rest, longer first. A yoga block shows only when a practice was ticked in it.
+     then the rest, meals and rest blocks last, longer first. A yoga block shows only when a practice was ticked in it.
      items: [{ name, rank (0 sadhana, 1 health, 2 other), mins, yoga, practiced }] */
   function topDone(items, n = 3) {
     return (items || []).filter((x) => !x.yoga || x.practiced)

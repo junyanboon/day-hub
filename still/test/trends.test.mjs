@@ -89,11 +89,13 @@ test("d66: one kind line about what improved most against his week", () => {
   const good = [OK_NIGHT[0], { k: "hrv", last: 52, avg: 40, good: true }, OK_NIGHT[2]];
   assert.equal(T.encourage({ rows: rows({ prana: 66, body: 70, pf: 3, dr: 0 }), oura: good }), "HRV 52, up on your week's 40. Your system is calmer.");
   assert.match(T.encourage({ rows: [], oura: OK_NIGHT }), /looked at it honestly/);
+  const body = [{ k: "body", today: 73, avg: 34.6, good: true }];
+  assert.equal(T.encourage({ rows: body }), "Body ended at 73, above your week's 35. You looked after yourself today.");
 });
 
 test("d63: names of drains and pranic foods, short and once each", () => {
   const ctxM = ctx.QuestMeals;
-  assert.deepEqual(J(T.namesOf(["neg", "coffee", "neg", "x"], ctxM.DRAINS)), ["Onion or garlic", "Coffee or tea"]);
+  assert.deepEqual(J(T.namesOf(["neg", "coffee", "neg", "x", "heavy"], ctxM.DRAINS)), ["Onion or garlic", "Coffee or tea", "Heavy meal"]);
   assert.deepEqual(J(T.namesOf(["fveg", "pos"], ctxM.PRANA_FOODS)), ["Fresh vegetables", "Pranic food"]);
 });
 
