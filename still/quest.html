@@ -186,6 +186,17 @@
   .sq-t small { display:block; font-weight:400; font-size:12px; color:var(--ink-soft); margin-top:2px; }
   .sq-bar { display:block; height:6px; border-radius:4px; background:rgba(0,0,0,.25); margin-top:7px; overflow:hidden; }
   .sq-bar b { display:block; height:100%; width:0; background:linear-gradient(90deg, #7fd0ff, #8fe3b0); border-radius:4px; transition:width .8s cubic-bezier(.2,.8,.2,1); }
+  /* the water card (2026-10-19, d23): like the steps side quest, with a "by 4 PM" marker on the bar */
+  .wq { flex-wrap:wrap; }
+  .wq.done { border-color:rgba(127,208,255,.65); background:linear-gradient(135deg, rgba(127,208,255,.18), rgba(143,227,176,.08)); }
+  .wq-bar { position:relative; height:10px; overflow:visible; margin-top:9px; }
+  .wq-bar b { background:linear-gradient(90deg, #7fd0ff, #b8e6ff); }
+  .wq-bar i { position:absolute; top:-3px; bottom:-3px; width:2px; background:#ffd479; border-radius:1px; }
+  .wq-bar em { position:absolute; top:12px; transform:translateX(-50%); font-style:normal; font-size:10px; color:#ffd479; white-space:nowrap; }
+  .wq-btn { width:100%; margin-top:16px; padding:11px 12px; border-radius:12px; border:1px solid rgba(127,208,255,.55); background:rgba(127,208,255,.16);
+    color:var(--ink); font:inherit; font-weight:600; font-size:14px; cursor:pointer; position:relative; }
+  .wq-btn:active { transform:scale(.97); }
+  .wq-note { width:100%; font-size:12px; color:var(--ink-soft); margin-top:7px; }
   .hgrid.sugg { grid-template-columns:repeat(3, 1fr); }
   .sugw { margin:14px 0 4px; padding:10px 12px; border-radius:14px; background:var(--glass); border:1px solid var(--glass-border); }
   .sugr { display:flex; align-items:center; gap:6px; padding:8px 0; border-top:1px solid var(--glass-border); }
@@ -720,16 +731,17 @@
 </style>
 <script src="keeps.js?v=20261009k"></script>
 <script src="bag.js?v=20261009k"></script>
-<script src="quest-merge.js?v=20261016g"></script>
+<script src="quest-merge.js?v=20261019w"></script>
 <script src="quest-levels.js?v=20261016b"></script>
 <script src="quest-gymlog.js?v=20261017a"></script>
 <script src="quest-meals.js?v=20261019f"></script>
 <script src="quest-trends.js?v=20261019c"></script>
 <script src="nvc-words.js?v=20261010a"></script>
 <script src="quest-fx.js?v=20261009b"></script>
-<script src="quest-night.js?v=20261019b"></script>
+<script src="quest-night.js?v=20261019w"></script>
 <script src="quest-basics.js?v=20261019f"></script>
 <script src="quest-suggest.js?v=20261019a"></script>
+<script src="quest-water.js?v=20261019a"></script>
 <script src="quest-gym.js?v=20261016i"></script>
 <script src="quest-morning.js?v=20261019a"></script>
 <script src="quest-agenda.js?v=20261014c"></script>
@@ -1407,6 +1419,46 @@
       `<i class="sq-bar"><b style="width:${pct}%"></b></i></span></div>`;
   }
 
+  /* ---------- Water (Junyan, 2026-10-19, d23 and d24; quest-water.js) ----------
+     Its own card, like the steps side quest: 8 glasses, a marker at 6 by 4 PM, and "+1 glass" naming the block he
+     is in. Each glass pays what one cup of water paid before (the "water" habit's value, same meter, same daily
+     limit). A tap by mistake can be undone for a few seconds. */
+  const QW = () => window.QuestWater;
+  const hourNow = () => +tzParts(now(), { hour:"numeric", hourCycle:"h23" }).hour;
+  function waterBlock(){ const b = currentOf(blocks(), now()); return b && b.kind !== "open" && b.kind !== "break" && !isSleep(b) ? b : null; }
+  function waterPay(){ const h = HABITS.find(x => x[0] === "water"); return QW().pay(G.day.glasses, Math.max(1, Math.round(h[2] * gainMult())), h[3]); }
+  function waterHTML(){
+    if (!QW() || !G.day) return "";
+    const W = QW(), s = W.summary(G.day.glasses), b = waterBlock(), pct = Math.min(100, Math.round(s.total / W.AIM * 100));
+    const left = W.AIM - s.total, after = W.late(hourNow());
+    const sub = s.total >= W.AIM ? `${s.total} glasses, ${(s.ml / 1000).toLocaleString()} L. The aim is met.`
+      : `${s.ml.toLocaleString()} ml so far${!after && s.total < W.BY4 ? `, ${W.BY4 - s.total} more by 4 PM` : `, ${left} to the aim`}`;
+    return `<div class="sq wq${s.total >= W.AIM ? " done" : ""}"><span class="sq-i">💧</span><span class="sq-t">Water · ${s.total} / ${W.AIM} glasses` +
+      `<small>${esc(sub)}</small>` +
+      `<i class="sq-bar wq-bar"><b style="width:${pct}%"></b><i style="left:${W.markerPct()}%"></i><em style="left:${W.markerPct()}%">by 4 PM</em></i></span>` +
+      `<button class="wq-btn" data-glass>${esc(W.button(b ? shortName(b) : "", hourNow()))}</button>` +
+      `<span class="wq-note">${esc(W.TEXT)}</span></div>`;
+  }
+  function waterStamp(){ const s = QW() ? QW().summary(G.day.glasses) : null; return s && s.total ? { wt:s.total, w4:s.before4 } : {}; }
+  function addGlass(el){
+    if (!QW() || !G.day) return;
+    const b = waterBlock(), id = "g" + (+now()) + Math.random().toString(36).slice(2, 6), d = waterPay();
+    const fx = window.QuestFx, rect = el ? el.getBoundingClientRect() : null;
+    G.day.glasses = QW().add(G.day.glasses, { id, at:now().toISOString(), blk:b ? gk(b) : "none", name:b ? shortName(b) : "", hour:hourNow(), d });
+    const where = b ? ` (${shortName(b)})` : "";
+    addHabit("water", d, `Water, one 250 ml glass${where}`, "1 glass", !!fx);
+    if (fx && rect) fx.tap(rect, { icon:"💧", gain:d, full:QW().summary(G.day.glasses).total >= QW().AIM, water:true, color:"#7fd0ff" });
+    render();
+    if (fx) fx.pop(document.querySelector(".wq"));
+    calToast(`1 glass of water logged${where}.`, 6000, () => undoGlass(id));
+  }
+  function undoGlass(id){
+    const x = ((G.day && G.day.glasses) || {})[id]; if (!x || x.off) return;
+    G.day.glasses = QW().undo(G.day.glasses, id);
+    addHabit("water", -(x.d || 0), "Water: a glass taken back (tapped by mistake)", "undo", true);
+    render();
+  }
+
   /* ---------- Asleep by 11 PM (Junyan, 2026-10-09: bio clock 10:30 PM to 6:30 AM) ----------
      Oura files a night under the day he woke up, so this morning's game day
      holds last night. Asleep between 6 PM and 11 PM pays the prana once. Reads
@@ -1460,10 +1512,15 @@
     const today = { day:gameYmd(), prana:Math.round(prana()), body:Math.round(body()), ...foodStamp() };
     const rows = [["prana", "Prana"], ["body", "Body"], ["pf", "Pranic foods"], ["dr", "Drains", "down"]].map(([k, l, w]) => TR.dayRow(k, l, history, today, w));
     const oura = NIGHTS ? TR.ouraRows(NIGHTS, gameYmd()) : [];
+    // water beside the sleep score (d23): glasses today, how many before 4 PM, and the last 7 days (G.days wt)
+    const wh = Object.entries(G.days || {}).filter(([k]) => k !== G.day.date).map(([k, v]) => { const d = new Date(k); return isNaN(d) || !v ? null : { day:ymd(d), wt:v.wt }; })
+      .filter(Boolean).sort((a, b) => a.day.localeCompare(b.day)).slice(-30);
+    const ws = QW() ? QW().summary(G.day.glasses) : { total:0, before4:0 };
+    const water = { ...TR.dayRow("wt", "Water", wh, { day:gameYmd(), wt:ws.total }), before4:ws.before4, aim:QW() ? QW().AIM : 8 };
     const hit = Object.values(G.day.mealq || {}).flatMap(q => q && !q.kind && Array.isArray(q.sel) ? q.sel : []);
     const top = QM.DRAINS.find(([id]) => hit.includes(id));
     const topDrain = top ? top[2] : G.day.lateBody ? "late night" : null;
-    return { rows, oura, beat:TR.beatLine({ rows, oura, topDrain }) };
+    return { rows, oura, water, beat:TR.beatLine({ rows, oura, topDrain }) };
   }
   async function openNight(){
     if (!window.QuestNight || !G.day) return;
@@ -1640,9 +1697,9 @@
 
   /* No free-floating tiles (Junyan, 2026-10-19, d6 d11: "Everything needs to be directly connected to what I'm doing
      right now"). Prana and body actions are ticked inside their calendar block (Morning Yoga, Domestics or Grooming,
-     Wind-down, the meal quiz). Only the water tile stays out here for now (how water counts is still being decided),
-     beside the two automatic ones, which only show their state. */
-  const TILES = HABITS.filter(h => h[0] === "water" || h[6] === "auto");
+     Wind-down, the meal quiz). Water has its own card (waterHTML, d23 and d24); only the two automatic tiles stay
+     out here, and they only show their state. */
+  const TILES = HABITS.filter(h => h[6] === "auto");   // water has its own card since 2026-10-19 (d23, waterHTML)
   const h7 = id => (HABITS.find(x => x[0] === id) || [])[7];
   function habitTile([id, full, , max, icon, short, flag]){
     const n = G.day.habits[id] || 0, g = habitGain(id), auto = flag === "auto", earned = auto && (G.day.earn || {})[id];
@@ -1758,7 +1815,7 @@
   }
   // today's line in the day history: the meters, pranic foods and drains (for the day-end trends, 2026-10-19)
   function stampDay(){
-    (G.days = G.days || {})[G.day.date] = { place:placeNow(), prana:G.day.prana, body:G.day.body, level:lvl(), ...foodStamp(), ...gymDayStamp() };
+    (G.days = G.days || {})[G.day.date] = { place:placeNow(), prana:G.day.prana, body:G.day.body, level:lvl(), ...foodStamp(), ...gymDayStamp(), ...waterStamp() };
   }
   // drains: the meal quiz ones, and staying up past 11 (it took body: G.day.lateBody)
   function foodStamp(){ const t = window.QuestMeals.tally(G.day.mealq); return { pf:t.foods, dr:t.drains + (G.day.lateBody ? 1 : 0) }; }
@@ -1914,7 +1971,6 @@
     log(`Started ${shortName(b)}`); saveG();
     // the bag hands out tools at real moments
     if (isSadhana(b)) giveItem("breath", "After Shambhavi.");
-    if (isMeal(b)) giveItem("water", `At ${shortName(b)}.`);
     if (isSleep(b) && !late) giveItem("lantern", "On-time bedtime.");
     G.day.onRun = late ? 0 : (G.day.onRun || 0) + 1;
     if (G.day.onRun >= 3) { G.day.onRun = 0; giveItem("buffer", "Three on-time starts in a row."); }
@@ -1997,9 +2053,9 @@
   function restGuide(cur, all, t){
     const left = (cur.e - t) / 60000, out = [], tired = recoveryReasons();
     const ate = lastMealBefore(t, all), nextMeal = all.find(b => isMeal(b) && b.s > t), bed = all.find(b => isSleep(b) && b.s > t);
-    const hour = +tzParts(t, { hour:"numeric", hourCycle:"h23" }).hour, cups = (G.day.habits || {}).water || 0;
+    const hour = +tzParts(t, { hour:"numeric", hourCycle:"h23" }).hour, cups = QW() ? QW().summary(G.day.glasses).total : 0;
     const sadhanaDone = doneToday("shambhavi") || all.some(b => isSadhana(b) && ["in", "late"].includes(G.day.checks[gk(b)]));
-    out.push({ icon:"💧", text:"Water first", why:`${tired.length ? "Travel and sun dry you out. " : ""}${cups ? `${cups} cup${cups > 1 ? "s" : ""} so far today.` : "A full cup before anything else."}`, habit:"water", btn:"+1 cup" });
+    out.push({ icon:"💧", text:"Water first", why:`${tired.length ? "Travel and sun dry you out. " : ""}${cups ? `${cups} glass${cups > 1 ? "es" : ""} so far today.` : "A full glass before anything else."}`, habit:"water", btn:"+1 glass" });
     if (!sadhanaDone && left >= 20) {
       if (emptyStomach(t, all)) out.push({ icon:"🪷", text:"Shambhavi, 21 min", why:"Not done yet today, and your stomach is empty. A shower first is a good start. Tick it in a Yoga block on the calendar." });
       else out.push({ icon:"🪷", text:"Shambhavi later", why:`You ate at ${fmtT(ate)}. Shambhavi wants about 3 hours after a meal.` });
@@ -3121,8 +3177,8 @@
     save: () => saveG(),
     openBag: () => openBag(),
     actions: {
-      water: async () => { G.day.water = (G.day.water || 0) + 250; logHabit("water");
-        return `250 ml logged. ${G.day.water.toLocaleString()} ml today.`; },
+      // a water item still in the bag counts one glass on the water card (2026-10-19, d24: water lives only there)
+      water: async () => { addGlass(null); return `1 glass logged. ${QW().summary(G.day.glasses).ml.toLocaleString()} ml today.`; },
       breath: async (item, o = {}) => { if (o.completed) { addPrana(Math.round(3 * gainMult()), "Breath reset", "breath"); render(); return "Reset done. Carry it into the next thing."; } return "Stopped early. That still counts as a pause."; },
       buffer: async () => { const n = nextFixed(); if (!n) return "Nothing fixed is coming up.";
         await shiftFrom(n.key, 15); return `${shortName(n)} moved 15 min later. Breathe.`; },
@@ -4865,7 +4921,8 @@
     // phone and desktop alike: the steps card, three picks for right now, then the full list one tap away (2026-10-09)
     const endAt = lastItemEnd(all), nightNow = PLAN && endAt && +t >= endAt;
     if (nightNow && !G.day.nightShown && !$("sheet").classList.contains("open") && !$("night")) { G.day.nightShown = true; saveG(); openNight(); }
-    put("habits", PLAN ? (nightNow ? `<button class="pa-all nt-open" data-night>🌙 Day's end<span>tomorrow, deathbed, reflection ›</span></button>` : "") + stepsHTML() + suggestHTML() + sugHTML() : ""); bindHabits($("habits")); bindSug($("habits"));
+    put("habits", PLAN ? (nightNow ? `<button class="pa-all nt-open" data-night>🌙 Day's end<span>tomorrow, deathbed, reflection ›</span></button>` : "") + stepsHTML() + waterHTML() + suggestHTML() + sugHTML() : ""); bindHabits($("habits")); bindSug($("habits"));
+    $("habits").querySelectorAll("[data-glass]").forEach(bn => bn.onclick = () => addGlass(bn));
     $("habits").querySelectorAll("[data-night]").forEach(bn => bn.onclick = openNight);
     if (PLAN && !z && body() < 40 && !G.day.lotusGiven) { G.day.lotusGiven = true; giveItem("lotus", "Your energy is low today."); }
     if ($("bMorning")) $("bMorning").onclick = () => openMorning();
@@ -4942,7 +4999,7 @@
     practiceDay();
     drawNearby();
     on("bGym", () => openGym(cur));
-    $("main").querySelectorAll("[data-rhabit]").forEach(bn => bn.onclick = () => { logHabit(bn.dataset.rhabit, true); saveG(); render(); });
+    $("main").querySelectorAll("[data-rhabit]").forEach(bn => bn.onclick = () => { if (bn.dataset.rhabit === "water") return addGlass(bn); logHabit(bn.dataset.rhabit, true); saveG(); render(); });
     $("main").querySelectorAll("[data-side]").forEach(bn => bn.onclick = () => takeSide(bn.dataset.side));
     $("main").querySelectorAll("[data-now]").forEach(bn => bn.onclick = () => { const [n, m] = bn.dataset.now.split("|"); startNow(n, +m); });
     const qt = $("main").querySelector(".quest-title"), tb = cur || nxt;
