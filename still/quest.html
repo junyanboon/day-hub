@@ -483,6 +483,10 @@
   .win-hd { display:flex; gap:12px; align-items:center; }
   .win-hd .tt { font-size:21px; font-weight:600; } .win-hd .sb { font-size:13px; color:var(--ink-soft); }
   .win-lb { font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:var(--ink-faint); margin-top:16px; }
+  /* the meal quiz groups (2026-10-19): gold for prana, teal for body, as on the meters */
+  .wck b.mp, .mq-lb.mp { color:var(--gold); } .wck b.mb, .mq-lb.mb { color:#5fd3c4; }
+  .mq-lb { border-left:3px solid currentColor; padding-left:8px; font-weight:700; }
+  .mq-sub { font-size:12px; color:var(--ink-faint); margin:10px 2px 4px; }
   .wck { display:flex; gap:10px; align-items:center; width:100%; text-align:left; padding:11px 2px; border-top:1px solid rgba(255,255,255,.08); font-size:15px; color:var(--ink); background:none; }
   .wck .bx { width:22px; height:22px; border-radius:6px; border:2px solid var(--ink-faint); flex:none; display:flex; align-items:center; justify-content:center; font-size:14px; }
   .wck.on .bx { background:#85B7EB; border-color:#85B7EB; color:#0c3a66; }
@@ -705,6 +709,7 @@
 <script src="quest-merge.js?v=20261016g"></script>
 <script src="quest-levels.js?v=20261016b"></script>
 <script src="quest-gymlog.js?v=20261017a"></script>
+<script src="quest-meals.js?v=20261019a"></script>
 <script src="nvc-words.js?v=20261010a"></script>
 <script src="quest-fx.js?v=20261009b"></script>
 <script src="quest-night.js?v=20261011a"></script>
@@ -1538,7 +1543,7 @@
       `<button class="hsnd" data-hsnd aria-label="Tap sounds">${window.QuestFx && QuestFx.soundOn() ? "🔊" : "🔇"}</button></div>` +
       `<div class="hkey"><b class="mp">gold</b> fills prana (Sadhguru) · <b class="mb">teal</b> fills body (Bryan Johnson)</div>` +
       `<div class="hgrp"><div class="hgl">Heart</div><div class="hgrid"><button class="htile" data-nvc="checkin"><span class="hi">🫶</span><span class="hl">How am I?</span><b class="mp">check in</b></button><button class="htile" data-nvc="conflict"><span class="hi">⚡</span><span class="hl">Conflict</span><b class="mp">NVC</b></button><button class="htile" data-nvc="journal"><span class="hi">📓</span><span class="hl">Journal</span><b class="mp">feelings</b></button></div></div>` +
-      ["Morning", "Practice", "Food", "Evening"].map(gr => `<div class="hgrp"><div class="hgl">${gr}</div><div class="hgrid">${gr === "Food" ? `<button class="htile" data-mealq=""><span class="hi">🍽️</span><span class="hl">Rate a meal</span><b class="mp">quiz</b></button>` : ""}${TILES.filter(h => h[7] === gr).map(tile).join("")}</div></div>`).join("");
+      ["Morning", "Practice", "Food", "Evening"].map(gr => `<div class="hgrp"><div class="hgl">${gr}</div><div class="hgrid">${TILES.filter(h => h[7] === gr).map(tile).join("")}</div></div>`).join("");
   }
   /* Three picks for right now (Junyan, 2026-10-09: "only suggestions for this exact
      moment, 3 suggestions; the rest behind an All Actions button"). Each action has
@@ -1582,11 +1587,10 @@
     const key = `${G.day.date}|${tzParts(now(), { hour:"numeric", hourCycle:"h23" }).hour}|${JSON.stringify(G.day.habits)}`;
     if (!SUGG || SUGG.key !== key) SUGG = { key, list: suggestions() };
     const hDone = TILES.filter(h => (G.day.habits[h[0]] || 0) > 0).length;
-    const mq = unratedMeal(), aq = unratedActivity();
+    const aq = unratedActivity();   // meals are rated from their calendar block only (Junyan, 2026-10-19, d3)
     return `<div class="hhead"><span class="eyebrow">Prana actions · right now</span>` +
       `<button class="hsnd" data-hsnd aria-label="Tap sounds">${window.QuestFx && QuestFx.soundOn() ? "🔊" : "🔇"}</button></div>` +
       (pastBed(now()) != null ? `<div class="bedline">🌙 Past bedtime: body drops 3 every half hour you stay up${G.day.lateBody ? ` (−${G.day.lateBody} so far)` : ""}. Time to wind down.</div>` : "") +
-      (mq ? `<button class="pa-all" style="margin:0 0 10px" data-mealq="${esc(gk(mq))}">🍽️ How was ${esc(shortName(mq))}?<span>Rate it ›</span></button>` : "") +
       (aq ? `<button class="pa-all" style="margin:0 0 10px" data-actq="${esc(gk(aq))}">🧍 How was ${esc(shortName(aq))}?<span>Check it ›</span></button>` : "") +
       (nvDue() ? `<button class="pa-all" style="margin:0 0 10px" data-nvc="checkin">🫶 How are you, really?<span>Check in ›</span></button>` : "") +
       (SUGG.list.length ? `<div class="hgrid sugg">${SUGG.list.map(habitTile).join("")}</div>` : `<div class="hint" style="margin:8px 2px">Nothing pressing right now.</div>`) +
@@ -1596,7 +1600,6 @@
   function bindHabits(root){
     root.querySelectorAll("[data-all]").forEach(bn => bn.onclick = openActions);
     root.querySelectorAll("[data-nvc]").forEach(bn => bn.onclick = () => bn.dataset.nvc === "conflict" ? openConflict() : bn.dataset.nvc === "journal" ? openJournal() : openCheckin());
-    root.querySelectorAll("[data-mealq]").forEach(bn => bn.onclick = () => openMealQuiz(bn.dataset.mealq ? blocks().find(b => gk(b) === bn.dataset.mealq) : null));
     root.querySelectorAll("[data-actq]").forEach(bn => bn.onclick = () => { const b = blocks().find(x => gk(x) === bn.dataset.actq); if (b) openActQuiz(b); });
     root.querySelectorAll("[data-habit]").forEach(bn => bn.onclick = () => tapHabit(bn));
     root.querySelectorAll("[data-hsnd]").forEach(bn => bn.onclick = () => { QuestFx.setSound(!QuestFx.soundOn()); refreshActions(); render(); });
@@ -1662,8 +1665,9 @@
   const onTimeMin = b => isSleep(b) ? 30 : ON_TIME_MIN;   // bedtime counts within 30 min (Blueprint: same time nightly)
   const SIDE_P = 5;
   /* Two meters (Junyan, 2026-10-09, d200 to d204: "Bryan johnson is about the body and sadhguru
-     is about the prana"). Prana is the pitch of his energy: Sadhguru's practices raise it; eating
-     within 3 hours of bed, a skipped sadhana and a heavy meal lower it. The goal is to keep it high.
+     is about the prana"). Prana is the pitch of his energy: Sadhguru's practices and pranic food raise it; the drains
+     in a meal block's quiz (coffee or tea, onion or garlic, alcohol, leftovers, a heavy meal) lower it
+     (2026-10-19, d3 and d4). The goal is to keep it high.
      Prana starts at 0 each morning and is built up through sadhana (Junyan, 2026-10-09: "Prana starts at 0
      and we need to build it up.. through sadhana so it works the opposite of the body").
      Body is how rested the body is: it starts each morning at the Oura sleep score, Bryan Johnson's
@@ -2148,67 +2152,53 @@
     $("mBp").onclick = () => openMealQuiz(b);
   }
 
-  /* ---------- the meal quiz (Junyan, 2026-10-10) ----------
-     After each meal, a few taps say what it was; Confirm shares it out once. Prana by
-     Sadhguru's food rules (fresh, positive pranic, light, eaten with attention lift it;
-     negative pranic, stale and heavy lower it), Body by Bryan Johnson's Blueprint (the
-     old food tiles, same gains and daily limits, and ultra-processed food takes some).
-     Replaces the Food tiles and the Heavy meal tile. */
-  const MQ_PRANA = [
-    ["fresh", "🌿", "Fresh: cooked within 1.5 hr, or fresh raw food", 3],
-    ["pos", "🍈", "Positive pranic: fruit, ash gourd, sprouts, honey, raw veg", 3],
-    ["light", "🪶", "Stopped before full, light 30 min after", 2],
-    ["attn", "🙏", "Ate with attention: a pause first, phone away", 2],
-    ["neg", "🧄", "Negative pranic: garlic, onion, chili, asafoetida or eggplant", -3],
-    ["stale", "🧊", "Stale: leftovers, reheated, or long-stored packaged food", -2],
-    ["heavy", "🥘", "Heavy, or ate too much", 0],   // the old Heavy meal action
-  ];
-  const MQ_BODY = ["blueprint", "protein", "legumes", "veg", "greens", "evoo", "nuts", "berries", "seeds", "ferment"];
-  const MQ_JUNK = ["junk", "🍟", "Ultra-processed, fried or added sugar", -3];
-  const MQ_ONEOF = { fresh:"stale", stale:"fresh" };
+  /* ---------- the meal quiz (Junyan, 2026-10-10; regrouped 2026-10-19, d3 and d4) ----------
+     It opens only from a meal block on the calendar ("Rate this meal" in its sheet): "Everything needs
+     to be directly connected to what I'm doing right now." A few taps say what the meal was; Confirm
+     shares it out once. Three groups (quest-meals.js): Prana foods in gold (Sadhguru's positive pranic
+     foods and how he ate), Body foods in teal (Bryan Johnson's Blueprint, the old food tiles, same gains
+     and daily limits; ultra-processed takes some), and Drains in gold that lower prana (coffee or tea,
+     onion or garlic, alcohol, leftovers, a heavy meal). Eating within 3 hours of bed and staying up past
+     11 stay automatic. A block that already ended today still opens it. */
+  const QM = window.QuestMeals;
   const mqSum = q => [q.p ? `prana ${q.p > 0 ? "+" : ""}${q.p}` : "", q.b ? `body ${q.b > 0 ? "+" : ""}${q.b}` : ""].filter(Boolean).join(", ") || "no change";
-  // a meal that ended in the last 4 hours and has not been rated
-  function unratedMeal(){
-    const t = now(), q = G.day.mealq || {};
-    return blocks().filter(b => isMeal(b) && b.e <= t && t - b.e < 4 * 3600000 && !q[gk(b)]).pop() || null;
-  }
-  function mqScore(sel){
-    let p = 0, b = 0;
-    MQ_PRANA.forEach(([id, , , v]) => { if (sel[id]) p += id === "heavy" ? habitGain("heavy") : v > 0 ? Math.round(v * gainMult()) : v; });
-    MQ_BODY.forEach(id => { if (sel[id]) b += habitGain(id); });
-    if (sel.junk) b += MQ_JUNK[3];
-    return { p, b };
-  }
+  const mqOpt = () => ({ mult:gainMult(), heavy:habitGain("heavy"), bodyGain:habitGain });
+  const mqScore = sel => QM.score(sel, mqOpt());
   function openMealQuiz(b, sel = {}){
-    const k = b ? gk(b) : "meal:" + now().toISOString(), done = b && (G.day.mealq || {})[k];
-    const name = b ? shortName(b) : "This meal";
+    if (!b) return;
+    const k = gk(b), done = (G.day.mealq || {})[k], name = shortName(b);
     if (done) {
-      openSheet(`${b ? winHead(b) : ""}<h3>${esc(name)}: rated</h3><p>${esc(mqSum(done))}.</p>
+      openSheet(`${winHead(b)}<h3>${esc(name)}: rated</h3><p>${esc(mqSum(done))}.</p>
         <div class="actions"><button class="btn ghost" id="mqX">Done</button></div>`);
       $("mqX").onclick = closeSheet; return;
     }
-    const sc = mqScore(sel);
+    const sc = mqScore(sel), o = mqOpt();
     const row = (id, icon, txt, tag, cls) => `<button class="wck${sel[id] ? " on" : ""}" data-q="${id}"><span class="bx">${sel[id] ? "✓" : ""}</span><span>${icon} ${esc(txt)}</span><b class="${cls}" style="margin-left:auto;font-size:12px">${tag}</b></button>`;
     const sign = v => v > 0 ? `+${v}` : `${v}`;
-    openSheet(`${b ? winHead(b) : ""}<h3>How was ${esc(name.toLowerCase() === "this meal" ? "this meal" : name)}?</h3>
+    const gold = ([id, icon, txt]) => row(id, icon, txt, sign(QM.value(id, o)), "mp");
+    openSheet(`${winHead(b)}<h3>How was ${esc(name)}?</h3>
       <p>Tap what fits, then confirm.</p>
-      <div class="win-lb">Prana (Sadhguru)</div>
-      ${MQ_PRANA.map(([id, icon, txt, v]) => row(id, icon, txt, sign(id === "heavy" ? habitGain("heavy") : v > 0 ? Math.round(v * gainMult()) : v), "mp")).join("")}
-      <div class="win-lb">Body (Bryan Johnson)</div>
-      ${MQ_BODY.map(id => { const h = HABITS.find(x => x[0] === id), g = habitGain(id); return row(id, h[4], h[5], g ? sign(g) : "full today", "mb"); }).join("")}
-      ${row(MQ_JUNK[0], MQ_JUNK[1], MQ_JUNK[2], sign(MQ_JUNK[3]), "mb")}
+      <div class="win-lb mq-lb mp">Prana foods · fill prana (Sadhguru)</div>
+      ${QM.PRANA_FOODS.map(gold).join("")}
+      <div class="mq-sub">How you ate</div>
+      ${QM.PRANA_WAYS.map(gold).join("")}
+      <div class="win-lb mq-lb mb">Body foods · fill body (Bryan Johnson)</div>
+      ${QM.BODY.map(id => { const h = HABITS.find(x => x[0] === id), g = habitGain(id); return row(id, h[4], h[5], g ? sign(g) : "full today", "mb"); }).join("")}
+      ${row(QM.JUNK[0], QM.JUNK[1], QM.JUNK[2], sign(QM.JUNK[3]), "mb")}
+      <div class="win-lb mq-lb mp">Drains · lower prana</div>
+      ${QM.DRAINS.map(gold).join("")}
+      <div class="mq-sub">${esc(QM.AUTO_NOTE)}</div>
       <div class="actions" style="position:sticky;bottom:0"><button class="btn primary" id="mqOk">Confirm · ${esc(mqSum(sc))}</button></div>
       <div class="actions"><button class="btn ghost" id="mqX">Not now</button></div>`, true);
     $("sheet").querySelectorAll("[data-q]").forEach(bn => bn.onclick = () => {
-      const id = bn.dataset.q, top = $("sheet").scrollTop;
-      sel[id] = !sel[id]; if (sel[id] && MQ_ONEOF[id]) sel[MQ_ONEOF[id]] = false;
-      openMealQuiz(b, sel); $("sheet").scrollTop = top;
+      const top = $("sheet").scrollTop;
+      openMealQuiz(b, Object.assign(sel, QM.toggle(sel, bn.dataset.q))); $("sheet").scrollTop = top;   // in place, like before: a fast second tap keeps the first
     });
     $("mqX").onclick = closeSheet;
     $("mqOk").onclick = () => {
       const q = mqScore(sel);
       G.day.habits = G.day.habits || {};
-      [...MQ_BODY, "heavy"].forEach(id => { if (sel[id]) G.day.habits[id] = (G.day.habits[id] || 0) + 1; });
+      [...QM.BODY, "heavy"].forEach(id => { if (sel[id]) G.day.habits[id] = (G.day.habits[id] || 0) + 1; });
       (G.day.mealq = G.day.mealq || {})[k] = { at:now().toISOString(), sel:Object.keys(sel).filter(x => sel[x]), p:q.p, b:q.b };
       if (q.p) addPrana(q.p, `${name}: meal quiz`, "meal");
       if (q.b) addBody(q.b, `${name}: meal quiz`, "meal");
@@ -4631,7 +4621,7 @@
     if (sky) { sky.style.setProperty("--orbx", (.12 + .76 * Math.min(1, Math.max(0, f))).toFixed(3)); sky.style.setProperty("--orby", (.42 - .32 * Math.sin(Math.PI * Math.min(1, Math.max(0, f)))).toFixed(3)); }
   }
   /* the Prana and Body stage: built once, then only its numbers and pose change */
-  const PRANA_WORD = p => p < 10 ? "Build it with sadhana" : p < 35 ? "Stirring" : p < 60 ? "Rising" : p < 85 ? "Bright" : "Radiant";
+  const PRANA_WORD = p => p < 10 ? "Sadhana and pranic food build it" : p < 35 ? "Stirring" : p < 60 ? "Rising" : p < 85 ? "Bright" : "Radiant";
   const BODY_WORD = b => b < 25 ? "Rest restores it" : b < 50 ? "Tired" : b < 75 ? "Steady" : "Fresh";
   let beingKey = "";
   // poses Junyan makes later (d210): add the name here once sprites/<name>.webp and <name>-glow.webp exist
