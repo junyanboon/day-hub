@@ -47,6 +47,12 @@
   const YOGA = [["shambhavi", "Shambhavi"], ["surya", "Surya Kriya"], ["angam", "Angamardana"], ["yogasana", "Yogasanas"],
     ["upa", "Upa Yoga"], ["bhuta", "Bhuta Shuddhi"], ["kriya", "Isha Kriya"], ["nadi", "Nadi Shuddhi"],
     ["neem", "Neem and turmeric"], ["lamp", "Light the oil lamp"]];
+  /* What each practice pays, exactly (Junyan, 2026-10-19, d25 and d26). No level multiplier and no smaller second
+     tick: the number on the tile is the number he gets. Tuned so a strong day (Shambhavi, one long practice, Bhuta
+     Shuddhi, the lamp, neem, and some pranic food) lands at about 71. */
+  const PRACTICE_PAY = { angam:25, yogasana:25, shambhavi:20, surya:20, kriya:10, bhuta:8, upa:5, nadi:4, lamp:3, neem:3 };
+  // n: how many already counted today, max: the daily limit. null: not a practice (the page's own rule applies)
+  const practicePay = (id, n, max) => (id in PRACTICE_PAY ? (n >= max ? 0 : PRACTICE_PAY[id]) : null);
   // the supplements moved to the meal quiz (Junyan, 2026-10-19: "I actually take these after my meal usually as my
   // stomach can't handle them otherwise")
   const yoga = () => ({ min:60, steps: YOGA.map(([h, t]) => ({ t, h })) });
@@ -208,5 +214,5 @@
     return { t: t[0].toUpperCase() + t.slice(1), min };
   }
 
-  root.QuestBasics = { domestics, windDown, yoga, groom, basic, blockBasic, stepAt, tickStep, paidOf, PM_HOUR, guessMode, placeBasics, growCaney, fitList, parseQuick, IDS:["caney", "domestics", "winddown"] };
+  root.QuestBasics = { PRACTICE_PAY, practicePay, domestics, windDown, yoga, groom, basic, blockBasic, stepAt, tickStep, paidOf, PM_HOUR, guessMode, placeBasics, growCaney, fitList, parseQuick, IDS:["caney", "domestics", "winddown"] };
 })(typeof window !== "undefined" ? window : globalThis);
