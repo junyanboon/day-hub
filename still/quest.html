@@ -2886,9 +2886,9 @@
       <div class="gtopline"><select id="gProg" aria-label="Program">${Object.keys(PROGRAMS).map(k => `<option ${k === GYM.program ? "selected" : ""}>${k}</option>`).join("")}</select></div>
       <div class="gbw"><label for="gBw">⚖️ Body weight</label><input class="set" id="gBw" inputmode="decimal" placeholder="lbs" value="${esc(GYM.bw || "")}">
         <small id="gBwT">${tr ? `Last ${esc(String(tr.last.lbs))}` : "optional"}</small></div>`;
-    const due = gymDue(), ring = due.length ? ` A green ring means you haven't done it in the last ${GL.DUE_DAYS} days.` : "";
+    const due = gymDue(), ringNote = due.length ? ` A green ring means you haven't done it in the last ${GL.DUE_DAYS} days.` : "";
     if (P.strength) h += `<div class="gmoves">${GL.movesHTML(LV, esc, GYM, gymRow, gymTesting, due)}</div>
-      <p class="gnote">Tap a move you're doing today. The ones you leave shut aren't logged.${ring}</p>`;
+      <p class="gnote">Tap a move you're doing today. The ones you leave shut aren't logged.${ringNote}</p>`;
     if (P.mobility) h += `<div class="glabel">Mobility</div><div class="gchips">${P.mobility.map(m =>
       `<button class="gchip${GYM.e["m:" + m].done ? " on" : ""}${due.includes("m:" + m) ? " due" : ""}" data-mob="${esc(m)}">${GYM.e["m:" + m].done ? "✓ " : ""}${esc(m)}</button>`).join("")}</div>`;
     (P.mis || []).forEach(([m, how, sets]) => {

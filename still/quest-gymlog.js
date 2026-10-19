@@ -111,7 +111,8 @@
   /* "How do you feel now?" (Junyan, 2026-10-17, d15 and d16; research: life-wiki answers/2026-10-17-strength-training-
      prana-and-body.md). One tap at Finish and save, and it is the only thing the gym log pays: "don't give any points for
      logging it". Body base points; gains are multiplied by the level's gainMult, losses are not. Wiped out also costs 1
-     prana (d16). Good, a healthy tired, is the goal (its "Aim for this" hint was dropped 2026-10-19: "I already know to aim"). Paid once per gym block: the answer is kept in G.day.mealq under
+     prana (d16). Good, a healthy tired, is the goal (kept as data: its "Aim for this" hint and ring were dropped
+     2026-10-19, "I already know to aim", and a green ring now means a move is due). Paid once per gym block: the answer is kept in G.day.mealq under
      feelKey with kind "gym", which syncs like a meal rating. */
   const FEEL = [
     { id:"energised", icon:"⚡", text:"Energised, light", b:2, p:0 },
