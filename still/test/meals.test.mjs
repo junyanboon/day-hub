@@ -50,21 +50,45 @@ test("no free-floating meal entry: the Rate a meal tile and the How was <meal>? 
   assert.ok(!/function unratedMeal/.test(html), "quest.html still looks for an unrated meal to nag about");
 });
 
-test("the quiz opens only from a calendar meal block's sheet", () => {
-  const calls = [...html.matchAll(/openMealQuiz\((b[^)]*)\)/g)].map(m => m[1]);
-  assert.equal([...html.matchAll(/openMealQuiz\(/g)].length, 3, "one definition, one redraw, one button");
-  // the definition, the redraw after a tap, and the one Rate this meal button in openMeal
-  assert.deepEqual(J(calls.sort()), ["b", "b, Object.assign(sel, QM.toggle(sel, id", "b, sel = {}"]);
-  assert.ok(/\$\("mBp"\)\.onclick = \(\) => openMealQuiz\(b\)/.test(html));
-  assert.ok(/function openMealQuiz\(b, sel = \{\}\)\{\s*if \(!b\) return;/.test(html), "openMealQuiz must refuse to open without a block");
+test("a meal block opens one screen that is the meal: no plate list, no Rate this meal, no Confirm", () => {
+  assert.ok(!/openMealQuiz|Rate this meal|id="mqOk"|data-plate|data-bp=|A full glass of water/.test(html));
+  assert.ok(/if \(isMeal\(b\)\) return openMeal\(b\);/.test(html), "a meal block opens openMeal");
+  assert.ok(/function openMeal\(b\)\{\s*if \(!b\) return;/.test(html), "openMeal must refuse to open without a block");
+  assert.equal([...html.matchAll(/openMeal\(/g)].length, 4, "the definition, the block tap, the redraw after a tap, the planner's button");
 });
 
-test("the quiz is grouped Prana foods, Body foods, Drains in the meters' colours, and loads quest-meals.js", () => {
-  const i = html.indexOf("function openMealQuiz"), body = html.slice(i, i + 4000);
+test("the meal screen is grouped Prana foods, Body foods, Drains in the meters' colours, and loads quest-meals.js", () => {
+  const i = html.indexOf("function openMeal(b)"), body = html.slice(i, i + 5000);
   const a = body.indexOf("Prana foods"), b = body.indexOf("Body foods"), c = body.indexOf("Drains");
   assert.ok(a > 0 && b > a && c > b, "groups out of order or missing");
   assert.ok(/<script src="quest-meals\.js\?v=\w+"><\/script>/.test(html));
   assert.ok(body.includes("QM.AUTO_NOTE"), "the automatic drains are named in the quiz");
+  assert.ok(body.includes("QM.tap("), "each tile pays as he taps");
+});
+
+test("tiles pay as he taps, and a second tap takes back exactly what was paid", () => {
+  const opt = { mult:1.5, heavy:-5, bodyGain:id => ({ veg:5, supps:2 })[id] || 0 };
+  let r = M.tap(null, "fruit", opt);
+  assert.deepEqual(J(r.ops), [{ id:"fruit", on:true, m:"p", d:3 }]);
+  r = M.tap(r.rec, "veg", opt);
+  assert.deepEqual(J(r.ops), [{ id:"veg", on:true, m:"b", d:5 }]);
+  assert.equal(r.rec.p, 3); assert.equal(r.rec.b, 5);
+  // the body food's value changes later (daily limit): the take-back is still what it paid
+  r = M.tap(r.rec, "veg", { ...opt, bodyGain:() => 0 });
+  assert.deepEqual(J(r.ops), [{ id:"veg", on:false, m:"b", d:-5 }]);
+  assert.equal(r.rec.b, 0); assert.deepEqual(J(r.rec.sel), ["fruit"]);
+  // fresh and leftover cannot both stand
+  r = M.tap(r.rec, "fresh", opt); r = M.tap(r.rec, "stale", opt);
+  assert.deepEqual(J(r.ops), [{ id:"fresh", on:false, m:"p", d:-5 }, { id:"stale", on:true, m:"p", d:-2 }]);
+  // drains lower prana; the heavy meal uses the page's value
+  assert.deepEqual(J(M.tap(null, "heavy", opt).ops), [{ id:"heavy", on:true, m:"p", d:-5 }]);
+  // supplements and xylitol are body foods
+  assert.equal(M.meterOf("supps"), "b"); assert.equal(M.meterOf("xylitol"), "b");
+});
+
+test("a rating from before (Confirm, no paid values) can be taken back at today's value", () => {
+  const r = M.tap({ sel:["fruit"], p:3, b:0 }, "fruit", { mult:1.5 });
+  assert.deepEqual(J(r.ops), [{ id:"fruit", on:false, m:"p", d:-3 }]);
 });
 
 test("the prana meter's low word names sadhana and pranic food", () => {

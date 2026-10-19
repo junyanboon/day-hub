@@ -718,7 +718,7 @@
 <script src="quest-merge.js?v=20261016g"></script>
 <script src="quest-levels.js?v=20261016b"></script>
 <script src="quest-gymlog.js?v=20261017a"></script>
-<script src="quest-meals.js?v=20261019e"></script>
+<script src="quest-meals.js?v=20261019f"></script>
 <script src="quest-trends.js?v=20261019c"></script>
 <script src="nvc-words.js?v=20261010a"></script>
 <script src="quest-fx.js?v=20261009b"></script>
@@ -2151,92 +2151,68 @@
     return `<div class="win-hd">${badge(b, 44, st === "in" || st === "late")}<div><div class="tt">${esc(shortName(b))}</div>
       <div class="sb">${fmtT(b.s)} to ${fmtT(b.e)}${shortName(b) !== b.t ? ` · ${esc(b.t)}` : ""}</div></div></div>`;
   }
-  // Food (blue). Vegan Blueprint plate, eaten with attention; 3 hr clear of bed and practice.
-  const PLATE = [["protein", "Protein: tofu, tempeh, legumes or seitan"], ["veg", "Veg or fruit, half the plate"], ["water", "A full glass of water"]];
-  function openMeal(b){
-    const all = blocks(), t = now(), st = G.day.checks[gk(b)], k = gk(b);
-    const M = ((G.day.meals = G.day.meals || {})[k] = G.day.meals[k] || { plate:{}, phone:false });
-    const running = t >= b.s && t < b.e, started = st === "in" || st === "late", closed = !!G.day.closes[k];
-    const warn = mealWarn(b, all), lastFood = lastMealBefore(b.s, all);
-    openSheet(`${winHead(b)}
-      ${warn ? `<div class="warnline">${esc(warn)}</div>` : ""}
-      ${lastFood ? `<p>Last food ended ${fmtT(lastFood)} (${fmtHM(Math.round((b.s - lastFood) / 60000))} before this).</p>` : ""}
-      <div class="win-lb">On the plate</div>
-      ${PLATE.map(([id, txt]) => `<button class="wck${M.plate[id] ? " on" : ""}" data-plate="${id}"><span class="bx">${M.plate[id] ? "✓" : ""}</span>${txt}</button>`).join("")}
-      <div class="win-lb">Eat with attention</div>
-      <p>⏳ Sit with the food and wait two minutes before the first bite, so you eat by choice, not by compulsion (Sadhguru).</p>
-      <button class="wck${M.phone ? " on" : ""}" id="mPhone"><span class="bx">${M.phone ? "✓" : ""}</span>Phone face down until I'm done</button>
-      <div class="actions"><button class="btn" id="mBp">${(G.day.mealq || {})[k] ? `🍽️ Rated: ${mqSum(G.day.mealq[k])}` : "🍽️ Rate this meal"}</button></div>
-      <div class="actions"><button class="btn ghost" id="mEdit">Change time or name</button></div>`, true);
-    $("sheet").querySelectorAll("[data-plate]").forEach(bn => bn.onclick = () => {
-      M.plate[bn.dataset.plate] = !M.plate[bn.dataset.plate];
-      saveG();
-      openMeal(b);
-    });
-    $("mPhone").onclick = () => { M.phone = !M.phone; saveG(); openMeal(b); };
-    $("mEdit").onclick = () => openEdit(b);
-    $("mBp").onclick = () => openMealQuiz(b);
-  }
-
-  /* ---------- the meal quiz (Junyan, 2026-10-10; regrouped 2026-10-19, d3 and d4) ----------
-     It opens only from a meal block on the calendar ("Rate this meal" in its sheet): "Everything needs
-     to be directly connected to what I'm doing right now." A few taps say what the meal was; Confirm
-     shares it out once. Three groups (quest-meals.js): Prana foods in gold (Sadhguru's positive pranic
-     foods and how he ate), Body foods in teal (Bryan Johnson's Blueprint, the old food tiles, same gains
-     and daily limits; ultra-processed takes some), and Drains in gold that lower prana (coffee or tea,
-     onion or garlic, alcohol, leftovers, a heavy meal). Eating within 3 hours of bed and staying up past
-     11 stay automatic. A block that already ended today still opens it. */
+  /* ---------- a meal block (Junyan, 2026-10-19: "how do I even interact with this?") ----------
+     Tapping a meal block opens ONE screen, and it is the meal: his habit tiles in three groups (quest-meals.js),
+     Prana foods in gold (Sadhguru's pranic foods and how he ate, the two minutes and the phone face down folded into
+     "Ate with attention"), Body foods in teal (Bryan Johnson's Blueprint, the old plate's protein and vegetables,
+     xylitol and the supplements, taken after a meal), and Drains in gold that lower prana. Each tile pays as he taps
+     it, with the burst and pop; a second tap takes it back. No plate checklist, no separate rating step, no Confirm.
+     Water is its own widget (the next job). Eating within 3 hours of bed and staying up past 11 stay automatic. */
   const QM = window.QuestMeals;
   const mqSum = q => [q.p ? `prana ${q.p > 0 ? "+" : ""}${q.p}` : "", q.b ? `body ${q.b > 0 ? "+" : ""}${q.b}` : ""].filter(Boolean).join(", ") || "no change";
   const mqOpt = () => ({ mult:gainMult(), heavy:habitGain("heavy"), bodyGain:habitGain });
-  const mqScore = sel => QM.score(sel, mqOpt());
-  function openMealQuiz(b, sel = {}){
+  const mqCounted = id => QM.BODY.includes(id) || id === "heavy";   // daily-limit habits
+  function openMeal(b){
     if (!b) return;
-    const k = gk(b), done = (G.day.mealq || {})[k], name = shortName(b);
-    if (done) {
-      openSheet(`${winHead(b)}<h3>${esc(name)}: rated</h3><p>${esc(mqSum(done))}.</p>
-        <div class="actions"><button class="btn ghost" id="mqX">Done</button></div>`);
-      $("mqX").onclick = closeSheet; return;
-    }
-    const sc = mqScore(sel), o = mqOpt();
-    // each food is one of his habit tiles (d23), lit when picked
-    const row = (id, icon, txt, tag, cls) => `<button class="htile mqt${sel[id] ? " full" : ""}" data-q="${id}" data-icon="${esc(icon)}"><span class="hi">${icon}</span><span class="hl">${esc(txt)}</span>${sel[id] ? `<span class="hc">✓</span>` : ""}<b class="${cls}">${tag}</b></button>`;
-    const grid = rows => `<div class="hgrid mqg">${rows.join("")}</div>`;
+    const all = blocks(), k = gk(b), name = shortName(b), q = (G.day.mealq || {})[k] || null;
+    const sel = new Set(q && !q.kind && Array.isArray(q.sel) ? q.sel : []), paid = (q && q.v) || {};
+    const warn = mealWarn(b, all), lastFood = lastMealBefore(b.s, all), o = mqOpt();
     const sign = v => v > 0 ? `+${v}` : `${v}`;
-    const gold = ([id, icon, txt]) => row(id, icon, txt, sign(QM.value(id, o)), "mp");
-    openSheet(`${winHead(b)}<h3>How was ${esc(name)}?</h3>
-      <p>Tap what fits, then confirm.</p>
+    const row = (id, icon, txt, tag, cls) => `<button class="htile mqt${sel.has(id) ? " full" : ""}" data-q="${id}" data-icon="${esc(icon)}"><span class="hi">${icon}</span><span class="hl">${esc(txt)}</span>${sel.has(id) ? `<span class="hc">✓</span>` : ""}<b class="${cls}">${tag}</b></button>`;
+    const tagOf = (id, now) => sel.has(id) && paid[id] ? sign(paid[id][1]) : now;
+    const grid = rows => `<div class="hgrid mqg">${rows.join("")}</div>`;
+    const gold = ([id, icon, txt]) => row(id, icon, txt, tagOf(id, sign(QM.value(id, o))), "mp");
+    openSheet(`${winHead(b)}
+      ${warn ? `<div class="warnline">${esc(warn)}</div>` : ""}
+      ${lastFood ? `<p>Last food ended ${fmtT(lastFood)} (${fmtHM(Math.round((b.s - lastFood) / 60000))} before this).</p>` : ""}
+      <p>⏳ Sit with the food two minutes before the first bite, phone face down. Then tap what you ate. Each tile counts as you tap it.</p>
       <div class="win-lb mq-lb mp">Prana foods · fill prana (Sadhguru)</div>
       ${grid(QM.PRANA_FOODS.map(gold))}
       <div class="mq-sub">How you ate</div>
       ${grid(QM.PRANA_WAYS.map(gold))}
       <div class="win-lb mq-lb mb">Body foods · fill body (Bryan Johnson)</div>
-      ${grid(QM.BODY.map(id => { const h = HABITS.find(x => x[0] === id), g = habitGain(id); return row(id, h[4], h[5], g ? sign(g) : "full", "mb"); }).concat(row(QM.JUNK[0], QM.JUNK[1], QM.JUNK[2], sign(QM.JUNK[3]), "mb")))}
+      ${grid(QM.BODY.map(id => { const h = HABITS.find(x => x[0] === id), g = habitGain(id); return row(id, h[4], h[5], tagOf(id, g ? sign(g) : "full"), "mb"); })
+        .concat(row(QM.JUNK[0], QM.JUNK[1], QM.JUNK[2], tagOf(QM.JUNK[0], sign(QM.JUNK[3])), "mb")))}
       <div class="win-lb mq-lb mp">Drains · lower prana</div>
       ${grid(QM.DRAINS.map(gold))}
       <div class="mq-sub">${esc(QM.AUTO_NOTE)}</div>
-      <div class="actions" style="position:sticky;bottom:0"><button class="btn primary" id="mqOk">Confirm · ${esc(mqSum(sc))}</button></div>
-      <div class="actions"><button class="btn ghost" id="mqX">Not now</button></div>`, true);
+      <div class="hint" style="margin:10px 2px">${q && (q.p || q.b) ? `This meal so far: ${esc(mqSum(q))}.` : "Nothing counted yet."}</div>
+      <div class="actions"><button class="btn ghost" id="mEdit">Change time or name</button></div>`, true);
     $("sheet").querySelectorAll("[data-q]").forEach(bn => bn.onclick = () => {
-      const top = $("sheet").scrollTop, id = bn.dataset.q, fx = window.QuestFx, rect = bn.getBoundingClientRect(), was = !!sel[id];
-      openMealQuiz(b, Object.assign(sel, QM.toggle(sel, id))); $("sheet").scrollTop = top;   // in place, like before: a fast second tap keeps the first
-      if (fx && !was) {   // the tile burst on a pick (d23); the meters move once, on Confirm
-        const v = QM.BODY.includes(id) ? habitGain(id) : QM.value(id, mqOpt());
-        fx.tap(rect, { icon:bn.dataset.icon, gain:v, color:v < 0 ? "#ff9b8a" : QM.BODY.includes(id) ? "#8fe3b0" : "#ffd479" });
+      const top = $("sheet").scrollTop, id = bn.dataset.q, fx = window.QuestFx, rect = bn.getBoundingClientRect();
+      if (mqCounted(id) && !sel.has(id) && id !== "heavy" && !habitGain(id)) { if (fx) fx.nope(bn); return; }   // full for today
+      const cur = (G.day.mealq || {})[k];
+      const r = QM.tap(cur && !cur.kind ? cur : null, id, mqOpt());
+      G.day.habits = G.day.habits || {};
+      r.ops.forEach(op => {
+        if (mqCounted(op.id)) {   // habits only go up when devices merge, so a take-back is counted off in G.day.voided
+          if (op.on) G.day.habits[op.id] = (G.day.habits[op.id] || 0) + 1;
+          else (G.day.voided = G.day.voided || {})[op.id] = ((G.day.voided || {})[op.id] || 0) + 1;
+        }
+        const label = (QM.PRANA_FOODS.concat(QM.PRANA_WAYS, QM.DRAINS, [QM.JUNK]).find(x => x[0] === op.id) || [, , (HABITS.find(x => x[0] === op.id) || [])[5] || op.id])[2];
+        if (op.d) addEnergy(op.m, op.d, `${name}: ${label}${op.on ? "" : " (taken back)"}`, label, !!fx);
+        else log(`${name}: ${label}${op.on ? "" : " (taken back)"}`);
+      });
+      (G.day.mealq = G.day.mealq || {})[k] = { ...r.rec, at:now().toISOString() };
+      stampDay(); saveG();
+      openMeal(b); $("sheet").scrollTop = top; render();
+      const on = r.ops.find(op => op.id === id && op.on);
+      if (fx && on) {
+        fx.tap(rect, { icon:bn.dataset.icon, gain:on.d, color:on.d < 0 ? "#ff9b8a" : on.m === "b" ? "#8fe3b0" : "#ffd479" });
         fx.pop($("sheet").querySelector(`[data-q="${id}"]`));
       }
     });
-    $("mqX").onclick = closeSheet;
-    $("mqOk").onclick = () => {
-      const q = mqScore(sel);
-      G.day.habits = G.day.habits || {};
-      [...QM.BODY, "heavy"].forEach(id => { if (sel[id]) G.day.habits[id] = (G.day.habits[id] || 0) + 1; });
-      (G.day.mealq = G.day.mealq || {})[k] = { at:now().toISOString(), sel:Object.keys(sel).filter(x => sel[x]), p:q.p, b:q.b };
-      if (q.p) addPrana(q.p, `${name}: meal quiz`, "meal");
-      if (q.b) addBody(q.b, `${name}: meal quiz`, "meal");
-      stampDay(); log(`Rated ${name}: ${mqSum(q)}`); saveG();
-      closeSheet(); render();
-    };
+    $("mEdit").onclick = () => openEdit(b);
   }
 
   /* ---------- the activity check (Junyan, 2026-10-10: "after each activity there should also be some
@@ -3547,10 +3523,8 @@
     let h = `<div class="mo-det-time">${fmtT(b.s)} to ${fmtT(b.e)} · ${fmtHM(mins)}</div>`;
     if (b.basic) h += basicHtml(b, "mo-ck", "mo-det-lb");
     else if (isMeal(b)) {
-      const M = ((G.day.meals = G.day.meals || {})[k] = G.day.meals[k] || { plate:{}, phone:false });
-      h += `<div class="mo-det-lb">On the plate</div>${PLATE.map(([id, txt]) => `<button class="mo-ck${M.plate[id] ? " on" : ""}" data-plate="${id}" data-k="${esc(b.key)}"><span class="bx">${M.plate[id] ? "✓" : ""}</span>${txt}</button>`).join("")}
-        <button class="mo-ck${M.phone ? " on" : ""}" data-phone="${esc(b.key)}"><span class="bx">${M.phone ? "✓" : ""}</span>Phone face down until I'm done</button>
-        <button class="mo-det-btn" data-bp="1">🥗 Super Veggie or Nutty Pudding${habitGain("blueprint") ? ` +${habitGain("blueprint")}` : " (done)"}</button>`;
+      const q = (G.day.mealq || {})[k];
+      h += `<button class="mo-det-btn" data-meal="${esc(b.key)}">🍽️ ${q && (q.p || q.b) ? `This meal: ${esc(mqSum(q))}` : "Open the meal: tap what you ate"}</button>`;
     } else {
       const I0 = INSIGHTS[k] || { items:[], links:[] };
       const know = I0.items.filter(x => x.kind === "know"), mind = I0.items.filter(x => x.kind === "mind");
@@ -3588,12 +3562,7 @@
     bindGymMove(root, redraw);
     root.querySelectorAll("[data-fold]").forEach(b => b.onclick = e => { e.stopPropagation();
       const k = b.dataset.fold; moOpen.has(k) ? moOpen.delete(k) : moOpen.add(k); redraw(); });
-    root.querySelectorAll("[data-plate]").forEach(b => b.onclick = e => { e.stopPropagation();
-      const id = b.dataset.plate, blk = blkOf(b.dataset.k); if (!blk) return;
-      const M = G.day.meals[gk(blk)]; M.plate[id] = !M.plate[id]; saveG(); redraw(); });
-    root.querySelectorAll("[data-phone]").forEach(b => b.onclick = e => { e.stopPropagation();
-      const blk = blkOf(b.dataset.phone); if (!blk) return; const M = G.day.meals[gk(blk)]; M.phone = !M.phone; saveG(); redraw(); });
-    root.querySelectorAll("[data-bp]").forEach(b => b.onclick = e => { e.stopPropagation(); logHabit("blueprint", true); saveG(); redraw(); });
+    root.querySelectorAll("[data-meal]").forEach(b => b.onclick = e => { e.stopPropagation(); const blk = blkOf(b.dataset.meal); if (blk) openMeal(blk); });
     root.querySelectorAll("[data-tick]").forEach(b => b.onclick = e => { e.stopPropagation();
       const i = b.dataset.tick, blk = blkOf(b.dataset.k); if (!blk) return;
       const W = G.day.work[gk(blk)]; W.tick[i] = !W.tick[i]; saveG(); redraw(); });
