@@ -187,6 +187,11 @@
   .sq-bar { display:block; height:6px; border-radius:4px; background:rgba(0,0,0,.25); margin-top:7px; overflow:hidden; }
   .sq-bar b { display:block; height:100%; width:0; background:linear-gradient(90deg, #7fd0ff, #8fe3b0); border-radius:4px; transition:width .8s cubic-bezier(.2,.8,.2,1); }
   .hgrid.sugg { grid-template-columns:repeat(3, 1fr); }
+  .sugw { margin:14px 0 4px; padding:10px 12px; border-radius:14px; background:var(--glass); border:1px solid var(--glass-border); }
+  .sugr { display:flex; align-items:center; gap:6px; padding:8px 0; border-top:1px solid var(--glass-border); }
+  .sugr:first-of-type { border-top:0; }
+  .sugr > span { flex:1; min-width:0; } .sugr small { display:block; color:var(--ink-dim, rgba(255,255,255,.78)); font-size:12px; margin-top:2px; }
+  .sugr .btn { flex:0 0 auto; width:auto; padding:6px 12px; font-size:13px; min-height:0; }
   .hgrid.btiles, .hgrid.mqg { grid-template-columns:repeat(3, 1fr); margin:4px 0 10px; }
   .hgrid.btiles .htile, .hgrid.mqg .htile { min-height:78px; padding:14px 4px 6px; }
   .hgrid.mqg .hl { font-size:10px; }
@@ -724,6 +729,7 @@
 <script src="quest-fx.js?v=20261009b"></script>
 <script src="quest-night.js?v=20261019b"></script>
 <script src="quest-basics.js?v=20261019e"></script>
+<script src="quest-suggest.js?v=20261019a"></script>
 <script src="quest-gym.js?v=20261016i"></script>
 <script src="quest-morning.js?v=20261019a"></script>
 <script src="quest-agenda.js?v=20261014c"></script>
@@ -1572,6 +1578,63 @@
   // d206: his pixel icons replace the emoji as they arrive (still/sprites/icons/<id>.webp); add the id here
   const ICONS = new Set([]);
   const hIcon = (id, icon) => ICONS.has(id) ? `<img class="hi-img" src="sprites/icons/${id}.webp" alt="">` : icon;
+  /* ---------- Add to your calendar (Junyan, 2026-10-19, d13 d14) ----------
+     Plain rules (quest-suggest.js) find a slot for Morning Yoga, the Wind down and Domestics on today and tomorrow when
+     that day has none. Add writes the event straight onto his Junyan calendar, only on his tap, through still-api's
+     /cal/event (the route the gym sessions use). Skip hides that suggestion for that day (G.sugSkip, synced). */
+  const QS = () => window.QuestSuggest;
+  const nextYmd = () => new Date(Date.parse(gameYmd() + "T12:00:00Z") + 86400000).toISOString().slice(0, 10);
+  let SUG_NEXT = null, SUG_PULL = false;
+  const SUG_BUSY = {};   // added (or being added) this session: hidden until the calendar shows the new event
+  async function pullNextPlan(){
+    if (SUG_PULL || (SUG_NEXT && SUG_NEXT.day === nextYmd() && Date.now() - SUG_NEXT.at < 10 * 60000)) return;
+    SUG_PULL = true;
+    try { const day = nextYmd(), plan = await getPlan(day); SUG_NEXT = { day, at:Date.now(), plan }; render(); }
+    catch {} finally { SUG_PULL = false; }
+  }
+  const sugBlocks = list => list.map(b => ({ t:b.t, s:+b.s, e:+b.e, free:b.kind === "open" || b.kind === "break", meal:isMeal(b), basic:basicId(b) }));
+  function sugList(){
+    if (!QS() || !PLAN || !QB()) return [];
+    const skip = G.sugSkip || {}, today = gameYmd(), out = [];
+    const add = (day, tz, list) => QS().suggest({ day, tz, now:+now(), blocks:sugBlocks(list), skip:skip[day] })
+      .forEach(x => { if (!SUG_BUSY[`${day}|${x.id}`]) out.push({ ...x, day, tz }); });
+    add(today, TZ(), blocks());
+    if (SUG_NEXT && SUG_NEXT.day === nextYmd()) {
+      const p = SUG_NEXT.plan, tb = p.blocks.map(b => ({ ...b, s:new Date(b.s), e:new Date(b.e) })).map(b => ({ ...b, kind:kindOf(b) }));
+      add(SUG_NEXT.day, p.tz || TZ(), tb);
+    } else pullNextPlan();
+    return out;
+  }
+  const sugT = (ms, tz) => new Date(ms).toLocaleTimeString([], { hour:"numeric", minute:"2-digit", timeZone:tz });
+  function sugHTML(){
+    const L = sugList(); if (!L.length) return "";
+    return `<div class="sugw"><div class="eyebrow">Add to your calendar</div>` + L.map(x =>
+      `<div class="sugr"><span><b>${esc(x.t)}</b><small>${x.day === gameYmd() ? "Today" : "Tomorrow"}, ${sugT(x.s, x.tz)} to ${sugT(x.e, x.tz)}</small></span>` +
+      `<button class="btn" data-sadd="${x.day}|${x.id}">Add</button><button class="btn ghost" data-sskip="${x.day}|${x.id}">Skip</button></div>`).join("") + `</div>`;
+  }
+  function bindSug(root){
+    const find = k => sugList().find(x => `${x.day}|${x.id}` === k);
+    root.querySelectorAll("[data-sadd]").forEach(bn => bn.onclick = () => { const x = find(bn.dataset.sadd); if (x) sugAdd(x); });
+    root.querySelectorAll("[data-sskip]").forEach(bn => bn.onclick = () => {
+      const [day, id] = bn.dataset.sskip.split("|"), x = find(bn.dataset.sskip);
+      const keep = Object.fromEntries(Object.entries(G.sugSkip || {}).filter(([d]) => d >= gameYmd()));   // only today and later
+      G.sugSkip = { ...keep, [day]:{ ...(keep[day] || {}), [id]:true } };
+      log(`Skipped the suggestion: ${x ? x.t : id} (${day === gameYmd() ? "today" : "tomorrow"})`); saveG(); render();
+    });
+  }
+  async function sugAdd(x){
+    const k = `${x.day}|${x.id}`; if (SUG_BUSY[k]) return;   // a fast second tap writes nothing
+    SUG_BUSY[k] = true; render();
+    try {
+      await qfetch("/cal/event", { method:"POST", body:JSON.stringify({ s:new Date(x.s).toISOString(), e:new Date(x.e).toISOString(), title:x.t,
+        desc:"Added from Day Quest: a suggested practice block. Move it or delete it as you like." }) });
+      log(`Added ${x.t} to the calendar: ${x.day === gameYmd() ? "today" : "tomorrow"}, ${sugT(x.s, x.tz)} to ${sugT(x.e, x.tz)}`); saveG();
+      calToast(`${x.t} is on your calendar.`, 4000);
+      if (x.day === gameYmd()) await pullAll(); else { SUG_NEXT = null; pullNextPlan(); }
+    } catch (err) { delete SUG_BUSY[k]; calToast(`Could not add ${x.t} to the calendar (${err.message}). Nothing was added.`, 7000); }
+    render();
+  }
+
   /* No free-floating tiles (Junyan, 2026-10-19, d6 d11: "Everything needs to be directly connected to what I'm doing
      right now"). Prana and body actions are ticked inside their calendar block (Morning Yoga, Domestics or Grooming,
      Wind-down, the meal quiz). Only the water tile stays out here for now (how water counts is still being decided),
@@ -4799,7 +4862,7 @@
     // phone and desktop alike: the steps card, three picks for right now, then the full list one tap away (2026-10-09)
     const endAt = lastItemEnd(all), nightNow = PLAN && endAt && +t >= endAt;
     if (nightNow && !G.day.nightShown && !$("sheet").classList.contains("open") && !$("night")) { G.day.nightShown = true; saveG(); openNight(); }
-    put("habits", PLAN ? (nightNow ? `<button class="pa-all nt-open" data-night>🌙 Day's end<span>tomorrow, deathbed, reflection ›</span></button>` : "") + stepsHTML() + suggestHTML() : ""); bindHabits($("habits"));
+    put("habits", PLAN ? (nightNow ? `<button class="pa-all nt-open" data-night>🌙 Day's end<span>tomorrow, deathbed, reflection ›</span></button>` : "") + stepsHTML() + suggestHTML() + sugHTML() : ""); bindHabits($("habits")); bindSug($("habits"));
     $("habits").querySelectorAll("[data-night]").forEach(bn => bn.onclick = openNight);
     if (PLAN && !z && body() < 40 && !G.day.lotusGiven) { G.day.lotusGiven = true; giveItem("lotus", "Your energy is low today."); }
     if ($("bMorning")) $("bMorning").onclick = () => openMorning();
