@@ -736,8 +736,8 @@
     src:url(fonts/figtree-latin.woff2) format("woff2"); }
 </style>
 <script src="keeps.js?v=20261009k"></script>
-<script src="bag.js?v=20261009k"></script>
-<script src="quest-merge.js?v=20261019z"></script>
+<script src="bag.js?v=20261019a"></script>
+<script src="quest-merge.js?v=20261019zz"></script>
 <script src="quest-oura.js?v=20261019a"></script>
 <script src="quest-levels.js?v=20261016b"></script>
 <script src="quest-gymlog.js?v=20261019a"></script>
@@ -746,12 +746,12 @@
 <script src="nvc-words.js?v=20261010a"></script>
 <script src="quest-fx.js?v=20261019x"></script>
 <script src="quest-night.js?v=20261019w"></script>
-<script src="quest-basics.js?v=20261019y"></script>
+<script src="quest-basics.js?v=20261019z"></script>
 <script src="quest-suggest.js?v=20261019a"></script>
 <script src="quest-water.js?v=20261019m"></script>
 <script src="quest-gym.js?v=20261019x"></script>
 <script src="quest-morning.js?v=20261019a"></script>
-<script src="quest-agenda.js?v=20261019zb"></script>
+<script src="quest-agenda.js?v=20261019zc"></script>
 <script src="quest-offline.js?v=20261017a"></script>
 <script src="quest-nearby.js?v=20261016k"></script>
 </head>
@@ -1906,7 +1906,7 @@
   function log(msg, xp = 0, extra){
     G.day.log.unshift({ at:now().toISOString(), msg, xp, ...(extra || {}) });
     if (extra && extra.at) G.day.log.sort((x, y) => Date.parse(y.at) - Date.parse(x.at));
-    G.day.log = QuestMerge.trimLog(G.day.log);   // every Body line stays: Body is worked out from them
+    G.day.log = QuestMerge.trimLog ? QuestMerge.trimLog(G.day.log) : G.day.log.slice(0, 80);   // every Body line stays: Body is worked out from them
     saveG();
   }
   function floatXp(n, label){
@@ -4765,7 +4765,7 @@
     d.habits = d.habits || {};
     if (d.body == null) { d.body = 60; d.bl = [[now().toISOString(), 60]]; }
     // Body follows its log lines (2026-10-19): a copy that drifted from them (a stale device, an old merge) heals here
-    const bd = QuestMerge.bodyOf(d);
+    const bd = QuestMerge.bodyOf ? QuestMerge.bodyOf(d) : null;   // a cached older quest-merge.js has none
     if (bd != null && bd !== d.body) { d.body = bd; (d.bl = d.bl || []).push([now().toISOString(), bd]); }
     if (!d.pranaSince) d.pranaSince = d.since || now().toISOString();
     if (G.mode !== "prana") { G.mode = "prana"; delete G.summits; delete G.ropes; delete G.souvenirs; }
