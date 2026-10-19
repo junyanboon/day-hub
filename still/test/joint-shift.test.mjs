@@ -40,6 +40,8 @@ test("settle: overlaps already among Joint Plans are pushed apart, the earlier o
   const after = day.map(b => { const m = r.find(x => x.b.key === b.key); return m ? { ...b, s:m.s, e:m.e } : b; });
   assert.equal(A.settle(after, T("11:00")).length, 0, "settling twice moves nothing the second time");
   assert.equal(A.settle([J("a", "12:00", "13:00", "A"), J("b", "13:00", "14:00", "B")], T("11:00")).length, 0, "touching is fine");
+  // a Joint block under way stays, and what starts inside it is pushed after it
+  assert.deepEqual(shown(A.settle([J("run", "10:30", "12:00", "Lunch"), J("w", "11:30", "12:00", "Walk")], T("11:00"))), ["Walk 12:00-12:30"]);
 });
 
 test("shiftPlan: Joint events go in one /cal/shift batch from where the calendar has them; Quest blocks stay in today's plan", () => {
@@ -78,7 +80,7 @@ test("the page: calendar moves only from shiftBlocks, after his move or add, and
   assert.equal((html.match(/shiftBlocks\(/g) || []).length, 3, "definition, roomFor, settleDay");
   const sd = html.slice(html.indexOf("async function settleDay("), html.indexOf("async function settleDay(") + 900);
   assert.match(sd, /visibilityState !== "visible"/);
-  assert.match(sd, /store\.get\(mark\) \|\| \(G\.day && G\.day\.settled\)/);
+  assert.match(sd, /store\.get\(mark\) \|\| G\.day\.settled/);
   // the mark is set before any write
   assert.ok(sd.indexOf("store.set(mark") < sd.indexOf("shiftBlocks("));
   assert.match(sd, /AGD\(\)\.settle\(blocks\(\), now\(\)\)/);
@@ -89,11 +91,11 @@ test("the page: calendar moves only from shiftBlocks, after his move or add, and
 
 test("d41: the Add sheet, the suggestions and the idea sheet add to Joint Plans by default; the Add sheet can pick another", () => {
   assert.equal(A.ADD_CALS[0].name, "Joint Plans"); assert.equal(A.ADD_CALS[0].id, A.JOINT);
-  assert.match(html, /async function addBlockCal\(t, s, e, makeRoom, calId = AGD\(\) \? AGD\(\)\.JOINT : undefined\)/);
+  assert.match(html, /async function addBlockCal\(t, s, e, makeRoom, calId = jointId\(\)\)/);
   assert.match(html, /<select id="aWhere" class="awhere">\$\{AGD\(\)\.ADD_CALS\.map/);
   assert.match(html, /Today only \(not in Google Calendar\)/);
   const sug = html.slice(html.indexOf("async function sugAdd("), html.indexOf("async function sugAdd(") + 700);
-  assert.match(sug, /calId:AGD\(\) \? AGD\(\)\.JOINT/);
-  assert.match(html, /title, calId:AGD\(\) \? AGD\(\)\.JOINT : undefined \}\) \}\); \}/, "the idea sheet, another day");
+  assert.match(sug, /calId:jointId\(\)/);
+  assert.match(html, /title, calId:jointId\(\) \}\) \}\); \}/, "the idea sheet, another day");
   assert.ok(!/Google Calendar \(Junyan\)/.test(html), "no Junyan-only wording left");
 });

@@ -191,7 +191,8 @@
   function settle(list, from, step = 15){
     const q = step * MIN, up = ms => Math.ceil(ms / q) * q, out = [];
     const xs = list.filter(b => inRoom(b) && +b.s >= +from).sort(byStart);
-    let cur = -Infinity;
+    // a Joint block already under way does not move, but what starts inside it does
+    let cur = Math.max(-Infinity, ...list.filter(b => inRoom(b) && +b.s < +from && +b.e > +from).map(b => +b.e));
     for (const b of xs) {
       if (+b.s < cur) { const s = up(cur), e = s + (+b.e - +b.s); out.push({ b, s:new Date(s), e:new Date(e) }); cur = e; }
       else cur = Math.max(cur, +b.e);

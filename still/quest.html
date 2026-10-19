@@ -1699,7 +1699,7 @@
     SUG_BUSY[k] = true; render();
     try {
       const made = await qfetch("/cal/event", { method:"POST", body:JSON.stringify({ s:new Date(x.s).toISOString(), e:new Date(x.e).toISOString(), title:x.t,
-        calId:AGD() ? AGD().JOINT : undefined, desc:"Added from Day Quest: a suggested practice block. Move it or delete it as you like." }) });
+        calId:jointId(), desc:"Added from Day Quest: a suggested practice block. Move it or delete it as you like." }) });
       log(`Added ${x.t} to the calendar: ${x.day === gameYmd() ? "today" : "tomorrow"}, ${sugT(x.s, x.tz)} to ${sugT(x.e, x.tz)}`); saveG();
       calToast(`${x.t} is on your calendar${calName(made.calId)}.`, 4000);
       if (x.day === gameYmd()) await pullAll(); else { SUG_NEXT = null; pullNextPlan(); }
@@ -2221,8 +2221,8 @@
      failure, a reload or the pull it triggers never runs it again: it cannot loop. */
   async function settleDay(){
     const ymd = gameYmd(), mark = "dq-settled-" + ymd;
-    if (!AGD() || !canShift() || !PLAN || document.visibilityState !== "visible") return;
-    if (store.get(mark) || (G.day && G.day.settled)) return;
+    if (!AGD() || !canShift() || !PLAN || !G.day || document.visibilityState !== "visible") return;
+    if (store.get(mark) || G.day.settled) return;
     store.set(mark, now().toISOString()); G.day.settled = now().toISOString(); saveG();
     const moves = AGD().settle(blocks(), now());
     if (!moves.length) { log("Checked Joint Plans for overlaps: none"); return; }
@@ -2253,10 +2253,11 @@
     await roomFor(b, s, e);
     await pullAll();
   }
+  const jointId = () => AGD() ? AGD().JOINT : undefined;   // where Day Quest's adds go by default (d41)
   const calName = id => { const c = AGD() && AGD().ADD_CALS.find(x => x.id === id); return c ? ` (${c.name})` : ""; };
   /* calId: the calendar it goes on. Adds from Day Quest go on Joint Plans unless he picks another (d41, 2026-10-19:
      "when I add an item on the day quest it should go to the joint plans calendar by default"). */
-  async function addBlockCal(t, s, e, makeRoom, calId = AGD() ? AGD().JOINT : undefined){
+  async function addBlockCal(t, s, e, makeRoom, calId = jointId()){
     let made = {};
     try { made = await qfetch("/cal/event", { method:"POST", body:JSON.stringify({ s:s.toISOString(), e:e.toISOString(), title:t, calId,
       ...(isGym({ t }) ? { color:"3", desc:"Added from Day Quest: a gym session. Move it or delete it as you like." } : {}) }) }); }
@@ -2876,7 +2877,7 @@
       const s = fromField($("aS").value, other ? t0 : now()), e = new Date(s.getTime() + dur * 60000);
       // Joint Plans unless he picks another (d41). A gym session always goes on Google Calendar (later 2026-10-16: no
       // more plan-only gym blocks), on Joint Plans if he picked Today only.
-      const where = $("aWhere") ? $("aWhere").value : "", calId = where || (AGD() ? AGD().JOINT : undefined);
+      const where = $("aWhere") ? $("aWhere").value : "", calId = where || jointId();
       const cal = other || isGym({ t }) && questKey() && !DRY || !!where;
       closeSheet();
       if (cal) addBlockCal(t, s, e, !other && $("aRoom").checked, calId); else addBlock(t, s, e, $("aRoom").checked);
@@ -4009,7 +4010,7 @@
     add: (t, s, e, extra) => {
       // a gym session goes on Google Calendar as a real event, never a plan-only block (later 2026-10-16)
       // it stays on his own Junyan calendar, where the weekly gym plan puts gym sessions (not an Add sheet add, d41)
-      if (isGym({ t }) && questKey() && !DRY) return addBlockCal(t, s, e, false, AGD() ? AGD().JUNYAN : undefined);
+      if (isGym({ t }) && questKey() && !DRY) return addBlockCal(t, s, e, false, (AGD() ? AGD().JUNYAN : undefined));
       log(`Planned ${t}: ${fmtT(s)} to ${fmtT(e)}`);
       return writeOps(o => o.adds.push({ key:newKey(s), s:s.toISOString(), e:e.toISOString(), t, type:"task", cal:"you", ...(extra || {}) })); },
     // done in Notion; the answer carries the status it had, so Undo can put it back (2026-10-10)
@@ -4507,7 +4508,7 @@
         closeSheet();
         if (today) await (cal ? addBlockCal : addBlock)(title, s, e, false);
         else {   // another day: only the calendar can hold it (today's edit layer is today only)
-          try { await qfetch("/cal/event", { method:"POST", body:JSON.stringify({ s:s.toISOString(), e:e.toISOString(), title, calId:AGD() ? AGD().JOINT : undefined }) }); }
+          try { await qfetch("/cal/event", { method:"POST", body:JSON.stringify({ s:s.toISOString(), e:e.toISOString(), title, calId:jointId() }) }); }
           catch (err) { alert(`Could not add it to the calendar (${err.message}). Nothing was added.`); return back(); }
           log(`Added ${title} to the calendar: tomorrow ${fmtT(s)}`);
         }
