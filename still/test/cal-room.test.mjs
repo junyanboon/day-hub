@@ -48,14 +48,14 @@ test("makeRoom: past bedtime is fine (d31), and open space is never pushed", () 
   assert.deepEqual(shown(A.makeRoom(day, { key:"s", s:T("21:30"), e:T("22:30") })), ["Wind down 22:30-23:30"]);
 });
 
-test("the page makes room after every move and add, in its own view of today, never in Google Calendar", () => {
-  const fn = html.slice(html.indexOf("function roomFor("), html.indexOf("function roomFor(") + 700);
+test("the page makes room after every move and add, today only, among Joint Plans (d40); calendar writes go through shiftBlocks (d38)", () => {
+  const fn = html.slice(html.indexOf("function roomFor("), html.indexOf("function roomFor(") + 400);
   assert.match(fn, /gameDayOf\(s\) !== gameYmd\(\)/, "today only");
-  assert.match(fn, /AGD\(\)\.makeRoom\(blocks\(\)/);
-  assert.match(fn, /setBlock\(o, m\.b, m\.s, m\.e, m\.b\.t\)/, "the /ops layer");
-  assert.ok(!/cal\/event/.test(fn), "no calendar write");
-  assert.match(html, /\}\)\.then\(\(\) => roomFor\(b\.key, s, e\)\);/, "saveBlock (drag in today's plan, Change this block)");
-  assert.match(html, /\}\)\.then\(\(\) => roomFor\(key, s, e\)\);/, "addBlock");
+  assert.match(fn, /AGD\(\)\.roomJoint\(blocks\(\)/);
+  assert.match(fn, /shiftBlocks\(moves/);
+  assert.ok(!/cal\/event/.test(fn), "no single-event write: the batch route only");
+  assert.match(html, /\}\)\.then\(\(\) => roomFor\(b, s, e\)\);/, "saveBlock (drag in today's plan, Change this block)");
+  assert.match(html, /\}\)\.then\(\(\) => roomFor\(\{ key, extra:true \}, s, e\)\);/, "addBlock");
   assert.equal((html.match(/await roomFor\(/g) || []).length, 4, "calendar drag, calendar change, calendar add, gym move");
 });
 

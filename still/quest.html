@@ -535,6 +535,9 @@
   .chip.sel { background:#fff; color:#3b3670; font-weight:600; }
   .sheet input { width:100%; margin-top:12px; padding:13px 14px; border-radius:14px; border:1px solid var(--glass-border);
     background:rgba(0,0,0,.18); color:var(--ink); font:inherit; font-size:16px; }
+  .sheet select.awhere { display:block; width:100%; margin-top:4px; padding:12px 14px; border-radius:14px; border:1px solid var(--glass-border);
+    background:rgba(0,0,0,.18); color:var(--ink); font:inherit; font-size:16px; -webkit-appearance:none; appearance:none; }
+  .sheet select.awhere option { color:#111; }
   .sheet input::placeholder { color:var(--ink-faint); }
 
   /* ---------- toasts ---------- */
@@ -742,7 +745,7 @@
 <script src="quest-water.js?v=20261019a"></script>
 <script src="quest-gym.js?v=20261019x"></script>
 <script src="quest-morning.js?v=20261019a"></script>
-<script src="quest-agenda.js?v=20261019x"></script>
+<script src="quest-agenda.js?v=20261019z"></script>
 <script src="quest-offline.js?v=20261017a"></script>
 <script src="quest-nearby.js?v=20261016k"></script>
 </head>
@@ -802,7 +805,7 @@
     const r = await fetch(API + path, { ...opts, signal:opts.signal || (opts.method ? undefined : quick()), cache:"no-store",
       headers:{ "Content-Type":"application/json", "X-Quest-Key":questKey(), ...(opts.headers || {}) } });
     const body = await r.json().catch(() => ({}));
-    if (!r.ok) throw new Error(body.error || "HTTP " + r.status);
+    if (!r.ok) { const err = new Error(body.error || "HTTP " + r.status); err.status = r.status; throw err; }
     return body;
   }
   const qs = new URLSearchParams(location.search);
@@ -1087,7 +1090,8 @@
       if (SAVED_AT == null) {
         lastPull = new Date();
         // every day, without him typing (d1): the basics go in on each full pull, once (placeBasics only adds what is missing)
-        placeBasics().then(() => { if (window.QuestMorning) QuestMorning.redraw(); }).catch(e => console.warn("basics", e));
+        placeBasics().then(() => { if (window.QuestMorning) QuestMorning.redraw(); }).catch(e => console.warn("basics", e))
+          .then(() => settleDay()).catch(e => console.warn("settle", e));   // once a day: Joint Plans overlaps pushed apart (d40)
         planGym().catch(e => console.warn("gym", e));   // this week's and next week's gym, on his calendar (at most every 2 hours)
       }   // offline: both wait for a fresh calendar, so nothing is placed twice or against an old day
       saveSnap();
@@ -1120,7 +1124,8 @@
       const k = keyOf(b);
       if (OPS.drops.includes(k)) return;
       const ed = OPS.edits[k];
-      out.push({ ...b, key:k, s:new Date(ed?.s ?? b.s), e:new Date(ed?.e ?? b.e), t:ed?.t ?? b.t });
+      // cs/ce: where the calendar has it (an edit in today's plan can differ); /cal/shift moves it only from there
+      out.push({ ...b, key:k, s:new Date(ed?.s ?? b.s), e:new Date(ed?.e ?? b.e), t:ed?.t ?? b.t, cs:b.s, ce:b.e });
     });
     OPS.adds.forEach(a => out.push({ ...a, key:a.key, s:new Date(a.s), e:new Date(a.e), extra:true }));
     return out.map(b => ({ ...b, kind:kindOf(b) })).sort((x,y) => x.s - y.s);
@@ -1647,7 +1652,7 @@
   const hIcon = (id, icon) => ICONS.has(id) ? `<img class="hi-img" src="sprites/icons/${id}.webp" alt="">` : icon;
   /* ---------- Add to your calendar (Junyan, 2026-10-19, d13 d14) ----------
      Plain rules (quest-suggest.js) find a slot for Morning Yoga, the Wind down and Domestics on today and tomorrow when
-     that day has none. Add writes the event straight onto his Junyan calendar, only on his tap, through still-api's
+     that day has none. Add writes the event straight onto the Joint Plans calendar (d41, 2026-10-19), only on his tap, through still-api's
      /cal/event (the route the gym sessions use). Skip hides that suggestion for that day (G.sugSkip, synced). */
   const QS = () => window.QuestSuggest;
   const nextYmd = () => new Date(Date.parse(gameYmd() + "T12:00:00Z") + 86400000).toISOString().slice(0, 10);
@@ -1693,10 +1698,10 @@
     const k = `${x.day}|${x.id}`; if (SUG_BUSY[k]) return;   // a fast second tap writes nothing
     SUG_BUSY[k] = true; render();
     try {
-      await qfetch("/cal/event", { method:"POST", body:JSON.stringify({ s:new Date(x.s).toISOString(), e:new Date(x.e).toISOString(), title:x.t,
-        desc:"Added from Day Quest: a suggested practice block. Move it or delete it as you like." }) });
+      const made = await qfetch("/cal/event", { method:"POST", body:JSON.stringify({ s:new Date(x.s).toISOString(), e:new Date(x.e).toISOString(), title:x.t,
+        calId:AGD() ? AGD().JOINT : undefined, desc:"Added from Day Quest: a suggested practice block. Move it or delete it as you like." }) });
       log(`Added ${x.t} to the calendar: ${x.day === gameYmd() ? "today" : "tomorrow"}, ${sugT(x.s, x.tz)} to ${sugT(x.e, x.tz)}`); saveG();
-      calToast(`${x.t} is on your calendar.`, 4000);
+      calToast(`${x.t} is on your calendar${calName(made.calId)}.`, 4000);
       if (x.day === gameYmd()) await pullAll(); else { SUG_NEXT = null; pullNextPlan(); }
     } catch (err) { delete SUG_BUSY[k]; calToast(`Could not add ${x.t} to the calendar (${err.message}). Nothing was added.`, 7000); }
     render();
@@ -2167,20 +2172,61 @@
         setBlock(o, x, new Date(x.s.getTime() + de), new Date(x.e.getTime() + de), x.t);
       });
       setBlock(o, b, s, e, t);
-    }).then(() => roomFor(b.key, s, e));
+    }).then(() => roomFor(b, s, e));
   }
-  /* Nothing overlaps (Junyan, 2026-10-19, d30 d31): after a block is moved or added today, a block it lands on starts
-     again at the next 15-minute mark after it, and the rest of the day follows (quest-agenda.js makeRoom). The shift
-     is in Day Quest's own view of today (/ops), never in Google Calendar, so a shared Joint Plans event is not moved
-     for Caney. Past bedtime is fine (d31). key: the moved block's key in blocks(), left out of the shift. */
-  function roomFor(key, s, e){
+  /* Nothing overlaps (Junyan, 2026-10-19, d30 d31), among Joint Plans only (d40): after a block is moved or added today,
+     a Joint Plans event or Quest block it lands on starts again at the next 15-minute mark after it, and the rest of the
+     day follows (quest-agenda.js roomJoint). Junyan calendar events overlap freely and never move. Past bedtime is fine
+     (d31). d38 "it needs to move everything together": the pushed Joint Plans events move in Google Calendar too (Caney
+     sees it), in one /cal/shift batch, only from here (his own move or add) and settleDay. moved: the block moved or
+     added ({ key, calId? | extra? }); its key is left out of the shift. */
+  function roomFor(moved, s, e){
     if (!AGD() || gameDayOf(s) !== gameYmd()) return Promise.resolve();
-    return writeOps(o => {
-      const moves = AGD().makeRoom(blocks(), { key, s:new Date(s), e:new Date(e) });
-      if (!moves.length) return;
-      moves.forEach(m => setBlock(o, m.b, m.s, m.e, m.b.t));
-      log(`Made room, nothing overlaps: ${moves.map(m => `${shortName(m.b)} now ${fmtT(m.s)}`).join(", ")}`);
+    const moves = AGD().roomJoint(blocks(), { ...moved, s:new Date(s), e:new Date(e) });
+    return moves.length ? shiftBlocks(moves, `${moved.t || "a block"} at ${fmtT(new Date(s))}`) : Promise.resolve();
+  }
+  /* Carry out make-room moves: Joint Plans events in Google Calendar (one /cal/shift batch; the server moves each only if
+     it is still where we read it, later only, same length, at most 12 a batch and 40 a day), Quest blocks in today's
+     plan. Not paired, test mode, an old still-api (404) or a failed write: that block moves in today's plan only, as
+     before. More than MAX_SHIFT moves: nothing moves, and the log says so. */
+  async function shiftBlocks(moves, why){
+    const P = AGD().shiftPlan(moves, canShift(), m => `Moved later by Day Quest to make room (was ${fmtT(m.b.s)}).`);
+    if (P.refuse) { log(`Did not make room: ${moves.length} blocks would move, more than ${AGD().MAX_SHIFT}. Nothing moved.`); return; }
+    const stay = P.ops.slice(), done = [];
+    if (P.cal.length) {
+      try {
+        const r = await qfetch("/cal/shift", { method:"POST", body:JSON.stringify({ why, day:gameYmd(), moves:P.cal.map(x => x.body) }) });
+        const ok = new Set((r.moved || []).map(x => x.id));
+        P.cal.forEach(x => (ok.has(x.m.b.id) ? done : stay).push(x.m));
+        if ((r.skipped || []).length) log(`Joint Plans not moved in Google Calendar: ${r.skipped.map(k => {
+          const m = P.cal.find(x => x.m.b.id === k.id); return `${m ? shortName(m.m.b) : "an event"} (${k.why})`; }).join(", ")}; moved in today's plan only.`);
+      } catch (err) {
+        P.cal.forEach(x => stay.push(x.m));
+        log(`Joint Plans not moved in Google Calendar (${err.status === 404 ? "still-api needs its update" : err.message}); moved in today's plan only.`);
+      }
+    }
+    await writeOps(o => {
+      stay.forEach(m => setBlock(o, m.b, m.s, m.e, m.b.t));
+      done.forEach(m => { delete o.edits[m.b.key]; });   // the calendar holds these now
     });
+    const say = list => list.map(m => `${shortName(m.b)} now ${fmtT(m.s)}`).join(", ");
+    if (done.length) log(`Made room in Joint Plans, moved in Google Calendar: ${say(done)}`);
+    if (stay.length) log(`Made room, nothing overlaps (today's plan): ${say(stay)}`);
+    if (done.length) await pullAll();
+  }
+  const canShift = () => !!(questKey() && !DRY);
+  /* Overlaps already there among Joint Plans (d40, "push apart overlaps that already exist"): once a game day, on the first
+     fresh pull of that day with the page in front of him. Only blocks that have not started yet; the earlier one stays.
+     Marked done for the day before anything is written (on this device and in the synced game, G.day.settled), so a
+     failure, a reload or the pull it triggers never runs it again: it cannot loop. */
+  async function settleDay(){
+    const ymd = gameYmd(), mark = "dq-settled-" + ymd;
+    if (!AGD() || !canShift() || !PLAN || document.visibilityState !== "visible") return;
+    if (store.get(mark) || (G.day && G.day.settled)) return;
+    store.set(mark, now().toISOString()); G.day.settled = now().toISOString(); saveG();
+    const moves = AGD().settle(blocks(), now());
+    if (!moves.length) { log("Checked Joint Plans for overlaps: none"); return; }
+    await shiftBlocks(moves, "pushed apart overlaps on opening the day");
   }
   /* Calendar writes: a block that came from Google Calendar (it has an id) can
      be moved or renamed in the calendar itself. Blocks moved along with it
@@ -2204,22 +2250,26 @@
         setBlock(o, x, new Date(x.s.getTime() + de), new Date(x.e.getTime() + de), x.t);
       });
     });
-    await roomFor(b.key, s, e);
+    await roomFor(b, s, e);
     await pullAll();
   }
-  async function addBlockCal(t, s, e, makeRoom){
-    try { await qfetch("/cal/event", { method:"POST", body:JSON.stringify({ s:s.toISOString(), e:e.toISOString(), title:t,
+  const calName = id => { const c = AGD() && AGD().ADD_CALS.find(x => x.id === id); return c ? ` (${c.name})` : ""; };
+  /* calId: the calendar it goes on. Adds from Day Quest go on Joint Plans unless he picks another (d41, 2026-10-19:
+     "when I add an item on the day quest it should go to the joint plans calendar by default"). */
+  async function addBlockCal(t, s, e, makeRoom, calId = AGD() ? AGD().JOINT : undefined){
+    let made = {};
+    try { made = await qfetch("/cal/event", { method:"POST", body:JSON.stringify({ s:s.toISOString(), e:e.toISOString(), title:t, calId,
       ...(isGym({ t }) ? { color:"3", desc:"Added from Day Quest: a gym session. Move it or delete it as you like." } : {}) }) }); }
     catch (err) {
       // today's plan cannot hold another day, so a failed add there is only reported
       if (gameDayOf(s) !== gameYmd()) return calToast(`Could not add ${t} to the calendar (${err.message}). Nothing was added.`, 7000);
       alert(`Could not add it to the calendar (${err.message}). Added for today only.`); return addBlock(t, s, e, makeRoom); }
-    log(`Added ${t} to the calendar: ${fmtT(s)} to ${fmtT(e)}`);
+    log(`Added ${t} to the calendar${calName(made.calId || calId)}: ${fmtT(s)} to ${fmtT(e)}`);
     if (makeRoom) await writeOps(o => blocks().forEach(x => {
       if (x.s < s) return;
       setBlock(o, x, new Date(x.s.getTime() + (e - s)), new Date(x.e.getTime() + (e - s)), x.t);
     }));
-    await roomFor("new", s, e);   // not in today's plan until the pull
+    await roomFor({ key:"new", t, calId:made.calId || calId }, s, e);   // not in today's plan until the pull
     await pullAll();
   }
   function dropBlock(b){
@@ -2239,7 +2289,7 @@
         setBlock(o, x, new Date(x.s.getTime() + dur), new Date(x.e.getTime() + dur), x.t);
       });
       o.adds.push({ key, s:s.toISOString(), e:e.toISOString(), t, type:"task", cal:"you" });
-    }).then(() => roomFor(key, s, e));
+    }).then(() => roomFor({ key, extra:true }, s, e));
   }
   // time inputs speak the calendar's clock, not the device's
   const toField = d => { const p = tzParts(d, { hour:"2-digit", minute:"2-digit", hourCycle:"h23" });
@@ -2813,7 +2863,7 @@
       <div class="row"><label>Start<input id="aS" type="time" value="${toField(t0)}"></label></div>
       <div class="chips" style="grid-template-columns:repeat(4,1fr)">${[15,30,60,90].map(m =>
         `<button class="chip ${m === dur ? "sel" : ""}" data-d="${m}" style="text-align:center">${m < 60 ? m + "m" : m/60 + "h"}</button>`).join("")}</div>
-      ${other ? `<p style="font-size:12px">It goes in Google Calendar (Junyan).</p>` : canAdd ? `<label class="check"><input id="aCal" type="checkbox" checked> Add it to Google Calendar (Junyan)</label>` : ""}
+      ${canAdd && AGD() ? `<div class="row"><label>Goes on<select id="aWhere" class="awhere">${AGD().ADD_CALS.map(c => `<option value="${c.id}">${esc(c.name)} calendar</option>`).join("")}${other ? "" : `<option value="">Today only (not in Google Calendar)</option>`}</select></label></div>` : ""}
       ${other ? "" : `<label class="check"><input id="aRoom" type="checkbox"> Make room (push what follows later, today only)</label>`}
       <div class="actions"><button class="btn ghost" id="aCancel">Cancel</button><button class="btn primary" id="aGo">Add</button></div>`);
     $("sheet").querySelectorAll("[data-d]").forEach(c => c.onclick = () => {
@@ -2824,9 +2874,12 @@
     $("aGo").onclick = () => {
       const t = $("aT").value.trim(); if (!t) { $("aT").focus(); return; }
       const s = fromField($("aS").value, other ? t0 : now()), e = new Date(s.getTime() + dur * 60000);
-      // a gym session always goes on Google Calendar (later 2026-10-16: no more plan-only gym blocks)
-      const cal = other || isGym({ t }) && questKey() && !DRY || $("aCal") && $("aCal").checked;
-      closeSheet(); (cal ? addBlockCal : addBlock)(t, s, e, !other && $("aRoom").checked);
+      // Joint Plans unless he picks another (d41). A gym session always goes on Google Calendar (later 2026-10-16: no
+      // more plan-only gym blocks), on Joint Plans if he picked Today only.
+      const where = $("aWhere") ? $("aWhere").value : "", calId = where || (AGD() ? AGD().JOINT : undefined);
+      const cal = other || isGym({ t }) && questKey() && !DRY || !!where;
+      closeSheet();
+      if (cal) addBlockCal(t, s, e, !other && $("aRoom").checked, calId); else addBlock(t, s, e, $("aRoom").checked);
     };
     setTimeout(() => $("aT").focus(), 300);
   }
@@ -3469,7 +3522,7 @@
     store.set(GYM_AT, "");
     closeSheet();
     calToast(`${what}: ${o.label}. Saved to Google Calendar${b.cal ? ` (${b.cal})` : ""}.`);
-    try { if (b.game && OPS.edits[b.key]) await writeOps(x => { delete x.edits[b.key]; }); await roomFor(b.game ? b.key : "new", o.s, o.e); await pushG(); await pullAll(); } catch {}
+    try { if (b.game && OPS.edits[b.key]) await writeOps(x => { delete x.edits[b.key]; }); await roomFor(b.game ? b : { ...b, key:"new" }, o.s, o.e); await pushG(); await pullAll(); } catch {}
     if (window.QuestMorning && QuestMorning.isOpen()) QuestMorning.redraw();
     planGym(false).catch(e => console.warn("gym", e));
   }
@@ -3955,7 +4008,8 @@
     drop: key => { const b = blkByKey(key); if (b) return dropBlock(b); },
     add: (t, s, e, extra) => {
       // a gym session goes on Google Calendar as a real event, never a plan-only block (later 2026-10-16)
-      if (isGym({ t }) && questKey() && !DRY) return addBlockCal(t, s, e, false);
+      // it stays on his own Junyan calendar, where the weekly gym plan puts gym sessions (not an Add sheet add, d41)
+      if (isGym({ t }) && questKey() && !DRY) return addBlockCal(t, s, e, false, AGD() ? AGD().JUNYAN : undefined);
       log(`Planned ${t}: ${fmtT(s)} to ${fmtT(e)}`);
       return writeOps(o => o.adds.push({ key:newKey(s), s:s.toISOString(), e:e.toISOString(), t, type:"task", cal:"you", ...(extra || {}) })); },
     // done in Notion; the answer carries the status it had, so Undo can put it back (2026-10-10)
@@ -4438,7 +4492,7 @@
           <label>Minutes<input id="iD" type="number" min="5" max="240" step="5" value="${dur}"></label></div>
         <p style="font-size:12px">${first ? `First open time that fits: ${fmtT(first.s)}.` : "No open time that fits. Pick a start."}
           ${slots.slice(1, 4).map(w => `<button class="ping-ask" data-at="${w.s.toISOString()}">${fmtT(w.s)}</button>`).join(" ")}</p>
-        ${canWrite ? `<label class="check"><input id="iCal" type="checkbox" checked ${today ? "" : "disabled"}> Add it to Google Calendar (Junyan)</label>` : ""}
+        ${canWrite ? `<label class="check"><input id="iCal" type="checkbox" checked ${today ? "" : "disabled"}> Add it to Google Calendar (Joint Plans)</label>` : ""}
         ${DRY ? `<p style="color:var(--warn)">Test mode: nothing is added.</p>` : !questKey() ? `<p>Pair this device to add it to the calendar.</p>` : ""}
         <div class="actions"><button class="btn ghost" id="iBack">Back</button><button class="btn primary" id="iGo">Add it</button></div>`);
       $("sheet").querySelectorAll("[data-day]").forEach(b => b.onclick = () => { day = b.dataset.day; draw(); });
@@ -4453,7 +4507,7 @@
         closeSheet();
         if (today) await (cal ? addBlockCal : addBlock)(title, s, e, false);
         else {   // another day: only the calendar can hold it (today's edit layer is today only)
-          try { await qfetch("/cal/event", { method:"POST", body:JSON.stringify({ s:s.toISOString(), e:e.toISOString(), title }) }); }
+          try { await qfetch("/cal/event", { method:"POST", body:JSON.stringify({ s:s.toISOString(), e:e.toISOString(), title, calId:AGD() ? AGD().JOINT : undefined }) }); }
           catch (err) { alert(`Could not add it to the calendar (${err.message}). Nothing was added.`); return back(); }
           log(`Added ${title} to the calendar: tomorrow ${fmtT(s)}`);
         }
@@ -4736,7 +4790,7 @@
         // the calendar now holds the change, so drop any today-only edit of it
         if (OPS.edits[b.key]) await writeOps(o => { delete o.edits[b.key]; });
       }
-      await roomFor(b.game ? b.key : "new", s, e);
+      await roomFor(b.game ? b : { ...b, key:"new" }, s, e);
       await pullAll();
     } catch {}   // the calendar has it; the next pull shows it
   }
