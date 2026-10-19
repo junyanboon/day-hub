@@ -54,7 +54,7 @@ test("the quiz opens only from a calendar meal block's sheet", () => {
   const calls = [...html.matchAll(/openMealQuiz\((b[^)]*)\)/g)].map(m => m[1]);
   assert.equal([...html.matchAll(/openMealQuiz\(/g)].length, 3, "one definition, one redraw, one button");
   // the definition, the redraw after a tap, and the one Rate this meal button in openMeal
-  assert.deepEqual(J(calls.sort()), ["b", "b, Object.assign(sel, QM.toggle(sel, bn.dataset.q", "b, sel = {}"]);
+  assert.deepEqual(J(calls.sort()), ["b", "b, Object.assign(sel, QM.toggle(sel, id", "b, sel = {}"]);
   assert.ok(/\$\("mBp"\)\.onclick = \(\) => openMealQuiz\(b\)/.test(html));
   assert.ok(/function openMealQuiz\(b, sel = \{\}\)\{\s*if \(!b\) return;/.test(html), "openMealQuiz must refuse to open without a block");
 });

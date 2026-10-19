@@ -187,6 +187,9 @@
   .sq-bar { display:block; height:6px; border-radius:4px; background:rgba(0,0,0,.25); margin-top:7px; overflow:hidden; }
   .sq-bar b { display:block; height:100%; width:0; background:linear-gradient(90deg, #7fd0ff, #8fe3b0); border-radius:4px; transition:width .8s cubic-bezier(.2,.8,.2,1); }
   .hgrid.sugg { grid-template-columns:repeat(3, 1fr); }
+  .hgrid.btiles, .hgrid.mqg { grid-template-columns:repeat(3, 1fr); margin:4px 0 10px; }
+  .hgrid.btiles .htile, .hgrid.mqg .htile { min-height:78px; padding:14px 4px 6px; }
+  .hgrid.mqg .hl { font-size:10px; }
   .hgrid.sugg .htile { min-height:76px; }
   .why-tip { position:fixed; z-index:300; display:none; padding:9px 11px; border-radius:12px; background:#0f1230; border:1px solid var(--glass-border);
     color:var(--ink); font-size:12.5px; line-height:1.35; box-shadow:0 10px 30px rgba(0,0,0,.45); pointer-events:none; }
@@ -2174,26 +2177,32 @@
       $("mqX").onclick = closeSheet; return;
     }
     const sc = mqScore(sel), o = mqOpt();
-    const row = (id, icon, txt, tag, cls) => `<button class="wck${sel[id] ? " on" : ""}" data-q="${id}"><span class="bx">${sel[id] ? "✓" : ""}</span><span>${icon} ${esc(txt)}</span><b class="${cls}" style="margin-left:auto;font-size:12px">${tag}</b></button>`;
+    // each food is one of his habit tiles (d23), lit when picked
+    const row = (id, icon, txt, tag, cls) => `<button class="htile mqt${sel[id] ? " full" : ""}" data-q="${id}" data-icon="${esc(icon)}"><span class="hi">${icon}</span><span class="hl">${esc(txt)}</span>${sel[id] ? `<span class="hc">✓</span>` : ""}<b class="${cls}">${tag}</b></button>`;
+    const grid = rows => `<div class="hgrid mqg">${rows.join("")}</div>`;
     const sign = v => v > 0 ? `+${v}` : `${v}`;
     const gold = ([id, icon, txt]) => row(id, icon, txt, sign(QM.value(id, o)), "mp");
     openSheet(`${winHead(b)}<h3>How was ${esc(name)}?</h3>
       <p>Tap what fits, then confirm.</p>
       <div class="win-lb mq-lb mp">Prana foods · fill prana (Sadhguru)</div>
-      ${QM.PRANA_FOODS.map(gold).join("")}
+      ${grid(QM.PRANA_FOODS.map(gold))}
       <div class="mq-sub">How you ate</div>
-      ${QM.PRANA_WAYS.map(gold).join("")}
+      ${grid(QM.PRANA_WAYS.map(gold))}
       <div class="win-lb mq-lb mb">Body foods · fill body (Bryan Johnson)</div>
-      ${QM.BODY.map(id => { const h = HABITS.find(x => x[0] === id), g = habitGain(id); return row(id, h[4], h[5], g ? sign(g) : "full today", "mb"); }).join("")}
-      ${row(QM.JUNK[0], QM.JUNK[1], QM.JUNK[2], sign(QM.JUNK[3]), "mb")}
+      ${grid(QM.BODY.map(id => { const h = HABITS.find(x => x[0] === id), g = habitGain(id); return row(id, h[4], h[5], g ? sign(g) : "full", "mb"); }).concat(row(QM.JUNK[0], QM.JUNK[1], QM.JUNK[2], sign(QM.JUNK[3]), "mb")))}
       <div class="win-lb mq-lb mp">Drains · lower prana</div>
-      ${QM.DRAINS.map(gold).join("")}
+      ${grid(QM.DRAINS.map(gold))}
       <div class="mq-sub">${esc(QM.AUTO_NOTE)}</div>
       <div class="actions" style="position:sticky;bottom:0"><button class="btn primary" id="mqOk">Confirm · ${esc(mqSum(sc))}</button></div>
       <div class="actions"><button class="btn ghost" id="mqX">Not now</button></div>`, true);
     $("sheet").querySelectorAll("[data-q]").forEach(bn => bn.onclick = () => {
-      const top = $("sheet").scrollTop;
-      openMealQuiz(b, Object.assign(sel, QM.toggle(sel, bn.dataset.q))); $("sheet").scrollTop = top;   // in place, like before: a fast second tap keeps the first
+      const top = $("sheet").scrollTop, id = bn.dataset.q, fx = window.QuestFx, rect = bn.getBoundingClientRect(), was = !!sel[id];
+      openMealQuiz(b, Object.assign(sel, QM.toggle(sel, id))); $("sheet").scrollTop = top;   // in place, like before: a fast second tap keeps the first
+      if (fx && !was) {   // the tile burst on a pick (d23); the meters move once, on Confirm
+        const v = QM.BODY.includes(id) ? habitGain(id) : QM.value(id, mqOpt());
+        fx.tap(rect, { icon:bn.dataset.icon, gain:v, color:v < 0 ? "#ff9b8a" : QM.BODY.includes(id) ? "#8fe3b0" : "#ffd479" });
+        fx.pop($("sheet").querySelector(`[data-q="${id}"]`));
+      }
     });
     $("mqX").onclick = closeSheet;
     $("mqOk").onclick = () => {
@@ -3572,12 +3581,17 @@
       // each ticked step pays its Prana action once (quest-basics.js tickStep); unticking takes nothing back
       const r = QB().tickStep(W, G.day.work, basicId(blk), i, st, MO_CTX.hour(now()), habitGain);
       W.tick[i] = r.on; if (W.tick[i] === false) delete W.tick[i];
+      const fx = window.QuestFx, rect = b.getBoundingClientRect(), tile = b.classList.contains("htile");
       if (r.pay) { const h = HABITS.find(x => x[0] === r.pay.h);
         G.day.habits = G.day.habits || {}; G.day.habits[r.pay.h] = (G.day.habits[r.pay.h] || 0) + 1;
         (W.paid = W.paid || {})[i] = r.pay;
-        addHabit(r.pay.h, r.pay.d, `${h[1].replace(/ \(.*$/, "")} (${shortName(blk)})`, h[5]); }
+        addHabit(r.pay.h, r.pay.d, `${h[1].replace(/ \(.*$/, "")} (${shortName(blk)})`, h[5], !!fx);
+        // the habit tile burst, sound and float, as the old Prana action tiles did (d23)
+        if (fx) fx.tap(rect, { icon:h[4], gain:r.pay.d, full:G.day.habits[r.pay.h] >= h[3], color:HCOL[h[7]] }); }
+      else if (r.on && tile && fx && r.why) fx.nope(b);   // already paid today: the little shake
       if (W.tick[i] && st.wind && !G.day.windDown) G.day.windDown = now().toISOString();
-      saveG(); redraw(); });
+      saveG(); redraw();
+      if (fx && r.on) fx.pop(document.querySelector(`[data-bstep="${i}"][data-k="${CSS.escape(b.dataset.k)}"]`)); });
     root.querySelectorAll("[data-bskip]").forEach(b => b.onclick = e => { e.stopPropagation();   // "travelling, skip" on a home-only step
       const blk = blkOf(b.dataset.k); if (!blk) return; const W = G.day.work[gk(blk)];
       (W.skip = W.skip || {})[b.dataset.bskip] = true; log(`Skipped today (travelling): ${b.dataset.t || "a home step"}`); saveG(); redraw(); });
@@ -3671,24 +3685,31 @@
     return placeBasics();
   }
   // a basic's checklist, in the planner (mo-ck) or its own window (wck)
+  /* A step that pays is one of his habit tiles, with the same tap animation (Junyan, 2026-10-19, d23: "keep the really
+     fun tiles wherever possible in this new system as the animations are amazing"). Its tag says what it pays, what it
+     paid, or "done" when the day's limit (or this kind of block) already paid it. */
+  function stepTile(b, W, x, i, hr, id){
+    const paid = (W.paid || {})[i], s = paid ? (paid.h === x.h ? x : QB().stepAt(x, PM_LABEL)) : QB().stepAt(x, hr);
+    const h = HABITS.find(y => y[0] === s.h) || [], on = !!W.tick[i];
+    const r = paid ? null : QB().tickStep({ tick:{}, paid:{} }, G.day.work, id, i, x, hr, habitGain);
+    const tg = paid ? `+${paid.d}` : r.pay ? `+${r.pay.d}` : "done";
+    return `<button class="htile${on ? " full" : ""}" data-bstep="${i}" data-k="${esc(b.key)}" data-why="${esc(WHY[s.h] || s.t)}"><span class="hi">${hIcon(s.h, h[4] || "✨")}</span>` +
+      `<span class="hl">${esc(h[5] || s.t)}</span>${on ? `<span class="hc">✓</span>` : ""}<b class="${meterOf(s.h) === "b" ? "mb" : "mp"}">${tg}</b></button>`;
+  }
   function basicHtml(b, ck, lb){
     const B = basicOf(b), k = gk(b); if (!B) return "";
     const W = ((G.day.work = G.day.work || {})[k] = G.day.work[k] || { tick:{}, goal:"" }), done = G.day.closes[k] === "done";
     W.tick = W.tick || {};
     // a home-only step (the copper pot) shows a quiet skip while home or travelling is only the calendar's guess
     const hr = MO_CTX.hour(now()), id = basicId(b), skip = W.skip || {};
-    // what each step pays: its value, "paid" once paid, "done today" when the day's limit or this kind already paid it
-    const tag = (x, i) => { const s = QB().stepAt(x, hr), paid = (W.paid || {})[i];
-      if (paid) return `<b class="${meterOf(paid.h) === "b" ? "mb" : "mp"}" style="margin-left:auto;font-size:12px">+${paid.d}</b>`;
-      if (!s.h) return "";
-      const r = QB().tickStep({ tick:{}, paid:{} }, G.day.work, id, i, x, hr, habitGain);
-      return `<b class="${meterOf(s.h) === "b" ? "mb" : "mp"}" style="margin-left:auto;font-size:12px">${r.pay ? `+${r.pay.d}` : "done today"}</b>`; };
     const steps = B.steps.map((x, i) => [x, i]).filter(([x, i]) => !skip[i]);
     const pd = blockPaid(b), paidTxt = [pd.p ? `prana +${pd.p}` : "", pd.b ? `body +${pd.b}` : ""].filter(Boolean).join(", ");
     return `${B.steps.length ? `<div class="${lb}">${id === "yoga" ? "What did you do?" : "Steps"} ${steps.filter(([, i]) => W.tick[i]).length}/${steps.length}</div>` : ""}
       ${steps.some(([x]) => x.h) ? `<div class="hkey" style="margin:0 0 6px"><b class="mp">gold</b> fills prana · <b class="mb">teal</b> fills body · each one pays once</div>` : ""}
-      ${steps.map(([x, i]) => `<button class="${ck}${W.tick[i] ? " on" : ""}" data-bstep="${i}" data-k="${esc(b.key)}"><span class="bx">${W.tick[i] ? "✓" : ""}</span><span>${esc((W.paid || {})[i] ? (W.paid[i].h === x.h ? x.t : QB().stepAt(x, PM_LABEL).t) : QB().stepAt(x, hr).t)}</span>${tag(x, i)}</button>` +
-        (x.skip && !(G.day.plan || {}).mode && !W.tick[i] && !(W.paid || {})[i] ? `<button class="mo-det-btn" style="opacity:.7;font-size:12px;margin:-2px 0 6px" data-bskip="${i}" data-k="${esc(b.key)}" data-t="${esc(x.t)}">Travelling today, skip this</button>` : "")).join("")}
+      ${steps.some(([x]) => x.h) ? `<div class="hgrid btiles">${steps.filter(([x]) => x.h).map(([x, i]) => stepTile(b, W, x, i, hr, id)).join("")}</div>` : ""}
+      ${steps.filter(([x, i]) => x.skip && !(G.day.plan || {}).mode && !W.tick[i] && !(W.paid || {})[i]).map(([x, i]) =>
+        `<button class="mo-det-btn" style="opacity:.7;font-size:12px;margin:4px 0 6px" data-bskip="${i}" data-k="${esc(b.key)}" data-t="${esc(x.t)}">Travelling today, skip the ${esc(x.t.toLowerCase().replace(/^clean the /, ""))}</button>`).join("")}
+      ${steps.filter(([x]) => !x.h).map(([x, i]) => `<button class="${ck}${W.tick[i] ? " on" : ""}" data-bstep="${i}" data-k="${esc(b.key)}"><span class="bx">${W.tick[i] ? "✓" : ""}</span><span>${esc(x.t)}</span></button>`).join("")}
       ${id !== "caney" ? `<div class="hint" style="margin:8px 2px" data-paid>${paidTxt ? `Paid so far: ${paidTxt}.` : "Nothing paid yet. Tick what you did."}</div>` : ""}
       <button class="mo-det-btn" data-bdone="${esc(b.key)}">${done ? "✓ Done · tap to undo" : "Done"}</button>`;
   }
