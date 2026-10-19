@@ -11,8 +11,12 @@
 (function (root) {
   "use strict";
   const MIN = 60000;
-  const DR_AM = { t:"Dr Ellie AM mouth care", h:"mouthAm" };
-  const WASH = { t:"Shower, face wash, moisturizer with SPF, dress" };
+  // Dr Ellie is the morning routine before about 2 PM and the night one after (Junyan, 2026-10-19, d11)
+  const DR_AM = { t:"Dr Ellie AM mouth care", h:"mouthAm", pm:{ t:"Dr Ellie PM mouth care", h:"mouth" } };
+  const WASH = { t:"Shower, face wash, moisturizer with SPF, dress", h:"shower" };
+  // at home only (Junyan, 2026-10-19: "not when I travel but yes when I'm at home")
+  const COPPER = { t:"Clean the copper pot and bless the water", h:"copper", home:true, skip:true };
+  const PM_HOUR = 14;
   // Mon to Fri at home: one bigger job a day
   const PLUS = { 1:"Vacuum", 2:"Iron", 3:"Deep-clean the kitchen", 4:"Deep-clean the bathroom", 5:"Deep-clean the bedroom (sheets, surfaces)" };
   const CANEY = { id:"caney", t:"Go over the day with Caney", min:15 }, CANEY_OLD = 10;
@@ -20,7 +24,7 @@
   // wd: 0 Sunday to 6 Saturday, the game day's weekday
   function domestics(mode, wd){
     if (mode === "travel") return { min:25, steps:[DR_AM, WASH, { t:"Tidy the room" }] };
-    const steps = [{ t:"Wash the dishes" }, { t:"Sweep" }, DR_AM, WASH];
+    const steps = [{ t:"Wash the dishes" }, { t:"Sweep" }, DR_AM, WASH, COPPER];
     if (PLUS[wd]) return { min:60, steps: steps.concat([{ t:`Plus One: ${PLUS[wd]}` }]) };
     return { min:30, steps };
   }
@@ -37,12 +41,63 @@
     ];
     return mode === "travel" ? { min:35, steps: steps.filter(x => !x.home) } : { min:45, steps };
   }
-  // one basic by id: { id, t, min, steps, habit } (habit: the Prana action that ticking it done ticks)
+  /* Morning Yoga (Junyan, 2026-10-19, d6: "let's change it back to giving prana based on the yogas that were
+     performed"). A yoga or sadhana block is a checklist of what he did; each tick pays that practice once, and the
+     block's length no longer matters. Neem and turmeric, the lamp and the supplements are ticked here too ("this
+     happens at the time I wake up"). */
+  const YOGA = [["shambhavi", "Shambhavi"], ["surya", "Surya Kriya"], ["angam", "Angamardana"], ["yogasana", "Yogasanas"],
+    ["upa", "Upa Yoga"], ["bhuta", "Bhuta Shuddhi"], ["kriya", "Isha Kriya"], ["nadi", "Nadi Shuddhi"],
+    ["neem", "Neem and turmeric"], ["lamp", "Light the oil lamp"], ["supps", "Morning supplements"]];
+  const yoga = () => ({ min:60, steps: YOGA.map(([h, t]) => ({ t, h })) });
+  // a Grooming or Shower block on the calendar: the body care, and the copper pot at home
+  function groom(mode){
+    const steps = [DR_AM, WASH, COPPER];
+    return { min:20, steps: mode === "travel" ? steps.filter(x => !x.home) : steps };
+  }
+  /* one basic by id: { id, t, min, steps, habit }. The checklist's steps carry the Prana actions they pay (h), so
+     ticking a step pays it; Done only closes the block (habit is null since 2026-10-19). "yoga" and "groom" are
+     never placed by the plan: they come from calendar blocks with those titles (blockBasic). */
   function basic(id, mode, wd){
     if (id === "caney") return { ...CANEY, steps:[], habit:null };
-    if (id === "domestics") return { id, t:"Domestics", ...domestics(mode, wd), habit:"mouthAm" };
-    if (id === "winddown") return { id, t:"Wind-down", ...windDown(mode), habit:"mouth" };
+    if (id === "domestics") return { id, t:"Domestics", ...domestics(mode, wd), habit:null };
+    if (id === "winddown") return { id, t:"Wind-down", ...windDown(mode), habit:null };
+    if (id === "yoga") return { id, t:"Morning Yoga", ...yoga(), habit:null };
+    if (id === "groom") return { id, t:"Grooming", ...groom(mode), habit:null };
     return null;
+  }
+  /* Which checklist a calendar block opens, from its title (Junyan, 2026-10-19, d6 d9 d11). Wind-down first
+     ("Wind down, shower" is the evening one), then Domestics, then the yoga and sadhana practices, then grooming.
+     Yoga Nidra and NSDR are rest, not practice. */
+  function blockBasic(title, kind){
+    const t = String(title || "");
+    if (/wind.?down/i.test(t)) return "winddown";
+    if (/\bdomestics?\b/i.test(t)) return "domestics";
+    if (/nidra|nsdr/i.test(t)) return null;
+    if (/yoga|sadhana|shambhavi|mahamudra|kriya|angamardana|yogasana|hatha|bhuta shuddhi|nadi shuddhi/i.test(t) || kind === "practice") return "yoga";
+    if (/groom|shower/i.test(t)) return "groom";
+    return null;
+  }
+  // the Prana action a step pays at this hour (Dr Ellie: AM before 2 PM, PM after), and its label
+  const stepAt = (st, hour) => st && st.pm && hour >= PM_HOUR ? { ...st, ...st.pm } : st;
+  /* What ticking step i of a block pays. W: that block's { tick, paid } (G.day.work[key]); all: every block's W today;
+     kind: the block's basic id. A step pays once per kind a day (the lamp: once in Morning Yoga and once in the
+     Wind-down, d9) and never past the habit's daily limit (gain(h) is 0 then). Unticking takes nothing back, as
+     before: habits only ever go up when two devices merge. Returns { on, pay:{ h, d, kind } | null, why }. */
+  function tickStep(W, all, kind, i, st, hour, gain){
+    const on = !(W.tick || {})[i];
+    if (!on) return { on, pay:null, why:"" };
+    if ((W.paid || {})[i]) return { on, pay:null, why:"paid" };
+    const s = stepAt(st, hour), h = s && s.h; if (!h) return { on, pay:null, why:"" };
+    const had = Object.values(all || {}).some(w => w && Object.values(w.paid || {}).some(p => p && p.h === h && p.kind === kind));
+    if (had) return { on, pay:null, why:"done" };
+    const d = gain(h); if (!d) return { on, pay:null, why:"full" };
+    return { on, pay:{ h, d, kind }, why:"" };
+  }
+  // what a block's ticks paid: { p, b } by meter (meter(h) is "p" or "b")
+  function paidOf(W, meter){
+    let p = 0, b = 0;
+    for (const x of Object.values((W && W.paid) || {})) if (x && x.d) { if (meter(x.h) === "b") b += x.d; else p += x.d; }
+    return { p, b };
   }
 
   /* Home or travelling. list: [{ t, day:"YYYY-MM-DD" }] from the calendar around today. */
@@ -151,5 +206,5 @@
     return { t: t[0].toUpperCase() + t.slice(1), min };
   }
 
-  root.QuestBasics = { domestics, windDown, basic, guessMode, placeBasics, growCaney, fitList, parseQuick, IDS:["caney", "domestics", "winddown"] };
+  root.QuestBasics = { domestics, windDown, yoga, groom, basic, blockBasic, stepAt, tickStep, paidOf, PM_HOUR, guessMode, placeBasics, growCaney, fitList, parseQuick, IDS:["caney", "domestics", "winddown"] };
 })(typeof window !== "undefined" ? window : globalThis);

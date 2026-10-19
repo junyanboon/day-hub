@@ -29,7 +29,7 @@ test("the drains lower prana and never body: coffee or tea, onion or garlic, alc
 });
 
 test("Blueprint body foods stay and fill body only; ultra-processed takes body", () => {
-  assert.deepEqual(J(M.BODY), ["blueprint", "protein", "legumes", "veg", "greens", "evoo", "nuts", "berries", "seeds", "ferment"]);
+  assert.deepEqual(J(M.BODY), ["blueprint", "protein", "legumes", "veg", "greens", "evoo", "nuts", "berries", "seeds", "ferment", "xylitol"]);   // xylitol moved into the quiz (2026-10-19, d11)
   assert.deepEqual(J(M.score({ veg: true, nuts: true, junk: true }, opt)), { p: 0, b: 4 + 3 - 3 });
 });
 

@@ -40,7 +40,7 @@ test("Domestics: 60 min with today's Plus One on weekdays at home, 30 at the wee
     const d = B.domestics("home", wd);
     assert.equal(d.min, 30);
     assert.ok(!d.steps.some(x => /plus one/i.test(x.t)));
-    assert.equal(d.steps.length, 4);
+    assert.equal(d.steps.length, 5);   // dishes, sweep, Dr Ellie, shower, copper pot
   }
   for (const wd of [0, 3, 6]) {
     const d = B.domestics("travel", wd);

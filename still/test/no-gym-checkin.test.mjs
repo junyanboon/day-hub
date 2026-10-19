@@ -16,7 +16,7 @@ function pageFns(){
   const isGym = grab(/const isGym = b => [^\n]+;/);
   const act = grab(/const actRatable = b => [^\n]+\n[^\n]+;/);
   return new Function(`
-    const isMeal = b => /lunch|dinner|breakfast/i.test(b.t), isSleep = b => /sleep/i.test(b.t), blockHabits = () => [];
+    const isMeal = b => /lunch|dinner|breakfast/i.test(b.t), isSleep = b => /sleep/i.test(b.t), blockHabits = () => [], basicId = b => /yoga|domestic|wind.?down|groom|shower/i.test(b.t) ? "x" : null;
     ${isGym}
     ${act}
     return { isGym, actRatable };`)();
@@ -32,6 +32,11 @@ test("gym blocks are not offered the activity check-in", () => {
 test("other activities keep their check-in", () => {
   const { actRatable } = pageFns();
   for (const t of ["Hike to the falls", "Deep work", "Dance class", "Walk by the river"]) assert.equal(actRatable(blk(t)), true, t);
+});
+
+test("checklist blocks (Morning Yoga, Domestics, Grooming, Wind-down) have their checklist, not the check-in", () => {
+  const { actRatable } = pageFns();
+  for (const t of ["Morning Yoga", "Domestics", "Wind down", "Grooming"]) assert.equal(actRatable(blk(t)), false, t);
 });
 
 test("every place the check-in shows goes through actRatable", () => {
