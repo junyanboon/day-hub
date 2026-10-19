@@ -1,13 +1,13 @@
 /* Day Quest bedtime screen (Junyan, 2026-10-09, d180). Opens once the day's last
    item ends. In his order:
    1. how today went, 2. tomorrow's schedule, 3. the deathbed practice as a simple
-   tile, 4. an exercise for considering the end of life, 5. no prana here, only
-   reflection: every day's prana laid on a life of 84 years, one square a week.
+   tile, 4. an exercise for considering the end of life. Keep a memory and Your life in prana
+   were taken off on 2026-10-19 (Junyan: "Drop the keep a memory and line in prana").
    quest.html gathers the data and passes callbacks; this file only draws. */
 (function (root) {
   "use strict";
   const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-  const YEARS = 84, WEEK = 7 * 86400000;
+  const YEARS = 84;
   // written for him, in plain words; one a night, "Another" moves on
   const EXERCISES = [
     "Write three lines you would want said about you at the end. Did today live them?",
@@ -23,33 +23,6 @@
   ];
   // d198: one tap at day's end, how tired he feels, against the game's number
   const FEEL = [[1, "Wiped out"], [2, "Tired"], [3, "Okay"], [4, "Good"], [5, "Full of energy"]], FEEL_PCT = [10, 30, 50, 70, 90];
-  const colour = (p) => p == null ? null : p >= 70 ? "#8fe3b0" : p >= 45 ? "#ffd479" : p >= 25 ? "#ffb36b" : "#ff9c9c";
-
-  function lifeGrid(birth, days, now) {
-    // one square a week, 52 a row, 84 rows; colour = that week's average prana
-    const b = Date.parse(birth + "T00:00:00"), weeks = YEARS * 52, cur = Math.floor((now - b) / WEEK);
-    const avg = {};
-    for (const [ymd, p] of Object.entries(days)) {
-      const w = Math.floor((Date.parse(ymd + "T12:00:00") - b) / WEEK);
-      (avg[w] = avg[w] || []).push(p);
-    }
-    const S = 5, G = 1, W = 52 * (S + G), H = YEARS * (S + G);
-    let r = "";
-    for (let w = 0; w < weeks; w++) {
-      const x = (w % 52) * (S + G), y = Math.floor(w / 52) * (S + G);
-      const a = avg[w] ? avg[w].reduce((s, v) => s + v, 0) / avg[w].length : null;
-      const fill = a != null ? colour(a) : w < cur ? "rgba(255,255,255,.28)" : "rgba(255,255,255,.07)";
-      r += `<rect x="${x}" y="${y}" width="${S}" height="${S}" rx="1" fill="${fill}"${w === cur ? ' stroke="#fff" stroke-width="1"' : ""}/>`;
-    }
-    return `<svg class="nt-life" viewBox="0 0 ${W} ${H}" aria-label="Your life in weeks">${r}</svg>`;
-  }
-  function recentBars(days) {
-    const list = Object.entries(days).sort((a, b) => a[0].localeCompare(b[0])).slice(-30);
-    if (!list.length) return "";
-    return `<div class="nt-bars">${list.map(([d, p]) => `<i title="${esc(d)}: ${p}" style="height:${Math.max(4, p)}%;background:${colour(p)}"></i>`).join("")}</div>
-      <div class="nt-hint">Each bar is a day's ending prana, the last ${list.length} days.</div>`;
-  }
-
   /* The deathbed sitting, guided (Junyan, 2026-10-11: "I need help answering this question"): three things to
      look at, a one-minute timer, then the question with three answers and a line for what it showed him. */
   const BED_ANSWERS = [
@@ -68,11 +41,11 @@
     const colour = { prana: "#ffd479", body: "#7fe3d4", pf: "#ffd479", dr: "#ffb36b", rhr: "#7fe3d4", hrv: "#7fe3d4", score: "#7fe3d4", wt: "#7fd0ff" };
     const cls = (x) => x.good === true ? "good" : x.good === false ? "off" : "";
     const pct = (k, v) => v == null ? "·" : (k === "prana" || k === "body") ? `${v}%` : `${v}`;
-    const row = (k, label, now, avg, arrow, good, series, best) =>
-      `<div class="tr-r"><span class="tr-l">${esc(label)}${best ? `<small>${best}</small>` : ""}</span><b>${esc(now)}</b>${TR.spark(series, colour[k] || "#fff")}` +
+    const row = (k, label, now, avg, arrow, good, series, best, names) =>
+      `<div class="tr-r"><span class="tr-l">${esc(label)}${names && names.length ? `<small class="tr-n">${esc(names.join(", "))}</small>` : ""}${best ? `<small>${best}</small>` : ""}</span><b>${esc(now)}</b>${TR.spark(series, colour[k] || "#fff")}` +
       `<span class="tr-a ${good}">${arrow || ""} ${avg == null ? "" : `<small>7-day ${esc(avg)}</small>`}</span></div>`;
     const days = t.rows.map((x) => row(x.k, x.label, pct(x.k, x.today), x.avg == null ? null : pct(x.k, Math.round(x.avg)), x.arrow, cls(x), x.series,
-      x.best ? (x.best.isToday ? "🏆 best" : `best ${esc(pct(x.k, x.best.v))} ${esc(DOW(x.best.day))}`) : ""));
+      x.best ? (x.best.isToday ? "🏆 best" : `best ${esc(pct(x.k, x.best.v))} ${esc(DOW(x.best.day))}`) : "", x.names));
     const nights = (t.oura || []).filter((x) => x.last != null || x.avg != null).map((x) => row(x.k, x.label, x.last ?? "·", x.avg, x.arrow, cls(x), x.series,
       x.best == null ? "" : x.last === x.best ? "🏆 best" : `best ${x.best}`));
     // water beside the sleep score (2026-10-19, d23): glasses today, how many before 4 PM, the last 7 days
@@ -80,6 +53,7 @@
     const water = w ? row("wt", "Water today, glasses", w.today == null ? "0" : `${w.today}`, w.avg == null ? null : Math.round(w.avg), w.arrow, cls(w), w.series,
       `${w.before4 || 0} before 4 PM · aim ${w.aim || 8}`) : "";
     return `<div class="tr">${days.join("")}${nights.length ? `<div class="tr-h">Last night</div>${nights.join("")}` : ""}${water}
+      ${t.cheer ? `<div class="tr-cheer"><span>✨</span><span>${esc(t.cheer)}</span></div>` : ""}
       <div class="tr-beat"><span>🌱</span><span><b>Tomorrow's one thing</b>${esc(t.beat)}</span></div></div>`;
   }
 
@@ -114,7 +88,6 @@
       const prevBody = el.querySelector(".nt-body"), scroll = prevBody ? prevBody.scrollTop : 0;
       const typed = {}; el.querySelectorAll("textarea[id]").forEach((t) => typed[t.id] = t.value);
       const now = Date.now(), b = d.birth ? Date.parse(d.birth + "T00:00:00") : null;
-      const lived = b ? Math.floor((now - b) / 86400000) : null, left = b ? Math.max(0, Math.floor((b + YEARS * 365.25 * 86400000 - now) / 86400000)) : null;
       const summers = b ? Math.max(0, Math.round(YEARS - (now - b) / (365.25 * 86400000))) : "your remaining";
       el.innerHTML = `
       <div class="nt-top"><b>🌙 Day's end</b><button class="btn" id="ntX">Close</button></div>
@@ -135,11 +108,6 @@
           ${d.tomorrow.items.length ? `<ul class="nt-sched">${d.tomorrow.items.map((x) => `<li><span>${esc(x.time)}</span>${esc(x.name)}</li>`).join("")}</ul>`
             : `<div class="nt-hint">${esc(d.tomorrow.note || "Nothing on the calendar yet.")}</div>`}
         </section>
-        ${d.keeps && d.keeps.length ? `<section><h3>Keep a memory</h3>
-          <div class="nt-hint" style="margin-bottom:8px">Tap what was amazing today. Overnight it becomes a keepsake in your bag, with its own poem and song. Tap again to take it back.</div>
-          <div class="nt-keeps">${d.keeps.map((c, i) => `<button class="nt-keep${c.state ? " on" : ""}${c.state === "made" ? " made" : ""}" data-keep="${i}"${c.state === "made" ? " disabled" : ""}>
-            <span>${c.state === "made" ? "🎁" : c.state === "asked" ? "✨" : "☆"}</span><span><b>${esc(c.name)}</b><small>${esc(c.time)}${c.state === "made" ? " · in your bag" : c.state === "asked" ? " · being made · tap to undo" : ""}</small></span></button>`).join("")}</div>
-        </section>` : ""}
         <section>
           <button class="nt-tile${d.deathbedDone ? " done" : ""}" id="ntBed"><span class="nt-ti">🕯️</span><span>
             <b>Sit as if on your deathbed</b><small>Sit on your bed. One minute left to live. Look back on your day: was it worthwhile?</small></span>
@@ -151,24 +119,11 @@
           <textarea id="ntNote" rows="3" placeholder="A line, if you want to keep it">${esc(d.note || "")}</textarea>
           <div class="nt-row"><button class="btn ghost" id="ntNext">Another</button><button class="btn" id="ntSave">Keep it</button></div>
         </section>
-        <section><h3>Your life in prana</h3>
-          <div class="nt-hint">No prana tonight. At the end there is only this: how the days went.</div>
-          ${recentBars(d.days)}
-          ${b ? `<div class="nt-hint" style="margin-top:12px">${lived.toLocaleString()} days lived · about ${left.toLocaleString()} left of ${YEARS} years · one square a week, this week outlined</div>${lifeGrid(d.birth, d.days, now)}`
-            : `<div class="nt-birth"><label>Your birth date, to lay your days on a life of ${YEARS} years</label><input type="date" id="ntBirth"><button class="btn" id="ntBirthOk">Save</button></div>`}
-        </section>
       </div>`;
       for (const [id, v] of Object.entries(typed)) { const t = el.querySelector("#" + id); if (t) t.value = v; }
       el.querySelector(".nt-body").scrollTop = scroll;
       el.querySelector("#ntX").onclick = close;
       el.querySelectorAll("[data-feel]").forEach((bn) => bn.onclick = () => { d.feel = +bn.dataset.feel; d.onFeel(d.feel); draw(); });
-      el.querySelectorAll("[data-keep]").forEach((bn) => bn.onclick = async () => {
-        const c = d.keeps[+bn.dataset.keep]; if (c.state === "made") return;
-        bn.disabled = true;
-        try { if (c.state === "asked") { await d.onUnkeep(c); c.state = ""; } else { await d.onKeep(c); c.state = "asked"; } }
-        catch (e) { bn.disabled = false; bn.querySelector("small").textContent = "Could not save it. Try again."; return; }
-        draw();
-      });
       el.querySelector("#ntBed").onclick = () => { bedOpen = !bedOpen; draw(); };
       const mn = el.querySelector("#ntMin");
       if (mn) mn.onclick = () => {
@@ -188,8 +143,6 @@
       if (bs) bs.onclick = () => { bed.line = el.querySelector("#ntBedLine").value.trim(); d.onBed({ ...bed }); bs.textContent = "Kept ✓"; };
       el.querySelector("#ntNext").onclick = () => { ex = (ex + 1) % EXERCISES.length; draw(); };
       el.querySelector("#ntSave").onclick = () => { d.note = el.querySelector("#ntNote").value.trim(); d.onNote(d.note, EXERCISES[ex]); el.querySelector("#ntSave").textContent = "Kept ✓"; };
-      const bo = el.querySelector("#ntBirthOk");
-      if (bo) bo.onclick = () => { const v = el.querySelector("#ntBirth").value; if (!v) return; d.birth = v; d.onBirth(v); draw(); };
     };
     const close = () => { clearInterval(bedTimer); el.classList.remove("open"); setTimeout(() => el.remove(), 250); };
     draw();
@@ -221,6 +174,8 @@
     .tr-a { font-weight:700; color:var(--ink-faint); white-space:nowrap; } .tr-a.good { color:#8fe3b0; } .tr-a.off { color:#ffb36b; }
     .tr-a small { font-weight:400; color:var(--ink-faint); font-size:11px; } .tr-l small { display:block; font-size:11px; color:var(--ink-faint); }
     .tr-h { font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:#7fe3d4; margin:10px 0 2px; }
+    .tr-l small.tr-n { color:var(--ink-soft); }
+    .tr-cheer { display:flex; gap:10px; margin:10px 0 0; padding:10px 12px; border-radius:12px; background:rgba(127,227,212,.10); font-size:14px; line-height:1.4; }
     .tr-beat { display:flex; gap:10px; margin:10px 0 4px; padding:10px 12px; border-radius:12px; background:linear-gradient(135deg, rgba(143,227,176,.16), rgba(255,212,121,.10)); font-size:14px; line-height:1.4; }
     .tr-beat b { display:block; font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:#8fe3b0; margin-bottom:2px; }
     .nt-tile { width:100%; display:flex; gap:12px; align-items:center; text-align:left; padding:14px; border-radius:16px;
@@ -232,9 +187,6 @@
     .nt textarea, .nt input[type=date] { width:100%; background:rgba(0,0,0,.25); border:1px solid var(--glass-border); border-radius:10px;
       padding:9px; color:var(--ink); font:inherit; color-scheme:dark; }
     .nt-row { display:flex; gap:8px; margin-top:8px; }
-    .nt-bars { display:flex; align-items:flex-end; gap:2px; height:70px; margin-top:10px; }
-    .nt-bars i { flex:1; border-radius:2px 2px 0 0; min-width:3px; max-width:14px; }
-    .nt-life { width:100%; max-width:330px; display:block; margin:10px auto 0; }
     .nt-feel { display:grid; grid-template-columns:repeat(5, 1fr); gap:6px; }
     .nt-feel button { background:var(--glass); border:1px solid var(--glass-border); border-radius:12px; padding:8px 2px; color:var(--ink); font:inherit; cursor:pointer; }
     .nt-feel button b { display:block; font-size:18px; } .nt-feel button small { display:block; font-size:10.5px; color:var(--ink-soft); margin-top:2px; }
@@ -242,13 +194,6 @@
     .nt-ahead { display:grid; grid-template-columns:repeat(3, 1fr); gap:8px; }
     .nt-ahead div { background:var(--glass); border-radius:14px; padding:10px 6px; text-align:center; }
     .nt-ahead b { display:block; font-size:20px; } .nt-ahead span { font-size:11px; color:var(--ink-soft); }
-    .nt-keeps { display:flex; flex-direction:column; gap:8px; }
-    .nt-keep { display:flex; gap:12px; align-items:center; text-align:left; padding:12px 14px; border-radius:14px; background:var(--glass);
-      border:1px solid var(--glass-border); color:var(--ink); font:inherit; cursor:pointer; }
-    .nt-keep > span:first-child { font-size:20px; width:24px; text-align:center; }
-    .nt-keep b { display:block; font-size:14px; } .nt-keep small { display:block; font-size:12px; color:var(--ink-soft); margin-top:2px; }
-    .nt-keep.on { border-color:rgba(240,166,192,.6); background:linear-gradient(135deg, rgba(240,166,192,.16), rgba(255,255,255,.04)); cursor:default; }
-    .nt-keep.made { cursor:default; }
     .nt-bed { margin-top:10px; padding:14px; border-radius:16px; background:rgba(0,0,0,.18); border:1px solid var(--glass-border); }
     .nt-bed ol { margin:10px 0 12px; padding-left:20px; font-size:14px; line-height:1.45; } .nt-bed li { margin-bottom:6px; }
     .nt-bed h4 { font-size:15px; margin:14px 0 8px; font-weight:600; }
@@ -256,8 +201,7 @@
     .nt-min span { font-size:13px; color:var(--ink-soft); }
     .nt-ans { display:grid; grid-template-columns:repeat(3, 1fr); gap:6px; }
     .nt-ans button { background:var(--glass); border:1px solid var(--glass-border); border-radius:12px; padding:10px 4px; color:var(--ink); font:inherit; font-size:13.5px; cursor:pointer; }
-    .nt-ans button.on { border-color:#ffd479; background:rgba(255,212,121,.16); }
-    .nt-birth { display:flex; flex-direction:column; gap:8px; margin-top:12px; } .nt-birth label { font-size:13px; color:var(--ink-soft); }`;
+    .nt-ans button.on { border-color:#ffd479; background:rgba(255,212,121,.16); }`;
   document.head.appendChild(css);
   root.QuestNight = { open };
 })(window);

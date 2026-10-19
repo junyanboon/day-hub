@@ -54,23 +54,78 @@ test("no history yet, or nothing eaten: no best day is claimed", () => {
   assert.equal(T.dayRow("pf", "Pranic foods", [{ day: "2026-10-18", pf: 0 }], { day: "2026-10-19", pf: 0 }).best, null);
 });
 
-test("beat tomorrow: more drains than yesterday comes first and names the drain", () => {
-  const line = T.beatLine({ rows: rows({ prana: 70, body: 70, pf: 3, dr: 2 }), topDrain: "Coffee or tea" });
-  assert.equal(line, "2 drains today vs 0 yesterday. Skip the coffee or tea tomorrow to win the day back.");
+const OK_NIGHT = [{ k: "rhr", last: 52, avg: 52, good: null }, { k: "hrv", last: 40, avg: 40, good: null }, { k: "score", last: 75, avg: 75, good: null }];
+const FULL = { today: 8, aim: 8 };
+
+test("d65: tomorrow's one thing is the weakest area, and drains are named", () => {
+  const line = T.beatLine({ rows: rows({ prana: 70, body: 70, pf: 3, dr: 2 }), oura: OK_NIGHT, water: FULL, drainNames: ["Onion or garlic", "Coffee or tea"], seed: 0 });
+  assert.equal(line, "Drains today: onion or garlic and coffee or tea. Skip the onion or garlic tomorrow to win the day back.");
 });
 
-test("beat tomorrow: yesterday means the calendar day before, and an unknown yesterday is not called 0", () => {
-  const gap = [{ day: "2026-10-16", prana: 60, body: 70, pf: 3, dr: 0 }];
-  const r = ["prana", "body", "pf", "dr"].map(k => T.dayRow(k, k, gap, { day: "2026-10-19", prana: 70, body: 70, pf: 3, dr: 1 }, k === "dr" ? "down" : "up"));
-  assert.equal(r[3].yesterday, null);
-  assert.equal(T.beatLine({ rows: r, topDrain: "Alcohol" }), "1 drain today. Skip the alcohol tomorrow to win the day back.");
+test("d65: not always drains: a low water day or a weak HRV wins over one small drain", () => {
+  const water = T.beatLine({ rows: rows({ prana: 70, body: 70, pf: 3, dr: 1 }), oura: OK_NIGHT, water: { today: 2, aim: 8 }, drainNames: ["Coffee or tea"], seed: 0 });
+  assert.match(water, /water|Water/);
+  const hrv = [OK_NIGHT[0], { k: "hrv", last: 28, avg: 40, good: false }, OK_NIGHT[2]];
+  assert.match(T.beatLine({ rows: rows({ prana: 70, body: 70, pf: 3, dr: 0 }), oura: hrv, water: FULL, seed: 0 }), /^HRV 28/);
+  assert.match(T.beatLine({ rows: rows({ prana: 70, body: 70, pf: 3, dr: 0 }), oura: OK_NIGHT, water: FULL, bedLate: true, seed: 0 }), /after 11|past 11/);
+  assert.match(T.beatLine({ rows: rows({ prana: 40, body: 70, pf: 3, dr: 0 }), oura: OK_NIGHT, water: FULL, seed: 0 }), /^Prana ended at 40, your week averages 65\./);
+  const rhr = [{ k: "rhr", last: 60, avg: 52, good: false }, OK_NIGHT[1], OK_NIGHT[2]];
+  assert.match(T.beatLine({ rows: rows({ prana: 70, body: 70, pf: 3, dr: 0 }), oura: rhr, water: FULL, seed: 0 }), /^Resting heart rate 60/);
 });
 
-test("beat tomorrow: prana under the week, then fewer pranic foods, then body", () => {
-  assert.match(T.beatLine({ rows: rows({ prana: 40, body: 70, pf: 3, dr: 0 }) }), /^Prana ended at 40, your week averages 65\./);
-  assert.match(T.beatLine({ rows: rows({ prana: 70, body: 70, pf: 1, dr: 0 }) }), /^1 pranic food today, your week averages 3\./);
-  assert.match(T.beatLine({ rows: rows({ prana: 70, body: 50, pf: 3, dr: 0 }) }), /^Body ended at 50/);
-  assert.match(T.beatLine({ rows: rows({ prana: 90, body: 70, pf: 3, dr: 0 }) }), /best day lately/);
+test("d65: the wording changes from day to day, and close areas take turns", () => {
+  const t = (seed) => T.beatLine({ rows: rows({ prana: 70, body: 70, pf: 3, dr: 0 }), oura: OK_NIGHT, water: { today: 4, aim: 8 }, seed });
+  assert.notEqual(t(0), t(1));
+  const two = (seed) => T.beatLine({ rows: rows({ prana: 70, body: 70, pf: 3, dr: 0 }), oura: OK_NIGHT, water: { today: 4, aim: 8 }, bedLate: true, seed });
+  const seen = new Set([0, 1, 2, 3].map(two).map(l => /water|Water/.test(l) ? "water" : "sleep"));
+  assert.deepEqual([...seen].sort(), ["sleep", "water"]);
+});
+
+test("d65: nothing weak: the best-day line", () => {
+  assert.match(T.beatLine({ rows: rows({ prana: 90, body: 70, pf: 3, dr: 0 }), oura: OK_NIGHT, water: FULL }), /best day lately/);
+});
+
+test("d66: one kind line about what improved most against his week", () => {
+  const good = [OK_NIGHT[0], { k: "hrv", last: 52, avg: 40, good: true }, OK_NIGHT[2]];
+  assert.equal(T.encourage({ rows: rows({ prana: 66, body: 70, pf: 3, dr: 0 }), oura: good }), "HRV 52, up on your week's 40. Your system is calmer.");
+  assert.match(T.encourage({ rows: [], oura: OK_NIGHT }), /looked at it honestly/);
+});
+
+test("d63: names of drains and pranic foods, short and once each", () => {
+  const ctxM = ctx.QuestMeals;
+  assert.deepEqual(J(T.namesOf(["neg", "coffee", "neg", "x"], ctxM.DRAINS)), ["Onion or garlic", "Coffee or tea"]);
+  assert.deepEqual(J(T.namesOf(["fveg", "pos"], ctxM.PRANA_FOODS)), ["Fresh vegetables", "Pranic food"]);
+});
+
+test("d67: the 3 that mattered most, sadhana and health first; yoga only with a practice ticked", () => {
+  const items = [
+    { name: "✓ Lunch", rank: 2, mins: 60 }, { name: "✓ Yoga", rank: 0, mins: 60, yoga: true, practiced: false },
+    { name: "✓ Gym", rank: 1, mins: 90 }, { name: "✓ Shambhavi", rank: 0, mins: 30, yoga: true, practiced: true },
+    { name: "✓ Walk", rank: 1, mins: 30 }, { name: "✓ Email", rank: 2, mins: 120 },
+  ];
+  assert.deepEqual(J(T.topDone(items)), ["✓ Shambhavi", "✓ Gym", "✓ Walk"]);
+});
+
+test("d68: 2026-10-19's old Body is left out of the average and the best unless it came from the log", () => {
+  assert.equal(T.bodyOk("2026-10-19", { body: 95 }), false);
+  assert.equal(T.bodyOk("2026-10-19", { body: 40, bk: 1 }), true);
+  assert.equal(T.bodyOk("2026-10-18", { body: 70 }), true);
+  const hist = [{ day: "2026-10-18", body: 60 }, { day: "2026-10-19", body: null }];
+  const r = J(T.dayRow("body", "Body", hist, { day: "2026-10-20", body: 62 }));
+  assert.equal(r.avg, 60); assert.equal(r.best.isToday, true);
+});
+
+test("d68: the page stamps Body from its logged lines and the trends read past Body through bodyOk", () => {
+  assert.match(html, /body:bd \?\? G\.day\.body, \.\.\.\(bd != null \? \{ bk:1 \}/);
+  assert.match(html, /body:TR\.bodyOk\(day, v\) \? v\.body : null/);
+});
+
+test("Day's end: Keep a memory and Your life in prana are gone, the tiles say what they count", () => {
+  const night = fs.readFileSync(here + "quest-night.js", "utf8");
+  for (const w of ["<h3>Keep a memory", "<h3>Your life in prana", "No prana tonight", "data-keep", "lifeGrid", "recentBars", "ntBirth"]) assert.ok(!night.includes(w), w);
+  for (const w of ["keepCandidates", "onKeep", "onUnkeep", '"fires lit"', '"actions"]']) assert.ok(!html.includes(w), w);
+  assert.match(html, /"health blocks done"\], \[`\$\{hDone\}`, "habits ticked"\]/);
+  assert.ok(/t\.cheer/.test(night), "the encouragement line is drawn");
 });
 
 test("beat tomorrow speaks kindly: no punishment words, no em or en dashes", () => {
