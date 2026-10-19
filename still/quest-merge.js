@@ -3,7 +3,7 @@
    one copy. Newest-wins on the whole object let a device with an older day, or an
    older version of the page, wipe check-ins, habits and prana the other one had
    saved. This folds two copies into one instead:
-   - check-ins, closes, starts, log lines, zaps, bag events: kept from both;
+   - check-ins, closes, starts, opened blocks, log lines, zaps, bag events: kept from both;
    - habit counts, their take-backs (voided), XP: the higher number;
    - a block's checklist: step by step, the later change winning (mergeWork);
    - prana: the newer copy's number plus the log changes only the older copy saw
@@ -69,7 +69,7 @@
     if (!n || !n.date) return o;
     if (o.date !== n.date) return ms(o.date) > ms(n.date) ? o : n;
     const out = { ...o, ...n };
-    for (const k of ["checks", "closes", "missed", "caches", "started", "spent", "meals", "mealq"])
+    for (const k of ["checks", "closes", "missed", "caches", "started", "spent", "meals", "mealq", "opened"])
       if (o[k] || n[k]) out[k] = { ...obj(o[k]), ...obj(n[k]) };
     if (o.work || n.work) out.work = mergeWork(o.work, n.work);
     // habit counts and their take-backs (voided, 2026-10-19, d28) only go up: the higher number from either copy,

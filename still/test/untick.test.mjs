@@ -215,16 +215,14 @@ test("quest.html: the tile tap runs tapDay, counts read habitCount, owed take-ba
   assert.match(html, /undoTimedPay\(\);\n\s*settleTicks\(\);/);
   assert.ok(!/\(G\.day\.habits \|\| \{\}\)\[h\] > 0/.test(html), "done-today checks read the live count");
   assert.ok(!/unticking takes nothing back/.test(html));
-  const a = html.indexOf("function barefootHTML"), q = html.slice(a, a + 3200);
-  assert.match(q, /outdoorBlock\(/);
-  assert.ok(!/G\.day\.work = /.test(q.slice(0, q.indexOf("function bindBarefoot"))), "drawing it writes nothing");
+  // the barefoot walk is the outdoor block's own list, opened straight from the block (d32; the check-in is gone)
+  const a = html.indexOf("function openOutdoor("), q = html.slice(a, a + 1400);
+  assert.ok(a > 0);
+  assert.ok(!/G\.day\.work = /.test(q), "drawing it writes nothing");
   assert.match(q, /tapStep\(bn, b, "outdoor"/, "and the same tap, pay and take-back");
-  const aq = q.slice(q.indexOf("function openActQuiz"));
-  assert.equal((aq.match(/\$\{barefootHTML\(b\)\}/g) || []).length, 2, "in the check-in and in its checked view");
-  const so = html.slice(html.indexOf("function openStop("), html.indexOf("function openStop(") + 900);
-  assert.match(so, /\(G\.day\.mealq \|\| \{\}\)\[gk\(b\)\] && QB\(\)\.outdoorBlock\(b\.t\)\) return openActQuiz\(b\)/,
-    "a confirmed outdoor block reopens its checked view, barefoot tile included");
-  assert.match(aq, /id="aqE">Change this block</, "and the block can still be changed from there");
+  assert.match(q, /id="oEdit">Change time or name</, "and the block can still be changed from there");
+  const so = html.slice(html.indexOf("function blockList("), html.indexOf("function blockList(") + 900);
+  assert.match(so, /QB\(\)\.outdoorBlock\(b\.t\)\) return "outdoor"/, "a walk or hike opens its barefoot tile");
   const mq = html.indexOf("function openMeal"), m = html.slice(mq, mq + 5200);
   assert.match(m, /fx\.back\(/, "meal tiles use the same take-back animation");
   assert.match(html, /\[data-tick\][^]{0,300}\(W\.t = W\.t \|\| \{\}\)\[i\] = now\(\)\.toISOString\(\)/, "prep lists stamp their steps too");

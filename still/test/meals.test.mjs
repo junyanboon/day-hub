@@ -52,7 +52,7 @@ test("no free-floating meal entry: the Rate a meal tile and the How was <meal>? 
 
 test("a meal block opens one screen that is the meal: no plate list, no Rate this meal, no Confirm", () => {
   assert.ok(!/openMealQuiz|Rate this meal|id="mqOk"|data-plate|data-bp=|A full glass of water/.test(html));
-  assert.ok(/if \(isMeal\(b\)\) return openMeal\(b\);/.test(html), "a meal block opens openMeal");
+  assert.ok(/if \(isMeal\(b\)\) return "meal";/.test(html) && /if \(l === "meal"\) return openMeal\(b\);/.test(html), "a meal block opens openMeal");
   assert.ok(/function openMeal\(b\)\{\s*if \(!b\) return;/.test(html), "openMeal must refuse to open without a block");
   assert.equal([...html.matchAll(/openMeal\(/g)].length, 4, "the definition, the block tap, the redraw after a tap, the planner's button");
 });

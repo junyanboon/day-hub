@@ -91,7 +91,7 @@ test("quest.html: no free-floating action tiles, no time pay, every action ticke
   const html = fs.readFileSync(fileURLToPath(new URL("../quest.html", import.meta.url)), "utf8");
   assert.ok(!/All prana actions|Prana actions · right now|data-all>/.test(html), "the All prana actions sheet is gone");
   assert.ok(!/PRACTICE_PER_MIN|payBlock\(/.test(html), "practice blocks no longer pay by time");
-  assert.match(html, /const TILES = HABITS\.filter\(h => h\[6\] === "auto"\);/);   // water has its own card (d23)
+  assert.ok(!/const TILES = /.test(html), "no tiles on Right now at all (d35): the auto ones left too");
   // every habit but water (its own card) and the automatic ones is ticked in a block or the meal quiz
   const rows = [...html.matchAll(/^\s*\["(\w+)", "[^"]*", [\d.]+, \d+, "[^"]*", "[^"]*", "(\w*)", "\w+"\],$/gm)].map(m => [m[1], m[2]]);
   assert.ok(rows.length > 25, "HABITS rows found");
