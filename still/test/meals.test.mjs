@@ -72,6 +72,15 @@ test("the prana meter's low word names sadhana and pranic food", () => {
   assert.ok(/p < 10 \? "Sadhana and pranic food build it"/.test(html));
 });
 
+test("a rating from before the regroup still counts its pranic food", () => {
+  assert.deepEqual(J(M.tally({ old: { sel: ["pos", "neg", "fresh"] } })), { foods: 1, drains: 1 });
+});
+
+test("the morning hint no longer says prana only rises through sadhana", () => {
+  const m = fs.readFileSync(here + "quest-morning.js", "utf8");
+  assert.ok(!m.includes("Prana only rises through sadhana"));
+});
+
 test("user-facing text in the quiz module has no em or en dashes", () => {
   const src = fs.readFileSync(here + "quest-meals.js", "utf8");
   assert.ok(!/[–—]/.test(src));

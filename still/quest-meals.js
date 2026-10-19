@@ -73,7 +73,8 @@
     let foods = 0, drains = 0;
     for (const q of Object.values(mealq || {})) {
       if (!q || q.kind || !Array.isArray(q.sel)) continue;
-      for (const id of q.sel) { if (FOOD_IDS.includes(id)) foods++; else if (DRAIN_IDS.includes(id)) drains++; }
+      for (const id of q.sel) { if (FOOD_IDS.includes(id) || id === "pos") foods++;   // "pos": a pranic food in the quiz before 2026-10-19
+        else if (DRAIN_IDS.includes(id)) drains++; }
     }
     return { foods, drains };
   }
