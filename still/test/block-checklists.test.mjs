@@ -38,14 +38,15 @@ test("grooming and Domestics: Dr Ellie and the shower fill body; the copper pot 
   for (const id of ["domestics", "winddown", "groom", "yoga"]) assert.equal(B.basic(id, "home", 2).habit, null, id);
 });
 
-test("Dr Ellie is the AM routine before 2 PM and the PM one after", () => {
+test("Dr Ellie in Domestics and Grooming is always the AM routine; PM lives only in the Wind-down (Junyan, 2026-10-19)", () => {
   const dr = B.basic("groom", "home", 1).steps.find(x => x.h === "mouthAm");
-  assert.equal(B.stepAt(dr, 9).h, "mouthAm");
-  assert.equal(B.stepAt(dr, 13).h, "mouthAm");
-  assert.equal(B.stepAt(dr, 14).h, "mouth");
-  assert.match(B.stepAt(dr, 20).t, /PM/);
-  assert.equal(B.stepAt(dr, 1).h, "mouth");   // 1 AM is still the night routine (the game day runs to 4 AM)
-  assert.equal(B.stepAt(dr, 5).h, "mouthAm");
+  for (const hr of [1, 5, 9, 13, 14, 16, 20, 23]) assert.equal(B.stepAt(dr, hr).h, "mouthAm", "groom at " + hr);
+  const dd = B.basic("domestics", "travel", 1).steps.find(x => x.h === "mouthAm");
+  for (const hr of [11, 14, 20]) { assert.equal(B.stepAt(dd, hr).h, "mouthAm"); assert.match(B.stepAt(dd, hr).t, /AM/); }
+  for (const id of ["domestics", "groom"]) for (const m of ["home", "travel"]) for (const wd of [0, 1, 6])
+    assert.ok(!B.basic(id, m, wd).steps.some(x => x.h === "mouth" || x.pm || /PM/.test(x.t)), `${id} ${m} ${wd} has no PM step`);
+  assert.equal(B.windDown("home").steps.filter(x => x.h === "mouth").length, 1);
+  assert.equal(B.windDown("travel").steps.filter(x => x.h === "mouth").length, 1);
   const lamp = { t:"Lamp", h:"lamp" };
   assert.equal(B.stepAt(lamp, 21).h, "lamp");
 });
@@ -73,11 +74,26 @@ test("a tick pays once; the lamp pays once in Morning Yoga and once in the Wind-
   assert.equal(B.tickStep(work.w, work, "winddown", 0, wsteps[0], 22, gain).pay, null);
 });
 
-test("Dr Ellie ticked in the afternoon pays the PM routine", () => {
-  const steps = B.basic("groom", "travel", 1).steps, i = steps.findIndex(x => x.h === "mouthAm");
+test("Dr Ellie ticked in Domestics in the afternoon still pays the AM routine", () => {
+  const steps = B.basic("domestics", "travel", 1).steps, i = steps.findIndex(x => x.h === "mouthAm");
   const W = { tick:{}, paid:{} };
-  assert.equal(B.tickStep(W, { W }, "groom", i, steps[i], 16, gain).pay.h, "mouth");
-  assert.equal(B.tickStep(W, { W }, "groom", i, steps[i], 8, gain).pay.h, "mouthAm");
+  assert.equal(B.tickStep(W, { W }, "domestics", i, steps[i], 16, gain).pay.h, "mouthAm");
+  assert.equal(B.tickStep(W, { W }, "domestics", i, steps[i], 8, gain).pay.h, "mouthAm");
+});
+
+test("today's Domestics that already paid Dr Ellie PM keeps showing it, and its untick takes back the PM pay", () => {
+  const steps = B.basic("domestics", "travel", 1).steps, i = steps.findIndex(x => x.h === "mouthAm");
+  const at = "2026-10-19T15:30:00.000Z", paid = { h:"mouth", d:2, kind:"domestics", at };
+  // the tile reads what it paid
+  assert.equal(B.stepShown(steps[i], paid).h, "mouth");
+  assert.equal(B.stepShown(steps[i], null).h, "mouthAm");
+  assert.equal(B.stepShown(steps[i], { h:"mouthAm", d:2 }).h, "mouthAm");
+  const day = { work:{ dom:{ tick:{ [i]:true }, paid:{ [i]:paid } } } };
+  const t = B.tapDay(day, "dom", "domestics", i, steps[i], 17, gain, "2026-10-19T17:00:00.000Z");
+  assert.equal(t.r.on, false); assert.equal(t.back.h, "mouth"); assert.equal(t.back.d, 2);
+  // ticked again: now it pays AM
+  const t2 = B.tapDay(day, "dom", "domestics", i, steps[i], 17, gain, "2026-10-19T17:01:00.000Z");
+  assert.equal(t2.pay.h, "mouthAm");
 });
 
 test("what a block paid, by meter", () => {
