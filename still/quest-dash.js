@@ -24,6 +24,7 @@
   const KNOWN = [
     { id: "hud", title: "", pick: [".hud"] },
     { id: "being", title: "", pick: ["#being"] },
+    { id: "night", title: "", pick: ["#bgNight"] },   // Last night, its own slim card under Prana and Body (d54)
     { id: "now", title: "Right now", pick: ["#brief", "#loose", "#main", "#nextLine"] },
     { id: "habits", title: "", pick: ["#habits"] },
   ];
@@ -32,7 +33,8 @@
   const DEFAULT = {
     hud: { x: 0, y: 0, w: 12, h: 1 },   // one quiet line (2026-10-10)
     mtn: { x: 0, y: 1, w: 4, h: 15 },
-    being: { x: 4, y: 1, w: 5, h: 10 },
+    being: { x: 4, y: 1, w: 5, h: 8 },
+    night: { x: 4, y: 9, w: 5, h: 2 },
     now: { x: 4, y: 11, w: 5, h: 5 },
     habits: { x: 9, y: 1, w: 3, h: 10 },
     skills: { x: 9, y: 11, w: 3, h: 5 },
@@ -97,17 +99,19 @@
       body.dash .w-quick .bag-qbar { height:100%; max-height:70px; padding:6px; }
       body.dash .w-quick .bag-qbar .bag-sock { flex:0 0 auto; height:100%; width:auto; aspect-ratio:1; max-height:56px; }
       body.dash .w-being { padding:6px; overflow:hidden; } body.dash .w-being > #being { height:100%; margin:0; display:flex; flex-direction:column; }
-      /* the stage takes what the Last night box leaves: a full-height stage pushed that box below the card's edge,
-         where overflow:hidden cut it off (Junyan, 2026-10-19: "I'm missing my oura ring stats") */
+      /* the stage fills the card; Last night is its own card under it since d54 (2026-10-19) */
       body.dash .w-being .bg-stage { flex:1; min-height:0; border:0; }
-      body.dash .w-being .bg-night { flex:none; margin-top:6px; }
+      body.dash .w-night { padding:6px; overflow:hidden; } body.dash .w-night > .w-grip { display:none; }
+      body.dash .w-night > .bg-night { margin:0; height:100%; box-sizing:border-box; }
       .dash-reset { position:fixed; left:14px; bottom:14px; z-index:50; background:var(--glass); border:1px solid var(--glass-border);
         color:var(--ink-soft); font-size:12px; padding:7px 12px; border-radius:999px; backdrop-filter:blur(10px); opacity:.35; transition:opacity .2s; }
       .dash-reset:hover { opacity:1; }
       body.dash .w-grip:has(> span:first-child:empty) { position:absolute; top:4px; right:10px; margin:0; z-index:2; }`;
     document.head.appendChild(css);
     const lay = saved(), grid = document.createElement("div");
-    if (lay.hud) { lay.hud.h = 1; lay.hud.y = 0; }   // the top bar is one line now; the widgets below move up to fill
+    if (lay.hud) { lay.hud.h = 1; lay.hud.y = 0; }
+    // a layout saved before Last night had its own card (d54): take its two rows from the bottom of Prana and Body
+    if (lay.being && !lay.night) { const b = lay.being, h = b.h > 4 ? 2 : 0; b.h -= h; lay.night = { x: b.x, y: b.y + b.h, w: b.w, h: h || 2 }; }   // the top bar is one line now; the widgets below move up to fill
 
     grid.className = "grid-stack";
     let nextY = ROWS;

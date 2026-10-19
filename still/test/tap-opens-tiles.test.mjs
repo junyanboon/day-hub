@@ -95,9 +95,11 @@ test("gym keeps How do you feel now? in its own list, and it still pays (d34)", 
   assert.match(html, /the answer to "How do you feel now\?" is what pays/);
 });
 
-test("the Last night box is not clipped by the Prana and Body card on the dashboard", () => {
+test("on the dashboard Last night is its own widget under Prana and Body, and old layouts make room for it", () => {
   assert.match(dash, /body\.dash \.w-being > #being \{[^}]*display:flex[^}]*flex-direction:column/);
   assert.match(dash, /body\.dash \.w-being \.bg-stage \{[^}]*flex:1[^}]*min-height:0/);
-  assert.match(dash, /body\.dash \.w-being \.bg-night \{[^}]*flex:none/);
+  assert.match(dash, /\{ id: "night", title: "", pick: \["#bgNight"\] \}/);
+  assert.match(dash, /night: \{ x: 4, y: 9, w: 5, h: 2 \}/);
+  assert.match(dash, /if \(lay\.being && !lay\.night\)/);
   assert.ok(!/body\.dash \.w-being \.bg-stage \{[^}]*height:100%/.test(dash), "a full-height stage pushed the box out of sight");
 });
