@@ -74,4 +74,7 @@ test("the page: no push anywhere; every move and add path places only his block"
   assert.match(fn("function saveBlock("), /writeOps\(o => setBlock\(o, b, s, e, t\)\)/);
   // a gym session added from the morning still goes on the Junyan calendar (the calId argument moved up one)
   assert.match(html, /return addBlockCal\(t, s, e, \(AGD\(\) \? AGD\(\)\.JUNYAN : undefined\)\);/);
+  // no caller passes the old makeRoom flag where the calendar now goes
+  assert.ok(!/addBlockCal\b[^\n]*\(t(itle)?, s, e, (false|true|!)/.test(html), "no boolean in the calId place");
+  assert.ok(!/addBlock\)\(title, s, e, false\)/.test(html), "the idea sheet adds to Joint Plans by default");
 });

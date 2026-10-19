@@ -1124,7 +1124,7 @@
       const k = keyOf(b);
       if (OPS.drops.includes(k)) return;
       const ed = OPS.edits[k];
-      // cs/ce: where the calendar has it (an edit in today's plan can differ); /cal/shift moves it only from there
+      // cs/ce: where the calendar has it (an edit in today's plan can differ)
       out.push({ ...b, key:k, s:new Date(ed?.s ?? b.s), e:new Date(ed?.e ?? b.e), t:ed?.t ?? b.t, cs:b.s, ce:b.e });
     });
     OPS.adds.forEach(a => out.push({ ...a, key:a.key, s:new Date(a.s), e:new Date(a.e), extra:true }));
@@ -2170,7 +2170,7 @@
   function placeOwn(b, s, e, quiet){
     if (!AGD() || gameDayOf(s) !== gameYmd()) return { s, e, hit:null };
     const r = AGD().freeSlot(blocks(), { ...b, s:new Date(s), e:new Date(e) });
-    if (r.hit) { log(snapSay(b, r)); if (!quiet) calToast(snapSay(b, r), 6000); }
+    if (r.hit) { const say = snapSay(b, r); log(say); if (!quiet) calToast(say, 6000); }
     return r;
   }
   const snapSay = (b, r) => r.hit ? `${shortName(b)} would have overlapped ${shortName(r.hit)}, so it starts at ${fmtT(r.s)}.` : "";
@@ -4440,7 +4440,7 @@
         const cal = !today || ($("iCal") && $("iCal").checked);
         if (DRY || (!today && !questKey())) { log(`Test: would schedule ${title} at ${fmtT(s)}`); return back(); }
         closeSheet();
-        if (today) await (cal ? addBlockCal : addBlock)(title, s, e, false);
+        if (today) await (cal ? addBlockCal : addBlock)(title, s, e);
         else {   // another day: only the calendar can hold it (today's edit layer is today only)
           try { await qfetch("/cal/event", { method:"POST", body:JSON.stringify({ s:s.toISOString(), e:e.toISOString(), title, calId:jointId() }) }); }
           catch (err) { alert(`Could not add it to the calendar (${err.message}). Nothing was added.`); return back(); }
