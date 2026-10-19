@@ -130,6 +130,12 @@
   .bg-h { display:block; font-size:11px; color:var(--ink-soft); margin-top:3px; }
   .bg-prana .bg-n, .bg-prana .bg-k { color:#ffd479; text-shadow:0 0 calc(4px + 14px * var(--p)) rgba(255,196,110,.6); }
   .bg-body .bg-n, .bg-body .bg-k { color:#7fe3d4; }
+  /* Last night (2026-10-19, d2): under Body, display only */
+  .bg-night { margin:8px 0 0 50%; padding:8px 10px; border-radius:14px; background:rgba(95,211,196,.08); border:1px solid rgba(95,211,196,.22); font-size:12.5px; }
+  .bn-h { color:#7fe3d4; font-size:11px; letter-spacing:.1em; text-transform:uppercase; margin-bottom:4px; } .bn-h span { text-transform:none; letter-spacing:0; color:var(--ink-faint); }
+  .bn-r { display:grid; grid-template-columns:1fr auto 14px 26px; gap:6px; align-items:baseline; padding:2px 0; }
+  .bn-l { color:var(--ink-soft); } .bn-r b { font-size:15px; } .bn-r small { color:var(--ink-faint); text-align:right; }
+  .bn-r i { font-style:normal; font-weight:700; color:var(--ink-faint); } .bn-r i.good { color:#8fe3b0; } .bn-r i.off { color:#ffb36b; }
   .bg-motes { position:absolute; inset:0; pointer-events:none; overflow:hidden; }
   .bg-motes i { position:absolute; bottom:60px; width:3px; height:3px; border-radius:50%; background:#ffe3a6; opacity:0; animation:bgRise linear infinite; }
   @keyframes bgPulse { 50% { filter:brightness(1.25); } }
@@ -710,9 +716,10 @@
 <script src="quest-levels.js?v=20261016b"></script>
 <script src="quest-gymlog.js?v=20261017a"></script>
 <script src="quest-meals.js?v=20261019a"></script>
+<script src="quest-trends.js?v=20261019c"></script>
 <script src="nvc-words.js?v=20261010a"></script>
 <script src="quest-fx.js?v=20261009b"></script>
-<script src="quest-night.js?v=20261011a"></script>
+<script src="quest-night.js?v=20261019b"></script>
 <script src="quest-basics.js?v=20261016d"></script>
 <script src="quest-gym.js?v=20261016i"></script>
 <script src="quest-morning.js?v=20261019a"></script>
@@ -1047,6 +1054,7 @@
       seedFromOura();
       pullSteps();
       pullBedtime();
+      pullLastNight();
       if (questKey()) qfetch("/quest/insights").then(j => { INSIGHTS = j || {};
         // the insight agent answered: drop those "Research this" requests
         const left = (G.research || []).filter(r => !INSIGHTS[r.key]);
@@ -1410,8 +1418,24 @@
     return did.sort((a, b) => energy(b).rate - energy(a).rate || a.s - b.s).slice(0, 6)
       .map(b => ({ key:gk(b), title:b.t, name:moName(b), time:`${fmtT(b.s)} to ${fmtT(b.e)}`, state:made.has(gk(b)) ? "made" : want.has(gk(b)) ? "asked" : "", s:b.s, e:b.e }));
   }
+  /* How today went, against his recent days (Junyan, 2026-10-19: "show how I performed today and my trends and
+     ... help encourage me to be better each day"): prana and body at day's end, pranic foods and drains, last
+     night's Oura numbers, each with the 7-day trend and his best day, and the one thing to beat tomorrow. */
+  function dayTrends(){
+    const QM = window.QuestMeals, history = Object.entries(G.days || {}).filter(([k]) => k !== G.day.date)
+      .map(([k, v]) => { const d = new Date(k); return isNaN(d) || !v ? null : { day:ymd(d), prana:v.prana, body:v.body, pf:v.pf, dr:v.dr }; })
+      .filter(Boolean).sort((a, b) => a.day.localeCompare(b.day)).slice(-30);
+    const today = { day:gameYmd(), prana:Math.round(prana()), body:Math.round(body()), ...foodStamp() };
+    const rows = [["prana", "Prana"], ["body", "Body"], ["pf", "Pranic foods"], ["dr", "Drains", "down"]].map(([k, l, w]) => TR.dayRow(k, l, history, today, w));
+    const oura = NIGHTS ? TR.ouraRows(NIGHTS, gameYmd()) : [];
+    const hit = Object.values(G.day.mealq || {}).flatMap(q => q && !q.kind && Array.isArray(q.sel) ? q.sel : []);
+    const top = QM.DRAINS.find(([id]) => hit.includes(id));
+    const topDrain = top ? top[2] : G.day.lateBody ? "late night" : null;
+    return { rows, oura, beat:TR.beatLine({ rows, oura, topDrain }) };
+  }
   async function openNight(){
     if (!window.QuestNight || !G.day) return;
+    if (!NIGHTS) await pullLastNight();   // the trends need last night's Oura numbers
     const all = blocks(), t = now();
     const health = all.filter(b => b.e <= t && isHealth(b));
     const lit = health.filter(b => ["in", "late"].includes(G.day.checks[gk(b)])).length;
@@ -1437,7 +1461,7 @@
     const night = (G.night || {})[G.day.date] || {};
     QuestNight.open({
       today: { stats: [[`${Math.round(prana())}%`, "prana"], [`${Math.round(body())}%`, "body"], [`${lit}/${health.length}`, "fires lit"], [`${hDone}`, "actions"], [STEPS != null ? STEPS.toLocaleString() : "·", "steps"]],
-        line: pranaLine(), done: done.slice(0, 12) },
+        line: pranaLine(), done: done.slice(0, 12), trends: dayTrends() },
       tomorrow: { label: new Date(next + "T12:00:00Z").toLocaleDateString("en-US", { timeZone:"UTC", weekday:"long", month:"short", day:"numeric" }), items, note, ahead },
       prana: Math.round(body()), feel: night.feel || null,
       onFeel: n => { const o = (G.night = G.night || {})[G.day.date] || {}; G.night[G.day.date] = { ...o, feel:n, feelBody:Math.round(body()), feelPrana:Math.round(prana()), feelAt:now().toISOString() };
@@ -1654,10 +1678,10 @@
     }
     saveG();
   }
-  // sleep sets the body for the day: the Oura sleep score, or hours slept x 10 (d201)
-  function refillSleep(level, why){
+  // sleep sets the body for the day: the Oura readiness score (2026-10-19, d1), else the sleep score, or hours slept x 10 (d201)
+  function refillSleep(level, why, sleepScore = level){
     if (G.day.slept) return;
-    G.day.slept = true; G.day.sleepScore = Math.round(level);   // the Oura score, or hours x 10
+    G.day.slept = true; G.day.sleepScore = sleepScore == null ? null : Math.round(sleepScore);   // the Oura sleep score, or hours x 10
     addBody(Math.max(0, Math.min(100, level)) - body(), why, "sleep");
     render();
   }
@@ -1670,7 +1694,7 @@
      (2026-10-19, d3 and d4). The goal is to keep it high.
      Prana starts at 0 each morning and is built up through sadhana (Junyan, 2026-10-09: "Prana starts at 0
      and we need to build it up.. through sadhana so it works the opposite of the body").
-     Body is how rested the body is: it starts each morning at the Oura sleep score, Bryan Johnson's
+     Body is how rested the body is: it starts each morning at the Oura readiness score (else the sleep score), Bryan Johnson's
      health actions fill it, effort (the blocks) uses it. Log lines for Body carry m:"b". */
   function prana(){ return G.day.prana ?? 0; }
   function body(){ return G.day.body ?? 60; }
@@ -1683,10 +1707,16 @@
       G.day.prana = Math.max(0, Math.min(100, prana() + d));
       (G.day.pl = G.day.pl || []).push([now().toISOString(), G.day.prana]);
     }
-    (G.days = G.days || {})[G.day.date] = { place:placeNow(), prana:G.day.prana, body:G.day.body, level:lvl(), ...gymDayStamp() };
+    stampDay();
     log(msg, d, m === "b" ? { ...(extra || {}), m:"b" } : extra); if (d && !noFloat) floatXp(d, (label || "") + (m === "b" ? " · body" : ""));
     saveG();
   }
+  // today's line in the day history: the meters, pranic foods and drains (for the day-end trends, 2026-10-19)
+  function stampDay(){
+    (G.days = G.days || {})[G.day.date] = { place:placeNow(), prana:G.day.prana, body:G.day.body, level:lvl(), ...foodStamp(), ...gymDayStamp() };
+  }
+  // drains: the meal quiz ones, and staying up past 11 (it took body: G.day.lateBody)
+  function foodStamp(){ const t = window.QuestMeals.tally(G.day.mealq); return { pf:t.foods, dr:t.drains + (G.day.lateBody ? 1 : 0) }; }
   // how many gym sessions today ended "wiped out", and last night's sleep, kept per day for the recovery advice
   function wipedToday(){ return GL.wipedCount(G.day.mealq); }
   function gymDayStamp(){ const n = wipedToday(); return n ? { wiped:n, sleep:G.day.sleepScore ?? null } : {}; }
@@ -1710,17 +1740,39 @@
     }
     return n + (prana() >= 70 ? 1 : 0);
   }
-  // last night's Oura sleep score sets where the day starts (d79)
+  /* Where body starts the day (d79): the Oura readiness score (Junyan, 2026-10-19, d1), else last night's
+     sleep score, else the old fallback (yesterday's body, or the "how long did you sleep?" question). */
   async function seedFromOura(){
     if (!G.day || G.day.ouraTried || G.day.slept) return;
     G.day.ouraTried = true;
+    const today = j => j && j.day === gameYmd() && typeof j.score === "number" ? j.score : null;
+    const read = path => fetch(API + path, { cache:"no-store" }).then(r => r.ok ? r.json() : null).catch(() => null);
+    const [rd, sl] = await Promise.all([read("/readiness"), read("/sleep")]);
+    const ready = today(rd), slept = today(sl);
+    // the sleep score stays the sleep score: the gym's go-easy check reads it (G.day.sleepScore)
+    if (ready != null) { G.day.readiness = ready; refillSleep(ready, `Readiness ${ready} (Oura)`, slept); }
+    else if (slept != null) refillSleep(slept, `Slept ${slept} (Oura)`);
+  }
+  /* ---------- Last night (Junyan, 2026-10-19, d2 and d5) ----------
+     Resting heart rate (lowest overnight), HRV average and sleep score, each beside its 7-day average with an
+     arrow, green when it moved the right way. Display only: no points, no effect on body. still-api /lastnight. */
+  let NIGHTS = null;
+  async function pullLastNight(){
     try {
-      const r = await fetch(API + "/sleep", { cache:"no-store" }); if (!r.ok) return;
-      const j = await r.json();
-      if (j.day === gameYmd() && typeof j.score === "number") {
-        refillSleep(j.score, `Slept ${j.score} (Oura)`);
-      }
+      const r = await fetch(API + "/lastnight", { cache:"no-store" }); if (!r.ok) return;
+      NIGHTS = (await r.json()).nights || null; drawLastNight();
     } catch {}
+  }
+  const TR = window.QuestTrends;
+  function drawLastNight(){
+    const el = $("bgNight"); if (!el) return;
+    const rows = NIGHTS && G.day ? TR.ouraRows(NIGHTS, gameYmd()) : null;
+    if (!rows || rows.every(x => x.last == null && x.avg == null)) { el.hidden = true; return; }
+    const short = { rhr:"Resting HR", hrv:"HRV", score:"Sleep" };
+    const html = `<div class="bn-h">Last night <span>vs 7-day avg</span></div>` + rows.map(x =>
+      `<div class="bn-r"><span class="bn-l">${short[x.k]}</span><b>${x.last ?? "·"}</b><i class="${x.good === true ? "good" : x.good === false ? "off" : ""}">${x.arrow}</i><small>${x.avg ?? "·"}</small></div>`).join("");
+    if (el.innerHTML !== html) el.innerHTML = html;
+    el.hidden = false;
   }
   // the day as two step lines (d205): prana in gold, body in teal, with the 70% mark (d74)
   function pranaLine(){
@@ -2202,7 +2254,7 @@
       (G.day.mealq = G.day.mealq || {})[k] = { at:now().toISOString(), sel:Object.keys(sel).filter(x => sel[x]), p:q.p, b:q.b };
       if (q.p) addPrana(q.p, `${name}: meal quiz`, "meal");
       if (q.b) addBody(q.b, `${name}: meal quiz`, "meal");
-      log(`Rated ${name}: ${mqSum(q)}`); saveG();
+      stampDay(); log(`Rated ${name}: ${mqSum(q)}`); saveG();
       closeSheet(); render(); refreshActions();
     };
   }
@@ -4639,7 +4691,8 @@
         <div class="bg-col bg-prana"><div class="bg-fig"><img class="bg-glow" src="sprites/seat-glow.webp" alt=""><img class="bg-seat" id="bgSeat" src="sprites/seat.webp" alt="You, seated in meditation"></div>
           <div class="bg-lab"><div class="bg-k">Prana</div><div class="bg-n" id="bgP"></div><span class="bg-h" id="bgPh"></span></div></div>
         <div class="bg-col bg-body"><div class="bg-fig"><img class="bg-glow" src="sprites/stand-glow.webp" alt=""><img class="bg-stand" src="sprites/stand.webp" alt="You, standing"><div class="bg-fill"></div></div>
-          <div class="bg-lab"><div class="bg-k">Body</div><div class="bg-n" id="bgB"></div><span class="bg-h" id="bgBh"></span></div></div></div>`;
+          <div class="bg-lab"><div class="bg-k">Body</div><div class="bg-n" id="bgB"></div><span class="bg-h" id="bgBh"></span></div></div></div>
+        <div class="bg-night" id="bgNight" hidden></div>`;
       el.querySelector(".bg-body").onclick = () => { if (!(G.unlocks || {}).robe) return; G.outfit = G.outfit === "plain" ? "robe" : "plain"; saveG(); beingKey = ""; render(); };
     }
     // d209: the purple robe, unlocked after 7 days ending at 70% or more; tap the standing figure to switch
@@ -4650,6 +4703,7 @@
     const cur = currentOf(blocks(), now()), act = cur ? (isSleep(cur) ? "lie" : isMeal(cur) ? "eat" : /hike|walk|trek|climb|tour/i.test(cur.t) ? "walk" : "") : "";
     // d221 (2026-10-10): the standing figure has a drawing per body stage: tired under 30%, steady, strong from 75%
     const bodyImg = POSES.has(act) ? act : outfit === "robe" ? "robe" : B < 30 ? "stand-low" : B < 75 ? "stand" : "strong";
+    drawLastNight();
     const k = P + "|" + B + "|" + bodyImg; if (k === beingKey) return; beingKey = k;
     const st = el.firstChild;
     const bi = st.querySelector(".bg-stand");

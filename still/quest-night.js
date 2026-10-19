@@ -58,6 +58,27 @@
     ["no", "Not really", "That is honest, and useful. What is one small thing you would change tomorrow?"],
   ];
 
+  /* How today went against his recent days (Junyan, 2026-10-19): today's prana and body, pranic foods and drains,
+     last night's Oura numbers, each with a small line of the last 7 days, the arrow against his 7-day average (green
+     when it moved the right way) and his best day; then the one thing to beat tomorrow. quest-trends.js works it out. */
+  const DOW = (ymd) => new Date(ymd + "T12:00:00Z").toLocaleDateString("en-US", { timeZone: "UTC", weekday: "short" });
+  function trendsHtml(t) {
+    const TR = root.QuestTrends;
+    if (!t || !TR) return "";
+    const colour = { prana: "#ffd479", body: "#7fe3d4", pf: "#ffd479", dr: "#ffb36b", rhr: "#7fe3d4", hrv: "#7fe3d4", score: "#7fe3d4" };
+    const cls = (x) => x.good === true ? "good" : x.good === false ? "off" : "";
+    const pct = (k, v) => v == null ? "·" : (k === "prana" || k === "body") ? `${v}%` : `${v}`;
+    const row = (k, label, now, avg, arrow, good, series, best) =>
+      `<div class="tr-r"><span class="tr-l">${esc(label)}${best ? `<small>${best}</small>` : ""}</span><b>${esc(now)}</b>${TR.spark(series, colour[k] || "#fff")}` +
+      `<span class="tr-a ${good}">${arrow || ""} ${avg == null ? "" : `<small>7-day ${esc(avg)}</small>`}</span></div>`;
+    const days = t.rows.map((x) => row(x.k, x.label, pct(x.k, x.today), x.avg == null ? null : pct(x.k, Math.round(x.avg)), x.arrow, cls(x), x.series,
+      x.best ? (x.best.isToday ? "🏆 best" : `best ${esc(pct(x.k, x.best.v))} ${esc(DOW(x.best.day))}`) : ""));
+    const nights = (t.oura || []).filter((x) => x.last != null || x.avg != null).map((x) => row(x.k, x.label, x.last ?? "·", x.avg, x.arrow, cls(x), x.series,
+      x.best == null ? "" : x.last === x.best ? "🏆 best" : `best ${x.best}`));
+    return `<div class="tr">${days.join("")}${nights.length ? `<div class="tr-h">Last night</div>${nights.join("")}` : ""}
+      <div class="tr-beat"><span>🌱</span><span><b>Tomorrow's one thing</b>${esc(t.beat)}</span></div></div>`;
+  }
+
   function open(d) {
     if (document.getElementById("night")) return;
     const el = document.createElement("div");
@@ -96,6 +117,7 @@
       <div class="nt-body">
         <section><h3>Today</h3>
           <div class="nt-stats">${d.today.stats.map(([n, l]) => `<div><b>${esc(n)}</b><span>${esc(l)}</span></div>`).join("")}</div>
+          ${trendsHtml(d.today.trends)}
           ${d.today.line || ""}
           ${d.today.done.length ? `<ul class="nt-list">${d.today.done.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}
         </section>
@@ -189,6 +211,14 @@
     .nt-sched li { display:flex; gap:12px; padding:6px 0; border-bottom:1px solid rgba(255,255,255,.06); }
     .nt-sched span { width:72px; flex:none; color:var(--ink-soft); font-variant-numeric:tabular-nums; }
     .nt-hint { font-size:12px; color:var(--ink-faint); }
+    .tr { margin-top:10px; background:var(--glass); border-radius:14px; padding:8px 12px; }
+    .tr-r { display:grid; grid-template-columns:1fr 42px 64px 72px; gap:6px; align-items:center; padding:5px 0; border-bottom:1px solid rgba(255,255,255,.05); font-size:13px; }
+    .tr-l { color:var(--ink-soft); } .tr-r b { font-size:15px; text-align:right; } .tr-spark { display:block; }
+    .tr-a { font-weight:700; color:var(--ink-faint); white-space:nowrap; } .tr-a.good { color:#8fe3b0; } .tr-a.off { color:#ffb36b; }
+    .tr-a small { font-weight:400; color:var(--ink-faint); font-size:11px; } .tr-l small { display:block; font-size:11px; color:var(--ink-faint); }
+    .tr-h { font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:#7fe3d4; margin:10px 0 2px; }
+    .tr-beat { display:flex; gap:10px; margin:10px 0 4px; padding:10px 12px; border-radius:12px; background:linear-gradient(135deg, rgba(143,227,176,.16), rgba(255,212,121,.10)); font-size:14px; line-height:1.4; }
+    .tr-beat b { display:block; font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:#8fe3b0; margin-bottom:2px; }
     .nt-tile { width:100%; display:flex; gap:12px; align-items:center; text-align:left; padding:14px; border-radius:16px;
       background:var(--glass); border:1px solid var(--glass-border); }
     .nt-tile.done { border-color:rgba(255,212,121,.6); background:linear-gradient(135deg, rgba(255,212,121,.18), rgba(255,255,255,.05)); }

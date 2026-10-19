@@ -35,7 +35,7 @@ const API = "https://still.srv1948070.hstgr.cloud";
 // a test still-api on this computer (quest.html?api=http://localhost:…) is saved like the real one, so offline can be tested
 const TEST_API = (() => { try { const a = new URL(new URL(self.location.href).searchParams.get("api") || "");
   return /^(localhost|127\.0\.0\.1)$/.test(a.hostname) ? a.origin : null; } catch { return null; } })();
-const DATA_PATHS = /^\/(plan|ops|tasks|steps|bedtime|sleep)(\/|$)|^\/quest\/(state|insights|skills|content|wiki|keeps|practice)(\/|$)/;
+const DATA_PATHS = /^\/(plan|ops|tasks|steps|bedtime|sleep|readiness|lastnight)(\/|$)|^\/quest\/(state|insights|skills|content|wiki|keeps|practice)(\/|$)/;
 
 // the page's own ?v= scripts and styles, as quest.html names them
 const shellFiles = (html) => [...new Set([...html.matchAll(/<(?:script|link)\b[^>]*?(?:src|href)="([^":?#]+\.(?:js|css)\?v=[^"]+)"/g)].map((m) => m[1]))];
