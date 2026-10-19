@@ -1758,7 +1758,7 @@
   function refillSleep(level, why, sleepScore = level){
     if (G.day.slept) return;
     G.day.slept = true; G.day.sleepScore = sleepScore == null ? null : Math.round(sleepScore);   // the Oura sleep score, or hours x 10
-    addBody(Math.max(0, Math.min(100, level)) - body(), why, "sleep", false, { sl:1 });
+    addBody(Math.max(0, Math.min(100, level)) - body(), why, "sleep", false, { sl:1, to:Math.max(0, Math.min(100, Math.round(level))) });
     render();
   }
   const energyTag = b => { const id = basicId(b);
@@ -1838,7 +1838,7 @@
         G.day.readiness = ready; G.day.ouraReady = true; G.day.ouraTried = true; G.day.slept = true;
         if (slept != null) G.day.sleepScore = slept;   // the gym's go-easy check reads it
         else if (G.day.sleepScore == null) G.day.sleepScore = ready;
-        addBody(QO.bodyFrom(ready, G.day.log) - body(), `Readiness ${ready} (Oura)`, "sleep", false, { sl:1 });
+        addBody(QO.bodyFrom(ready, G.day.log) - body(), `Readiness ${ready} (Oura)`, "sleep", false, { sl:1, to:Math.round(ready) });
         render();
       } else if (slept != null && !G.day.slept) refillSleep(slept, `Slept ${slept} (Oura)`);
     } finally { ouraBusy = false; }
@@ -1906,7 +1906,7 @@
   function log(msg, xp = 0, extra){
     G.day.log.unshift({ at:now().toISOString(), msg, xp, ...(extra || {}) });
     if (extra && extra.at) G.day.log.sort((x, y) => Date.parse(y.at) - Date.parse(x.at));
-    G.day.log = G.day.log.slice(0, 80);
+    G.day.log = QuestMerge.trimLog(G.day.log);   // every Body line stays: Body is worked out from them
     saveG();
   }
   function floatXp(n, label){
@@ -4764,6 +4764,9 @@
     if (d.prana == null) { d.prana = 0; d.pranaSince = now().toISOString(); d.pl = [[now().toISOString(), 0]]; }
     d.habits = d.habits || {};
     if (d.body == null) { d.body = 60; d.bl = [[now().toISOString(), 60]]; }
+    // Body follows its log lines (2026-10-19): a copy that drifted from them (a stale device, an old merge) heals here
+    const bd = QuestMerge.bodyOf(d);
+    if (bd != null && bd !== d.body) { d.body = bd; (d.bl = d.bl || []).push([now().toISOString(), bd]); }
     if (!d.pranaSince) d.pranaSince = d.since || now().toISOString();
     if (G.mode !== "prana") { G.mode = "prana"; delete G.summits; delete G.ropes; delete G.souvenirs; }
   }
