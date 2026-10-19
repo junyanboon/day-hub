@@ -3121,7 +3121,9 @@
       water: async () => { addGlass(null); return `1 glass logged. ${QW().summary(G.day.glasses).ml.toLocaleString()} ml today.`; },
       breath: async (item, o = {}) => { if (o.completed) { addPrana(Math.round(3 * gainMult()), "Breath reset", "breath"); render(); return "Reset done. Carry it into the next thing."; } return "Stopped early. That still counts as a pause."; },
       // the Buffer Stone and the Trail Map pushed the rest of the day; nothing slides now (Junyan, 2026-10-19, d50), so they
-      // have no action: one still in the bag says so and is not used up (bag.js)
+      // do nothing: one still in the bag says so and is not used up (bag.js keeps an item whose action throws)
+      buffer: async () => { throw new Error("the Buffer Stone is retired: Day Quest no longer moves your plan"); },
+      map: async () => { throw new Error("the Trail Map is retired: Day Quest no longer slides your day"); },
       scout: async () => { const t = now(), n = blocks().find(b => b.s > t && ["work", "major", "travel"].includes(groupOf(b)) && !INSIGHTS[gk(b)]);
         if (!n) return "Everything coming up already has a prep list.";
         (G.research = G.research || []).push({ key:gk(n), title:n.t, s:n.s.toISOString() }); saveG();
@@ -3719,7 +3721,8 @@
     await writeOps(o => {   // again against the edit layer writeOps just pulled, so two devices place them once
       if (QB().growCaney(o.adds, now(), started, fixed())) log("Go over the day with Caney is 15 min now");
       const r = QB().placeBasics(placeArgs()); keepNotes(r);
-      const more = [];   // each one placed sees the ones placed before it in this batch
+      // each one placed sees the edit layer writeOps just pulled (another device's adds) and the ones placed before it
+      const more = o.adds.map(a => ({ ...a, s:new Date(a.s), e:new Date(a.e), extra:true }));
       r.place.forEach(p => { const q = placeOwn({ key:"new", t:p.t, extra:true }, p.s, p.e, true, more);
         log(`Planned ${p.t}: ${fmtT(q.s)} to ${fmtT(q.e)}`); const a = basicAdd(p.id, q.s, p.min); o.adds.push(a);
         more.push({ ...a, s:new Date(a.s), e:new Date(a.e), extra:true }); });

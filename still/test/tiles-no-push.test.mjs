@@ -65,7 +65,9 @@ test("no button or item pushes today's plan", () => {
     assert.ok(!html.includes(gone), gone);
   assert.ok(!/giveItem\("(buffer|map)"/.test(html), "the Buffer Stone and Trail Map are no longer handed out");
   const ctxSrc = html.slice(html.indexOf("const BAG_CTX"), html.indexOf("function openBag("));
-  assert.ok(!/\bbuffer:|\bmap:/.test(ctxSrc), "using an old Buffer Stone or Trail Map moves nothing (and is not used up)");
+  assert.match(ctxSrc, /buffer: async \(\) => \{ throw /, "an old Buffer Stone moves nothing and stays in the bag");
+  assert.match(ctxSrc, /map: async \(\) => \{ throw /, "an old Trail Map moves nothing and stays in the bag");
+  assert.ok(!/shiftFrom|openShiftMenu/.test(ctxSrc));
   assert.ok(!/Adds 15 minutes before your next block|Replans the rest of your day/.test(bag), "the bag says what they do now");
   assert.match(fn("function openRecover("), /rAbsorb/, "welcome back still offers Absorb it");
 });
