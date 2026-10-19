@@ -51,9 +51,9 @@
   const shortLevel = (LV, x) => (x.level >= LV.TOP ? `L${x.level} · top level` : `L${x.level} → Next L${x.level + 1}`);
 
   /* One move. x: the move in today's session. open: this row is the open one. testing: its Test question is showing. */
-  function moveHTML(LV, esc, c, x, open, testing) {
+  function moveHTML(LV, esc, c, x, open, testing, due) {
     const up = x.level > x.start, done = logged(LV, x);
-    let h = `<div class="gmove${open ? " open" : ""}${done ? " done" : ""}" id="gm-${c}">
+    let h = `<div class="gmove${open ? " open" : ""}${done ? " done" : ""}${due ? " due" : ""}" id="gm-${c}">
       <button class="grow" data-gopen="${c}" aria-expanded="${open}"><span class="gname">${esc(MOVE[c])}</span>
         <span class="glv${up ? " up" : ""}">${esc(shortLevel(LV, x))}${up ? " ⭐" : ""}</span><span class="gok" aria-label="${done ? "logged" : ""}">${done ? "✓" : ""}</span></button>`;
     if (!open) return h + `</div>`;
@@ -76,10 +76,34 @@
     if (lastTest) h += `<div class="gtest-h">${lastTest.pass ? `Passed L${lastTest.level} today. It saves with Finish and save.` : `Tried L${lastTest.level}: not yet. The try is saved with the session.`}</div>`;
     return h + `</div></div>`;
   }
-  // every strength row of the session; openCode is the one open row (or none)
-  function movesHTML(LV, esc, gym, openCode, testing) {
-    const P = PROGRAMS[gym.program] || {};
-    return (P.strength || []).map((c) => moveHTML(LV, esc, c, gym.e[c], openCode === c, testing === c)).join("");
+  // every strength row of the session; openCode is the one open row (or none); due: the keys that get a green ring
+  function movesHTML(LV, esc, gym, openCode, testing, due) {
+    const P = PROGRAMS[gym.program] || {}, ring = new Set(due || []);
+    return (P.strength || []).map((c) => moveHTML(LV, esc, c, gym.e[c], openCode === c, testing === c, ring.has(c))).join("");
+  }
+
+  /* Green rings (Junyan, 2026-10-19: "add green circles around the exercises that I haven't done yet in the last 5
+     days"). A Jack Woods move (its code) or mobility chip ("m:<name>") is due when no saved session in the last
+     DUE_DAYS game days (today counts) logged it and today's session has not logged it yet. No history means due.
+     sessions: the saved sessions (still-api /quest/workout), each { day?, date, entries }; day is the game day the
+     page works out from savedAt, else the calendar date. today: the game day, YYYY-MM-DD. */
+  const DUE_DAYS = 5;
+  const CODE_OF = Object.fromEntries(Object.entries(MOVE).map(([c, n]) => [n, c]));
+  const entryKey = (x) => (!x ? null : x.kind === "mobility" ? "m:" + x.name : x.code || CODE_OF[x.name] || null);
+  function doneKeys(sessions, today, n = DUE_DAYS) {
+    const t = Date.parse(today), out = new Set();
+    for (const w of sessions || []) {
+      const ago = Math.round((t - Date.parse((w && (w.day || w.date)) || "")) / 86400000);
+      if (!(ago < n)) continue;   // also skips a session with no readable date
+      (w.entries || []).forEach((x) => { const k = entryKey(x); if (k) out.add(k); });
+    }
+    return out;
+  }
+  // logged in today's session (not yet saved): a touched strength move, a ticked mobility chip
+  const loggedNow = (LV, gym, k) => { const x = gym && gym.e && gym.e[k]; return k.startsWith("m:") ? !!(x && x.done) : logged(LV, x); };
+  function dueKeys(LV, gym, sessions, today) {
+    const P = PROGRAMS[gym && gym.program] || {}, done = doneKeys(sessions, today);
+    return [...(P.strength || []), ...(P.mobility || []).map((m) => "m:" + m)].filter((k) => !done.has(k) && !loggedNow(LV, gym, k));
   }
   // tapping a row: it opens and any other row shuts; tapping the open row shuts it
   const toggle = (openCode, c) => (openCode === c ? null : c);
@@ -87,7 +111,8 @@
   /* "How do you feel now?" (Junyan, 2026-10-17, d15 and d16; research: life-wiki answers/2026-10-17-strength-training-
      prana-and-body.md). One tap at Finish and save, and it is the only thing the gym log pays: "don't give any points for
      logging it". Body base points; gains are multiplied by the level's gainMult, losses are not. Wiped out also costs 1
-     prana (d16). Good, a healthy tired, is the goal. Paid once per gym block: the answer is kept in G.day.mealq under
+     prana (d16). Good, a healthy tired, is the goal (kept as data: its "Aim for this" hint and ring were dropped
+     2026-10-19, "I already know to aim", and a green ring now means a move is due). Paid once per gym block: the answer is kept in G.day.mealq under
      feelKey with kind "gym", which syncs like a meal rating. */
   const FEEL = [
     { id:"energised", icon:"⚡", text:"Energised, light", b:2, p:0 },
@@ -113,7 +138,7 @@
   const ptsText = (pts) => [pts.b ? `${pts.b > 0 ? "+" : "−"}${Math.abs(pts.b)} body` : "", pts.p ? `${pts.p > 0 ? "+" : "−"}${Math.abs(pts.p)} prana` : ""].filter(Boolean).join(", ") || "0";
   function feelHTML(esc, sel, mult) {
     return `<div class="glabel">How do you feel now?</div><div class="gfeel">${FEEL.map((f) =>
-      `<button class="gchip gf${sel === f.id ? " on" : ""}${f.goal ? " goal" : ""}" data-feel="${f.id}" aria-pressed="${sel === f.id}">${f.icon} ${esc(f.text)}<b>${esc(ptsText(feelPoints(f.id, mult)))}</b>${f.goal ? `<small>🎯 Aim for this most sessions</small>` : ""}</button>`).join("")}</div>`;
+      `<button class="gchip gf${sel === f.id ? " on" : ""}" data-feel="${f.id}" aria-pressed="${sel === f.id}">${f.icon} ${esc(f.text)}<b>${esc(ptsText(feelPoints(f.id, mult)))}</b></button>`).join("")}</div>`;
   }
   /* The existing recovery advice (recoveryReasons) gets one more reason: wiped out twice in 7 days, or once after a
      night under 70 (today or yesterday). days: G.days style, keyed by a date string, each { wiped, sleep }. */
@@ -130,5 +155,6 @@
   }
 
   root.QuestGymLog = { MOVE, JW, PROGRAMS, programName, programFor, newSession, fromDraft, logged, shortLevel, moveHTML, movesHTML, toggle,
+    DUE_DAYS, doneKeys, dueKeys,
     FEEL, feelById, feelPoints, feelKey, feelPay, feelRecord, feelHTML, wipedCount, wipedReason };
 })(typeof window !== "undefined" ? window : globalThis);

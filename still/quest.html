@@ -358,7 +358,9 @@
   .gfeel .gf { border-radius:14px; text-align:left; color:#fff; line-height:1.3; }
   .gfeel .gf b { display:block; font-size:12px; font-weight:600; margin-top:2px; }
   .gfeel .gf small { display:block; font-size:11.5px; margin-top:2px; }
-  .gfeel .gf.goal { box-shadow:inset 0 0 0 1.5px var(--good); }
+  /* green ring: not done in the last 5 days (2026-10-19). A soft glow in --good; it goes once the move is logged. */
+  .gmoves .gmove.due { box-shadow:inset 0 0 0 1.5px rgba(143,227,176,.85), 0 0 12px rgba(143,227,176,.28); }
+  .gchip.due:not(.on) { box-shadow:inset 0 0 0 1.5px rgba(143,227,176,.85), 0 0 10px rgba(143,227,176,.3); }
   .gfeel .gf.on { color:#173b2a; }
   .gym-hb { display:flex; gap:6px; }
   .gmv { margin-top:10px; padding:12px; border-radius:14px; background:rgba(255,255,255,.08); }
@@ -734,7 +736,7 @@
 <script src="bag.js?v=20261009k"></script>
 <script src="quest-merge.js?v=20261019y"></script>
 <script src="quest-levels.js?v=20261016b"></script>
-<script src="quest-gymlog.js?v=20261017a"></script>
+<script src="quest-gymlog.js?v=20261019a"></script>
 <script src="quest-meals.js?v=20261019f"></script>
 <script src="quest-trends.js?v=20261019c"></script>
 <script src="nvc-words.js?v=20261010a"></script>
@@ -2848,6 +2850,11 @@
   const gymFeelKey = () => { const blk = GYM.blockKey && blocks().find(x => x.key === GYM.blockKey); return GL.feelKey(blk ? gk(blk) : null, gameYmd()); };
   function saveDraft(){ try { localStorage.setItem(gymDraftKey(), JSON.stringify(GYM)); } catch {} }
   const gymTrend = () => LV.bodyTrend(LV.readingsFrom(gymInfo.body, gymInfo.last));
+  /* Green rings (2026-10-19): the Jack Woods moves and mobility chips not logged in the last 5 game days (today counts),
+     read from his saved sessions (still-api keeps every save; /quest/workout sends the last 12) plus today's session.
+     A session's game day comes from savedAt (the day starts at 4 AM, as gameYmd), else its date. */
+  const gymDay = w => (w && w.savedAt && !isNaN(Date.parse(w.savedAt)) ? tzYmd(new Date(Date.parse(w.savedAt) - 4 * 3600000)) : w && w.date);
+  const gymDue = () => GL.dueKeys(LV, GYM, (gymInfo.last || []).map(w => ({ ...w, day:gymDay(w) })), gameYmd());
 
   let gymShowMove = false, gymTesting = null, gymRow = null;
   async function openGym(block){
@@ -2879,10 +2886,11 @@
       <div class="gtopline"><select id="gProg" aria-label="Program">${Object.keys(PROGRAMS).map(k => `<option ${k === GYM.program ? "selected" : ""}>${k}</option>`).join("")}</select></div>
       <div class="gbw"><label for="gBw">⚖️ Body weight</label><input class="set" id="gBw" inputmode="decimal" placeholder="lbs" value="${esc(GYM.bw || "")}">
         <small id="gBwT">${tr ? `Last ${esc(String(tr.last.lbs))}` : "optional"}</small></div>`;
-    if (P.strength) h += `<div class="gmoves">${GL.movesHTML(LV, esc, GYM, gymRow, gymTesting)}</div>
-      <p class="gnote">Tap a move you're doing today. The ones you leave shut aren't logged.</p>`;
+    const due = gymDue(), ringNote = due.length ? ` A green ring means you haven't done it in the last ${GL.DUE_DAYS} days.` : "";
+    if (P.strength) h += `<div class="gmoves">${GL.movesHTML(LV, esc, GYM, gymRow, gymTesting, due)}</div>
+      <p class="gnote">Tap a move you're doing today. The ones you leave shut aren't logged.${ringNote}</p>`;
     if (P.mobility) h += `<div class="glabel">Mobility</div><div class="gchips">${P.mobility.map(m =>
-      `<button class="gchip${GYM.e["m:" + m].done ? " on" : ""}" data-mob="${esc(m)}">${GYM.e["m:" + m].done ? "✓ " : ""}${esc(m)}</button>`).join("")}</div>`;
+      `<button class="gchip${GYM.e["m:" + m].done ? " on" : ""}${due.includes("m:" + m) ? " due" : ""}" data-mob="${esc(m)}">${GYM.e["m:" + m].done ? "✓ " : ""}${esc(m)}</button>`).join("")}</div>`;
     (P.mis || []).forEach(([m, how, sets]) => {
       const x = GYM.e["mis:" + m];
       h += `<div class="gmove gmis"><div class="gtop"><b>${esc(m)}</b><span class="gl">
@@ -2916,7 +2924,7 @@
     // a typed number marks the row ✓ when the field is left (redrawing on every key would close the phone's keyboard)
     // a typed number ticks its row in place (a redraw would close the phone's keyboard or eat the next tap)
     const tick = c => { const row = $("gm-" + c), ok = row && row.querySelector(".gok"), on = GL.logged(LV, GYM.e[c]);
-      if (row) row.classList.toggle("done", on); if (ok) ok.textContent = on ? "✓" : ""; };
+      if (row) { row.classList.toggle("done", on); row.classList.toggle("due", gymDue().includes(c)); } if (ok) ok.textContent = on ? "✓" : ""; };
     sh.querySelectorAll("[data-reps]").forEach(inp => inp.oninput = () => { GYM.e[inp.dataset.reps].reps = inp.value.trim(); saveDraft(); tick(inp.dataset.reps); });
     sh.querySelectorAll("[data-kg]").forEach(inp => inp.oninput = () => { GYM.e[inp.dataset.kg].kg = inp.value.trim(); saveDraft(); tick(inp.dataset.kg); });
     sh.querySelectorAll("[data-tr]").forEach(b => b.onclick = () => { const x = GYM.e[b.dataset.tr]; x.trained = Math.min(LV.TOP, Math.max(1, x.trained + +b.dataset.d)); saveDraft(); drawGym(); });

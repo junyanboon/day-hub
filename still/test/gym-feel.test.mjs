@@ -27,13 +27,14 @@ test("the multiplier touches gains only", () => {
   assert.equal(GL.feelPoints("nope", 1.5), null);
 });
 
-test("Good is marked as the goal with a plain hint", () => {
+test("Good is still the goal, with no Aim hint on it (2026-10-19: \"I already know to aim\"); the four answers stay", () => {
   const goal = GL.FEEL.filter(f => f.goal);
   assert.equal(goal.length, 1);
   assert.equal(goal[0].id, "good");
   const h = GL.feelHTML(s => s, null, 1.5);
   assert.match(h, /How do you feel now\?/);
-  assert.match(h, /Aim for this most sessions/);
+  assert.doesNotMatch(h, /Aim for this|🎯/);
+  assert.doesNotMatch(h, /class="[^"]*\bgoal\b/, "no goal ring either: a green ring now means a move is due");
   assert.equal((h.match(/data-feel="/g) || []).length, 4);
   assert.match(GL.feelHTML(s => s, "good", 1.5), /data-feel="good"[^>]*aria-pressed="true"/);
 });
@@ -84,5 +85,5 @@ test("the page wires it: pays at save from the answer, no points for logging, re
   assert.ok(!/Workout logged/.test(save[0]), "logging a workout earns nothing by itself");
   assert.match(html, /function recoveryReasons\(\)\{[\s\S]{0,900}GL\.wipedReason\(/);
   assert.match(html, /GL\.feelHTML\(/);
-  assert.match(html, /quest-gymlog\.js\?v=20261017a/);
+  assert.match(html, /quest-gymlog\.js\?v=\d{8}[a-z]+/);
 });
