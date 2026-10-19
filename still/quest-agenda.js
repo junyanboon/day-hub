@@ -151,68 +151,35 @@
     for (let i = 0; i < xs.length; i++) for (let j = i + 1; j < xs.length && +xs[j].s < +xs[i].e; j++) out.push([xs[i], xs[j]]);
     return out;
   }
-  /* "if the block slides on another one it will just be shifted back by 15 minutes or whatever so it can't overlap"
-     (d30). moved: the block just moved or added, at its new place { key, s, e }. A block it lands on starts again at
-     the next 15-minute mark after it ends, the same length, and whatever that one now lands on does the same, down
-     the day. Running past bedtime is fine (d31). Returns [{ b, s, e }] for each block that has to move. */
-  function makeRoom(list, moved, step = 15){
-    const q = step * MIN, up = ms => Math.ceil(ms / q) * q, from = +moved.s, out = [];
-    let cur = +moved.e;
-    for (const b of list.filter(x => !isGap(x) && x.key !== moved.key).sort(byStart)) {
-      if (+b.s >= cur) break;            // starts after everything placed so far: the day is clear from here
-      if (+b.e <= from) continue;        // over before the moved block starts
-      const s = up(cur), e = s + (+b.e - +b.s);
-      out.push({ b, s:new Date(s), e:new Date(e) }); cur = e;
-    }
-    return out;
-  }
-
-  /* ---------- only Joint Plans keeps apart, and its events move in Google Calendar too (Junyan, 2026-10-19) ----------
-     d40: "only for the joint plans calendar specifically. the other calendars don't conflict with this one." The rule
-     holds among Joint Plans events and blocks added in Quest (today's plan only); Junyan calendar events and anything
-     else may overlap and are never shifted. An event over 12 hours is a booking (a stay, a car), not a block: left out.
-     d38: "it needs to move everything together": a pushed Joint Plans event moves in the calendar, in one batch, and
-     only after his own move or add (and the once-a-day tidy, settle). */
+  /* ---------- nothing overlaps, and only his block moves (Junyan, 2026-10-19) ----------
+     "don't push any plans only move the things that I'm moving on the calendar specifically", "nothing should be
+     pushed". The rule holds among Joint Plans events and blocks added in Quest (d40: "the other calendars don't conflict
+     with this one"); Junyan calendar events overlap anything. An event over 12 hours is a booking (a stay, a car), not
+     a block: left out. */
   const JOINT = "fm1c5usrdr4n94qfla41lplg50@group.calendar.google.com";
   const JUNYAN = "c647a75387b94bd045b4e6ec216b3b42585b37c057c8ec35b54dbc9bf6230f1a@group.calendar.google.com";
   // the calendars Day Quest can add to (still-api's CALS), the default first (d41)
   const ADD_CALS = [{ id:JOINT, name:"Joint Plans" }, { id:JUNYAN, name:"Junyan" }];
-  const MAX_SHIFT = 12;   // more blocks than this would move: something is wrong, nothing moves (still-api has the same cap)
   const onJoint = b => !!b && (b.calId === JOINT || (!b.calId && b.cal === "Joint Plans"));
   const inRoom = b => !!b && !isGap(b) && (onJoint(b) || !!b.extra) && +b.e - +b.s <= 12 * HR;
-  // makeRoom inside the Joint Plans world; a block outside it pushes nothing
-  function roomJoint(list, moved, step = 15){
-    if (!inRoom(moved)) return [];
-    return makeRoom(list.filter(inRoom), moved, step);
-  }
-  /* Overlaps that are already there (d40 "push apart overlaps that already exist"): among blocks that start at or after
-     `from` (the past stays where it happened), each one that starts before the one ahead of it ends starts at the next
-     15-minute mark after it, the same length. The earlier one (by start, then end) stays. Returns [{ b, s, e }]. */
-  function settle(list, from, step = 15){
-    const q = step * MIN, up = ms => Math.ceil(ms / q) * q, out = [];
-    const xs = list.filter(b => inRoom(b) && +b.s >= +from).sort(byStart);
-    // a Joint block already under way does not move, but what starts inside it does
-    let cur = Math.max(-Infinity, ...list.filter(b => inRoom(b) && +b.s < +from && +b.e > +from).map(b => +b.e));
-    for (const b of xs) {
-      if (+b.s < cur) { const s = up(cur), e = s + (+b.e - +b.s); out.push({ b, s:new Date(s), e:new Date(e) }); cur = e; }
-      else cur = Math.max(cur, +b.e);
+  /* Where the block he moves or adds goes. moved: { key, id?, calId? | extra?, s, e } at the place he put it. If it lands
+     on another Joint Plans or Quest block, it starts at the next 15-minute mark after that one ends, and again after
+     whatever it lands on there, until a gap fits its length. Past bedtime is fine (d31). Nothing else moves. A block
+     outside the Joint Plans world stays where he put it. Returns { s, e, hit } (hit: the block it first landed on, or
+     null when it stays). */
+  function freeSlot(list, moved, step = 15){
+    const s0 = +moved.s, len = +moved.e - s0, stay = { s:new Date(s0), e:new Date(+moved.e), hit:null };
+    if (!inRoom(moved)) return stay;
+    const q = step * MIN, up = ms => Math.ceil(ms / q) * q;
+    const others = list.filter(b => inRoom(b) && b.key !== moved.key && !(moved.id && b.id === moved.id));
+    let s = s0, hit = null;
+    for (let n = 0; n < 500; n++) {
+      const on = others.filter(b => +b.s < s + len && +b.e > s);
+      if (!on.length) return { s:new Date(s), e:new Date(s + len), hit };
+      hit = hit || [...on].sort(byStart)[0];
+      s = up(Math.max(...on.map(b => +b.e)));
     }
-    return out;
-  }
-  /* What a set of moves writes. cal: Joint Plans events, as /cal/shift moves (from = the calendar's own time, cs/ce,
-     so the server moves each only if it is still there). ops: the rest (blocks added in Quest), in today's plan.
-     canCal false (not paired, test mode): every move stays in today's plan, as before d38. Over MAX_SHIFT: refuse. */
-  function shiftPlan(moves, canCal, note = () => ""){
-    if (moves.length > MAX_SHIFT) return { refuse:true, cal:[], ops:[] };
-    const cal = [], ops = [];
-    for (const m of moves) {
-      const b = m.b, cs = b.cs ?? b.s, ce = b.ce ?? b.e;
-      if (canCal && b.id && b.calId === JOINT && +new Date(ce) - +new Date(cs) === +m.e - +m.s)
-        cal.push({ m, body:{ id:b.id, calId:b.calId, t:b.t, from:{ s:new Date(cs).toISOString(), e:new Date(ce).toISOString() },
-          s:m.s.toISOString(), e:m.e.toISOString(), note:note(m) } });
-      else ops.push(m);
-    }
-    return { refuse:false, cal, ops };
+    return stay;
   }
 
   // "7:25 PM" and "7:40 PM" read "7:25 to 7:40 PM"
@@ -222,6 +189,6 @@
   }
 
   root.QuestAgenda = { addDays, agendaDays, mergeAgenda, snap, dragResult, dragKind, lanes, applyPending,
-    pickSpan, addKey, samePick, placePick, undoPick, carveFree, rangeText, overlaps, makeRoom,
-    JOINT, JUNYAN, ADD_CALS, MAX_SHIFT, onJoint, inRoom, roomJoint, settle, shiftPlan };
+    pickSpan, addKey, samePick, placePick, undoPick, carveFree, rangeText, overlaps, freeSlot,
+    JOINT, JUNYAN, ADD_CALS, onJoint, inRoom };
 })(typeof window !== "undefined" ? window : globalThis);

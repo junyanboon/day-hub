@@ -745,7 +745,7 @@
 <script src="quest-water.js?v=20261019a"></script>
 <script src="quest-gym.js?v=20261019x"></script>
 <script src="quest-morning.js?v=20261019a"></script>
-<script src="quest-agenda.js?v=20261019z"></script>
+<script src="quest-agenda.js?v=20261019zb"></script>
 <script src="quest-offline.js?v=20261017a"></script>
 <script src="quest-nearby.js?v=20261016k"></script>
 </head>
@@ -2162,103 +2162,54 @@
     if (b.extra) { const a = o.adds.find(x => x.key === b.key); if (a) { a.s = s.toISOString(); a.e = e.toISOString(); a.t = t; } }
     else o.edits[b.key] = { s:s.toISOString(), e:e.toISOString(), t };
   }
-  function saveBlock(b, s, e, t, moveLater){
-    const ds = s - b.s, de = e - b.e;
+  /* Nothing overlaps, and only his block moves (Junyan, 2026-10-19: "don't push any plans only move the things that I'm
+     moving on the calendar specifically", "nothing should be pushed"). The block he moves or adds today that lands on a
+     Joint Plans event or a Quest block starts at the next free 15-minute slot after it instead (quest-agenda.js
+     freeSlot). No other block moves, in today's plan or in Google Calendar. Junyan calendar events never block. b: the
+     block as he moved it ({ key, id?, calId? | extra? }). quiet: the caller says where it went in its own toast. */
+  function placeOwn(b, s, e, quiet){
+    if (!AGD() || gameDayOf(s) !== gameYmd()) return { s, e, hit:null };
+    const r = AGD().freeSlot(blocks(), { ...b, s:new Date(s), e:new Date(e) });
+    if (r.hit) { log(snapSay(b, r)); if (!quiet) calToast(snapSay(b, r), 6000); }
+    return r;
+  }
+  const snapSay = (b, r) => r.hit ? `${shortName(b)} would have overlapped ${shortName(r.hit)}, so it starts at ${fmtT(r.s)}.` : "";
+  const timeMoved = (b, s, e) => +s !== +b.s || +e !== +b.e;
+  function saveBlock(b, s, e, t){
+    if (timeMoved(b, s, e)) ({ s, e } = placeOwn(b, s, e));
     log(`Changed ${b.t}${t !== b.t ? ` to ${t}` : ""}: ${fmtT(s)} to ${fmtT(e)}`);
-    return writeOps(o => {
-      // later blocks move by however much this one's end moved
-      if (moveLater && de) blocks().forEach(x => {
-        if (x.key === b.key || x.s < b.e) return;
-        setBlock(o, x, new Date(x.s.getTime() + de), new Date(x.e.getTime() + de), x.t);
-      });
-      setBlock(o, b, s, e, t);
-    }).then(() => roomFor(b, s, e));
+    return writeOps(o => setBlock(o, b, s, e, t));
   }
-  /* Nothing overlaps (Junyan, 2026-10-19, d30 d31), among Joint Plans only (d40): after a block is moved or added today,
-     a Joint Plans event or Quest block it lands on starts again at the next 15-minute mark after it, and the rest of the
-     day follows (quest-agenda.js roomJoint). Junyan calendar events overlap freely and never move. Past bedtime is fine
-     (d31). d38 "it needs to move everything together": the pushed Joint Plans events move in Google Calendar too (Caney
-     sees it), in one /cal/shift batch, only from here (his own move or add). moved: the block moved or
-     added ({ key, calId? | extra? }); its key is left out of the shift. */
-  function roomFor(moved, s, e){
-    return Promise.resolve();   // switched off (Junyan, 2026-10-19): "don't push any plans only move the things that I'm moving"
-    if (!AGD() || gameDayOf(s) !== gameYmd()) return Promise.resolve();
-    const moves = AGD().roomJoint(blocks(), { ...moved, s:new Date(s), e:new Date(e) });
-    return moves.length ? shiftBlocks(moves, `${moved.t || "a block"} at ${fmtT(new Date(s))}`) : Promise.resolve();
-  }
-  /* Carry out make-room moves: Joint Plans events in Google Calendar (one /cal/shift batch; the server moves each only if
-     it is still where we read it, later only, same length, at most 12 a batch and 40 a day), Quest blocks in today's
-     plan. Not paired, test mode, an old still-api (404) or a failed write: that block moves in today's plan only, as
-     before. More than MAX_SHIFT moves: nothing moves, and the log says so. */
-  async function shiftBlocks(moves, why){
-    const P = AGD().shiftPlan(moves, canShift(), m => `Moved later by Day Quest to make room (was ${fmtT(m.b.s)}).`);
-    if (P.refuse) { log(`Did not make room: ${moves.length} blocks would move, more than ${AGD().MAX_SHIFT}. Nothing moved.`); return; }
-    const stay = P.ops.slice(), done = [];
-    if (P.cal.length) {
-      try {
-        const r = await qfetch("/cal/shift", { method:"POST", body:JSON.stringify({ why, day:gameYmd(), moves:P.cal.map(x => x.body) }) });
-        const ok = new Set((r.moved || []).map(x => x.id));
-        P.cal.forEach(x => (ok.has(x.m.b.id) ? done : stay).push(x.m));
-        if ((r.skipped || []).length) log(`Joint Plans not moved in Google Calendar: ${r.skipped.map(k => {
-          const m = P.cal.find(x => x.m.b.id === k.id); return `${m ? shortName(m.m.b) : "an event"} (${k.why})`; }).join(", ")}; moved in today's plan only.`);
-      } catch (err) {
-        P.cal.forEach(x => stay.push(x.m));
-        log(`Joint Plans not moved in Google Calendar (${err.status === 404 ? "still-api needs its update" : err.message}); moved in today's plan only.`);
-      }
-    }
-    await writeOps(o => {
-      stay.forEach(m => setBlock(o, m.b, m.s, m.e, m.b.t));
-      done.forEach(m => { delete o.edits[m.b.key]; });   // the calendar holds these now
-    });
-    const say = list => list.map(m => `${shortName(m.b)} now ${fmtT(m.s)}`).join(", ");
-    if (done.length) log(`Made room in Joint Plans, moved in Google Calendar: ${say(done)}`);
-    if (stay.length) log(`Made room, nothing overlaps (today's plan): ${say(stay)}`);
-    if (done.length) await pullAll();
-  }
-  const canShift = () => !!(questKey() && !DRY);
-  /* Calendar writes: a block that came from Google Calendar (it has an id) can
-     be moved or renamed in the calendar itself. Blocks moved along with it
-     ("move everything after") stay today-only, so a flight or a shared Joint
-     Plans event is never shifted in the calendar by accident. */
+  /* Calendar writes: a block that came from Google Calendar (it has an id) can be moved or renamed in the calendar
+     itself. Only that one event changes (his own move); nothing else is moved for it. */
   const canCal = b => !!(b.id && b.calId && questKey() && !DRY);
-  async function saveBlockCal(b, s, e, t, moveLater){
+  async function saveBlockCal(b, s, e, t){
+    if (timeMoved(b, s, e)) ({ s, e } = placeOwn(b, s, e));
     try {
       await qfetch("/cal/event", { method:"POST", body:JSON.stringify({
         id:b.id, calId:b.calId, raw:b.raw, s:s.toISOString(), e:e.toISOString(), title: t !== b.t ? t : "" }) });
     } catch (err) {
       alert(`Could not change the calendar (${err.message}). Saved for today only.`);
-      return saveBlock(b, s, e, t, moveLater);
+      return saveBlock(b, s, e, t);
     }
     log(`Changed ${b.t} in the calendar${t !== b.t ? ` to ${t}` : ""}: ${fmtT(s)} to ${fmtT(e)}`);
-    const de = e - b.e;
-    await writeOps(o => {
-      delete o.edits[b.key];   // the calendar now holds the change
-      if (moveLater && de) blocks().forEach(x => {
-        if (x.key === b.key || x.s < b.e) return;
-        setBlock(o, x, new Date(x.s.getTime() + de), new Date(x.e.getTime() + de), x.t);
-      });
-    });
-    await roomFor(b, s, e);
+    await writeOps(o => { delete o.edits[b.key]; });   // the calendar now holds the change
     await pullAll();
   }
   const jointId = () => AGD() ? AGD().JOINT : undefined;   // where Day Quest's adds go by default (d41)
   const calName = id => { const c = AGD() && AGD().ADD_CALS.find(x => x.id === id); return c ? ` (${c.name})` : ""; };
   /* calId: the calendar it goes on. Adds from Day Quest go on Joint Plans unless he picks another (d41, 2026-10-19:
      "when I add an item on the day quest it should go to the joint plans calendar by default"). */
-  async function addBlockCal(t, s, e, makeRoom, calId = jointId()){
+  async function addBlockCal(t, s, e, calId = jointId()){
+    ({ s, e } = placeOwn({ key:"new", t, calId }, s, e));
     let made = {};
     try { made = await qfetch("/cal/event", { method:"POST", body:JSON.stringify({ s:s.toISOString(), e:e.toISOString(), title:t, calId,
       ...(isGym({ t }) ? { color:"3", desc:"Added from Day Quest: a gym session. Move it or delete it as you like." } : {}) }) }); }
     catch (err) {
       // today's plan cannot hold another day, so a failed add there is only reported
       if (gameDayOf(s) !== gameYmd()) return calToast(`Could not add ${t} to the calendar (${err.message}). Nothing was added.`, 7000);
-      alert(`Could not add it to the calendar (${err.message}). Added for today only.`); return addBlock(t, s, e, makeRoom); }
+      alert(`Could not add it to the calendar (${err.message}). Added for today only.`); return addBlock(t, s, e); }
     log(`Added ${t} to the calendar${calName(made.calId || calId)}: ${fmtT(s)} to ${fmtT(e)}`);
-    if (makeRoom) await writeOps(o => blocks().forEach(x => {
-      if (x.s < s) return;
-      setBlock(o, x, new Date(x.s.getTime() + (e - s)), new Date(x.e.getTime() + (e - s)), x.t);
-    }));
-    await roomFor({ key:"new", t, calId:made.calId || calId }, s, e);   // not in today's plan until the pull
     await pullAll();
   }
   function dropBlock(b){
@@ -2269,16 +2220,11 @@
       else { if (!o.drops.includes(b.key)) o.drops.push(b.key); delete o.edits[b.key]; }
     });
   }
-  function addBlock(t, s, e, makeRoom){
+  function addBlock(t, s, e){
+    const key = newKey(s);
+    ({ s, e } = placeOwn({ key, t, extra:true }, s, e));
     log(`Added ${t}: ${fmtT(s)} to ${fmtT(e)}`);
-    const dur = e - s, key = newKey(s);
-    return writeOps(o => {
-      if (makeRoom) blocks().forEach(x => {
-        if (x.s < s) return;
-        setBlock(o, x, new Date(x.s.getTime() + dur), new Date(x.e.getTime() + dur), x.t);
-      });
-      o.adds.push({ key, s:s.toISOString(), e:e.toISOString(), t, type:"task", cal:"you" });
-    }).then(() => roomFor({ key, extra:true }, s, e));
+    return writeOps(o => { o.adds.push({ key, s:s.toISOString(), e:e.toISOString(), t, type:"task", cal:"you" }); });
   }
   // time inputs speak the calendar's clock, not the device's
   const toField = d => { const p = tzParts(d, { hour:"2-digit", minute:"2-digit", hourCycle:"h23" });
@@ -2762,7 +2708,6 @@
       <div class="row"><label>Start<input id="eS" type="time" value="${toField(b.s)}"></label>
         <label>End<input id="eE" type="time" value="${toField(b.e)}"></label></div>
       ${canCal(b) ? `<label class="check"><input id="eCal" type="checkbox" checked> Change it in Google Calendar (${esc(b.cal)})</label>` : ""}
-      <label class="check"><input id="eMove" type="checkbox"> Move everything after it too (today only)</label>
       <div class="actions"><button class="btn ghost" id="eCancel">Cancel</button><button class="btn primary" id="eSave">Save</button></div>
       <div class="actions"><button class="btn danger" id="eDrop">Remove from today</button></div>
       <p style="font-size:12px">${canCal(b) ? "Remove only hides it for today. It never deletes the calendar event."
@@ -2775,7 +2720,7 @@
       let e = fromField($("eE").value, b.s);
       if (e <= s) e = new Date(e.getTime() + 86400000);   // runs past midnight
       const cal = $("eCal") && $("eCal").checked;
-      closeSheet(); (cal ? saveBlockCal : saveBlock)(b, s, e, t, $("eMove").checked);
+      closeSheet(); (cal ? saveBlockCal : saveBlock)(b, s, e, t);
     };
     $("eDrop").onclick = () => { closeSheet(); dropBlock(b); };
   }
@@ -2819,7 +2764,7 @@
       <div class="actions"><button class="btn ghost" id="mvCancel">Close</button></div>`, true);
     $("sheet").querySelectorAll("[data-mv]").forEach(bn => bn.onclick = () => { const x = opts[+bn.dataset.mv]; closeSheet();
       pickMove({ t:x.o[1], s:x.sp.s, e:x.sp.e, ...x.p }); });
-    if ($("mvPull")) $("mvPull").onclick = () => { closeSheet(); log(`Pulled ${next.t} to ${fmtT(S)}`); saveBlock(next, S, new Date(+S + (next.e - next.s)), next.t, false); };
+    if ($("mvPull")) $("mvPull").onclick = () => { closeSheet(); log(`Pulled ${next.t} to ${fmtT(S)}`); saveBlock(next, S, new Date(+S + (next.e - next.s)), next.t); };
     $("mvOther").onclick = () => { closeSheet(); setTimeout(() => openAdd(S), 50); };
     if ($("mvPlan")) $("mvPlan").onclick = () => { closeSheet(); openMorning(); };
     $("mvCancel").onclick = closeSheet;
@@ -2853,7 +2798,6 @@
       <div class="chips" style="grid-template-columns:repeat(4,1fr)">${[15,30,60,90].map(m =>
         `<button class="chip ${m === dur ? "sel" : ""}" data-d="${m}" style="text-align:center">${m < 60 ? m + "m" : m/60 + "h"}</button>`).join("")}</div>
       ${canAdd && AGD() ? `<div class="row"><label>Goes on<select id="aWhere" class="awhere">${AGD().ADD_CALS.map(c => `<option value="${c.id}">${esc(c.name)} calendar</option>`).join("")}${other ? "" : `<option value="">Today only (not in Google Calendar)</option>`}</select></label></div>` : ""}
-      ${other ? "" : `<label class="check"><input id="aRoom" type="checkbox"> Make room (push what follows later, today only)</label>`}
       <div class="actions"><button class="btn ghost" id="aCancel">Cancel</button><button class="btn primary" id="aGo">Add</button></div>`);
     $("sheet").querySelectorAll("[data-d]").forEach(c => c.onclick = () => {
       $("sheet").querySelectorAll("[data-d]").forEach(x => x.classList.remove("sel"));
@@ -2868,7 +2812,7 @@
       const where = $("aWhere") ? $("aWhere").value : "", calId = where || jointId();
       const cal = other || isGym({ t }) && questKey() && !DRY || !!where;
       closeSheet();
-      if (cal) addBlockCal(t, s, e, !other && $("aRoom").checked, calId); else addBlock(t, s, e, $("aRoom").checked);
+      if (cal) addBlockCal(t, s, e, calId); else addBlock(t, s, e);
     };
     setTimeout(() => $("aT").focus(), 300);
   }
@@ -3496,6 +3440,8 @@
     try { await moveGymNow(b, o, what, from, k); } finally { gymMoveBusy = false; }
   }
   async function moveGymNow(b, o, what, from, k){
+    const r = placeOwn(b.game ? b : { ...b, key:"new" }, new Date(o.s), new Date(o.e), true);   // only this one moves
+    if (r.hit) o = { ...o, s:+r.s, e:+r.e, label:QG().label(+r.s, TZ()) };
     try {
       PEND[k] = { s:+o.s, e:+o.e, at:Date.now() };
       await qfetch("/cal/event", { method:"POST", body:JSON.stringify({ id:b.id, calId:b.calId, raw:b.raw, s:new Date(o.s).toISOString(),
@@ -3510,8 +3456,8 @@
     for (const d in PLANS) delete PLANS[d];
     store.set(GYM_AT, "");
     closeSheet();
-    calToast(`${what}: ${o.label}. Saved to Google Calendar${b.cal ? ` (${b.cal})` : ""}.`);
-    try { if (b.game && OPS.edits[b.key]) await writeOps(x => { delete x.edits[b.key]; }); await roomFor(b.game ? b : { ...b, key:"new" }, o.s, o.e); await pushG(); await pullAll(); } catch {}
+    calToast(`${r.hit ? snapSay(b, r) + " " : ""}${what}: ${o.label}. Saved to Google Calendar${b.cal ? ` (${b.cal})` : ""}.`);
+    try { if (b.game && OPS.edits[b.key]) await writeOps(x => { delete x.edits[b.key]; }); await pushG(); await pullAll(); } catch {}
     if (window.QuestMorning && QuestMorning.isOpen()) QuestMorning.redraw();
     planGym(false).catch(e => console.warn("gym", e));
   }
@@ -3991,14 +3937,14 @@
     fmtT, save: () => saveG(), log: m => { log(m); saveG(); },
     hour: d => { const p = tzParts(d, { hour:"numeric", minute:"numeric", hourCycle:"h23" }); return (+p.hour % 24) + p.minute / 60; },
     at: (ref, h, dd) => new Date(+fromField(`${String(Math.floor(h)).padStart(2, "0")}:${String(Math.round((h % 1) * 60)).padStart(2, "0")}`, ref) + (dd || 0) * 86400000),
-    move: (key, min) => { const b = blkByKey(key); if (b) return saveBlock(b, new Date(+b.s + min * 60000), new Date(+b.e + min * 60000), b.t, false); },
-    setTime: (key, s, e) => { const b = blkByKey(key); if (b) return saveBlock(b, s, e, b.t, false); },
-    rename: (key, t) => { const b = blkByKey(key); if (b) return saveBlock(b, b.s, b.e, t, false); },
+    move: (key, min) => { const b = blkByKey(key); if (b) return saveBlock(b, new Date(+b.s + min * 60000), new Date(+b.e + min * 60000), b.t); },
+    setTime: (key, s, e) => { const b = blkByKey(key); if (b) return saveBlock(b, s, e, b.t); },
+    rename: (key, t) => { const b = blkByKey(key); if (b) return saveBlock(b, b.s, b.e, t); },
     drop: key => { const b = blkByKey(key); if (b) return dropBlock(b); },
     add: (t, s, e, extra) => {
       // a gym session goes on Google Calendar as a real event, never a plan-only block (later 2026-10-16)
       // it stays on his own Junyan calendar, where the weekly gym plan puts gym sessions (not an Add sheet add, d41)
-      if (isGym({ t }) && questKey() && !DRY) return addBlockCal(t, s, e, false, (AGD() ? AGD().JUNYAN : undefined));
+      if (isGym({ t }) && questKey() && !DRY) return addBlockCal(t, s, e, (AGD() ? AGD().JUNYAN : undefined));
       log(`Planned ${t}: ${fmtT(s)} to ${fmtT(e)}`);
       return writeOps(o => o.adds.push({ key:newKey(s), s:s.toISOString(), e:e.toISOString(), t, type:"task", cal:"you", ...(extra || {}) })); },
     // done in Notion; the answer carries the status it had, so Undo can put it back (2026-10-10)
@@ -4753,15 +4699,19 @@
     m.addEventListener("click", e => { if (Date.now() - dragEnded < 450) { e.stopPropagation(); e.preventDefault(); } }, true);
   }
   async function commitDrag(b, dk, s, e){
-    const k = b.id ? "id:" + b.id : b.key, what = shortName(b), when = `${tzYmd(s) !== tzYmd(b.s) ? shortDay(tzYmd(s), tzYmd(now())) + " " : ""}${fmtT(s)} to ${fmtT(e)}`;
+    const k = b.id ? "id:" + b.id : b.key, what = shortName(b);
     const show = () => { $("calBody")._h = ""; render(); };
     if (+s < CAL.a0 || +e > CAL.z0) { show(); calToast("That is past the days shown here, so it stayed where it was."); return; }
-    if (dk.dry) { PEND[k] = { s:+s, e:+e, at:Date.now() }; show(); calToast(`Test mode: ${what} now ${when}, on this screen only. Nothing is saved.`); return; }
+    // landed on another Joint Plans or Quest block: this one goes to the next free 15-minute slot, nothing else moves
+    const r = placeOwn(b.game ? b : { ...b, key:"new" }, s, e, true), snapped = r.hit ? snapSay(b, r) + " " : "";
+    ({ s, e } = r);
+    const when = `${tzYmd(s) !== tzYmd(b.s) ? shortDay(tzYmd(s), tzYmd(now())) + " " : ""}${fmtT(s)} to ${fmtT(e)}`;
+    if (dk.dry) { PEND[k] = { s:+s, e:+e, at:Date.now() }; show(); calToast(`${snapped}Test mode: ${what} now ${when}, on this screen only. Nothing is saved.`); return; }
     if (dk.kind === "day") {
       // a block added in Quest lives in today's plan, which has no other days
       if (gameDayOf(s) !== gameYmd() || gameDayOf(e - 60000) !== gameYmd()) { show(); calToast(`${what} was added in Quest, so it lives in today's plan only. It can move within its day, not to another day.`, 6000); return; }
-      await saveBlock(b, s, e, b.t, false);
-      calToast(`${what}: ${when}. Saved in today's plan.`);
+      await saveBlock(b, s, e, b.t);
+      calToast(`${snapped}${what}: ${when}. Saved in today's plan.`);
       return;
     }
     PEND[k] = { s:+s, e:+e, at:Date.now() }; show();
@@ -4772,14 +4722,13 @@
       calToast(`Could not save the move (${err.message}). ${what} is back where it was.`, 7000);
       return;
     }
-    calToast(`${what}: ${when}. Saved to Google Calendar${b.cal ? ` (${b.cal})` : ""}.`);
+    calToast(`${snapped}${what}: ${when}. Saved to Google Calendar${b.cal ? ` (${b.cal})` : ""}.`);
     try {
       if (b.game) {
         log(`Moved ${what} in the calendar: ${when}`);
         // the calendar now holds the change, so drop any today-only edit of it
         if (OPS.edits[b.key]) await writeOps(o => { delete o.edits[b.key]; });
       }
-      await roomFor(b.game ? b : { ...b, key:"new" }, s, e);
       await pullAll();
     } catch {}   // the calendar has it; the next pull shows it
   }

@@ -26,39 +26,6 @@ test("overlaps: finds every pair that overlaps; open space, breathers and touchi
   assert.equal(A.overlaps([blk("a", "09:00", "12:00", "A"), blk("b", "10:00", "10:30", "B"), blk("c", "11:00", "11:30", "C")]).length, 2);
 });
 
-test("makeRoom: what the moved block lands on starts when it ends, and the rest of the day follows (d30)", () => {
-  // Gym moved onto the Shavasana at 2:30: it goes to 3:30, Rest (3:30) then starts after it at 3:45, dinner is clear
-  const day = [blk("sh", "14:30", "14:45", "Shavasana (rest after workout)"), blk("gym", "14:00", "15:00", "Gym"),
-    blk("rest", "15:30", "17:30", "Rest"), blk("din", "18:00", "19:00", "Early dinner")];
-  const r = A.makeRoom(day, { key:"gym", s:T("14:30"), e:T("15:30") });
-  assert.deepEqual(shown(r), ["Shavasana (rest after workout) 15:30-15:45", "Rest 15:45-17:45"]);
-  const after = day.map(b => { const m = r.find(x => x.b.key === b.key); return m ? { ...b, s:m.s, e:m.e } : b.key === "gym" ? { ...b, s:T("14:30"), e:T("15:30") } : b; });
-  assert.equal(A.overlaps(after).length, 0, "nothing overlaps afterwards");
-});
-
-test("makeRoom: starts snap to the next 15-minute mark; a block it lands in the middle of moves too; nothing else moves", () => {
-  const day = [blk("long", "09:00", "11:00", "Domestics"), blk("x", "11:20", "11:40", "Call"), blk("y", "13:00", "14:00", "Lunch")];
-  assert.deepEqual(shown(A.makeRoom(day, { key:"new", s:T("10:00"), e:T("11:10") })), ["Domestics 11:15-13:15", "Call 13:15-13:35", "Lunch 13:45-14:45"]);
-  assert.deepEqual(A.makeRoom(day, { key:"new", s:T("11:40"), e:T("12:00") }).length, 0, "a free spot moves nothing");
-  assert.deepEqual(A.makeRoom(day, { key:"x", s:T("11:20"), e:T("11:40") }).length, 0, "the moved block is not pushed by itself");
-});
-
-test("makeRoom: past bedtime is fine (d31), and open space is never pushed", () => {
-  const day = [blk("w", "22:00", "23:00", "Wind down"), blk("o", "21:00", "22:00", "Open space", { kind:"open" })];
-  assert.deepEqual(shown(A.makeRoom(day, { key:"s", s:T("21:30"), e:T("22:30") })), ["Wind down 22:30-23:30"]);
-});
-
-test("the page makes room after every move and add, today only, among Joint Plans (d40); calendar writes go through shiftBlocks (d38)", () => {
-  const fn = html.slice(html.indexOf("function roomFor("), html.indexOf("function roomFor(") + 400);
-  assert.match(fn, /gameDayOf\(s\) !== gameYmd\(\)/, "today only");
-  assert.match(fn, /AGD\(\)\.roomJoint\(blocks\(\)/);
-  assert.match(fn, /shiftBlocks\(moves/);
-  assert.ok(!/cal\/event/.test(fn), "no single-event write: the batch route only");
-  assert.match(html, /\}\)\.then\(\(\) => roomFor\(b, s, e\)\);/, "saveBlock (drag in today's plan, Change this block)");
-  assert.match(html, /\}\)\.then\(\(\) => roomFor\(\{ key, extra:true \}, s, e\)\);/, "addBlock");
-  assert.equal((html.match(/await roomFor\(/g) || []).length, 4, "calendar drag, calendar change, calendar add, gym move");
-});
-
 test("ghost copies: 'Shavasana (rest after workout)' is its own block, not a second Gym", () => {
   // 2026-10-19: Gym moved to 2:30 and the Shavasana event that follows it stayed at 2:30, drawn as "✓ Gym 2:30 PM"
   const SHORT = /\n  const SHORT = \[[\s\S]*?\n  \];\n/.exec(html)[0];
