@@ -80,5 +80,30 @@
     return { foods, drains };
   }
 
-  root.QuestMeals = { PRANA_FOODS, PRANA_WAYS, DRAINS, BODY, JUNK, ONEOF, FOOD_IDS, DRAIN_IDS, AUTO_NOTE, value, score, toggle, tally };
+  /* Pay as he taps (Junyan, 2026-10-19: one screen that IS the meal, no Confirm step). rec is the meal's record in
+     G.day.mealq: { sel:[ids], v:{ id:[meter, paid] }, p, b }. A tap on a picked tile takes back exactly what it paid;
+     fresh and leftover cannot both stand, so picking one takes the other back. Returns { rec, ops:[{ id, on, m, d }] }
+     (m "p" or "b"); the page moves the meters by each d. A record from before (no v) takes back today's value. */
+  const meterOf = (id) => (BODY.includes(id) || id === JUNK[0] ? "b" : "p");
+  function tap(rec, id, opt) {
+    const r = { sel: [...((rec && Array.isArray(rec.sel)) ? rec.sel : [])], v: { ...((rec && rec.v) || {}) }, p: +((rec && rec.p) || 0), b: +((rec && rec.b) || 0) };
+    const ops = [];
+    const off = (x) => {
+      const i = r.sel.indexOf(x); if (i < 0) return;
+      r.sel.splice(i, 1);
+      const [m, d] = r.v[x] || [meterOf(x), value(x, opt)];
+      delete r.v[x]; r[m] -= d;
+      ops.push({ id: x, on: false, m, d: -d });
+    };
+    if (r.sel.includes(id)) off(id);
+    else {
+      if (ONEOF[id]) off(ONEOF[id]);
+      const m = meterOf(id), d = value(id, opt);
+      r.sel.push(id); r.v[id] = [m, d]; r[m] += d;
+      ops.push({ id, on: true, m, d });
+    }
+    return { rec: r, ops };
+  }
+
+  root.QuestMeals = { PRANA_FOODS, PRANA_WAYS, DRAINS, BODY, JUNK, ONEOF, FOOD_IDS, DRAIN_IDS, AUTO_NOTE, value, score, toggle, tally, tap, meterOf };
 })(typeof window !== "undefined" ? window : globalThis);
