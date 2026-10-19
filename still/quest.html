@@ -204,6 +204,7 @@
   .hgrid.btiles, .hgrid.mqg { grid-template-columns:repeat(3, 1fr); margin:4px 0 10px; }
   .hgrid.btiles .htile, .hgrid.mqg .htile { min-height:78px; padding:14px 4px 6px; }
   .hgrid.mqg .hl { font-size:10px; }
+  .hgrid.ptiles { grid-template-columns:repeat(2, 1fr); } .hgrid.ptiles .hl { font-size:11.5px; padding:0 4px; }
   .why-tip { position:fixed; z-index:300; display:none; padding:9px 11px; border-radius:12px; background:#0f1230; border:1px solid var(--glass-border);
     color:var(--ink); font-size:12.5px; line-height:1.35; box-shadow:0 10px 30px rgba(0,0,0,.45); pointer-events:none; }
   .htile { -webkit-touch-callout:none; }
@@ -1130,19 +1131,6 @@
     OPS.adds.forEach(a => out.push({ ...a, key:a.key, s:new Date(a.s), e:new Date(a.e), extra:true }));
     return out.map(b => ({ ...b, kind:kindOf(b) })).sort((x,y) => x.s - y.s);
   }
-  // Stillness's shift: every block from `from` onward moves by `min` minutes.
-  function shiftFrom(fromKey, min){
-    return writeOps(o => {
-      const ms = min * 60000, all = blocks(), from = all.find(b => b.key === fromKey);
-      if (!from) return;
-      all.forEach(b => {
-        if (b.s < from.s) return;
-        const s = new Date(b.s.getTime()+ms).toISOString(), e = new Date(b.e.getTime()+ms).toISOString();
-        if (b.extra) { const a = o.adds.find(x => x.key === b.key); if (a) { a.s = s; a.e = e; } }
-        else o.edits[b.key] = { s, e, t:b.t };
-      });
-    });
-  }
 
   /* ---------- what kind of block is this ---------- */
   const KINDS = {
@@ -1698,10 +1686,12 @@
     const k = `${x.day}|${x.id}`; if (SUG_BUSY[k]) return;   // a fast second tap writes nothing
     SUG_BUSY[k] = true; render();
     try {
-      const made = await qfetch("/cal/event", { method:"POST", body:JSON.stringify({ s:new Date(x.s).toISOString(), e:new Date(x.e).toISOString(), title:x.t,
+      // today: it lands in a free slot like anything he adds (placeOwn), so it never overlaps a Joint Plans event or a Quest add
+      const p = placeOwn({ key:"new", t:x.t, calId:jointId() }, new Date(x.s), new Date(x.e), true);
+      const made = await qfetch("/cal/event", { method:"POST", body:JSON.stringify({ s:new Date(p.s).toISOString(), e:new Date(p.e).toISOString(), title:x.t,
         calId:jointId(), desc:"Added from Day Quest: a suggested practice block. Move it or delete it as you like." }) });
-      log(`Added ${x.t} to the calendar: ${x.day === gameYmd() ? "today" : "tomorrow"}, ${sugT(x.s, x.tz)} to ${sugT(x.e, x.tz)}`); saveG();
-      calToast(`${x.t} is on your calendar${calName(made.calId)}.`, 4000);
+      log(`Added ${x.t} to the calendar: ${x.day === gameYmd() ? "today" : "tomorrow"}, ${sugT(+p.s, x.tz)} to ${sugT(+p.e, x.tz)}`); saveG();
+      calToast(`${p.hit ? snapSay({ t:x.t }, p) + " " : ""}${x.t} is on your calendar${calName(made.calId)}.`, p.hit ? 7000 : 4000);
       if (x.day === gameYmd()) await pullAll(); else { SUG_NEXT = null; pullNextPlan(); }
     } catch (err) { delete SUG_BUSY[k]; calToast(`Could not add ${x.t} to the calendar (${err.message}). Nothing was added.`, 7000); }
     render();
@@ -1883,10 +1873,10 @@
     }
     return null;
   }
-  function addSadhana(S){
-    const E = new Date(+S + 30 * 60000);
+  function addSadhana(S0){
+    const key = newKey(S0), { s:S, e:E } = placeOwn({ key, t:"Shambhavi", extra:true }, S0, new Date(+S0 + 30 * 60000));
     log(`Added Shambhavi at ${fmtT(S)}`);
-    return writeOps(o => o.adds.push({ key:newKey(S), s:S.toISOString(), e:E.toISOString(), t:"Shambhavi", type:"task", cal:"you" }));
+    return writeOps(o => o.adds.push({ key, s:S.toISOString(), e:E.toISOString(), t:"Shambhavi", type:"task", cal:"you" }));
   }
   // d78: a meal that ends less than 3 hr before bed or practice
   function mealWarn(b, all){
@@ -1955,7 +1945,7 @@
     if (isSadhana(b)) giveItem("breath", "After Shambhavi.");
     if (isSleep(b) && !late) giveItem("lantern", "On-time bedtime.");
     G.day.onRun = late ? 0 : (G.day.onRun || 0) + 1;
-    if (G.day.onRun >= 3) { G.day.onRun = 0; giveItem("buffer", "Three on-time starts in a row."); }
+    if (G.day.onRun >= 3) G.day.onRun = 0;   // the Buffer Stone it gave pushed the day (retired 2026-10-19, d50)
     render();
   }
   // d148: blocks start on their own (no tap). Same effects as a check-in, quietly, once per block.
@@ -2060,7 +2050,8 @@
   }
   // put a block on today's plan starting now, and start it
   async function startNow(t, min){
-    const S = new Date(Math.floor(+now() / 60000) * 60000), E = new Date(+S + min * 60000), key = newKey(S);
+    const S0 = new Date(Math.floor(+now() / 60000) * 60000), key = newKey(S0);
+    const { s:S, e:E } = placeOwn({ key, t, extra:true }, S0, new Date(+S0 + min * 60000));   // never on top of another block
     log(`Your move: ${t}`);
     await writeOps(o => o.adds.push({ key, s:S.toISOString(), e:E.toISOString(), t, type:"task", cal:"you" }));
     const b = blocks().find(x => x.key === key); if (b) checkIn(b); else render();
@@ -2082,27 +2073,6 @@
     if (how === "done") { log(`Closed ${shortName(b)}`); saveG(); }
     else if (how === "carried") { log(`Carried ${shortName(b)} forward`); saveG(); }
     render();
-  }
-  function extend(b, min){
-    log(`Asked ${b.t} for +${min} min`);
-    return stretch(b, min);
-  }
-  // this block ends `min` later and everything after it moves by the same amount
-  function stretch(b, min){
-    return writeOps(o => {
-      const ms = min * 60000, all = blocks();
-      all.forEach(x => {
-        if (x.key === b.key) {
-          const e = new Date(x.e.getTime()+ms).toISOString();
-          if (x.extra) { const a = o.adds.find(y => y.key === x.key); if (a) a.e = e; }
-          else o.edits[x.key] = { s:x.s.toISOString(), e, t:x.t };
-        } else if (x.s >= b.e) {
-          const s = new Date(x.s.getTime()+ms).toISOString(), e = new Date(x.e.getTime()+ms).toISOString();
-          if (x.extra) { const a = o.adds.find(y => y.key === x.key); if (a) { a.s = s; a.e = e; } }
-          else o.edits[x.key] = { s, e, t:x.t };
-        }
-      });
-    });
   }
 
   /* side quests: one at a time (WIP limit 1) */
@@ -2141,7 +2111,7 @@
   function startZap(type, note){
     G.day.zap = { type, note, s:now().toISOString(), during: currentOf(blocks(), now())?.key || null };
     log(`⚡ ${type}${note ? ": " + note : ""}`);
-    giveItem("map", "After something came up.");
+    // the Trail Map it gave pushed the day (retired 2026-10-19, d50)
     saveG();
     render();
   }
@@ -2167,16 +2137,26 @@
      Joint Plans event or a Quest block starts at the next free 15-minute slot after it instead (quest-agenda.js
      freeSlot). No other block moves, in today's plan or in Google Calendar. Junyan calendar events never block. b: the
      block as he moved it ({ key, id?, calId? | extra? }). quiet: the caller says where it went in its own toast. */
-  function placeOwn(b, s, e, quiet){
+  function placeOwn(b, s, e, quiet, more){   // more: blocks placed earlier in the same batch, not in today's plan yet
     if (!AGD() || gameDayOf(s) !== gameYmd()) return { s, e, hit:null };
-    const r = AGD().freeSlot(blocks(), { ...b, s:new Date(s), e:new Date(e) });
+    const r = AGD().freeSlot(blocks().concat(more || []), { ...b, s:new Date(s), e:new Date(e) });
     if (r.hit) { const say = snapSay(b, r); log(say); if (!quiet) calToast(say, 6000); }
     return r;
   }
+  /* A drag of one edge (Junyan, 2026-10-19, d51): the end stops at the next block's start (the start at the end of the
+     block before), and the block does not jump. Same blocks as placeOwn: Joint Plans and Quest, today only. */
+  function placeEdge(b, s, e, mode){
+    if (!AGD() || gameDayOf(s) !== gameYmd()) return { s, e, hit:null };
+    const r = AGD().clampEdge(blocks(), { ...b, s:new Date(s), e:new Date(e) }, mode, b);
+    if (r.hit) log(edgeSay(b, r, mode));
+    return r;
+  }
+  const edgeSay = (b, r, mode) => r.hit ? `${shortName(b)} ${mode === "top" ? "starts" : "ends"} at ${fmtT(mode === "top" ? r.s : r.e)}, where ${shortName(r.hit)} ${mode === "top" ? "ends" : "starts"}.` : "";
   const snapSay = (b, r) => r.hit ? `${shortName(b)} would have overlapped ${shortName(r.hit)}, so it starts at ${fmtT(r.s)}.` : "";
   const timeMoved = (b, s, e) => +s !== +b.s || +e !== +b.e;
-  function saveBlock(b, s, e, t){
-    if (timeMoved(b, s, e)) ({ s, e } = placeOwn(b, s, e));
+  // placed: the caller already placed it (an edge drag clamps, it never snaps)
+  function saveBlock(b, s, e, t, placed){
+    if (!placed && timeMoved(b, s, e)) ({ s, e } = placeOwn(b, s, e));
     log(`Changed ${b.t}${t !== b.t ? ` to ${t}` : ""}: ${fmtT(s)} to ${fmtT(e)}`);
     return writeOps(o => setBlock(o, b, s, e, t));
   }
@@ -2640,6 +2620,19 @@
     (navigator.clipboard ? navigator.clipboard.writeText(c.dataset.copy) : Promise.reject()).then(done).catch(() => {});
   }, true);
 
+  /* One prep item (the insight agent's list) as a tile, like the habit tiles (Junyan, 2026-10-19, d23: "keep the really
+     fun tiles wherever possible"). It pays nothing by itself; finishing the list still gives the Scout Owl. key: the
+     block's key when the tile sits outside its own window (the planner and the coming-up card). */
+  function prepTile(x, i, on, key){
+    return `<button class="htile${on ? " full" : ""}" data-tick="${i}"${key ? ` data-k="${esc(key)}"` : ""}${x.why ? ` data-why="${esc(x.why)}"` : ""}>` +
+      `<span class="hi">${QB() ? QB().stepIcon(x.t) : "✅"}</span><span class="hl">${esc(x.t)}</span>${on ? `<span class="hc">✓</span>` : ""}</button>`;
+  }
+  // a tick on a prep tile: the burst on the way in (it pays nothing), the pop after the redraw
+  function prepFx(btn, on, t){
+    const fx = window.QuestFx; if (!fx || !on || !btn.classList.contains("htile")) return null;
+    fx.tap(btn.getBoundingClientRect(), { icon: QB() ? QB().stepIcon(t) : "✅" });
+    return () => fx.pop(document.querySelector(`.htile[data-tick="${btn.dataset.tick}"]${btn.dataset.k ? `[data-k="${CSS.escape(btn.dataset.k)}"]` : ""}`));
+  }
   // Work (green): a prep checklist and how-to links the insight agent researched,
   // plus the one thing that closes this block
   function openWork(b){
@@ -2662,7 +2655,7 @@
       ${I.know.length ? `<div class="knowcard"><div class="win-lb" style="margin-top:0">What to know</div>${I.know.map(x =>
         `<p><b>${esc(x.t)}</b>${x.why ? `<br><span>${esc(x.why)}</span>` : ""}</p>`).join("")}</div>` : ""}
       <div class="win-lb">${I.packing ? "Pack" : "Prep"} ${n ? `${done}/${n}` : ""}</div>
-      ${n ? I.items.map((x, i) => `<button class="wck${W.tick[i] ? " on" : ""}" data-tick="${i}"><span class="bx">${W.tick[i] ? "✓" : ""}</span><span>${esc(x.t)}${x.why ? `<br><small style="color:var(--ink-faint)">${esc(x.why)}</small>` : ""}</span></button>`).join("")
+      ${n ? `<div class="hgrid btiles ptiles">${I.items.map((x, i) => prepTile(x, i, !!W.tick[i])).join("")}</div>`
         : `<p>No prep list yet. The insight agent looks at what's coming at 6 AM and 8 PM.</p>
            ${(G.research || []).some(r => r.key === k) ? `<p>Asked. It researches this on its next run.</p>` : `<div class="actions"><button class="btn" id="wAsk">🔎 Research this</button></div>`}`}
       ${I.hype.length ? `<div class="win-lb">Get excited</div>${I.hype.map(linkRow).join("")}` : ""}
@@ -2674,10 +2667,12 @@
     $("wGoal").onchange = e => { W.goal = e.target.value.trim(); saveG(); };
     bindBarefootTile(b, openWork);
     $("sheet").querySelectorAll("[data-tick]").forEach(bn => bn.onclick = () => {
-      W.tick[bn.dataset.tick] = !W.tick[bn.dataset.tick];
+      const i = bn.dataset.tick; W.tick[i] = !W.tick[i]; (W.t = W.t || {})[i] = now().toISOString();   // W.t: merges per step
+      const pop = prepFx(bn, W.tick[i], (I.items[i] || {}).t);
       if (n && I.items.every((_, i) => W.tick[i]) && !W.scout) { W.scout = true; giveItem("scout", `Prepped ${shortName(b)}.`); }
       saveG();
-      openWork(b);
+      const top = $("sheet").scrollTop; openWork(b); $("sheet").scrollTop = top;
+      if (pop) pop();
     });
     if ($("wAsk")) $("wAsk").onclick = () => { (G.research = G.research || []).push({ key:k, title:b.t, s:b.s.toISOString() }); saveG(); openWork(b); };
     $("wEdit").onclick = () => openEdit(b);
@@ -3020,7 +3015,6 @@
   }
 
   function openRecover(mins, cur, nxt, z){
-    const shift = Math.ceil(mins / 5) * 5;
     const gap = nxt ? Math.round((nxt.s - now()) / 60000) : null;
     const tight = nxt && gap !== null && gap < 10;
     openSheet(`<h3>Welcome back. ${mins} min on ${esc(z.type)}.</h3>
@@ -3029,24 +3023,11 @@
       ${tight ? " That is tight." : ""}</p>
       <div class="actions" style="flex-direction:column">
         <button class="btn primary" id="rAbsorb">Absorb it. Keep the plan</button>
-        ${cur || nxt ? `<button class="btn" id="rShift">Shift the rest of the day +${shift} min</button>` : ""}
       </div>
-      <p style="font-size:12px;margin-top:10px">A shift writes to Stillness, so the phone and the orb move too.</p>`);
+      <p style="font-size:12px;margin-top:10px">Nothing on your plan moves for it (Day Quest never slides the rest of the day). Drag a block yourself if you need to.</p>`);
     $("rAbsorb").onclick = () => { log(`Absorbed ${mins} min on ${z.type}`); saveG(); closeSheet(); render(); };
-    if (cur || nxt) $("rShift").onclick = async () => {
-      closeSheet(); log(`Shifted the day +${shift} min after ${z.type}`); saveG();
-      if (cur) await stretch(cur, shift); else await shiftFrom(nxt.key, shift);
-      log("Replanned the rest of the day"); saveG();
-    };
   }
 
-  function openExtend(b){
-    openSheet(`<h3>Need more time on ${esc(b.t)}?</h3><p>Everything after it moves by the same amount, in Stillness too.</p>
-      <div class="chips"><button class="chip" data-m="10">+10 min</button><button class="chip" data-m="15">+15 min</button>
-      <button class="chip" data-m="30">+30 min</button><button class="chip" id="xCancel">Cancel</button></div>`);
-    $("sheet").querySelectorAll("[data-m]").forEach(c => c.onclick = () => { closeSheet(); extend(b, +c.dataset.m); });
-    $("xCancel").onclick = closeSheet;
-  }
 
   /* ---------- settings: pairing + phone pings ---------- */
   const standalone = () => window.matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
@@ -3131,7 +3112,6 @@
     if (!hasBag()) return;
     try { Bag.give(id, 1, why); } catch {}
   }
-  function nextFixed(){ const t = now(); return blocks().find(b => b.s > t && b.kind !== "open" && b.kind !== "break"); }
   const BAG_CTX = {
     getState: () => G,
     save: () => saveG(),
@@ -3140,10 +3120,8 @@
       // a water item still in the bag counts one glass on the water card (2026-10-19, d24: water lives only there)
       water: async () => { addGlass(null); return `1 glass logged. ${QW().summary(G.day.glasses).ml.toLocaleString()} ml today.`; },
       breath: async (item, o = {}) => { if (o.completed) { addPrana(Math.round(3 * gainMult()), "Breath reset", "breath"); render(); return "Reset done. Carry it into the next thing."; } return "Stopped early. That still counts as a pause."; },
-      buffer: async () => { const n = nextFixed(); if (!n) return "Nothing fixed is coming up.";
-        await shiftFrom(n.key, 15); return `${shortName(n)} moved 15 min later. Breathe.`; },
-      map: async () => { const n = nextFixed(); if (!n) return "Nothing left to replan today.";
-        setTimeout(() => openShiftMenu(n), 50); return "Pick how much room you need."; },
+      // the Buffer Stone and the Trail Map pushed the rest of the day; nothing slides now (Junyan, 2026-10-19, d50), so they
+      // have no action: one still in the bag says so and is not used up (bag.js)
       scout: async () => { const t = now(), n = blocks().find(b => b.s > t && ["work", "major", "travel"].includes(groupOf(b)) && !INSIGHTS[gk(b)]);
         if (!n) return "Everything coming up already has a prep list.";
         (G.research = G.research || []).push({ key:gk(n), title:n.t, s:n.s.toISOString() }); saveG();
@@ -3155,11 +3133,6 @@
       relive: item => log(`Relived: ${item.name}`),
     },
   };
-  function openShiftMenu(n){
-    openSheet(`<h3>Make room</h3><p>Moves ${esc(shortName(n))} and everything after it, today only.</p>
-      <div class="actions" style="flex-wrap:wrap">${[15, 30, 60].map(m => `<button class="btn" data-sh="${m}">+${m} min</button>`).join("")}</div>`);
-    $("sheet").querySelectorAll("[data-sh]").forEach(bn => bn.onclick = async () => { closeSheet(); log(`Map: shifted the day +${bn.dataset.sh} min`); await shiftFrom(n.key, +bn.dataset.sh); });
-  }
   function openBag(){
     if (!hasBag()) return;
     openSheet(`<div id="bagView"></div>`, true);
@@ -3624,7 +3597,8 @@
       const knowH = know.length ? `<div class="mo-det-lb">What to know</div>${know.map(x => `<div class="mo-det-k"><b>${esc(x.t)}</b>${x.why ? `<span>${esc(x.why)}</span>` : ""}</div>`).join("")}` : "";
       if (!packFirst) h += knowH;
       if (items.length) h += `<div class="mo-det-lb">${bk ? "At the desk" : items.some(x => x.kind === "pack") ? "Pack" : "Prep"} ${items.filter((_, i) => W.tick[i]).length}/${items.length}</div>
-        ${items.map((x, i) => `<button class="mo-ck${W.tick[i] ? " on" : ""}" data-tick="${i}" data-k="${esc(b.key)}"><span class="bx">${W.tick[i] ? "✓" : ""}</span>${esc(x.t)}</button>`).join("")}`;
+        ${bk ? items.map((x, i) => `<button class="mo-ck${W.tick[i] ? " on" : ""}" data-tick="${i}" data-k="${esc(b.key)}"><span class="bx">${W.tick[i] ? "✓" : ""}</span>${esc(x.t)}</button>`).join("")
+          : `<div class="hgrid btiles ptiles">${items.map((x, i) => prepTile(x, i, !!W.tick[i], b.key)).join("")}</div>`}`;
       if (packFirst) h += knowH;   // about to go: what to bring comes first
       if (isGym(b)) h += gymMoveHTML(b);
       else if (!know.length && !items.length && !mind.length) h += (G.research || []).some(r => r.key === k)
@@ -3657,9 +3631,10 @@
       addEnergy(meterOf(t.back.h), -t.back.d, `${h ? habitName(h) : t.back.h} (${shortName(blk)}, taken back)`, h && h[5], !!fx, { k:t.back.k });
       if (fx) fx.back(rect, { gain:t.back.d }); }
     else if (t.r.on && tile && fx && t.r.why) fx.nope(btn);   // already paid today: the little shake
+    else if (t.r.on && tile && fx && !st.h) fx.tap(rect, { icon:QB().stepIcon(st.t) });   // a step that pays nothing still bursts
     if (t.W.tick[i] && st.wind && !G.day.windDown) G.day.windDown = now().toISOString();
     saveG(); redraw();
-    if (fx && (t.pay || t.back)) fx.pop(document.querySelector(`[data-bstep="${i}"][data-k="${CSS.escape(btn.dataset.k)}"]`));
+    if (fx && (t.pay || t.back || (t.r.on && !st.h))) fx.pop(document.querySelector(`[data-bstep="${i}"][data-k="${CSS.escape(btn.dataset.k)}"]`));
   }
   /* After every pull: a checklist payment whose tick is gone and was never taken back (an untick on a device that had
      not seen the re-tick, or the same step ticked on two devices) is taken back now. Keyed, so two devices write it once. */
@@ -3678,7 +3653,9 @@
     root.querySelectorAll("[data-tick]").forEach(b => b.onclick = e => { e.stopPropagation();
       const i = b.dataset.tick, blk = blkOf(b.dataset.k); if (!blk) return;
       // stamped (W.t) so the step merges by itself across devices (quest-merge.js mergeWork)
-      const W = G.day.work[gk(blk)]; W.tick[i] = !W.tick[i]; (W.t = W.t || {})[i] = now().toISOString(); saveG(); redraw(); });
+      const W = G.day.work[gk(blk)]; W.tick[i] = !W.tick[i]; (W.t = W.t || {})[i] = now().toISOString();
+      const pop = prepFx(b, W.tick[i], b.querySelector(".hl") ? b.querySelector(".hl").textContent : "");
+      saveG(); redraw(); if (pop) pop(); });
     root.querySelectorAll("[data-bstep]").forEach(b => b.onclick = e => { e.stopPropagation();
       const blk = blkOf(b.dataset.k), B = basicOf(blk); if (!B) return;
       tapStep(b, blk, basicId(blk), b.dataset.bstep, B.steps[b.dataset.bstep] || {}, redraw); });
@@ -3713,7 +3690,6 @@
   // a block's checklist: a basic the plan placed, else one its calendar title names (Morning Yoga, Domestics,
   // Grooming or Shower, Wind down; Junyan, 2026-10-19, d6 d9 d11)
   const basicId = b => !b || !QB() ? null : b.basic || (isGym(b) || isMeal(b) || isSleep(b) ? null : QB().blockBasic(b.t, b.kind));
-  const PM_LABEL = 20;   // an hour that reads a step's evening label (Dr Ellie PM)
   const basicOf = b => basicId(b) ? QB().basic(basicId(b), b.bmode || dayMode(), b.wd ?? wdToday()) : null;
   const basicAdd = (id, s, min) => { const B = QB().basic(id, dayMode(), wdToday());
     return { key:newKey(s), s:new Date(s).toISOString(), e:new Date(+s + min * 60000).toISOString(), t:B.t, type:"task", cal:"you", basic:id, bmode:dayMode(), wd:wdToday() }; };
@@ -3743,7 +3719,10 @@
     await writeOps(o => {   // again against the edit layer writeOps just pulled, so two devices place them once
       if (QB().growCaney(o.adds, now(), started, fixed())) log("Go over the day with Caney is 15 min now");
       const r = QB().placeBasics(placeArgs()); keepNotes(r);
-      r.place.forEach(p => { log(`Planned ${p.t}: ${fmtT(p.s)} to ${fmtT(p.e)}`); o.adds.push(basicAdd(p.id, p.s, p.min)); });
+      const more = [];   // each one placed sees the ones placed before it in this batch
+      r.place.forEach(p => { const q = placeOwn({ key:"new", t:p.t, extra:true }, p.s, p.e, true, more);
+        log(`Planned ${p.t}: ${fmtT(q.s)} to ${fmtT(q.e)}`); const a = basicAdd(p.id, q.s, p.min); o.adds.push(a);
+        more.push({ ...a, s:new Date(a.s), e:new Date(a.e), extra:true }); });
     });
     saveG();
   }
@@ -3779,8 +3758,11 @@
      fun tiles wherever possible in this new system as the animations are amazing"). Its tag says what it pays, what it
      paid, or "done" when the day's limit (or this kind of block) already paid it. */
   function stepTile(b, W, x, i, hr, id){
-    const paid = (W.paid || {})[i], s = paid ? (paid.h === x.h ? x : QB().stepAt(x, PM_LABEL)) : QB().stepAt(x, hr);
-    const h = HABITS.find(y => y[0] === s.h) || [], on = !!W.tick[i];
+    const paid = (W.paid || {})[i], s = paid ? QB().stepShown(x, paid) : QB().stepAt(x, hr), on = !!W.tick[i];
+    // a step that pays nothing is a tile too, with its own icon and no amount (Junyan, 2026-10-19: tiles wherever possible)
+    if (!s.h) return `<button class="htile${on ? " full" : ""}" data-bstep="${i}" data-k="${esc(b.key)}" data-why="${esc(s.t)}"><span class="hi">${QB().stepIcon(s.t)}</span>` +
+      `<span class="hl">${esc(s.t.replace(/\s*\([^)]*\)\s*$/, ""))}</span>${on ? `<span class="hc">✓</span>` : ""}</button>`;
+    const h = HABITS.find(y => y[0] === s.h) || [];
     const r = paid ? null : QB().tickStep({ tick:{}, paid:{} }, G.day.work, id, i, x, hr, habitGain);
     const tg = paid ? `+${paid.d}` : r.pay ? `+${r.pay.d}` : "done";
     return `<button class="htile${on ? " full" : ""}" data-bstep="${i}" data-k="${esc(b.key)}" data-why="${esc(WHY[s.h] || s.t)}"><span class="hi">${hIcon(s.h, h[4] || "✨")}</span>` +
@@ -3796,10 +3778,9 @@
     const pd = blockPaid(b), paidTxt = [pd.p ? `prana +${pd.p}` : "", pd.b ? `body +${pd.b}` : ""].filter(Boolean).join(", ");
     return `${B.steps.length ? `<div class="${lb}">${id === "yoga" ? "What did you do?" : "Steps"} ${steps.filter(([, i]) => W.tick[i]).length}/${steps.length}</div>` : ""}
       ${steps.some(([x]) => x.h) ? `<div class="hkey" style="margin:0 0 6px"><b class="mp">gold</b> fills prana · <b class="mb">teal</b> fills body · each one pays once</div>` : ""}
-      ${steps.some(([x]) => x.h) ? `<div class="hgrid btiles">${steps.filter(([x]) => x.h).map(([x, i]) => stepTile(b, W, x, i, hr, id)).join("")}</div>` : ""}
+      ${steps.length ? `<div class="hgrid btiles">${steps.map(([x, i]) => stepTile(b, W, x, i, hr, id)).join("")}</div>` : ""}
       ${steps.filter(([x, i]) => x.skip && !(G.day.plan || {}).mode && !W.tick[i] && !(W.paid || {})[i]).map(([x, i]) =>
         `<button class="mo-det-btn" style="opacity:.7;font-size:12px;margin:4px 0 6px" data-bskip="${i}" data-k="${esc(b.key)}" data-t="${esc(x.t)}">Travelling today, skip the ${esc(x.t.toLowerCase().replace(/^clean the /, ""))}</button>`).join("")}
-      ${steps.filter(([x]) => !x.h).map(([x, i]) => `<button class="${ck}${W.tick[i] ? " on" : ""}" data-bstep="${i}" data-k="${esc(b.key)}"><span class="bx">${W.tick[i] ? "✓" : ""}</span><span>${esc(x.t)}</span></button>`).join("")}
       ${id !== "caney" ? `<div class="hint" style="margin:8px 2px" data-paid>${paidTxt ? `Paid so far: ${paidTxt}.` : "Nothing paid yet. Tick what you did."}</div>` : ""}
       <button class="mo-det-btn" data-bdone="${esc(b.key)}">${done ? "✓ Done · tap to undo" : "Done"}</button>`;
   }
@@ -3891,9 +3872,10 @@
     if (!slot) { st.msg[id] = `No free slot of ${QN.hm(min)} left today.`; return drawNearby(); }
     if (gym) return nearbyGym(QN, st, stay, p, id, slot);
     let twice = null;   // checked again against the edit layer writeOps pulls, so another device's add counts too
+    const nk = newKey(slot.s); ({ s:slot.s, e:slot.e } = placeOwn({ key:nk, t:p.name, extra:true }, slot.s, slot.e, true));
     await writeOps(o => {
       twice = o.adds.find(a => a.nearby === tag && Date.parse(a.e) > +now());
-      if (!twice) o.adds.push({ key:newKey(slot.s), s:slot.s.toISOString(), e:slot.e.toISOString(), t:p.name, type:"task", cal:"you", nearby:tag });
+      if (!twice) o.adds.push({ key:nk, s:slot.s.toISOString(), e:slot.e.toISOString(), t:p.name, type:"task", cal:"you", nearby:tag });
     });
     if (twice) st.msg[id] = `Already on the plan at ${fmtT(new Date(twice.s))}.`;
     else { st.msg[id] = `On the plan at ${fmtT(slot.s)}, ${QN.hm(min)}.`; log(`Planned ${p.name}: ${fmtT(slot.s)} to ${fmtT(slot.e)}`); saveG(); }
@@ -3945,8 +3927,9 @@
       // a gym session goes on Google Calendar as a real event, never a plan-only block (later 2026-10-16)
       // it stays on his own Junyan calendar, where the weekly gym plan puts gym sessions (not an Add sheet add, d41)
       if (isGym({ t }) && questKey() && !DRY) return addBlockCal(t, s, e, (AGD() ? AGD().JUNYAN : undefined));
+      const key = newKey(s); ({ s, e } = placeOwn({ key, t, extra:true }, s, e));   // lands in a free slot, nothing else moves
       log(`Planned ${t}: ${fmtT(s)} to ${fmtT(e)}`);
-      return writeOps(o => o.adds.push({ key:newKey(s), s:s.toISOString(), e:e.toISOString(), t, type:"task", cal:"you", ...(extra || {}) })); },
+      return writeOps(o => o.adds.push({ key, s:s.toISOString(), e:e.toISOString(), t, type:"task", cal:"you", ...(extra || {}) })); },
     // done in Notion; the answer carries the status it had, so Undo can put it back (2026-10-10)
     taskDone: async id => {
       let was = "";
@@ -3983,8 +3966,9 @@
     // the basics: one placed at a given start (Fill it), and the day's Home / Travelling switch
     addBasic: (id, s) => { const B = QB() && QB().basic(id, dayMode(), wdToday()); if (!B) return;
       const p = G.day.plan; if (p.basicsOff) delete p.basicsOff[id];
-      log(`Planned ${B.t}: ${fmtT(s)} to ${fmtT(new Date(+s + B.min * 60000))}`);
-      return writeOps(o => o.adds.push(basicAdd(id, s, B.min))); },
+      const at = placeOwn({ key:"new", t:B.t, extra:true }, s, new Date(+s + B.min * 60000)).s;
+      log(`Planned ${B.t}: ${fmtT(at)} to ${fmtT(new Date(+at + B.min * 60000))}`);
+      return writeOps(o => o.adds.push(basicAdd(id, at, B.min))); },
     setMode: m => setDayMode(m),
     bind: (root, redraw) => bindDetail(root, redraw),
     begin: () => { G.day.briefDone = true; log("Planned the day"); saveG(); },
@@ -4669,7 +4653,7 @@
       dragEnded = Date.now();
       const r = result(d);
       if (cancel || (+r.s === +d.b.s && +r.e === +d.b.e)) { $("calBody")._h = ""; render(); return; }
-      commitDrag(d.b, d.dk, r.s, r.e);
+      commitDrag(d.b, d.dk, r.s, r.e, d.mode);
     };
     m.addEventListener("pointerdown", e => {
       if (e.button > 0) return;
@@ -4698,19 +4682,22 @@
     // the click that ends a drag is not a tap
     m.addEventListener("click", e => { if (Date.now() - dragEnded < 450) { e.stopPropagation(); e.preventDefault(); } }, true);
   }
-  async function commitDrag(b, dk, s, e){
+  async function commitDrag(b, dk, s, e, mode = "move"){
     const k = b.id ? "id:" + b.id : b.key, what = shortName(b);
     const show = () => { $("calBody")._h = ""; render(); };
     if (+s < CAL.a0 || +e > CAL.z0) { show(); calToast("That is past the days shown here, so it stayed where it was."); return; }
-    // landed on another Joint Plans or Quest block: this one goes to the next free 15-minute slot, nothing else moves
-    const r = placeOwn(b.game ? b : { ...b, key:"new" }, s, e, true), snapped = r.hit ? snapSay(b, r) + " " : "";
+    // landed on another Joint Plans or Quest block: this one goes to the next free 15-minute slot, nothing else moves;
+    // an edge drag only stops at the next block (d51)
+    const own = b.game ? b : { ...b, key:"new" }, edge = mode === "top" || mode === "bottom";
+    const r = edge ? placeEdge(own, s, e, mode) : placeOwn(own, s, e, true);
+    const snapped = r.hit ? (edge ? edgeSay(b, r, mode) : snapSay(b, r)) + " " : "";
     ({ s, e } = r);
     const when = `${tzYmd(s) !== tzYmd(b.s) ? shortDay(tzYmd(s), tzYmd(now())) + " " : ""}${fmtT(s)} to ${fmtT(e)}`;
     if (dk.dry) { PEND[k] = { s:+s, e:+e, at:Date.now() }; show(); calToast(`${snapped}Test mode: ${what} now ${when}, on this screen only. Nothing is saved.`); return; }
     if (dk.kind === "day") {
       // a block added in Quest lives in today's plan, which has no other days
       if (gameDayOf(s) !== gameYmd() || gameDayOf(e - 60000) !== gameYmd()) { show(); calToast(`${what} was added in Quest, so it lives in today's plan only. It can move within its day, not to another day.`, 6000); return; }
-      await saveBlock(b, s, e, b.t);
+      await saveBlock(b, s, e, b.t, true);
       calToast(`${snapped}${what}: ${when}. Saved in today's plan.`);
       return;
     }

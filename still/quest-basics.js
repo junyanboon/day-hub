@@ -11,12 +11,13 @@
 (function (root) {
   "use strict";
   const MIN = 60000;
-  // Dr Ellie is the morning routine before about 2 PM and the night one after (Junyan, 2026-10-19, d11)
-  const DR_AM = { t:"Dr Ellie AM mouth care", h:"mouthAm", pm:{ t:"Dr Ellie PM mouth care", h:"mouth" } };
+  /* Dr Ellie in Domestics and Grooming is always the morning routine, at any hour; the night one lives only in the
+     Wind-down (Junyan, 2026-10-19: "dr ellie should be am in the morning. Wind down is where dr ellie pm should reside").
+     It used to turn into the PM routine after 2 PM (d11). */
+  const DR_AM = { t:"Dr Ellie AM mouth care", h:"mouthAm" };
   const WASH = { t:"Shower, face wash, moisturizer with SPF, dress", h:"shower" };
   // at home only (Junyan, 2026-10-19: "not when I travel but yes when I'm at home")
   const COPPER = { t:"Clean the copper pot and bless the water", h:"copper", home:true, skip:true };
-  const PM_HOUR = 14;
   // Mon to Fri at home: one bigger job a day
   const PLUS = { 1:"Vacuum", 2:"Iron", 3:"Deep-clean the kitchen", 4:"Deep-clean the bathroom", 5:"Deep-clean the bedroom (sheets, surfaces)" };
   const CANEY = { id:"caney", t:"Go over the day with Caney", min:15 }, CANEY_OLD = 10;
@@ -84,9 +85,20 @@
     if (/groom|shower/i.test(t)) return "groom";
     return null;
   }
-  // the Prana action a step pays at this hour (Dr Ellie: AM before 2 PM, PM after), and its label
-  // (the game day runs to 4 AM, so midnight to 4 AM is still the night routine)
-  const stepAt = (st, hour) => st && st.pm && (hour >= PM_HOUR || hour < 4) ? { ...st, ...st.pm } : st;
+  /* the Prana action a step pays at this hour, and its label. A step with a pm part turns into it from 2 PM to the end
+     of the game day (4 AM). No step has one since Dr Ellie stayed AM (2026-10-19); kept for the shape. */
+  const stepAt = (st, hour) => st && st.pm && (hour >= 14 || hour < 4) ? { ...st, ...st.pm } : st;
+  /* What a step's tile shows: what it paid, when that differs from what it pays now. Today's Domestics may hold a
+     Dr Ellie PM tick from before Dr Ellie stayed AM: it keeps showing PM with its amount, and its untick takes back
+     exactly that (tickStep reads the paid record). */
+  const stepShown = (st, paid) => paid && paid.h && st && paid.h !== st.h ? { ...st, h:paid.h } : st;
+  /* The icon on a step's tile when the step pays nothing (d23: every step is a tile). First match wins. */
+  const ICONS = [[/dish|kitchen/i, "🍽️"], [/sweep|vacuum/i, "🧹"], [/tidy|bedroom|sheets/i, "🛏️"], [/iron/i, "👔"], [/bathroom/i, "🛁"],
+    [/deathbed|how today went|bedtime/i, "🌙"], [/read|stretch|quiet/i, "📖"], [/phone|screen/i, "📵"], [/shower/i, "🚿"],
+    [/face|cream|moistur/i, "🧴"], [/lamp/i, "🪔"], [/pack|bring|passport|bag/i, "🎒"], [/book|ticket|reserve|confirm/i, "🎟️"],
+    [/call|text|email|message/i, "📞"], [/water|bottle/i, "💧"], [/eat|food|snack|meal/i, "🥗"], [/shoe|cloth|wear|dress/i, "👟"],
+    [/map|route|directions|leave|drive|uber|transit/i, "🗺️"], [/charge|battery/i, "🔋"], [/learn|watch|video|practice|warm/i, "🎯"]];
+  const stepIcon = t => (ICONS.find(([re]) => re.test(String(t || ""))) || [null, "✅"])[1];
   /* What ticking step i of a block pays. W: that block's { tick, paid } (G.day.work[key]); all: every block's W today;
      kind: the block's basic id. A step pays once per kind a day (the lamp: once in Morning Yoga and once in the
      Wind-down, d9) and never past the habit's daily limit (gain(h) is 0 then). Unticking takes back exactly what
@@ -289,5 +301,5 @@
     return { t: t[0].toUpperCase() + t.slice(1), min };
   }
 
-  root.QuestBasics = { PRACTICE_PAY, practicePay, domestics, windDown, yoga, groom, basic, blockBasic, stepAt, tickStep, applyTick, tapDay, owedBacks, liveTicks, habitCount, payKey, backKey, outdoorBlock, barefootStep, unopened, paidOf, PM_HOUR, guessMode, placeBasics, growCaney, fitList, parseQuick, IDS:["caney", "domestics", "winddown"] };
+  root.QuestBasics = { PRACTICE_PAY, practicePay, domestics, windDown, yoga, groom, basic, blockBasic, stepAt, stepShown, stepIcon, tickStep, applyTick, tapDay, owedBacks, liveTicks, habitCount, payKey, backKey, outdoorBlock, barefootStep, unopened, paidOf, guessMode, placeBasics, growCaney, fitList, parseQuick, IDS:["caney", "domestics", "winddown"] };
 })(typeof window !== "undefined" ? window : globalThis);

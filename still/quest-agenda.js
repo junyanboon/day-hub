@@ -182,6 +182,25 @@
     return stay;
   }
 
+  /* A drag of one edge of a block (Junyan, 2026-10-19, d51: "the end stops at the next block's start. The block doesn't
+     jump"). moved: the block with its new s and e; mode "bottom" (the end moved) or "top" (the start moved); was: the
+     block before the drag. The end stops at the start of the first Joint Plans or Quest block that begins after the
+     block's start; the start stops at the end of the latest one that began before it. It never shrinks the block past
+     where it was (one that already overlapped stays as it was). Nothing else moves. Returns { s, e, hit }. */
+  function clampEdge(list, moved, mode, was){
+    let s = +moved.s, e = +moved.e, hit = null;
+    if (!inRoom(moved)) return { s:new Date(s), e:new Date(e), hit };
+    const others = list.filter(b => inRoom(b) && b.key !== moved.key && !(moved.id && b.id === moved.id));
+    if (mode === "bottom") {
+      const nx = others.filter(b => +b.s > s && +b.s < e).sort(byStart)[0];
+      if (nx && Math.max(+nx.s, +was.e) < e) { e = Math.max(+nx.s, +was.e); hit = nx; }
+    } else if (mode === "top") {
+      const pv = others.filter(b => +b.s < +was.s && +b.e > s).sort((x, y) => +y.e - +x.e)[0];
+      if (pv && Math.min(+pv.e, +was.s) > s) { s = Math.min(+pv.e, +was.s); hit = pv; }
+    }
+    return { s:new Date(s), e:new Date(e), hit };
+  }
+
   // "7:25 PM" and "7:40 PM" read "7:25 to 7:40 PM"
   function rangeText(a, b){
     const m = /\s?([AP]M)$/i, x = a.match(m), y = b.match(m);
@@ -189,6 +208,6 @@
   }
 
   root.QuestAgenda = { addDays, agendaDays, mergeAgenda, snap, dragResult, dragKind, lanes, applyPending,
-    pickSpan, addKey, samePick, placePick, undoPick, carveFree, rangeText, overlaps, freeSlot,
+    pickSpan, addKey, samePick, placePick, undoPick, carveFree, rangeText, overlaps, freeSlot, clampEdge,
     JOINT, JUNYAN, ADD_CALS, onJoint, inRoom };
 })(typeof window !== "undefined" ? window : globalThis);
