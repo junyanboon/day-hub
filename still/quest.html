@@ -155,7 +155,7 @@
   .bar-body > i { background:linear-gradient(90deg, #5fd3c4, #b8f3e9) !important; }
   .bar > i.mid { background:linear-gradient(90deg, #ffb36b, #ffd479); } .bar > i.low { background:linear-gradient(90deg, #ff7f7f, #ffb0a0); }
   .o2row { gap:10px; white-space:nowrap; overflow:hidden; } .o2row .ok { color:#8fe3b0; }
-  .float.down { color:#ff9c9c; } .log div span.xp.neg { color:#ff9c9c; }
+  .float.down { color:#ff9c9c; }
   .pline { width:100%; height:80px; margin-top:10px; } .pline path { fill:none; stroke:var(--gold); stroke-width:2.5; stroke-linejoin:round; }
   .pline path.pl-b { stroke:#5fd3c4; stroke-width:2; opacity:.9; }
   .pl-key { display:flex; gap:14px; font-size:12px; margin-top:4px; } .pl-key .pl-p { color:var(--gold); } .pl-key .pl-b { color:#5fd3c4; }
@@ -486,11 +486,7 @@
   .b-in { color:var(--good); } .b-late { color:var(--warn); } .b-skip { color:var(--bad); } .b-zap { color:var(--zap); }
   @keyframes pulse { 50% { box-shadow:0 0 0 10px rgba(255,255,255,.08), 0 0 30px rgba(255,255,255,.6); } }
 
-  .log { font-size:13px; color:var(--ink-soft); }
   #nearbyH[hidden], #nearby[hidden] { display:none; }
-  .log div { padding:6px 4px; border-bottom:1px solid rgba(255,255,255,.08); display:flex; gap:8px; }
-  .log div span:first-child { color:var(--ink-faint); flex:none; width:58px; font-variant-numeric:tabular-nums; }
-  .log div span.xp { margin-left:auto; color:var(--gold); flex:none; }
 
   /* ---------- zap button + sheet ---------- */
   .zap { position:fixed; left:50%; transform:translateX(-50%); bottom:calc(env(safe-area-inset-bottom) + 18px);
@@ -742,9 +738,9 @@
 <script src="quest-basics.js?v=20261019x"></script>
 <script src="quest-suggest.js?v=20261019a"></script>
 <script src="quest-water.js?v=20261019a"></script>
-<script src="quest-gym.js?v=20261016i"></script>
+<script src="quest-gym.js?v=20261019x"></script>
 <script src="quest-morning.js?v=20261019a"></script>
-<script src="quest-agenda.js?v=20261014c"></script>
+<script src="quest-agenda.js?v=20261019x"></script>
 <script src="quest-offline.js?v=20261017a"></script>
 <script src="quest-nearby.js?v=20261016k"></script>
 </head>
@@ -777,8 +773,6 @@
   <h2 id="nearbyH" hidden><span id="nearbyT">Nearby</span></h2>
   <div id="nearby" data-dash-optional hidden></div>
 
-  <h2><span>Quest log</span><span id="dayXp"></span></h2>
-  <div class="log" id="log"></div>
 </div>
 
 
@@ -969,7 +963,9 @@
         // still on yesterday: today's events before the switch show on it too (2026-10-11: a midnight dinner,
         // work and a 1 AM bus to Matrouh were missing from the calendar at 1:23 AM)
         if (+t < cutoff) { p = { ...prev, blocks: prev.blocks.concat(p.blocks.filter(b => +new Date(b.s) < cutoff
-          && b.type !== "break" && !/^open space|^rest$/i.test(b.t) && !prev.blocks.some(x => x.s === b.s && x.t === b.t))) }; day = y; }
+          && b.type !== "break" && !/^open space|^rest$/i.test(b.t)
+          // the same calendar event in both plans shows once, by its id when it has one, even if it moved (no ghost copy)
+          && !prev.blocks.some(x => (x.id && x.id === b.id) || (x.s === b.s && x.t === b.t)))) }; day = y; }
       }
     }
     PLAN = p;
@@ -1193,7 +1189,7 @@
   }
   const SYM_RULES = [
     [/^open space|^free time/i, "compass"], [/video|shoot|film/i, "camera"], [/sleep|\bbed\b|\bnap\b|wind.?down/i, "moon-stars"],
-    [/gym|workout|training|weights/i, "barbell"], [/breakfast|coffee/i, "coffee"],
+    [/gym|(?<!after )workout|training|weights/i, "barbell"], [/breakfast|coffee/i, "coffee"],
     [/lunch|dinner|\beat\b|meal|snack|cook|brunch/i, "tools-kitchen-2"], [/swim|pool|beach/i, "swimming"],
     [/stretch|mobility/i, "stretching"], [/yoga|shambhavi|meditat|sadhana|kriya|breath/i, "yoga"],
     [/walk|hike|trek/i, "walk"], [/quad|motor|bike/i, "motorbike"],
@@ -1209,7 +1205,7 @@
     return { rest:"moon-stars", body:"stretching", fuel:"tools-kitchen-2", practice:"yoga", travel:"luggage", call:"phone", dance:"music" }[b.kind] || "map-pin";
   }
   const SHORT = [
-    [/^open space/i, "Your move"], [/sleep/i, "Sleep"], [/gym|workout/i, "Gym"], [/breakfast/i, "Breakfast"],
+    [/^open space/i, "Your move"], [/sleep/i, "Sleep"], [/gym|(?<!after )workout/i, "Gym"], [/breakfast/i, "Breakfast"],
     [/brunch/i, "Brunch"], [/lunch/i, "Lunch"], [/dinner/i, t => /pack/i.test(t) ? "Dinner + pack" : "Dinner"],
     [/quad/i, "Quad bikes"], [/check.?out/i, "Check-out"], [/walk/i, "Walk"], [/video|shoot|film/i, "Video shoot"],
   ];
@@ -2195,6 +2191,19 @@
         setBlock(o, x, new Date(x.s.getTime() + de), new Date(x.e.getTime() + de), x.t);
       });
       setBlock(o, b, s, e, t);
+    }).then(() => roomFor(b.key, s, e));
+  }
+  /* Nothing overlaps (Junyan, 2026-10-19, d30 d31): after a block is moved or added today, a block it lands on starts
+     again at the next 15-minute mark after it, and the rest of the day follows (quest-agenda.js makeRoom). The shift
+     is in Day Quest's own view of today (/ops), never in Google Calendar, so a shared Joint Plans event is not moved
+     for Caney. Past bedtime is fine (d31). key: the moved block's key in blocks(), left out of the shift. */
+  function roomFor(key, s, e){
+    if (!AGD() || gameDayOf(s) !== gameYmd()) return Promise.resolve();
+    return writeOps(o => {
+      const moves = AGD().makeRoom(blocks(), { key, s:new Date(s), e:new Date(e) });
+      if (!moves.length) return;
+      moves.forEach(m => setBlock(o, m.b, m.s, m.e, m.b.t));
+      log(`Made room, nothing overlaps: ${moves.map(m => `${shortName(m.b)} now ${fmtT(m.s)}`).join(", ")}`);
     });
   }
   /* Calendar writes: a block that came from Google Calendar (it has an id) can
@@ -2219,6 +2228,7 @@
         setBlock(o, x, new Date(x.s.getTime() + de), new Date(x.e.getTime() + de), x.t);
       });
     });
+    await roomFor(b.key, s, e);
     await pullAll();
   }
   async function addBlockCal(t, s, e, makeRoom){
@@ -2233,6 +2243,7 @@
       if (x.s < s) return;
       setBlock(o, x, new Date(x.s.getTime() + (e - s)), new Date(x.e.getTime() + (e - s)), x.t);
     }));
+    await roomFor("new", s, e);   // not in today's plan until the pull
     await pullAll();
   }
   function dropBlock(b){
@@ -2245,14 +2256,14 @@
   }
   function addBlock(t, s, e, makeRoom){
     log(`Added ${t}: ${fmtT(s)} to ${fmtT(e)}`);
-    const dur = e - s;
+    const dur = e - s, key = newKey(s);
     return writeOps(o => {
       if (makeRoom) blocks().forEach(x => {
         if (x.s < s) return;
         setBlock(o, x, new Date(x.s.getTime() + dur), new Date(x.e.getTime() + dur), x.t);
       });
-      o.adds.push({ key:newKey(s), s:s.toISOString(), e:e.toISOString(), t, type:"task", cal:"you" });
-    });
+      o.adds.push({ key, s:s.toISOString(), e:e.toISOString(), t, type:"task", cal:"you" });
+    }).then(() => roomFor(key, s, e));
   }
   // time inputs speak the calendar's clock, not the device's
   const toField = d => { const p = tzParts(d, { hour:"2-digit", minute:"2-digit", hourCycle:"h23" });
@@ -2896,7 +2907,8 @@
      Saving sends the session to still-api, which keeps it and writes his Workout Tracker rows. */
   const LV = window.QuestLevels, GL = window.QuestGymLog;
   const MOVE = GL.MOVE, PROGRAMS = GL.PROGRAMS;
-  const isGym = b => !!b && /\bgym\b|workout|calisthenics|rings/i.test(b.t);
+  // "Shavasana (rest after workout)" is the rest that follows a gym, not a gym (2026-10-19: it showed as a second "Gym")
+  const isGym = b => !!b && /\bgym\b|(?<!after )workout|calisthenics|rings/i.test(b.t);
   const ymdLocal = () => { const p = tzParts(now(), { year:"numeric", month:"2-digit", day:"2-digit" }); return `${p.year}-${p.month}-${p.day}`; };
   let GYM = null, gymTimer = null, gymInfo = { levels:{}, last:[] };
 
@@ -3521,7 +3533,7 @@
     store.set(GYM_AT, "");
     closeSheet();
     calToast(`${what}: ${o.label}. Saved to Google Calendar${b.cal ? ` (${b.cal})` : ""}.`);
-    try { if (b.game && OPS.edits[b.key]) await writeOps(x => { delete x.edits[b.key]; }); await pushG(); await pullAll(); } catch {}
+    try { if (b.game && OPS.edits[b.key]) await writeOps(x => { delete x.edits[b.key]; }); await roomFor(b.game ? b.key : "new", o.s, o.e); await pushG(); await pullAll(); } catch {}
     if (window.QuestMorning && QuestMorning.isOpen()) QuestMorning.redraw();
     planGym(false).catch(e => console.warn("gym", e));
   }
@@ -4786,6 +4798,7 @@
         // the calendar now holds the change, so drop any today-only edit of it
         if (OPS.edits[b.key]) await writeOps(o => { delete o.edits[b.key]; });
       }
+      await roomFor(b.game ? b.key : "new", s, e);
       await pullAll();
     } catch {}   // the calendar has it; the next pull shows it
   }
@@ -5071,11 +5084,7 @@
       if (fixed) openStop(blocks().find(x => x.key === fixed.key) || fixed); else openMove(st);
     });
 
-    // log
-    $("dayXp").textContent = G.day.log.length ? `${G.day.log.length} today` : "";
-    put("log", G.day.log.length ? G.day.log.map(e =>
-      `<div><span>${fmtT(new Date(e.at))}</span><span>${esc(e.msg)}</span>${e.xp ? `<span class="xp${e.xp < 0 ? " neg" : ""}">${e.xp > 0 ? "+" : "−"}${Math.abs(e.xp)}</span>` : ""}</div>`).join("")
-      : `<div><span></span><span>Nothing yet. Check in to your first quest.</span></div>`);
+    // the Quest log card is gone (Junyan, 2026-10-19: "drop the quest log"); G.day.log stays, the night screen and the merge read it
     $("gear").classList.toggle("warn", !questKey() || !!syncErr);
     pings(all, t);
     tick();
@@ -5123,6 +5132,6 @@
   pullAll();
 })();
 </script>
-<script src="quest-dash.js?v=20261016b"></script>
+<script src="quest-dash.js?v=20261019x"></script>
 </body>
 </html>

@@ -57,7 +57,7 @@
   }
   const SYM_RULES = [
     [/^open space|^free time/i, "compass"], [/video|shoot|film/i, "camera"], [/sleep|\bbed\b|\bnap\b|wind.?down/i, "moon-stars"],
-    [/gym|workout|training|weights/i, "barbell"], [/breakfast|coffee/i, "coffee"],
+    [/gym|(?<!after )workout|training|weights/i, "barbell"], [/breakfast|coffee/i, "coffee"],
     [/lunch|dinner|\beat\b|meal|snack|cook|brunch/i, "tools-kitchen-2"], [/swim|pool|beach/i, "swimming"],
     [/stretch|mobility/i, "stretching"], [/yoga|shambhavi|meditat|sadhana|kriya|breath/i, "yoga"],
     [/walk|hike|trek/i, "walk"], [/quad|motor|bike/i, "motorbike"],
@@ -73,7 +73,7 @@
     return { rest:"moon-stars", body:"stretching", fuel:"tools-kitchen-2", practice:"yoga", travel:"luggage", call:"phone", dance:"music" }[b.kind] || "map-pin";
   }
   const SHORT = [
-    [/^open space|^free time/i, "Your move"], [/sleep/i, "Sleep"], [/gym|workout/i, "Gym"], [/breakfast/i, "Breakfast"],
+    [/^open space|^free time/i, "Your move"], [/sleep/i, "Sleep"], [/gym|(?<!after )workout/i, "Gym"], [/breakfast/i, "Breakfast"],
     [/brunch/i, "Brunch"], [/lunch/i, "Lunch"], [/dinner/i, t => /pack/i.test(t) ? "Dinner + pack" : "Dinner"],
     [/quad/i, "Quad bikes"], [/check.?out/i, "Check-out"], [/walk/i, "Walk"], [/video|shoot|film/i, "Video shoot"],
   ];

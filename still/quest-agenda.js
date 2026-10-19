@@ -140,6 +140,33 @@
     return out.sort((x, y) => x.s - y.s || x.e - y.e);
   }
 
+  /* ---------- nothing overlaps (Junyan, 2026-10-19, d30 d31) ----------
+     "I don't want the calendar to be able to have anything overlap." Open space and breathers are the gaps
+     between things, so they never count. */
+  const isGap = b => b.kind === "open" || b.kind === "break" || b.type === "break" || b.type === "focus";
+  const byStart = (x, y) => x.s - y.s || x.e - y.e;
+  // every pair of blocks that overlap, [[first, second], ...] by start; touching (one ends as the next starts) is fine
+  function overlaps(list){
+    const xs = list.filter(b => !isGap(b)).sort(byStart), out = [];
+    for (let i = 0; i < xs.length; i++) for (let j = i + 1; j < xs.length && +xs[j].s < +xs[i].e; j++) out.push([xs[i], xs[j]]);
+    return out;
+  }
+  /* "if the block slides on another one it will just be shifted back by 15 minutes or whatever so it can't overlap"
+     (d30). moved: the block just moved or added, at its new place { key, s, e }. A block it lands on starts again at
+     the next 15-minute mark after it ends, the same length, and whatever that one now lands on does the same, down
+     the day. Running past bedtime is fine (d31). Returns [{ b, s, e }] for each block that has to move. */
+  function makeRoom(list, moved, step = 15){
+    const q = step * MIN, up = ms => Math.ceil(ms / q) * q, from = +moved.s, out = [];
+    let cur = +moved.e;
+    for (const b of list.filter(x => !isGap(x) && x.key !== moved.key).sort(byStart)) {
+      if (+b.s >= cur) break;            // starts after everything placed so far: the day is clear from here
+      if (+b.e <= from) continue;        // over before the moved block starts
+      const s = up(cur), e = s + (+b.e - +b.s);
+      out.push({ b, s:new Date(s), e:new Date(e) }); cur = e;
+    }
+    return out;
+  }
+
   // "7:25 PM" and "7:40 PM" read "7:25 to 7:40 PM"
   function rangeText(a, b){
     const m = /\s?([AP]M)$/i, x = a.match(m), y = b.match(m);
@@ -147,5 +174,5 @@
   }
 
   root.QuestAgenda = { addDays, agendaDays, mergeAgenda, snap, dragResult, dragKind, lanes, applyPending,
-    pickSpan, addKey, samePick, placePick, undoPick, carveFree, rangeText };
+    pickSpan, addKey, samePick, placePick, undoPick, carveFree, rangeText, overlaps, makeRoom };
 })(typeof window !== "undefined" ? window : globalThis);
