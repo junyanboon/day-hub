@@ -25,7 +25,7 @@
   const NAMES = { jw:"Gym · Jack Woods", ms:"Gym · Matthew I. Smith" };
   const LEN = { jw:60, ms:45 };
 
-  const isGymTitle = t => /\bgym\b|workout|calisthenics|rings/i.test(t || "");
+  const isGymTitle = t => /\bgym\b|(?<!after )workout|calisthenics|rings/i.test(t || "");   // not "rest after workout"
   // which session a title (or a logged program) is: "ms" (Matthew I. Smith) or "jw" (any strength session, the old
   // "Jack Woods Day 1" and "Day 2" included)
   function sessionOf(t){

@@ -1,7 +1,8 @@
 /* Day Quest on a wide screen is a dashboard (Junyan, 2026-10-08: "widgets that I
    can move around and fill up the whole page").
    At 1100 px and wider, each part of the page (prana, right now, habits, the
-   mountain, skills, the log, and any part added later) becomes a widget on a
+   mountain, skills, and any part added later; the Quest log card went on 2026-10-19,
+   and a saved layout that still names it loads as before, its place unused) becomes a widget on a
    12-column grid. Drag a widget by its title bar, resize it from any edge or
    corner; the others make room. The layout is kept per device (localStorage
    quest-dash-v1); "Reset layout" brings back the default. The phone keeps the
@@ -35,7 +36,6 @@
     now: { x: 4, y: 11, w: 5, h: 5 },
     habits: { x: 9, y: 1, w: 3, h: 10 },
     skills: { x: 9, y: 11, w: 3, h: 5 },
-    log: { x: 4, y: 16, w: 5, h: 4 },
     "w-nearby": { x: 9, y: 16, w: 3, h: 6 },   // Nearby (2026-10-16), only while the stay has a list
   };
   const load = (tag, attrs) => new Promise((ok, fail) => {
@@ -59,7 +59,7 @@
       if (used.has(n)) { cur = null; continue; }
       if (n.tagName === "H2") {
         const body = n.nextElementSibling, bid = body && body.id;
-        const id = bid === "mtn" ? "mtn" : bid === "log" ? "log" : bid === "skillsRow" ? "skills" : "w-" + (bid || out.length);
+        const id = bid === "mtn" ? "mtn" : bid === "skillsRow" ? "skills" : "w-" + (bid || out.length);
         cur = { id, title: n.textContent.trim(), nodes: [n], head: n };
         out.push(cur);
       } else if (cur) cur.nodes.push(n);
