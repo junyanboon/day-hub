@@ -35,6 +35,12 @@
         series: before.map((n) => n[k]).concat([l]), ...move(l, avg == null ? null : avg, better) };
     });
   }
+  // the value on the calendar day before, or null when that day has none (older days carry no pf or dr)
+  function prevDay(list, day, k) {
+    const want = new Date(Date.parse(day + "T12:00:00Z") - 86400000).toISOString().slice(0, 10);
+    const h = list.find((x) => x.day === want);
+    return h && num(h[k]) ? h[k] : null;
+  }
   // one row of today's results: today, the 7 days before (avg and a sparkline), and the best day in the history
   function dayRow(k, label, history, today, better = "up") {
     const before = (history || []).filter((h) => num(h[k])).slice(-7), t = num(today[k]) ? today[k] : null;
@@ -44,7 +50,7 @@
     // a best day needs days to beat, and a best of 0 pranic foods is no best at all
     const best = bestV == null || !before.length || (better === "up" && bestV <= 0) ? null : all.filter((h) => h[k] === bestV).pop();
     const avg = mean(before.map((h) => h[k]));
-    return { k, label, better, today: t, avg: avg == null ? null : Math.round(avg * 10) / 10, yesterday: before.length ? before[before.length - 1][k] : null,
+    return { k, label, better, today: t, avg: avg == null ? null : Math.round(avg * 10) / 10, yesterday: prevDay(before, today.day, k),
       best: best ? { day: best.day, v: bestV, isToday: best.day === today.day } : null, series: before.map((h) => h[k]).concat([t]),
       ...move(t, avg, better) };
   }
@@ -55,9 +61,9 @@
     const r = Object.fromEntries((t.rows || []).map((x) => [x.k, x]));
     const o = Object.fromEntries((t.oura || []).map((x) => [x.k, x]));
     const dr = r.dr, pf = r.pf, p = r.prana, b = r.body;
-    if (dr && num(dr.today) && dr.today > 0 && dr.today > (dr.yesterday ?? 0)) {
+    if (dr && num(dr.today) && dr.today > 0 && (dr.yesterday == null || dr.today > dr.yesterday)) {
       const what = t.topDrain ? `Skip the ${t.topDrain.toLowerCase()} tomorrow` : "Pick one to skip tomorrow";
-      return `${plural(dr.today, "drain", "drains")} today vs ${dr.yesterday ?? 0} yesterday. ${what} to win the day back.`;
+      return `${plural(dr.today, "drain", "drains")} today${dr.yesterday == null ? "" : ` vs ${dr.yesterday} yesterday`}. ${what} to win the day back.`;
     }
     if (p && num(p.today) && num(p.avg) && p.today < p.avg - 2)
       return `Prana ended at ${p.today}, your week averages ${Math.round(p.avg)}. A sadhana block early tomorrow is the quickest way back up.`;

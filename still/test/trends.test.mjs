@@ -59,6 +59,13 @@ test("beat tomorrow: more drains than yesterday comes first and names the drain"
   assert.equal(line, "2 drains today vs 0 yesterday. Skip the coffee or tea tomorrow to win the day back.");
 });
 
+test("beat tomorrow: yesterday means the calendar day before, and an unknown yesterday is not called 0", () => {
+  const gap = [{ day: "2026-10-16", prana: 60, body: 70, pf: 3, dr: 0 }];
+  const r = ["prana", "body", "pf", "dr"].map(k => T.dayRow(k, k, gap, { day: "2026-10-19", prana: 70, body: 70, pf: 3, dr: 1 }, k === "dr" ? "down" : "up"));
+  assert.equal(r[3].yesterday, null);
+  assert.equal(T.beatLine({ rows: r, topDrain: "Alcohol" }), "1 drain today. Skip the alcohol tomorrow to win the day back.");
+});
+
 test("beat tomorrow: prana under the week, then fewer pranic foods, then body", () => {
   assert.match(T.beatLine({ rows: rows({ prana: 40, body: 70, pf: 3, dr: 0 }) }), /^Prana ended at 40, your week averages 65\./);
   assert.match(T.beatLine({ rows: rows({ prana: 70, body: 70, pf: 1, dr: 0 }) }), /^1 pranic food today, your week averages 3\./);
