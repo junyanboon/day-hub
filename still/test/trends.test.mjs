@@ -87,9 +87,12 @@ test("body starts at the Oura readiness score, then the sleep score, then the ol
   assert.ok(/Readiness \$\{/.test(f), "the log says readiness set the body");
 });
 
-test("the Last night box sits under Body in the Prana and Body widget, and the night screen gets trends", () => {
-  assert.ok(/<div class="bg-night" id="bgNight" hidden><\/div>/.test(html));
-  assert.ok(html.indexOf('id="bgNight"') > html.indexOf('<div class="bg-k">Body</div>'));
+test("Last night is its own card right under Prana and Body, one row of three, and the night screen gets trends", () => {
+  assert.match(html, /<div id="being"><\/div>\n  <div class="bg-night" id="bgNight" hidden><\/div>/);
+  assert.ok(!/<div class="bg-night"[^>]*><\/div>`/.test(html), "no longer drawn inside the Prana and Body stage");
+  assert.match(html, /<div class="bn-row">/);
+  assert.match(html, /\.bn-row \{[^}]*repeat\(3/);
+  assert.ok(!/\.bg-night \{[^}]*margin:[^;]*50%/.test(html), "no left gap under Prana");
   assert.ok(/API \+ "\/lastnight"/.test(html));
   assert.ok(/<script src="quest-trends\.js\?v=\w+"><\/script>/.test(html));
   const night = fs.readFileSync(here + "quest-night.js", "utf8");
