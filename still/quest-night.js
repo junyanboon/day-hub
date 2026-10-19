@@ -65,7 +65,7 @@
   function trendsHtml(t) {
     const TR = root.QuestTrends;
     if (!t || !TR) return "";
-    const colour = { prana: "#ffd479", body: "#7fe3d4", pf: "#ffd479", dr: "#ffb36b", rhr: "#7fe3d4", hrv: "#7fe3d4", score: "#7fe3d4" };
+    const colour = { prana: "#ffd479", body: "#7fe3d4", pf: "#ffd479", dr: "#ffb36b", rhr: "#7fe3d4", hrv: "#7fe3d4", score: "#7fe3d4", wt: "#7fd0ff" };
     const cls = (x) => x.good === true ? "good" : x.good === false ? "off" : "";
     const pct = (k, v) => v == null ? "·" : (k === "prana" || k === "body") ? `${v}%` : `${v}`;
     const row = (k, label, now, avg, arrow, good, series, best) =>
@@ -75,7 +75,11 @@
       x.best ? (x.best.isToday ? "🏆 best" : `best ${esc(pct(x.k, x.best.v))} ${esc(DOW(x.best.day))}`) : ""));
     const nights = (t.oura || []).filter((x) => x.last != null || x.avg != null).map((x) => row(x.k, x.label, x.last ?? "·", x.avg, x.arrow, cls(x), x.series,
       x.best == null ? "" : x.last === x.best ? "🏆 best" : `best ${x.best}`));
-    return `<div class="tr">${days.join("")}${nights.length ? `<div class="tr-h">Last night</div>${nights.join("")}` : ""}
+    // water beside the sleep score (2026-10-19, d23): glasses today, how many before 4 PM, the last 7 days
+    const w = t.water;
+    const water = w ? row("wt", "Water today, glasses", w.today == null ? "0" : `${w.today}`, w.avg == null ? null : Math.round(w.avg), w.arrow, cls(w), w.series,
+      `${w.before4 || 0} before 4 PM · aim ${w.aim || 8}`) : "";
+    return `<div class="tr">${days.join("")}${nights.length ? `<div class="tr-h">Last night</div>${nights.join("")}` : ""}${water}
       <div class="tr-beat"><span>🌱</span><span><b>Tomorrow's one thing</b>${esc(t.beat)}</span></div></div>`;
   }
 

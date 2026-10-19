@@ -55,6 +55,12 @@
       for (const [k, v] of Object.entries(obj(n.habits))) h[k] = Math.max(+h[k] || 0, +v || 0);
       out.habits = h;
     }
+    // water glasses (2026-10-19, d23): kept from both; a glass undone on either device stays undone
+    if (o.glasses || n.glasses) {
+      const g = { ...obj(o.glasses) };
+      for (const [k, v] of Object.entries(obj(n.glasses))) g[k] = g[k] && (g[k].off || (v && v.off)) ? { ...g[k], ...v, off: true } : { ...(g[k] || {}), ...v };
+      out.glasses = g;
+    }
     for (const k of ["slept", "ouraTried", "briefDone"]) if (o[k] || n[k]) out[k] = true;
     out.xp = Math.max(+o.xp || 0, +n.xp || 0);
     if (arr(o.sideDone).length > arr(n.sideDone).length) out.sideDone = o.sideDone;
