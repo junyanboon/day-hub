@@ -43,11 +43,12 @@
   }
   /* Morning Yoga (Junyan, 2026-10-19, d6: "let's change it back to giving prana based on the yogas that were
      performed"). A yoga or sadhana block is a checklist of what he did; each tick pays that practice once, and the
-     block's length no longer matters. Neem and turmeric, the lamp and the supplements are ticked here too ("this
-     happens at the time I wake up"). */
+     block's length no longer matters. Neem and turmeric and the lamp are ticked here too. */
   const YOGA = [["shambhavi", "Shambhavi"], ["surya", "Surya Kriya"], ["angam", "Angamardana"], ["yogasana", "Yogasanas"],
     ["upa", "Upa Yoga"], ["bhuta", "Bhuta Shuddhi"], ["kriya", "Isha Kriya"], ["nadi", "Nadi Shuddhi"],
-    ["neem", "Neem and turmeric"], ["lamp", "Light the oil lamp"], ["supps", "Morning supplements"]];
+    ["neem", "Neem and turmeric"], ["lamp", "Light the oil lamp"]];
+  // the supplements moved to the meal quiz (Junyan, 2026-10-19: "I actually take these after my meal usually as my
+  // stomach can't handle them otherwise")
   const yoga = () => ({ min:60, steps: YOGA.map(([h, t]) => ({ t, h })) });
   // a Grooming or Shower block on the calendar: the body care, and the copper pot at home
   function groom(mode){

@@ -36,7 +36,7 @@
     ["heavy", "🥘", "Heavy, or ate too much", -5],
   ];
   // xylitol joined the body foods on 2026-10-19 (d11): one tick is one gram after the meal
-  const BODY = ["blueprint", "protein", "legumes", "veg", "greens", "evoo", "nuts", "berries", "seeds", "ferment", "xylitol"];
+  const BODY = ["blueprint", "protein", "legumes", "veg", "greens", "evoo", "nuts", "berries", "seeds", "ferment", "xylitol", "supps"];   // supplements after the meal (2026-10-19)
   const JUNK = ["junk", "🍟", "Ultra-processed, fried or added sugar", -3];
   const ONEOF = { fresh: "stale", stale: "fresh" };
   const FOOD_IDS = PRANA_FOODS.map((x) => x[0]);

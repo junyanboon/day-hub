@@ -20,10 +20,10 @@ test("a calendar block's title picks its checklist", () => {
   assert.equal(B.blockBasic("Morning practice", "practice"), "yoga");
 });
 
-test("Morning Yoga lists the ten practices and the supplements, each paying its own habit", () => {
+test("Morning Yoga lists the ten practices (supplements moved to the meal quiz), each paying its own habit", () => {
   const y = B.basic("yoga", "home", 1);
   assert.equal(y.habit, null);
-  assert.deepEqual(J(y.steps.map(x => x.h)), ["shambhavi", "surya", "angam", "yogasana", "upa", "bhuta", "kriya", "nadi", "neem", "lamp", "supps"]);
+  assert.deepEqual(J(y.steps.map(x => x.h)), ["shambhavi", "surya", "angam", "yogasana", "upa", "bhuta", "kriya", "nadi", "neem", "lamp"]);
   assert.deepEqual(J(B.basic("yoga", "travel", 1).steps), J(y.steps));   // the same list when travelling
 });
 
@@ -99,4 +99,14 @@ test("quest.html: no free-floating action tiles, no time pay, every action ticke
   // and each "blk" habit (but barefoot, which waits on Junyan) is on some block's checklist
   const steps = new Set(["home", "travel"].flatMap(m => ["yoga", "groom", "domestics", "winddown"].flatMap(id => B.basic(id, m, 2).steps.flatMap(x => [x.h, x.pm && x.pm.h]))));
   for (const [id, flag] of rows) if (flag === "blk" && id !== "barefoot") assert.ok(steps.has(id), `${id} is on no checklist`);
+});
+
+test("the old timed payments are recognised for the take-back, and nothing else is", () => {
+  const html = fs.readFileSync(fileURLToPath(new URL("../quest.html", import.meta.url)), "utf8");
+  const src = html.match(/const TIMED_PAY = (\/.+\/);\n/)[1];
+  const re = new Function(`return ${src}`)();
+  for (const m of ["Shambhavi: 45 min", "Shambhavi, Angamardana, Surya Kriya: 60 min", "Isha Kriya: 12 min"]) assert.ok(re.test(m), m);
+  for (const m of ["Surya Kriya (Yoga)", "Shambhavi Mahamudra (Yoga)", "Gym used 7 (1 hr, 8:00 PM to 9:00 PM)", "Shambhavi: done for today", "Samba Class: 60 min"]) assert.ok(!re.test(m), m);
+  assert.match(html, /undoTimedPay\(\);/);
+  assert.match(html, /k:"undo:" \+ e\.at/);   // one take-back per payment, whichever device writes it
 });
