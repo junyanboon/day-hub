@@ -96,7 +96,7 @@ test("d66: one kind line about what improved most against his week", () => {
 test("d63: names of drains and pranic foods, short and once each", () => {
   const ctxM = ctx.QuestMeals;
   assert.deepEqual(J(T.namesOf(["neg", "coffee", "neg", "x", "heavy"], ctxM.DRAINS)), ["Onion or garlic", "Coffee or tea", "Heavy meal"]);
-  assert.deepEqual(J(T.namesOf(["fveg", "pos"], ctxM.PRANA_FOODS)), ["Fresh vegetables", "Pranic food"]);
+  assert.deepEqual(J(T.namesOf(["fveg", "pos", "heavy"], ctxM.PRANA_FOODS)), ["Fresh vegetables", "Pranic food"]);
 });
 
 test("d67: the 3 that mattered most, sadhana and health first; yoga only with a practice ticked", () => {
@@ -106,6 +106,8 @@ test("d67: the 3 that mattered most, sadhana and health first; yoga only with a 
     { name: "✓ Walk", rank: 1, mins: 30 }, { name: "✓ Email", rank: 2, mins: 120 },
   ];
   assert.deepEqual(J(T.topDone(items)), ["✓ Shambhavi", "✓ Gym", "✓ Walk"]);
+  // the page puts meals and rest blocks last even though they count as health kinds
+  assert.match(html, /rank:isSadhana\(b\) \? 0 : isMeal\(b\) \|\| b\.kind === "rest" \? 3 : isHealth\(b\) \? 1 : 2/);
 });
 
 test("d68: 2026-10-19's old Body is left out of the average and the best unless it came from the log", () => {

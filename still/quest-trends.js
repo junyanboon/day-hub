@@ -148,7 +148,7 @@
     const out = [];
     for (const id of ids || []) {
       const row = (rows || []).find((x) => x[0] === id);
-      const name = SHORT[id] || (row ? String(row[2]).split(/,| \(/)[0] : id === "pos" ? "Pranic food" : null);
+      const name = row ? SHORT[id] || String(row[2]).split(/,| \(/)[0] : id === "pos" ? "Pranic food" : null;
       if (name && !out.includes(name)) out.push(name);
     }
     return out;
