@@ -85,7 +85,8 @@
       for (const [k, v] of Object.entries(obj(n.glasses))) g[k] = g[k] && (g[k].off || (v && v.off)) ? { ...g[k], ...v, off: true } : { ...(g[k] || {}), ...v };
       out.glasses = g;
     }
-    for (const k of ["slept", "ouraTried", "briefDone"]) if (o[k] || n[k]) out[k] = true;
+    // ouraReady (2026-10-19, d58): today's Oura readiness is in; sticks like slept
+    for (const k of ["slept", "ouraTried", "ouraReady", "briefDone"]) if (o[k] || n[k]) out[k] = true;
     out.xp = Math.max(+o.xp || 0, +n.xp || 0);
     if (arr(o.sideDone).length > arr(n.sideDone).length) out.sideDone = o.sideDone;
     if (o.feel || n.feel) {   // feelings check-ins and conflicts (2026-10-10): kept from both, once each
