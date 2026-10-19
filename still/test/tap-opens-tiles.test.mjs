@@ -48,21 +48,27 @@ test("tapping a block opens its list: basics, gym, meal, outdoor (barefoot), a p
   const nt = fn("openNoTiles");
   assert.match(nt, /Tiles for this block aren't set up yet\./);
   assert.ok(nt.indexOf("set up yet") < nt.indexOf("Change time or name"), "the note sits above Change time or name");
-  const od = fn("openOutdoor");
-  assert.match(od, /barefootStep\(\)/); assert.match(od, /tapStep\(bn, b, "outdoor"/); assert.match(od, /Change time or name/);
-  assert.ok(!/G\.day\.work = /.test(od), "drawing it writes nothing");
+  assert.ok(bl.indexOf("INSIGHTS[gk(b)]") < bl.indexOf("outdoorBlock("), "a hike with a prep list keeps it");
+  const od = fn("openOutdoor"), bt = fn("barefootTile"), bb = fn("bindBarefootTile");
+  assert.match(od, /\$\{barefootTile\(b\)\}/); assert.match(od, /bindBarefootTile\(b, openOutdoor\)/); assert.match(od, /Change time or name/);
+  assert.match(bt, /outdoorBlock\(b\.t\)/); assert.match(bt, /barefootStep\(\)/); assert.match(bb, /tapStep\(bn, b, "outdoor"/);
+  assert.ok(!/G\.day\.work = /.test(bt), "drawing it writes nothing");
+  const wk = fn("openWork");
+  assert.match(wk, /\$\{barefootTile\(b\)\}/, "an outdoor block's prep list carries the barefoot tile too");
+  assert.match(wk, /bindBarefootTile\(b, openWork\)/);
 });
 
 test("the calendar draws the tap symbol from unopened, only on today's blocks, and the click marks the block opened", () => {
   const cal = fn("calendarHTML");
-  assert.match(cal, /QB\(\)\.unopened\(G\.day, gk\(b0\), !!blockList\(b0\), [^)]*\)/);
+  assert.match(cal, /const fb = [^\n]*st\.blocks\.find\(b => b\.kind !== "open" && b\.kind !== "break"\)/, "the dot reads the block a tap opens");
+  assert.match(cal, /QB\(\)\.unopened\(G\.day, gk\(fb\), !!blockList\(fb\), [^)]*\)/);
   assert.match(cal, /cal-tap/);
   assert.match(html, /\.cal-tap \{/);
-  assert.match(html, /n\.onclick = e => \{[^]{0,700}markOpened\(/);
+  assert.match(html, /n\.onclick = e => \{[^]{0,900}markOpened\(b\); return openGym\(b\);[^]{0,40}openStop\(b\);/, "the gym shortcut marks it too");
 });
 
 test("the check-ins are gone: no How was X?, no Check tag, no activity quiz", () => {
-  for (const gone of ["openActQuiz", "actRatable", "unratedActivity", "AQ_PRANA", "AQ_BODY", "aqScore", "data-actq", "cal-ask", "Check ›", "barefootHTML", "bindBarefoot"])
+  for (const gone of ["openActQuiz", "actRatable", "unratedActivity", "AQ_PRANA", "AQ_BODY", "aqScore", "data-actq", "cal-ask", "Check ›", "barefootHTML", "bindBarefoot("])
     assert.ok(!html.includes(gone), gone);
   assert.ok(!/How was \$\{/.test(html));
 });
@@ -77,6 +83,10 @@ test("Right now keeps only what is for now: no How are you, really?, no auto til
   assert.match(html, /\["early", "[^"]+", 5, 1, "🍽️", "Last meal 3 hr", "auto", "Evening"\]/);
   assert.match(html, /\["bedtime", "[^"]+", 5, 1, "🌙", "Asleep by 11", "auto", "Evening"\]/);
   assert.match(s, /How am I\?/, "his own check-in button stays");
+  const night = fn("openNight");
+  assert.match(night, /\(G\.day\.earn \|\| \{\}\)\.early \? "✓ Last meal 3 hr before bed/, "tonight's last meal shows on the day's end screen");
+  assert.match(night, /habitN\("bedtime"\) \? `✓ Asleep by 11 last night/, "and last night's sleep time");
+  assert.match(night, /done\.unshift\(\.\.\.auto\)/);
 });
 
 test("gym keeps How do you feel now? in its own list, and it still pays (d34)", () => {

@@ -179,7 +179,6 @@
   .htile.water .glass { background:linear-gradient(180deg, rgba(127,208,255,.45), rgba(127,208,255,.18)); }
   .htile.full { background:linear-gradient(160deg, rgba(255,212,121,.30), rgba(255,212,121,.08)); border-color:rgba(255,212,121,.6); }
   .htile.full .hc { color:var(--gold); }
-  .htile.auto { border-style:dashed; } .htile.auto b { color:var(--ink-faint); } .htile.earned { border-color:rgba(143,227,176,.7); }
   .sq { display:flex; gap:12px; align-items:center; margin-top:12px; padding:12px 14px; border-radius:16px; background:var(--glass); border:1px solid var(--glass-border); }
   .sq.done { border-color:rgba(143,227,176,.65); background:linear-gradient(135deg, rgba(143,227,176,.18), rgba(127,208,255,.10)); }
   .sq-i { font-size:22px; } .sq-t { flex:1; font-weight:600; font-size:14px; }
@@ -197,7 +196,6 @@
     color:var(--ink); font:inherit; font-weight:600; font-size:14px; cursor:pointer; position:relative; }
   .wq-btn:active { transform:scale(.97); }
   .wq-note { width:100%; font-size:12px; color:var(--ink-soft); margin-top:7px; }
-  .hgrid.sugg { grid-template-columns:repeat(3, 1fr); }
   .sugw { margin:14px 0 4px; padding:10px 12px; border-radius:14px; background:var(--glass); border:1px solid var(--glass-border); }
   .sugr { display:flex; align-items:center; gap:6px; padding:8px 0; border-top:1px solid var(--glass-border); }
   .sugr:first-of-type { border-top:0; }
@@ -206,7 +204,6 @@
   .hgrid.btiles, .hgrid.mqg { grid-template-columns:repeat(3, 1fr); margin:4px 0 10px; }
   .hgrid.btiles .htile, .hgrid.mqg .htile { min-height:78px; padding:14px 4px 6px; }
   .hgrid.mqg .hl { font-size:10px; }
-  .hgrid.sugg .htile { min-height:76px; }
   .why-tip { position:fixed; z-index:300; display:none; padding:9px 11px; border-radius:12px; background:#0f1230; border:1px solid var(--glass-border);
     color:var(--ink); font-size:12.5px; line-height:1.35; box-shadow:0 10px 30px rgba(0,0,0,.45); pointer-events:none; }
   .htile { -webkit-touch-callout:none; }
@@ -1537,6 +1534,10 @@
     const hDone = HABITS.filter(h => habitN(h[0]) > 0).length;
     const done = all.filter(b => G.day.closes[gk(b)] === "done" || ["in", "late"].includes(G.day.checks[gk(b)])).map(b => `✓ ${shortName(b)}`)
       .concat(all.filter(b => G.day.checks[gk(b)] === "skip").map(b => `· ${shortName(b)}, didn't happen`));
+    // the two automatic ones left Right now (d35) and show here by name: tonight's last meal, last night's sleep time
+    const auto = [(G.day.earn || {}).early ? "✓ Last meal 3 hr before bed, paid tomorrow morning" : null,
+      habitN("bedtime") ? `✓ Asleep by 11 last night${BED ? ` (${BED.asleep})` : ""}` : BED ? `· Asleep after 11 last night (${BED.asleep})` : null].filter(Boolean);
+    done.unshift(...auto);
     const next = new Date(Date.parse(gameYmd() + "T12:00:00Z") + 86400000).toISOString().slice(0, 10);
     let items = [], note = "", ahead = null;
     try {
@@ -2262,13 +2263,13 @@
     if (isGym(b)) return "gym";
     if (isMeal(b)) return "meal";
     if (basicId(b)) return "basic";   // Morning Yoga, Domestics or Grooming, Wind-down from the calendar (2026-10-19)
+    if (INSIGHTS[gk(b)]) return "work";   // the prep list the insight agent wrote (a hike's also carries its barefoot tile)
     if (QB() && QB().outdoorBlock(b.t)) return "outdoor";   // the barefoot walk (d27), on the walk or hike's own list
-    if (INSIGHTS[gk(b)]) return "work";   // the prep list the insight agent wrote
     return null;
   }
   // opened on this device or another (G.day.opened merges from both): the calendar's tap symbol goes
   function markOpened(b){
-    if (!b || !G.day || (G.day.opened || {})[gk(b)]) return;   // openStop is only reached for today's blocks
+    if (!b || !G.day || (G.day.opened || {})[gk(b)]) return;   // callers only pass today's blocks
     (G.day.opened = G.day.opened || {})[gk(b)] = now().toISOString(); saveG();
   }
   function openStop(b){
@@ -2363,14 +2364,21 @@
      taps it (the barefoot habit's value, once a day, into prana) and a second tap takes it back, the same as a checklist
      tile (tapStep). It is saved on the block's checklist (G.day.work). The old "How was X?" check-in is gone (d32). */
   const BAREFOOT_I = "bf";   // its own key in the block's ticks, apart from any prep list
-  function openOutdoor(b){
+  function barefootTile(b){
+    if (!QB() || !QB().outdoorBlock(b.t)) return "";
     const W = (G.day.work || {})[gk(b)] || {};   // read only: the tap creates the block's checklist
-    openSheet(`${winHead(b)}<div class="win-lb">Barefoot</div>
-      <div class="hgrid btiles">${stepTile(b, { ...W, tick:W.tick || {} }, QB().barefootStep(), BAREFOOT_I, MO_CTX.hour(now()), "outdoor")}</div>
-      <div class="actions"><button class="btn ghost" id="oEdit">Change time or name</button></div>`, true);
+    return `<div class="win-lb">Barefoot</div>
+      <div class="hgrid btiles">${stepTile(b, { ...W, tick:W.tick || {} }, QB().barefootStep(), BAREFOOT_I, MO_CTX.hour(now()), "outdoor")}</div>`;
+  }
+  function bindBarefootTile(b, reopen){
     $("sheet").querySelectorAll("[data-bstep]").forEach(bn => bn.onclick = e => { e.stopPropagation();
       const top = $("sheet").scrollTop;
-      tapStep(bn, b, "outdoor", BAREFOOT_I, QB().barefootStep(), () => { openOutdoor(b); $("sheet").scrollTop = top; render(); }); });
+      tapStep(bn, b, "outdoor", BAREFOOT_I, QB().barefootStep(), () => { reopen(b); $("sheet").scrollTop = top; render(); }); });
+  }
+  function openOutdoor(b){
+    openSheet(`${winHead(b)}${barefootTile(b)}
+      <div class="actions"><button class="btn ghost" id="oEdit">Change time or name</button></div>`, true);
+    bindBarefootTile(b, openOutdoor);
     $("oEdit").onclick = () => openEdit(b);
   }
 
@@ -2665,7 +2673,7 @@
     const linkRow = l => `<a class="wck" href="${esc(l.url)}" target="_blank" rel="noopener"><span class="bx">▶</span><span>${esc(l.title)}${l.note ? `<br><small style="color:var(--ink-faint)">${esc(l.note)}</small>` : ""}</span></a>`;
     const W = ((G.day.work = G.day.work || {})[k] = G.day.work[k] || { tick:{}, goal:"" });
     const n = I.items.length, done = I.items.filter((_, i) => W.tick[i]).length;
-    openSheet(`${winHead(b)}${bk ? bookingHtml(bk) : ""}
+    openSheet(`${winHead(b)}${bk ? bookingHtml(bk) : ""}${barefootTile(b)}
       ${I.know.length ? `<div class="knowcard"><div class="win-lb" style="margin-top:0">What to know</div>${I.know.map(x =>
         `<p><b>${esc(x.t)}</b>${x.why ? `<br><span>${esc(x.why)}</span>` : ""}</p>`).join("")}</div>` : ""}
       <div class="win-lb">${I.packing ? "Pack" : "Prep"} ${n ? `${done}/${n}` : ""}</div>
@@ -2679,6 +2687,7 @@
       ${I.links.length ? `<div class="win-lb">Learn</div>${I.links.map(linkRow).join("")}` : ""}
       <div class="actions"><button class="btn ghost" id="wEdit">Change time or name</button></div>`, true);
     $("wGoal").onchange = e => { W.goal = e.target.value.trim(); saveG(); };
+    bindBarefootTile(b, openWork);
     $("sheet").querySelectorAll("[data-tick]").forEach(bn => bn.onclick = () => {
       W.tick[bn.dataset.tick] = !W.tick[bn.dataset.tick];
       if (n && I.items.every((_, i) => W.tick[i]) && !W.scout) { W.scout = true; giveItem("scout", `Prepped ${shortName(b)}.`); }
@@ -4599,7 +4608,8 @@
       const rq = st.free || !game ? null : (G.day.mealq || {})[gk(b0)];
       const pts = st.free || !game ? 0 : st.blocks.reduce((a, b) => a + blockPaid(b).p, 0) + (rq ? rq.p || 0 : 0);
       // the tap symbol (d32): today's block with its own list, started, not opened yet; none for a block with no tiles (d36)
-      const ask = game && !st.free && QB() && QB().unopened(G.day, gk(b0), !!blockList(b0), +st.s <= +t);
+      const fb = st.free ? null : st.blocks.find(b => b.kind !== "open" && b.kind !== "break");   // the block a tap opens
+      const ask = game && !!fb && QB() && QB().unopened(G.day, gk(fb), !!blockList(fb), +st.s <= +t);
       // ✓ only when it is complete: closed as done, or checked in and over (not while it is still running)
       const done = game && (!st.free && st.blocks.some(b => G.day.closes[gk(b)] === "done") || (st.lit && past));
       const dk = st.free ? { kind:"free" } : win ? { kind:"view" } : AGD().dragKind(b0, ctx), drag = dk.kind === "cal" || dk.kind === "day";
@@ -5004,11 +5014,12 @@
     mt.querySelectorAll("[data-stop]").forEach(n => n.onclick = e => {
       const st = CAL.stops[+n.dataset.stop]; if (!st) return;   // the stops the column on screen was drawn from
       const fixed = st.blocks.find(b => b.kind !== "open" && b.kind !== "break");
-      if (fixed && st.blocks[0].game) markOpened(blocks().find(x => x.key === fixed.key) || fixed);
       // another day of the agenda: what it is and how to change it; open space there takes a new calendar event
       if (!st.blocks[0].game) { if (fixed) return openAgendaItem(fixed); if (st.e > now()) openAdd(new Date(Math.max(+st.s, +now()))); return; }
-      if (fixed && isGym(fixed) && fixed.s - now() < 3 * 3600000) return openGym(blocks().find(x => x.key === fixed.key) || fixed);
-      if (fixed) openStop(blocks().find(x => x.key === fixed.key) || fixed); else openMove(st);
+      if (!fixed) return openMove(st);
+      const b = blocks().find(x => x.key === fixed.key) || fixed;
+      if (isGym(b) && b.s - now() < 3 * 3600000) { markOpened(b); return openGym(b); }
+      openStop(b);
     });
 
     // the Quest log card is gone (Junyan, 2026-10-19: "drop the quest log"); G.day.log stays, the night screen and the merge read it

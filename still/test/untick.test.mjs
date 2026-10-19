@@ -216,10 +216,12 @@ test("quest.html: the tile tap runs tapDay, counts read habitCount, owed take-ba
   assert.ok(!/\(G\.day\.habits \|\| \{\}\)\[h\] > 0/.test(html), "done-today checks read the live count");
   assert.ok(!/unticking takes nothing back/.test(html));
   // the barefoot walk is the outdoor block's own list, opened straight from the block (d32; the check-in is gone)
-  const a = html.indexOf("function openOutdoor("), q = html.slice(a, a + 1400);
+  const a = html.indexOf("function barefootTile(");
+  let q = html.slice(a, html.indexOf("function openOutdoor("));
   assert.ok(a > 0);
   assert.ok(!/G\.day\.work = /.test(q), "drawing it writes nothing");
   assert.match(q, /tapStep\(bn, b, "outdoor"/, "and the same tap, pay and take-back");
+  q = html.slice(html.indexOf("function openOutdoor("), html.indexOf("function openOutdoor(") + 600);
   assert.match(q, /id="oEdit">Change time or name</, "and the block can still be changed from there");
   const so = html.slice(html.indexOf("function blockList("), html.indexOf("function blockList(") + 900);
   assert.match(so, /QB\(\)\.outdoorBlock\(b\.t\)\) return "outdoor"/, "a walk or hike opens its barefoot tile");
