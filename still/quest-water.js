@@ -12,7 +12,6 @@
 (function (root) {
   "use strict";
   const AIM = 8, BY4 = 6, ML = 250, CUT = 16;
-  const TEXT = "Drink when you're thirsty, a full glass at once. The aim is a guide.";
   const obj = (x) => (x && typeof x === "object" && !Array.isArray(x) ? x : {});
   const markerPct = () => Math.round((BY4 / AIM) * 100);
   // after 4 PM, and on to the game day's end at 4 AM
@@ -46,5 +45,5 @@
   // what the next glass pays: water's old value per cup, nothing past the old daily limit
   const pay = (g, value, cap) => (active(g).length >= cap ? 0 : value);
 
-  root.QuestWater = { AIM, BY4, ML, CUT, TEXT, markerPct, late, button, active, add, undo, summary, byBlock, pay };
+  root.QuestWater = { AIM, BY4, ML, CUT, markerPct, late, button, active, add, undo, summary, byBlock, pay };
 })(typeof window !== "undefined" ? window : globalThis);

@@ -14,8 +14,8 @@ const J = x => JSON.parse(JSON.stringify(x));
 test("the aim is 8 glasses of 250 ml with a marker at 6 by 4 PM", () => {
   assert.equal(W.AIM, 8); assert.equal(W.ML, 250); assert.equal(W.BY4, 6); assert.equal(W.CUT, 16);
   assert.equal(W.markerPct(), 75);
-  assert.equal(W.TEXT, "Drink when you're thirsty, a full glass at once. The aim is a guide.");
-  assert.doesNotMatch(W.TEXT + W.button("Work", 9) + W.button(null, 17), /[–—]/);
+  assert.equal(W.TEXT, undefined);
+  assert.doesNotMatch(W.button("Work", 9) + W.button(null, 17), /[–—]/);
 });
 
 test("the button names the block he is in, and reads thirsty after 4 PM", () => {
