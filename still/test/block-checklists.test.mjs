@@ -44,6 +44,8 @@ test("Dr Ellie is the AM routine before 2 PM and the PM one after", () => {
   assert.equal(B.stepAt(dr, 13).h, "mouthAm");
   assert.equal(B.stepAt(dr, 14).h, "mouth");
   assert.match(B.stepAt(dr, 20).t, /PM/);
+  assert.equal(B.stepAt(dr, 1).h, "mouth");   // 1 AM is still the night routine (the game day runs to 4 AM)
+  assert.equal(B.stepAt(dr, 5).h, "mouthAm");
   const lamp = { t:"Lamp", h:"lamp" };
   assert.equal(B.stepAt(lamp, 21).h, "lamp");
 });

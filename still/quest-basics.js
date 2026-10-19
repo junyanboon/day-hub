@@ -78,7 +78,8 @@
     return null;
   }
   // the Prana action a step pays at this hour (Dr Ellie: AM before 2 PM, PM after), and its label
-  const stepAt = (st, hour) => st && st.pm && hour >= PM_HOUR ? { ...st, ...st.pm } : st;
+  // (the game day runs to 4 AM, so midnight to 4 AM is still the night routine)
+  const stepAt = (st, hour) => st && st.pm && (hour >= PM_HOUR || hour < 4) ? { ...st, ...st.pm } : st;
   /* What ticking step i of a block pays. W: that block's { tick, paid } (G.day.work[key]); all: every block's W today;
      kind: the block's basic id. A step pays once per kind a day (the lamp: once in Morning Yoga and once in the
      Wind-down, d9) and never past the habit's daily limit (gain(h) is 0 then). Unticking takes nothing back, as

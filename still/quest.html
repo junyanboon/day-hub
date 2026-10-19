@@ -1259,7 +1259,7 @@
   const HARD = /swim|cycl|\bbike\b|walk|\btour\b|excursion|safari|snorkel|party|festival|wedding|concert|competition|performance|congress|gala/i;
   const FOCUSED = /\bdrive\b|driving/i;
   function energy(b){                                  // { rate: spent per hour while it runs }
-    if (isSadhana(b) || isRecovery(b) || isMeal(b) || isSleep(b) || b.kind === "open" || b.kind === "break" || /^rest\b|free time/i.test(b.t) || b.basic === "winddown") return { rate:0 };
+    if (isSadhana(b) || isRecovery(b) || isMeal(b) || isSleep(b) || b.kind === "open" || b.kind === "break" || /^rest\b|free time/i.test(b.t) || b.basic === "winddown" || /wind.?down/i.test(b.t)) return { rate:0 };
     if (VERY_HARD.test(b.t)) return { rate:10 };
     if (isGym(b) || b.kind === "body" || b.kind === "dance" || HARD.test(b.t) || groupOf(b) === "major") return { rate:7 };
     if (groupOf(b) === "work" || FOCUSED.test(b.t)) return { rate:5 };
@@ -1277,8 +1277,7 @@
      Grooming, Wind-down; quest-basics.js). Only water keeps a tile. The lamp counts twice a day: once in Morning
      Yoga and once in the Wind-down. Xylitol moved into the meal quiz. Shower and the copper pot are new.
      flags: "flat" = every tap gives the same, "quiz" = no tile, the meal quiz counts it
-     (2026-10-10), "cal" = no tile, only a calendar block
-     naming it pays it (2026-10-10), "auto" = the game counts it from the
+     (2026-10-10), "auto" = the game counts it from the
      calendar and check-ins (evening ones pay out the next morning). Ids that existed
      before keep their meaning except water, now 250 ml. No movement here: training,
      cardio, cold and walks take energy, and their calendar blocks spend it (Junyan,
@@ -1833,7 +1832,7 @@
     G.day.started = G.day.started || {};
     list.forEach(b => {
       G.day.checks[gk(b)] = "in"; G.day.started[gk(b)] = b.s.toISOString();
-      if (b.basic === "winddown" && !G.day.windDown) G.day.windDown = b.s.toISOString();
+      if (basicId(b) === "winddown" && !G.day.windDown) G.day.windDown = b.s.toISOString();
     });
     saveG();
   }
@@ -1908,14 +1907,14 @@
     const sadhanaDone = doneToday("shambhavi") || all.some(b => isSadhana(b) && ["in", "late"].includes(G.day.checks[gk(b)]));
     out.push({ icon:"💧", text:"Water first", why:`${tired.length ? "Travel and sun dry you out. " : ""}${cups ? `${cups} cup${cups > 1 ? "s" : ""} so far today.` : "A full cup before anything else."}`, habit:"water", btn:"+1 cup" });
     if (!sadhanaDone && left >= 20) {
-      if (emptyStomach(t, all)) out.push({ icon:"🪷", text:"Shambhavi, 21 min", why:"Not done yet today, and your stomach is empty. A shower first is a good start.", habit:"shambhavi", btn:"Done" });
+      if (emptyStomach(t, all)) out.push({ icon:"🪷", text:"Shambhavi, 21 min", why:"Not done yet today, and your stomach is empty. A shower first is a good start. Tick it in a Yoga block on the calendar." });
       else out.push({ icon:"🪷", text:"Shambhavi later", why:`You ate at ${fmtT(ate)}. Shambhavi wants about 3 hours after a meal.` });
     }
     if (tired.length && left >= 20 && hour < 15 && (!bed || bed.s - t > 6 * 3600000))
       out.push({ icon:"😴", text:"Lie down, 20 min timer", why:`${tired.join(", ").replace(/^./, c => c.toUpperCase())}. Up by ${fmtT(new Date(+t + 20 * 60000))}, so tonight's sleep stays whole.` });
     if ((!ate || t - ate >= 4 * 3600000) && (!nextMeal || nextMeal.s - t > 90 * 60000))
       out.push({ icon:"🍉", text:"Light fruit", why:`${ate ? `No meal on the plan since ${fmtT(ate)}` : "No meal on the plan yet today"}${nextMeal ? `, and the next is ${fmtT(nextMeal.s)}` : ""}. Watery fruit, after practice, not before.` });
-    if (left < 20) out.push({ icon:"🌬️", text:"Stand up, look far away", why:"A few rounds of Nadi Shuddhi if you like.", habit: doneToday("nadi") ? "" : "nadi", btn:"Did Nadi Shuddhi" });
+    if (left < 20) out.push({ icon:"🌬️", text:"Stand up, look far away", why:"A few rounds of Nadi Shuddhi if you like." });
     out.push({ icon:"📵", text:"Phone down", why:"Scrolling isn't rest, for Sadhguru or Bryan Johnson." });
     return out;
   }
@@ -3610,6 +3609,7 @@
   // a block's checklist: a basic the plan placed, else one its calendar title names (Morning Yoga, Domestics,
   // Grooming or Shower, Wind down; Junyan, 2026-10-19, d6 d9 d11)
   const basicId = b => !b || !QB() ? null : b.basic || (isGym(b) || isMeal(b) || isSleep(b) ? null : QB().blockBasic(b.t, b.kind));
+  const PM_LABEL = 20;   // an hour that reads a step's evening label (Dr Ellie PM)
   const basicOf = b => basicId(b) ? QB().basic(basicId(b), b.bmode || dayMode(), b.wd ?? wdToday()) : null;
   const basicAdd = (id, s, min) => { const B = QB().basic(id, dayMode(), wdToday());
     return { key:newKey(s), s:new Date(s).toISOString(), e:new Date(+s + min * 60000).toISOString(), t:B.t, type:"task", cal:"you", basic:id, bmode:dayMode(), wd:wdToday() }; };
@@ -3643,13 +3643,12 @@
     });
     saveG();
   }
-  // ticking a basic done: closes it, and Domestics ticks Dr Ellie AM, the Wind-down Dr Ellie PM. A second tap reopens the block (the Prana action stays ticked).
+  // ticking a basic done closes it (its steps pay, not Done, since 2026-10-19). A second tap reopens the block.
   function basicDone(b){
     const k = gk(b), B = basicOf(b); if (!B) return;
     if (G.day.closes[k] === "done") { delete G.day.closes[k]; log(`Not done after all: ${B.t}`); saveG(); return; }
     closeOut(b, "done");
-    if (B.habit) logHabit(B.habit, true);
-    if (b.basic === "winddown" && !G.day.windDown) G.day.windDown = now().toISOString();
+    if (basicId(b) === "winddown" && !G.day.windDown) G.day.windDown = now().toISOString();
     saveG();
   }
   async function setDayMode(m){
@@ -3676,6 +3675,7 @@
     const B = basicOf(b), k = gk(b); if (!B) return "";
     const W = ((G.day.work = G.day.work || {})[k] = G.day.work[k] || { tick:{}, goal:"" }), done = G.day.closes[k] === "done";
     W.tick = W.tick || {};
+    // a home-only step (the copper pot) shows a quiet skip while home or travelling is only the calendar's guess
     const hr = MO_CTX.hour(now()), id = basicId(b), skip = W.skip || {};
     // what each step pays: its value, "paid" once paid, "done today" when the day's limit or this kind already paid it
     const tag = (x, i) => { const s = QB().stepAt(x, hr), paid = (W.paid || {})[i];
@@ -3687,8 +3687,8 @@
     const pd = blockPaid(b), paidTxt = [pd.p ? `prana +${pd.p}` : "", pd.b ? `body +${pd.b}` : ""].filter(Boolean).join(", ");
     return `${B.steps.length ? `<div class="${lb}">${id === "yoga" ? "What did you do?" : "Steps"} ${steps.filter(([, i]) => W.tick[i]).length}/${steps.length}</div>` : ""}
       ${steps.some(([x]) => x.h) ? `<div class="hkey" style="margin:0 0 6px"><b class="mp">gold</b> fills prana · <b class="mb">teal</b> fills body · each one pays once</div>` : ""}
-      ${steps.map(([x, i]) => `<button class="${ck}${W.tick[i] ? " on" : ""}" data-bstep="${i}" data-k="${esc(b.key)}"><span class="bx">${W.tick[i] ? "✓" : ""}</span><span>${esc(QB().stepAt(x, hr).t)}</span>${tag(x, i)}</button>` +
-        (x.skip && !W.tick[i] && !(W.paid || {})[i] ? `<button class="mo-det-btn" style="opacity:.7;font-size:12px;margin:-2px 0 6px" data-bskip="${i}" data-k="${esc(b.key)}" data-t="${esc(x.t)}">Travelling today, skip this</button>` : "")).join("")}
+      ${steps.map(([x, i]) => `<button class="${ck}${W.tick[i] ? " on" : ""}" data-bstep="${i}" data-k="${esc(b.key)}"><span class="bx">${W.tick[i] ? "✓" : ""}</span><span>${esc((W.paid || {})[i] ? (W.paid[i].h === x.h ? x.t : QB().stepAt(x, PM_LABEL).t) : QB().stepAt(x, hr).t)}</span>${tag(x, i)}</button>` +
+        (x.skip && !(G.day.plan || {}).mode && !W.tick[i] && !(W.paid || {})[i] ? `<button class="mo-det-btn" style="opacity:.7;font-size:12px;margin:-2px 0 6px" data-bskip="${i}" data-k="${esc(b.key)}" data-t="${esc(x.t)}">Travelling today, skip this</button>` : "")).join("")}
       ${id !== "caney" ? `<div class="hint" style="margin:8px 2px" data-paid>${paidTxt ? `Paid so far: ${paidTxt}.` : "Nothing paid yet. Tick what you did."}</div>` : ""}
       <button class="mo-det-btn" data-bdone="${esc(b.key)}">${done ? "✓ Done · tap to undo" : "Done"}</button>`;
   }
