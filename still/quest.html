@@ -715,12 +715,12 @@
 <script src="quest-merge.js?v=20261016g"></script>
 <script src="quest-levels.js?v=20261016b"></script>
 <script src="quest-gymlog.js?v=20261017a"></script>
-<script src="quest-meals.js?v=20261019a"></script>
+<script src="quest-meals.js?v=20261019d"></script>
 <script src="quest-trends.js?v=20261019c"></script>
 <script src="nvc-words.js?v=20261010a"></script>
 <script src="quest-fx.js?v=20261009b"></script>
 <script src="quest-night.js?v=20261019b"></script>
-<script src="quest-basics.js?v=20261016d"></script>
+<script src="quest-basics.js?v=20261019d"></script>
 <script src="quest-gym.js?v=20261016i"></script>
 <script src="quest-morning.js?v=20261019a"></script>
 <script src="quest-agenda.js?v=20261014c"></script>
@@ -1246,19 +1246,10 @@
     if (!ids.length && isRecovery(b)) ids.push("kriya");
     return ids;
   }
-  /* Paid by time only (Junyan, 2026-10-10: "Just give the same prana ... based on time.
-     Don't worry about the length of the practice"). Every minute of a practice block is
-     worth the same, whatever it names: 0.6 a minute before the level (30 min = +27 at
-     level 1). The practices it names are marked done for the day. */
-  const PRACTICE_PER_MIN = 0.6;
-  const blockGain = b => blockHabits(b).length ? Math.max(1, Math.round(Math.max(0, (b.e - b.s) / 60000) * PRACTICE_PER_MIN * gainMult())) : 0;
-  function payBlock(b){
-    const ids = blockHabits(b), g = blockGain(b); if (!ids.length) return;
-    G.day.habits = G.day.habits || {};
-    ids.forEach(id => { G.day.habits[id] = (G.day.habits[id] || 0) + 1; });
-    const names = ids.map(id => HABITS.find(x => x[0] === id)[5]).join(", ");
-    addHabit(ids[0], g, `${names}: ${Math.round((b.e - b.s) / 60000)} min`, names.toLowerCase());
-  }
+  /* Paid by what he did, not by time (Junyan, 2026-10-19, d6: "let's change it back to giving prana based on the
+     yogas that were performed"). A practice block opens the Morning Yoga checklist (quest-basics.js) and each ticked
+     practice pays its own value once; the block's length no longer matters. What a block's ticks paid: */
+  const blockPaid = b => QB() ? QB().paidOf((G.day.work || {})[gk(b)], meterOf) : { p:0, b:0 };
   // today's not-yet-started block that will pay this practice, so its tile says when
   const schedFor = id => { const t = now(); return blocks().find(b => b.e > t && !(G.day.checks || {})[gk(b)] && blockHabits(b).includes(id)); };
   /* What effort costs an hour (Junyan, 2026-10-09, d187 to d189: "Hike should consume a
@@ -1268,7 +1259,7 @@
   const HARD = /swim|cycl|\bbike\b|walk|\btour\b|excursion|safari|snorkel|party|festival|wedding|concert|competition|performance|congress|gala/i;
   const FOCUSED = /\bdrive\b|driving/i;
   function energy(b){                                  // { rate: spent per hour while it runs }
-    if (isSadhana(b) || isRecovery(b) || isMeal(b) || isSleep(b) || b.kind === "open" || b.kind === "break" || /^rest\b|free time/i.test(b.t) || b.basic === "winddown") return { rate:0 };
+    if (isSadhana(b) || isRecovery(b) || isMeal(b) || isSleep(b) || b.kind === "open" || b.kind === "break" || /^rest\b|free time/i.test(b.t) || b.basic === "winddown" || /wind.?down/i.test(b.t)) return { rate:0 };
     if (VERY_HARD.test(b.t)) return { rate:10 };
     if (isGym(b) || b.kind === "body" || b.kind === "dance" || HARD.test(b.t) || groupOf(b) === "major") return { rate:7 };
     if (groupOf(b) === "work" || FOCUSED.test(b.t)) return { rate:5 };
@@ -1282,9 +1273,11 @@
      spends more. Mostly ending days high moves him up; mostly low moves him down. */
   /* The habit list (Junyan, 2026-10-08: "very specific, not generic", water is one
      250 ml cup a tap). [id, full label, prana, max a day, icon, tile label, flags, group].
+     2026-10-19 (d6 d9 d11): "blk" = no tile, ticked inside a calendar block's checklist (Morning Yoga, Domestics or
+     Grooming, Wind-down; quest-basics.js). Only water keeps a tile. The lamp counts twice a day: once in Morning
+     Yoga and once in the Wind-down. Xylitol moved into the meal quiz. Shower and the copper pot are new.
      flags: "flat" = every tap gives the same, "quiz" = no tile, the meal quiz counts it
-     (2026-10-10), "cal" = no tile, only a calendar block
-     naming it pays it (2026-10-10), "auto" = the game counts it from the
+     (2026-10-10), "auto" = the game counts it from the
      calendar and check-ins (evening ones pay out the next morning). Ids that existed
      before keep their meaning except water, now 250 ml. No movement here: training,
      cardio, cold and walks take energy, and their calendar blocks spend it (Junyan,
@@ -1294,18 +1287,20 @@
   const HABITS = [
     ["water", "Water, one 250 ml cup", 0.6, 12, "💧", "250 ml water", "flat", "Morning"],
     ["protein", "30 g protein at breakfast", 3, 1, "🍳", "30 g protein AM", "quiz", "Morning"],
-    ["supps", "Morning supplements taken", 1, 1, "💊", "Supplements", "", "Morning"],
-    ["neem", "Neem and turmeric, every morning", 3, 1, "🌿", "Neem + turmeric", "", "Morning"],
-    ["mouthAm", "Dr Ellie's mouthcare routine in the morning, the whole routine in one tap", 2, 1, "🦷", "Dr Ellie AM", "", "Morning"],
-    ["shambhavi", "Shambhavi Mahamudra (counts itself from a sadhana block on the calendar)", 18, 1, "🧘", "Shambhavi", "cal", "Practice"],
-    ["kriya", "Isha Kriya", 8, 1, "🌀", "Isha Kriya", "", "Practice"],
-    ["upa", "Upa Yoga", 5, 1, "🙆", "Upa Yoga", "", "Practice"],
-    ["surya", "Surya Kriya", 10, 1, "☀️", "Surya Kriya", "cal", "Practice"],
-    ["angam", "Angamardana", 8, 1, "💪", "Angamardana", "cal", "Practice"],
-    ["yogasana", "Yogasanas", 8, 1, "🧘", "Yogasanas", "cal", "Practice"],
-    ["bhuta", "Bhuta Shuddhi", 6, 1, "🔥", "Bhuta Shuddhi", "cal", "Practice"],
-    ["barefoot", "Walk barefoot on natural ground (soil, grass or sand), daily, any length; most important around the new moon", 3, 1, "🦶", "Barefoot walk", "", "Practice"],
-    ["nadi", "Nadi Shuddhi, 5 min", 3, 2, "🌬️", "Nadi Shuddhi 5'", "", "Practice"],
+    ["supps", "Morning supplements taken", 1, 1, "💊", "Supplements", "blk", "Morning"],
+    ["neem", "Neem and turmeric, every morning", 3, 1, "🌿", "Neem + turmeric", "blk", "Morning"],
+    ["mouthAm", "Dr Ellie's mouthcare routine in the morning, the whole routine in one tap", 2, 1, "🦷", "Dr Ellie AM", "blk", "Morning"],
+    ["shower", "Shower, face wash, moisturizer with SPF", 2, 1, "🚿", "Shower", "blk", "Morning"],
+    ["copper", "Clean the copper pot and bless the water (at home)", 3, 1, "🏺", "Copper pot", "blk", "Morning"],
+    ["shambhavi", "Shambhavi Mahamudra", 18, 1, "🧘", "Shambhavi", "blk", "Practice"],
+    ["kriya", "Isha Kriya", 8, 1, "🌀", "Isha Kriya", "blk", "Practice"],
+    ["upa", "Upa Yoga", 5, 1, "🙆", "Upa Yoga", "blk", "Practice"],
+    ["surya", "Surya Kriya", 10, 1, "☀️", "Surya Kriya", "blk", "Practice"],
+    ["angam", "Angamardana", 8, 1, "💪", "Angamardana", "blk", "Practice"],
+    ["yogasana", "Yogasanas", 8, 1, "🧘", "Yogasanas", "blk", "Practice"],
+    ["bhuta", "Bhuta Shuddhi", 6, 1, "🔥", "Bhuta Shuddhi", "blk", "Practice"],
+    ["barefoot", "Walk barefoot on natural ground (soil, grass or sand), daily, any length; most important around the new moon", 3, 1, "🦶", "Barefoot walk", "blk", "Practice"],
+    ["nadi", "Nadi Shuddhi, 5 min", 3, 2, "🌬️", "Nadi Shuddhi 5'", "blk", "Practice"],
     ["blueprint", "Blueprint meal: Super Veggie or Nutty Pudding", 6, 2, "🥗", "Veggie / Pudding", "quiz", "Food"],
     ["legumes", "150 g cooked beans or lentils", 3, 1, "🫘", "150 g lentils", "quiz", "Food"],
     ["veg", "250 g vegetables (about 2 big handfuls)", 3, 2, "🥦", "250 g veg", "quiz", "Food"],
@@ -1316,9 +1311,9 @@
     ["seeds", "1 tbsp ground flax or chia", 1, 1, "🌱", "1 tbsp flax/chia", "quiz", "Food"],
     ["ferment", "Fermented food: 100 g yogurt, kefir or sauerkraut", 2, 1, "🥛", "100 g fermented food", "quiz", "Food"],
     ["heavy", "Heavy meal: tap it honestly when you ate too much or too heavy (lowers prana)", 5, 1, "🥘", "Heavy meal", "quiz", "Food"],
-    ["xylitol", "Xylitol, 1 g (one mint or gum) after eating or drinking; Dr Ellie: 6 to 10 g a day", 0.6, 10, "🍬", "Xylitol 1 g", "flat", "Food"],
-    ["lamp", "Light an oil lamp (natural oil, like sesame or ghee) before sleep", 2, 1, "🪔", "Oil lamp", "", "Evening"],
-    ["mouth", "Dr Ellie's mouthcare routine at night, the whole routine in one tap", 2, 1, "🦷", "Dr Ellie PM", "", "Evening"],
+    ["xylitol", "Xylitol, 1 g (one mint or gum) after eating or drinking; Dr Ellie: 6 to 10 g a day", 0.6, 10, "🍬", "Xylitol 1 g", "quiz", "Food"],
+    ["lamp", "Light an oil lamp (natural oil, like sesame or ghee)", 2, 2, "🪔", "Oil lamp", "blk", "Evening"],
+    ["mouth", "Dr Ellie's mouthcare routine at night, the whole routine in one tap", 2, 1, "🦷", "Dr Ellie PM", "blk", "Evening"],
     ["early", "Last meal 3+ hr before bed (counts itself from the calendar, paid next morning)", 5, 1, "🍽️", "Last meal 3 hr", "auto", "Evening"],
     ["bedtime", "Asleep before 11 PM, read from your Oura ring (paid the next morning)", 5, 1, "🌙", "Asleep by 11", "auto", "Evening"],
   ];
@@ -1549,7 +1544,11 @@
   // d206: his pixel icons replace the emoji as they arrive (still/sprites/icons/<id>.webp); add the id here
   const ICONS = new Set([]);
   const hIcon = (id, icon) => ICONS.has(id) ? `<img class="hi-img" src="sprites/icons/${id}.webp" alt="">` : icon;
-  const TILES = HABITS.filter(h => h[6] !== "cal" && h[6] !== "quiz");   // calendar practices and meal-quiz food get no tile
+  /* No free-floating tiles (Junyan, 2026-10-19, d6 d11: "Everything needs to be directly connected to what I'm doing
+     right now"). Prana and body actions are ticked inside their calendar block (Morning Yoga, Domestics or Grooming,
+     Wind-down, the meal quiz). Only the water tile stays out here for now (how water counts is still being decided),
+     beside the two automatic ones, which only show their state. */
+  const TILES = HABITS.filter(h => h[0] === "water" || h[6] === "auto");
   const h7 = id => (HABITS.find(x => x[0] === id) || [])[7];
   function habitTile([id, full, , max, icon, short, flag]){
     const n = G.day.habits[id] || 0, g = habitGain(id), auto = flag === "auto", earned = auto && (G.day.earn || {})[id];
@@ -1560,80 +1559,29 @@
     const tg = id === "bedtime" && BED ? `${n ? "✓" : "✗"} ${BED.asleep}` : auto ? (n ? "✓ last night" : earned ? "✓ tonight" : "auto") : sb ? `📅 ${fmtT(sb.s)}` : g ? (g > 0 ? `+${g}` : `${g}`) : "";
     return `<button class="${cls}" data-habit="${id}" data-why="${esc(WHY[id] || full)}">${fill}<span class="hi">${hIcon(id, icon)}</span><span class="hl">${esc(short)}</span>${cnt}<b class="${meterOf(id) === "b" ? "mb" : "mp"}">${tg}</b></button>`;
   }
-  function habitsHTML(){
-    const tile = habitTile;
-    const hDone = TILES.filter(h => (G.day.habits[h[0]] || 0) > 0).length;
-    return `<div class="hhead"><span class="eyebrow">Prana actions · ${hDone}/${TILES.length}</span>` +
-      `<button class="hsnd" data-hsnd aria-label="Tap sounds">${window.QuestFx && QuestFx.soundOn() ? "🔊" : "🔇"}</button></div>` +
-      `<div class="hkey"><b class="mp">gold</b> fills prana (Sadhguru) · <b class="mb">teal</b> fills body (Bryan Johnson)</div>` +
-      `<div class="hgrp"><div class="hgl">Heart</div><div class="hgrid"><button class="htile" data-nvc="checkin"><span class="hi">🫶</span><span class="hl">How am I?</span><b class="mp">check in</b></button><button class="htile" data-nvc="conflict"><span class="hi">⚡</span><span class="hl">Conflict</span><b class="mp">NVC</b></button><button class="htile" data-nvc="journal"><span class="hi">📓</span><span class="hl">Journal</span><b class="mp">feelings</b></button></div></div>` +
-      ["Morning", "Practice", "Food", "Evening"].map(gr => `<div class="hgrp"><div class="hgl">${gr}</div><div class="hgrid">${TILES.filter(h => h[7] === gr).map(tile).join("")}</div></div>`).join("");
-  }
-  /* Three picks for right now (Junyan, 2026-10-09: "only suggestions for this exact
-     moment, 3 suggestions; the rest behind an All Actions button"). Each action has
-     the hours it fits; around a meal the food ones lead and xylitol follows it, low
-     prana brings the recovery practices up, water rises when he is behind pace
-     (12 cups from 6:30 AM to 9:30 PM), and a window about to close gets a nudge. */
-  const WHEN = {
-    water:[6,21.5], protein:[6,11], supps:[6,11], neem:[5,10], mouthAm:[5,11],
-    shambhavi:[5,10], kriya:[6,21], nadi:[6,21], upa:[6,21], barefoot:[6,19], lamp:[20,24], surya:[5,9.5], angam:[5,9.5], bhuta:[5,21], blueprint:[7,15], legumes:[11,21], veg:[11,21],
-    greens:[11,21], evoo:[7,21], nuts:[7,21], berries:[7,21], seeds:[7,21], ferment:[7,21], xylitol:[7,22],
-    mouth:[20,24],
-  };
-  const FOOD = new Set(["protein", "blueprint", "legumes", "veg", "greens", "evoo", "nuts", "berries", "seeds", "ferment"]);
-  function suggestions(n = 3){
-    const t = now(), all = blocks(), p = tzParts(t, { hour:"numeric", minute:"numeric", hourCycle:"h23" }), h = +p.hour + +p.minute / 60;
-    const meal = all.find(b => isMeal(b) && +b.s - 20 * 60000 <= +t && +t <= +b.e + 40 * 60000);
-    const afterMeal = all.some(b => isMeal(b) && +b.e <= +t && +t - +b.e <= 45 * 60000);
-    const out = [];
-    HABITS.forEach(([id, , , max, , , flag], k) => {
-      const w = WHEN[id]; if (!w || flag === "auto" || flag === "cal" || flag === "quiz" || !habitGain(id) || h < w[0] || h > w[1]) return;
-      let sc = 10 + habitGain(id) / 3 - k * 0.01;
-      if (w[1] - h < 1.5) sc += 4;                                     // its window closes soon
-      if (FOOD.has(id)) sc += meal ? 9 : -4;
-      if (id === "xylitol") sc += afterMeal ? 12 : -5;
-      if (id === "barefoot" && nearNewMoon(t)) sc += 8;                  // Sadhguru: most important around the new moon
-      if (id === "water") { const due = Math.floor((h - 6.5) / 1.25) + 1; sc += (due - (G.day.habits.water || 0)) * 3; }
-      if (["kriya", "nadi", "upa", "bhuta"].includes(id) && prana() < 45) sc += 8;
-      out.push([sc, HABITS[k]]);
-    });
-    return out.sort((a, b) => b[0] - a[0]).slice(0, n).map(x => x[1]);
-  }
   // days from a known new moon (2000-01-06 18:14 UTC), synodic month 29.53 days
   const nearNewMoon = t => { const a = (((+t - Date.UTC(2000, 0, 6, 18, 14)) / 86400000) % 29.530588 + 29.530588) % 29.530588; return a < 1.5 || a > 28; };
-  let SUGG = null;   // keep the same three on screen until one is tapped or the hour turns
   // minutes past 11 PM where he is, from 11 PM to the end of the game day at 4 AM; null otherwise (d223, d225)
   function pastBed(t){
     const p = tzParts(t, { hour:"numeric", minute:"numeric", hourCycle:"h23" }), h = +p.hour, m = +p.minute;
     return h >= 23 ? (h - 23) * 60 + m : h < 4 ? (h + 1) * 60 + m : null;
   }
   function suggestHTML(){
-    const key = `${G.day.date}|${tzParts(now(), { hour:"numeric", hourCycle:"h23" }).hour}|${JSON.stringify(G.day.habits)}`;
-    if (!SUGG || SUGG.key !== key) SUGG = { key, list: suggestions() };
-    const hDone = TILES.filter(h => (G.day.habits[h[0]] || 0) > 0).length;
     const aq = unratedActivity();   // meals are rated from their calendar block only (Junyan, 2026-10-19, d3)
-    return `<div class="hhead"><span class="eyebrow">Prana actions · right now</span>` +
+    return `<div class="hhead"><span class="eyebrow">Right now</span>` +
       `<button class="hsnd" data-hsnd aria-label="Tap sounds">${window.QuestFx && QuestFx.soundOn() ? "🔊" : "🔇"}</button></div>` +
       (pastBed(now()) != null ? `<div class="bedline">🌙 Past bedtime: body drops 3 every half hour you stay up${G.day.lateBody ? ` (−${G.day.lateBody} so far)` : ""}. Time to wind down.</div>` : "") +
       (aq ? `<button class="pa-all" style="margin:0 0 10px" data-actq="${esc(gk(aq))}">🧍 How was ${esc(shortName(aq))}?<span>Check it ›</span></button>` : "") +
       (nvDue() ? `<button class="pa-all" style="margin:0 0 10px" data-nvc="checkin">🫶 How are you, really?<span>Check in ›</span></button>` : "") +
-      (SUGG.list.length ? `<div class="hgrid sugg">${SUGG.list.map(habitTile).join("")}</div>` : `<div class="hint" style="margin:8px 2px">Nothing pressing right now.</div>`) +
-      `<button class="pa-all" data-all>All prana actions<span>${hDone}/${TILES.length} done ›</span></button>` +
-      `<div class="actions" style="margin-top:8px"><button class="btn" data-nvc="checkin">🫶 How am I?</button><button class="btn" data-nvc="conflict">⚡ Conflict</button></div>`;
+      `<div class="hgrid sugg">${TILES.map(habitTile).join("")}</div>` +
+      `<div class="hint" style="margin:8px 2px">Practices, Dr Ellie, the lamp and the rest are ticked inside their block on the calendar.</div>` +
+      `<div class="actions" style="margin-top:8px"><button class="btn" data-nvc="checkin">🫶 How am I?</button><button class="btn" data-nvc="conflict">⚡ Conflict</button><button class="btn" data-nvc="journal">📓 Journal</button></div>`;
   }
   function bindHabits(root){
-    root.querySelectorAll("[data-all]").forEach(bn => bn.onclick = openActions);
     root.querySelectorAll("[data-nvc]").forEach(bn => bn.onclick = () => bn.dataset.nvc === "conflict" ? openConflict() : bn.dataset.nvc === "journal" ? openJournal() : openCheckin());
     root.querySelectorAll("[data-actq]").forEach(bn => bn.onclick = () => { const b = blocks().find(x => gk(x) === bn.dataset.actq); if (b) openActQuiz(b); });
     root.querySelectorAll("[data-habit]").forEach(bn => bn.onclick = () => tapHabit(bn));
-    root.querySelectorAll("[data-hsnd]").forEach(bn => bn.onclick = () => { QuestFx.setSound(!QuestFx.soundOn()); refreshActions(); render(); });
-  }
-  const actionsOpen = () => $("sheet").classList.contains("open") && $("paBody");
-  function refreshActions(){ if (actionsOpen()) { $("paBody").innerHTML = habitsHTML(); bindHabits($("paBody")); } }
-  function openActions(){
-    openSheet(`<div id="paBody">${habitsHTML()}</div><div class="actions"><button class="btn ghost" id="paClose">Done</button></div>`, true);
-    bindHabits($("paBody"));
-    $("paClose").onclick = closeSheet;
+    root.querySelectorAll("[data-hsnd]").forEach(bn => bn.onclick = () => { QuestFx.setSound(!QuestFx.soundOn()); render(); });
   }
   // a habit tile tapped: count it, burst, sound, then the springy redraw
   const HCOL = { Morning:"#ffd479", Practice:"#c9a7ff", Food:"#8fe3b0", Move:"#7fd0ff", Mind:"#ffb3c7", Evening:"#a7b4ff" };
@@ -1648,8 +1596,8 @@
     const full = G.day.habits[id] >= h[3];
     addHabit(id, g, h[1].replace(/ \(.*$/, ""), h[5], !!fx);
     if (fx) fx.tap(rect, { icon:h[4], gain:g, full, water:id === "water", color:HCOL[h[7]] });
-    render(); refreshActions();
-    if (fx) fx.pop((actionsOpen() ? $("paBody") : $("habits")).querySelector(`[data-habit="${id}"]`));
+    render();
+    if (fx) fx.pop($("habits").querySelector(`[data-habit="${id}"]`));
   }
   // a new day: keep the carry, check the level, wait for sleep to refill
   function rollDay(){
@@ -1685,7 +1633,10 @@
     addBody(Math.max(0, Math.min(100, level)) - body(), why, "sleep");
     render();
   }
-  const energyTag = b => { const pg = blockGain(b); if (pg) return `fills +${pg}`; const r = energy(b).rate; return r ? `uses about ${Math.round(r * spendMult())} body an hour` : ""; };
+  const energyTag = b => { const id = basicId(b);
+    if (id && id !== "caney") { const pd = blockPaid(b), t = [pd.p ? `prana +${pd.p}` : "", pd.b ? `body +${pd.b}` : ""].filter(Boolean).join(", ");
+      if (t) return `paid ${t}`; if (id === "yoga") return "tick what you did"; }
+    const r = energy(b).rate; return r ? `uses about ${Math.round(r * spendMult())} body an hour` : ""; };
   const onTimeMin = b => isSleep(b) ? 30 : ON_TIME_MIN;   // bedtime counts within 30 min (Blueprint: same time nightly)
   const SIDE_P = 5;
   /* Two meters (Junyan, 2026-10-09, d200 to d204: "Bryan johnson is about the body and sadhguru
@@ -1723,7 +1674,7 @@
   function addPrana(d, msg, label, noFloat, extra){ addEnergy("p", d, msg, label, noFloat, extra); }
   function addBody(d, msg, label, noFloat, extra){ addEnergy("b", d, msg, label, noFloat, extra); }
   // which meter a Prana action fills: Sadhguru's (practices, neem, the lamp) fill Prana, Bryan Johnson's fill Body
-  function meterOf(id){ const h = HABITS.find(x => x[0] === id); return h && (h[7] === "Practice" || ["neem", "lamp", "heavy"].includes(id)) ? "p" : "b"; }
+  function meterOf(id){ const h = HABITS.find(x => x[0] === id); return h && (h[7] === "Practice" || ["neem", "lamp", "heavy", "copper"].includes(id)) ? "p" : "b"; }
   function addHabit(id, d, msg, label, noFloat){ addEnergy(meterOf(id), d, msg, label, noFloat); }
   function award(d, msg, opts = {}){ addPrana(d, msg, opts.label); }
   // 3 hours with no food before practice or bed: Isha asks for an empty
@@ -1867,7 +1818,6 @@
     G.day.checks[gk(b)] = late ? "late" : "in";
     G.day.started = G.day.started || {}; G.day.started[gk(b)] = now().toISOString();
     log(`Started ${shortName(b)}`); saveG();
-    payBlock(b);
     // the bag hands out tools at real moments
     if (isSadhana(b)) giveItem("breath", "After Shambhavi.");
     if (isMeal(b)) giveItem("water", `At ${shortName(b)}.`);
@@ -1882,8 +1832,7 @@
     G.day.started = G.day.started || {};
     list.forEach(b => {
       G.day.checks[gk(b)] = "in"; G.day.started[gk(b)] = b.s.toISOString();
-      if (b.basic === "winddown" && !G.day.windDown) G.day.windDown = b.s.toISOString();
-      payBlock(b);
+      if (basicId(b) === "winddown" && !G.day.windDown) G.day.windDown = b.s.toISOString();
     });
     saveG();
   }
@@ -1958,14 +1907,14 @@
     const sadhanaDone = doneToday("shambhavi") || all.some(b => isSadhana(b) && ["in", "late"].includes(G.day.checks[gk(b)]));
     out.push({ icon:"💧", text:"Water first", why:`${tired.length ? "Travel and sun dry you out. " : ""}${cups ? `${cups} cup${cups > 1 ? "s" : ""} so far today.` : "A full cup before anything else."}`, habit:"water", btn:"+1 cup" });
     if (!sadhanaDone && left >= 20) {
-      if (emptyStomach(t, all)) out.push({ icon:"🪷", text:"Shambhavi, 21 min", why:"Not done yet today, and your stomach is empty. A shower first is a good start.", habit:"shambhavi", btn:"Done" });
+      if (emptyStomach(t, all)) out.push({ icon:"🪷", text:"Shambhavi, 21 min", why:"Not done yet today, and your stomach is empty. A shower first is a good start. Tick it in a Yoga block on the calendar." });
       else out.push({ icon:"🪷", text:"Shambhavi later", why:`You ate at ${fmtT(ate)}. Shambhavi wants about 3 hours after a meal.` });
     }
     if (tired.length && left >= 20 && hour < 15 && (!bed || bed.s - t > 6 * 3600000))
       out.push({ icon:"😴", text:"Lie down, 20 min timer", why:`${tired.join(", ").replace(/^./, c => c.toUpperCase())}. Up by ${fmtT(new Date(+t + 20 * 60000))}, so tonight's sleep stays whole.` });
     if ((!ate || t - ate >= 4 * 3600000) && (!nextMeal || nextMeal.s - t > 90 * 60000))
       out.push({ icon:"🍉", text:"Light fruit", why:`${ate ? `No meal on the plan since ${fmtT(ate)}` : "No meal on the plan yet today"}${nextMeal ? `, and the next is ${fmtT(nextMeal.s)}` : ""}. Watery fruit, after practice, not before.` });
-    if (left < 20) out.push({ icon:"🌬️", text:"Stand up, look far away", why:"A few rounds of Nadi Shuddhi if you like.", habit: doneToday("nadi") ? "" : "nadi", btn:"Did Nadi Shuddhi" });
+    if (left < 20) out.push({ icon:"🌬️", text:"Stand up, look far away", why:"A few rounds of Nadi Shuddhi if you like." });
     out.push({ icon:"📵", text:"Phone down", why:"Scrolling isn't rest, for Sadhguru or Bryan Johnson." });
     return out;
   }
@@ -1990,7 +1939,7 @@
     if (G.day.missed[gk(b)]) return;
     G.day.missed[gk(b)] = happened ? "yes" : "no";
     if (happened) { G.day.checks[gk(b)] = "late"; G.day.closes[gk(b)] = "done"; log(`Did it, forgot to tap: ${shortName(b)}`); saveG();
-      payBlock(b); spend(b); }
+      spend(b); }
     else { G.day.checks[gk(b)] = "skip"; G.day.closes[gk(b)] = "missed"; log(`Didn't happen: ${shortName(b)}`); saveG(); }
     if (!quiet) render();
   }
@@ -2168,7 +2117,7 @@
     if (b.basic) return openBasic(b);
     if (isGym(b)) return openGym(b);
     if (isMeal(b)) return openMeal(b);
-    if (isSadhana(b)) return openSadhana(b);
+    if (basicId(b)) return openBasic(b);   // Morning Yoga, Domestics or Grooming, Wind-down from the calendar (2026-10-19)
     if (["work", "major", "travel"].includes(groupOf(b)) || INSIGHTS[gk(b)]) return openWork(b);
     return openEdit(b);
   }
@@ -2255,7 +2204,7 @@
       if (q.p) addPrana(q.p, `${name}: meal quiz`, "meal");
       if (q.b) addBody(q.b, `${name}: meal quiz`, "meal");
       stampDay(); log(`Rated ${name}: ${mqSum(q)}`); saveG();
-      closeSheet(); render(); refreshActions();
+      closeSheet(); render();
     };
   }
 
@@ -2283,7 +2232,7 @@
   const AQ_ONEOF = { spine:"slump", slump:"spine", invol:"auto", auto:"invol", moved:"sat", sat:"moved" };
   // no check-in for gym: the gym log already records how it went (Junyan, 2026-10-17: "I already recorded the details")
   const actRatable = b => !!b && !isMeal(b) && !isSleep(b) && !isGym(b) && !["rest", "open", "break"].includes(b.kind)
-    && !blockHabits(b).length && b.e - b.s >= 20 * 60000;
+    && !blockHabits(b).length && !basicId(b) && b.e - b.s >= 20 * 60000;
   // an activity that ended in the last 4 hours and has not been checked
   function unratedActivity(){
     const t = now(), q = G.day.mealq || {};
@@ -2325,7 +2274,7 @@
       if (q.p) addPrana(q.p, `${name}: how it went`, "activity");
       if (q.b) addBody(q.b, `${name}: how it went`, "activity");
       log(`Checked ${name}: ${mqSum(q)}`); saveG();
-      closeSheet(); render(); refreshActions();
+      closeSheet(); render();
     };
   }
 
@@ -2428,7 +2377,7 @@
       nvApply(e);
       (G.nvcOut = G.nvcOut || []).push(e); saveG();   // into the feelings journal on the server
       nvSend();
-      closeSheet(); render(); refreshActions();
+      closeSheet(); render();
     };
   }
 
@@ -2505,7 +2454,7 @@
       nvApply(e);
       (G.nvcOut = G.nvcOut || []).push(e); saveG();
       nvSend();
-      closeSheet(); render(); refreshActions();
+      closeSheet(); render();
     };
   }
   /* The feelings journal (Junyan, 2026-10-10: "make a new Db somewhere easy"): every check-in
@@ -2560,7 +2509,7 @@
       <div class="count"><div><div class="big">${endAt && endAt > t ? `<span data-until="${endAt.toISOString()}"></span>` : endAt ? "Complete" : `${SHAMBHAVI_MIN} min`}</div>
         <div class="sub">${endAt && endAt > t ? "left in Shambhavi" : endAt ? "Shambhavi done" : "Shambhavi Mahamudra Kriya"}</div></div></div>
       <div class="actions">${!S.at ? `<button class="btn primary" id="sStart">🪷 Start the ${SHAMBHAVI_MIN} min timer</button>` : ""}</div>
-      <div class="actions"><button class="btn ghost" id="sEdit">Change time or name</button></div>`);
+      <div class="actions"><button class="btn" id="sList">✓ Back to the checklist</button><button class="btn ghost" id="sEdit">Change time or name</button></div>`);
     clearTimeout(sadTimer);
     if (endAt && endAt > t && !closed) sadTimer = setTimeout(() => {
       banner("🪷", "SHAMBHAVI", "21 minutes. Sit a moment longer."); if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
@@ -2568,6 +2517,7 @@
     }, endAt - t);
     if ($("sStart")) $("sStart").onclick = () => { S.at = now().toISOString(); if (!st) checkIn(b); else saveG(); openSadhana(blocks().find(x => gk(x) === k) || b); };
     $("sEdit").onclick = () => openEdit(b);
+    $("sList").onclick = () => openBasic(blocks().find(x => gk(x) === k) || b);
   }
 
   /* A booking's facts as one card (Junyan, 2026-10-16: "I need the check in and check out dates, room type and
@@ -3170,7 +3120,7 @@
     if (id === "nvc") return { id, icon:"🫶", label:name, small:"Check in: the feeling and the need under it", action:true };
     const h = HABITS.find(x => x[0] === id); if (!h) return null;
     const at = schedFor(id);
-    return { id, icon:h[4], label:name || h[5], name:name || h[5], mins:mins || 0, done:!!(G.day.habits || {})[id], auto:h[6] === "auto", cal:h[6] === "cal",
+    return { id, icon:h[4], label:name || h[5], name:name || h[5], mins:mins || 0, done:!!(G.day.habits || {})[id], auto:h[6] === "auto", cal:h[6] !== "flat",   // ticked in its block (2026-10-19)
       gain:habitGain(id), at: at ? fmtT(at.s) : "", small: at ? `On the plan at ${fmtT(at.s)}` : mins ? `${mins} min` : h[1].replace(/\s*\(.*\)$/, "") };
   }
   // a skill with stages that name daily practices (Yoga, d240 "based on the stages") shows those, then its
@@ -3618,10 +3568,19 @@
       const W = G.day.work[gk(blk)]; W.tick[i] = !W.tick[i]; saveG(); redraw(); });
     root.querySelectorAll("[data-bstep]").forEach(b => b.onclick = e => { e.stopPropagation();
       const blk = blkOf(b.dataset.k), B = basicOf(blk); if (!B) return;
-      const i = b.dataset.bstep, W = G.day.work[gk(blk)], st = B.steps[i] || {}; W.tick[i] = !W.tick[i];
-      if (W.tick[i] && st.h) logHabit(st.h, true);   // Dr Ellie and the lamp tick their Prana actions
+      const i = b.dataset.bstep, W = G.day.work[gk(blk)], st = B.steps[i] || {};
+      // each ticked step pays its Prana action once (quest-basics.js tickStep); unticking takes nothing back
+      const r = QB().tickStep(W, G.day.work, basicId(blk), i, st, MO_CTX.hour(now()), habitGain);
+      W.tick[i] = r.on; if (W.tick[i] === false) delete W.tick[i];
+      if (r.pay) { const h = HABITS.find(x => x[0] === r.pay.h);
+        G.day.habits = G.day.habits || {}; G.day.habits[r.pay.h] = (G.day.habits[r.pay.h] || 0) + 1;
+        (W.paid = W.paid || {})[i] = r.pay;
+        addHabit(r.pay.h, r.pay.d, `${h[1].replace(/ \(.*$/, "")} (${shortName(blk)})`, h[5]); }
       if (W.tick[i] && st.wind && !G.day.windDown) G.day.windDown = now().toISOString();
       saveG(); redraw(); });
+    root.querySelectorAll("[data-bskip]").forEach(b => b.onclick = e => { e.stopPropagation();   // "travelling, skip" on a home-only step
+      const blk = blkOf(b.dataset.k); if (!blk) return; const W = G.day.work[gk(blk)];
+      (W.skip = W.skip || {})[b.dataset.bskip] = true; log(`Skipped today (travelling): ${b.dataset.t || "a home step"}`); saveG(); redraw(); });
     root.querySelectorAll("[data-bdone]").forEach(b => b.onclick = e => { e.stopPropagation();
       const blk = blkOf(b.dataset.bdone); if (blk) basicDone(blk); redraw(); });
     root.querySelectorAll("[data-ask]").forEach(b => b.onclick = e => { e.stopPropagation();
@@ -3647,14 +3606,20 @@
     return QB().guessMode(list, gameYmd());
   }
   const dayMode = () => ((G.day.plan || {}).mode) || travelGuess().mode;
-  const basicOf = b => b && b.basic && QB() ? QB().basic(b.basic, b.bmode || dayMode(), b.wd ?? wdToday()) : null;
+  // a block's checklist: a basic the plan placed, else one its calendar title names (Morning Yoga, Domestics,
+  // Grooming or Shower, Wind down; Junyan, 2026-10-19, d6 d9 d11)
+  const basicId = b => !b || !QB() ? null : b.basic || (isGym(b) || isMeal(b) || isSleep(b) ? null : QB().blockBasic(b.t, b.kind));
+  const PM_LABEL = 20;   // an hour that reads a step's evening label (Dr Ellie PM)
+  const basicOf = b => basicId(b) ? QB().basic(basicId(b), b.bmode || dayMode(), b.wd ?? wdToday()) : null;
   const basicAdd = (id, s, min) => { const B = QB().basic(id, dayMode(), wdToday());
     return { key:newKey(s), s:new Date(s).toISOString(), e:new Date(+s + min * 60000).toISOString(), t:B.t, type:"task", cal:"you", basic:id, bmode:dayMode(), wd:wdToday() }; };
   // the basics not on today's plan (for Fill it)
   const basicsLeft = all => QB() ? QB().IDS.filter(id => !all.some(b => b.basic === id)).map(id => QB().basic(id, dayMode(), wdToday())) : [];
   function placeArgs(){
     const D = MO_CTX.data(), t = D.now, hr = MO_CTX.hour(t), off = G.day.plan.basicsOff || {}, have = { ...off };
-    D.items.forEach(i => { if (i.basic) have[i.basic] = true; });
+    D.items.forEach(i => { if (i.basic) have[i.basic] = true;
+      const tb = !i.basic && !i.open && !i.brk && QB().blockBasic(i.name);   // one already on the calendar (d13)
+      if (tb === "domestics" || tb === "winddown") have[tb] = true; });
     const bf = D.items.find(i => i.meal && /breakfast|brunch/i.test(i.name) && MO_CTX.hour(i.s) < 12);
     const wake = D.items.filter(i => i.sleep && +i.e <= +t && MO_CTX.hour(i.e) < 12).pop(), bed = D.items.find(i => i.sleep && +i.s > +t);
     return { now:t, gaps:QuestMorning.gapsOf(D), breakfastEnd:bf && bf.e, wake:wake ? wake.e : t, latest:MO_CTX.at(t, 14),
@@ -3678,13 +3643,12 @@
     });
     saveG();
   }
-  // ticking a basic done: closes it, and Domestics ticks Dr Ellie AM, the Wind-down Dr Ellie PM. A second tap reopens the block (the Prana action stays ticked).
+  // ticking a basic done closes it (its steps pay, not Done, since 2026-10-19). A second tap reopens the block.
   function basicDone(b){
     const k = gk(b), B = basicOf(b); if (!B) return;
     if (G.day.closes[k] === "done") { delete G.day.closes[k]; log(`Not done after all: ${B.t}`); saveG(); return; }
     closeOut(b, "done");
-    if (B.habit) logHabit(B.habit, true);
-    if (b.basic === "winddown" && !G.day.windDown) G.day.windDown = now().toISOString();
+    if (basicId(b) === "winddown" && !G.day.windDown) G.day.windDown = now().toISOString();
     saveG();
   }
   async function setDayMode(m){
@@ -3710,17 +3674,32 @@
   function basicHtml(b, ck, lb){
     const B = basicOf(b), k = gk(b); if (!B) return "";
     const W = ((G.day.work = G.day.work || {})[k] = G.day.work[k] || { tick:{}, goal:"" }), done = G.day.closes[k] === "done";
-    const hn = B.habit ? (HABITS.find(x => x[0] === B.habit) || [])[5] : "";
-    return `${B.steps.length ? `<div class="${lb}">Steps ${B.steps.filter((_, i) => W.tick[i]).length}/${B.steps.length}</div>` : ""}
-      ${B.steps.map((x, i) => `<button class="${ck}${W.tick[i] ? " on" : ""}" data-bstep="${i}" data-k="${esc(b.key)}"><span class="bx">${W.tick[i] ? "✓" : ""}</span><span>${esc(x.t)}</span></button>`).join("")}
-      <button class="mo-det-btn" data-bdone="${esc(b.key)}">${done ? "✓ Done · tap to undo" : `Done${hn ? ` (ticks ${esc(hn)})` : ""}`}</button>`;
+    W.tick = W.tick || {};
+    // a home-only step (the copper pot) shows a quiet skip while home or travelling is only the calendar's guess
+    const hr = MO_CTX.hour(now()), id = basicId(b), skip = W.skip || {};
+    // what each step pays: its value, "paid" once paid, "done today" when the day's limit or this kind already paid it
+    const tag = (x, i) => { const s = QB().stepAt(x, hr), paid = (W.paid || {})[i];
+      if (paid) return `<b class="${meterOf(paid.h) === "b" ? "mb" : "mp"}" style="margin-left:auto;font-size:12px">+${paid.d}</b>`;
+      if (!s.h) return "";
+      const r = QB().tickStep({ tick:{}, paid:{} }, G.day.work, id, i, x, hr, habitGain);
+      return `<b class="${meterOf(s.h) === "b" ? "mb" : "mp"}" style="margin-left:auto;font-size:12px">${r.pay ? `+${r.pay.d}` : "done today"}</b>`; };
+    const steps = B.steps.map((x, i) => [x, i]).filter(([x, i]) => !skip[i]);
+    const pd = blockPaid(b), paidTxt = [pd.p ? `prana +${pd.p}` : "", pd.b ? `body +${pd.b}` : ""].filter(Boolean).join(", ");
+    return `${B.steps.length ? `<div class="${lb}">${id === "yoga" ? "What did you do?" : "Steps"} ${steps.filter(([, i]) => W.tick[i]).length}/${steps.length}</div>` : ""}
+      ${steps.some(([x]) => x.h) ? `<div class="hkey" style="margin:0 0 6px"><b class="mp">gold</b> fills prana · <b class="mb">teal</b> fills body · each one pays once</div>` : ""}
+      ${steps.map(([x, i]) => `<button class="${ck}${W.tick[i] ? " on" : ""}" data-bstep="${i}" data-k="${esc(b.key)}"><span class="bx">${W.tick[i] ? "✓" : ""}</span><span>${esc((W.paid || {})[i] ? (W.paid[i].h === x.h ? x.t : QB().stepAt(x, PM_LABEL).t) : QB().stepAt(x, hr).t)}</span>${tag(x, i)}</button>` +
+        (x.skip && !(G.day.plan || {}).mode && !W.tick[i] && !(W.paid || {})[i] ? `<button class="mo-det-btn" style="opacity:.7;font-size:12px;margin:-2px 0 6px" data-bskip="${i}" data-k="${esc(b.key)}" data-t="${esc(x.t)}">Travelling today, skip this</button>` : "")).join("")}
+      ${id !== "caney" ? `<div class="hint" style="margin:8px 2px" data-paid>${paidTxt ? `Paid so far: ${paidTxt}.` : "Nothing paid yet. Tick what you did."}</div>` : ""}
+      <button class="mo-det-btn" data-bdone="${esc(b.key)}">${done ? "✓ Done · tap to undo" : "Done"}</button>`;
   }
   function openBasic(b){
     openSheet(`${winHead(b)}${basicHtml(b, "wck", "win-lb")}
-      ${b.basic === "winddown" ? `<div class="actions"><button class="btn" id="bNight">🌙 Open the bedtime screen</button></div>` : ""}
+      ${basicId(b) === "winddown" ? `<div class="actions"><button class="btn" id="bNight">🌙 Open the bedtime screen</button></div>` : ""}
+      ${basicId(b) === "yoga" ? `<div class="actions"><button class="btn" id="bSad">🪷 Shambhavi timer</button></div>` : ""}
       <div class="actions"><button class="btn ghost" id="bEdit">Change time or name</button></div>`, true);
     bindDetail($("sheet"), () => { const x = blocks().find(y => y.key === b.key); if (x) openBasic(x); else closeSheet(); });
     if ($("bNight")) $("bNight").onclick = () => { closeSheet(); openNight(); };
+    if ($("bSad")) $("bSad").onclick = () => openSadhana(b);
     $("bEdit").onclick = () => openEdit(b);
   }
 
@@ -4086,7 +4065,7 @@
         el.innerHTML = `<div class="pg-top"><b>🪥 Done</b><button class="btn" data-g="x">Close</button></div>
           <div class="pg-body"><div class="pg-big">✨</div><p class="pg-t">That's the whole routine.</p><p class="pg-d">${esc((R.after || {})[slot] || "")}</p>
           ${secs.listerine ? `<p class="pg-d">Listerine: ${secs.listerine} seconds before it burned.</p>` : ""}
-          ${(G.day.habits || {})[slot === "am" ? "mouthAm" : "mouth"] ? "" : `<div class="actions"><button class="btn" data-g="tick">Tick Dr Ellie ${slot.toUpperCase()} in Prana actions too</button></div>`}
+          <p class="pg-d">Tick Dr Ellie in your Domestics, Grooming or Wind-down block.</p>
           <div class="actions"><button class="btn primary" data-g="x">Close</button></div></div>`;
         if (!ended) { ended = true; const pr = progOf(id); pr.runs.push({ at:now().toISOString(), slot, secs:{ ...secs } });
           practiceOp(id, { op:"run", slot, secs }); log(`${skillOf(id) ? skillOf(id).name : id}: guided routine (${slot === "am" ? "morning" : "night"})`); }
@@ -4120,7 +4099,6 @@
       if (k === "go") { bell(); i = 0; draw(); }
       if (k === "next") { i++; draw(); }
       if (k === "spit") { secs[R.steps[i].id] = Math.round((performance.now() - t0) / 1000); i++; draw(); }
-      if (k === "tick") { logHabit(slot === "am" ? "mouthAm" : "mouth"); b.remove(); }
     });
     draw();
     requestAnimationFrame(() => el.classList.add("open"));
@@ -4505,7 +4483,7 @@
       const b0 = st.blocks[0], isCur = cur && st.blocks.some(b => b.key === cur.key) && (!st.free || (t >= st.s && t < st.e)), past = st.e <= t && !isCur, game = !!b0.game;
       const c = st.free ? "" : calColor(b0), top = y(s) + 1, h = Math.max(18, y(e) - y(s) - 2);
       const rq = st.free || !game ? null : (G.day.mealq || {})[gk(b0)];
-      const pts = st.free || !game ? 0 : st.blocks.reduce((a, b) => a + blockGain(b), 0) + (rq ? rq.p || 0 : 0);
+      const pts = st.free || !game ? 0 : st.blocks.reduce((a, b) => a + blockPaid(b).p, 0) + (rq ? rq.p || 0 : 0);
       const ask = game && !rq && past && actRatable(b0) && t - st.e < 4 * 3600000;
       // ✓ only when it is complete: closed as done, or checked in and over (not while it is still running)
       const done = game && (!st.free && st.blocks.some(b => G.day.closes[gk(b)] === "done") || (st.lit && past));
