@@ -8,7 +8,9 @@
    - a block's checklist: step by step, the later change winning (mergeWork);
    - prana: the newer copy's number plus the log changes only the older copy saw
      (a block's spend and the sleep refill count once even if both devices did them);
-   - body (2026-10-09, d201): the same as prana, from the log lines marked m:"b";
+   - body (2026-10-19): worked out again from the merged log (bodyOf): the sleep line sets it, every
+     other line marked m:"b" moves it. Never a copy's own number, which let a device that rolled the day
+     from its own stale yesterday (or held an old copy) drop Body 48 points with nothing logged;
    - a later game day beats an earlier one; anything else: the newer copy (ts).
    The SAME file runs in the page (still/quest-merge.js) and on the server
    (still-api/src/quest-merge.js). Edit one, copy it to the other. */
@@ -28,20 +30,54 @@
     return /\bused \d+ \(|^Slept |\(Oura\)$/.test(e.msg || "") ? e.msg : null;
   };
 
+  /* Body from the day's log (2026-10-19). The latest sleep line (Oura readiness first) sets the level; every
+     other m:"b" line, in time order, moves it, kept between 0 and 100 at each step as addEnergy does.
+     null when the log holds no sleep line (the morning before sleep is in): then the copies' own numbers stand. */
+  const SLEEP_RE = /^(?:Slept (\d+(?:\.\d+)?) h|Slept (\d+) \(Oura\)|Readiness (\d+) \(Oura\))$/;
+  const sleepTo = (e) => {
+    if (!e) return null;
+    if (typeof e.to === "number") return e.to;
+    const m = SLEEP_RE.exec(e.msg || "");
+    if (!m) return null;
+    return m[1] != null ? +m[1] * 10 : +(m[2] ?? m[3]);
+  };
+  const isSleep = (e) => !!e && e.m === "b" && (!!e.sl || SLEEP_RE.test(e.msg || ""));
+  function bodyOf(day) {
+    const lines = arr(day && day.log).filter((e) => e && e.m === "b").sort((a, b) => ms(a.at) - ms(b.at));
+    let anchor = null;
+    for (const e of lines) if (isSleep(e) && sleepTo(e) != null) {
+      const ready = /^Readiness /.test(e.msg || "");
+      if (!anchor || ready || !anchor.ready) anchor = { to: sleepTo(e), ready: ready || (anchor && anchor.ready) };
+      if (ready) break;
+    }
+    if (!anchor) return null;
+    let b = Math.max(0, Math.min(100, anchor.to));
+    for (const e of lines) if (!isSleep(e)) b = Math.max(0, Math.min(100, b + (+e.xp || 0)));
+    return Math.round(b);
+  }
+  // the day's log, newest first: up to LOG_MAX lines, plus every Body line (Body is worked out from them)
+  function trimLog(log) {
+    const out = [];
+    let n = 0;
+    for (const e of arr(log)) if (n++ < LOG_MAX || (e && e.m === "b")) out.push(e);
+    return out;
+  }
+
   function mergeLog(o, n) {
     const out = [], seen = new Set(), once = new Set();
     let extra = 0, extraB = 0;
-    const nl = arr(n.log), floor = nl.length >= LOG_MAX ? Math.min(...nl.map((e) => ms(e.at))) : 0;
+    const nl = arr(n.log), nx = nl.filter((e) => !(e && e.m === "b"));
+    const floor = nl.length >= LOG_MAX && nx.length ? Math.min(...nx.map((e) => ms(e.at))) : 0;
     for (const e of nl) { const k = evKey(e), ok = onceKey(e); if (seen.has(k) || (ok && once.has(ok))) continue; seen.add(k); out.push(e); if (ok) once.add(ok); }
     for (const e of arr(o.log)) {
       const k = evKey(e), ok = onceKey(e);
-      if (seen.has(k) || (ok && once.has(ok)) || ms(e.at) < floor) continue;
+      if (seen.has(k) || (ok && once.has(ok)) || (ms(e.at) < floor && e.m !== "b")) continue;
       seen.add(k); if (ok) once.add(ok);
       out.push(e);   // the newer copy never saw this change
       if (e.m === "b") extraB += +e.xp || 0; else extra += +e.xp || 0;
     }
     out.sort((a, b) => ms(b.at) - ms(a.at));
-    return { log: out.slice(0, LOG_MAX), extra, extraB };
+    return { log: trimLog(out), extra, extraB };
   }
 
   /* A block's checklist (G.day.work[key], 2026-10-19, d28): a block both copies have merges step by step when its
@@ -103,12 +139,20 @@
     out.log = log;
     if (typeof n.prana === "number" && extra) out.prana = Math.max(0, Math.min(100, Math.round(n.prana + extra)));
     else if (typeof n.prana !== "number" && typeof o.prana === "number") out.prana = o.prana;
-    if (typeof n.body === "number" && extraB) out.body = Math.max(0, Math.min(100, Math.round(n.body + extraB)));
+    const derived = bodyOf(out);
+    if (derived != null) out.body = derived;
+    else if (typeof n.body === "number" && extraB) out.body = Math.max(0, Math.min(100, Math.round(n.body + extraB)));
     else if (typeof n.body !== "number" && typeof o.body === "number") out.body = o.body;
     if (o.bl || n.bl) {
       const p = new Map();
       for (const x of [...arr(o.bl), ...arr(n.bl)]) if (Array.isArray(x)) p.set(x[0], x);
-      out.bl = [...p.values()].sort((a, b) => ms(a[0]) - ms(b[0]));
+      const bl = [...p.values()].sort((a, b) => ms(a[0]) - ms(b[0]));
+      const last = bl[bl.length - 1];
+      if (typeof out.body === "number" && last && last[1] !== out.body) {
+        const at = Math.max(ms(last[0]), ...log.map((e) => ms(e.at)));
+        bl.push([new Date(at + (at === ms(last[0]) ? 1 : 0)).toISOString(), out.body]);
+      }
+      out.bl = bl;
     }
     if (o.pl || n.pl) {
       const p = new Map();
@@ -188,5 +232,5 @@
   }
   const same = (a, b) => canon({ ...obj(a), ts: 0 }) === canon({ ...obj(b), ts: 0 });
 
-  root.QuestMerge = { mergeQuest, same };
+  root.QuestMerge = { mergeQuest, same, bodyOf, trimLog };
 })(typeof self !== "undefined" ? self : globalThis);
