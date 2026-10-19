@@ -70,23 +70,10 @@ test("shiftPlan: more than MAX_SHIFT moves is refused whole, so a bug cannot mas
   assert.equal(A.shiftPlan(many.slice(0, A.MAX_SHIFT), true).cal.length, A.MAX_SHIFT);
 });
 
-test("the page: calendar moves only from shiftBlocks, after his move or add, and the once-a-day settle cannot loop", () => {
-  // the only /cal/shift call is inside shiftBlocks
-  assert.equal((html.match(/"\/cal\/shift"/g) || []).length, 1);
-  const sb = html.slice(html.indexOf("async function shiftBlocks("), html.indexOf("const canShift"));
-  assert.match(sb, /"\/cal\/shift"/); assert.match(sb, /if \(P\.refuse\)/);
-  assert.match(sb, /err\.status === 404/, "an old still-api falls back to today's plan");
-  // shiftBlocks is called from roomFor and settleDay only
-  assert.equal((html.match(/shiftBlocks\(/g) || []).length, 3, "definition, roomFor, settleDay");
-  const sd = html.slice(html.indexOf("async function settleDay("), html.indexOf("async function settleDay(") + 900);
-  assert.match(sd, /visibilityState !== "visible"/);
-  assert.match(sd, /store\.get\(mark\) \|\| G\.day\.settled/);
-  // the mark is set before any write
-  assert.ok(sd.indexOf("store.set(mark") < sd.indexOf("shiftBlocks("));
-  assert.match(sd, /AGD\(\)\.settle\(blocks\(\), now\(\)\)/);
-  // settleDay runs from the fresh pull only
-  assert.equal((html.match(/settleDay\(/g) || []).length, 2, "its definition and one call");
-  assert.match(html, /if \(SAVED_AT == null\) \{[\s\S]{0,400}settleDay\(\)/);
+test("nothing is pushed (Junyan, 2026-10-19): no once-a-day overlap pass, and no make-room moves after his move or add", () => {
+  assert.ok(!/settleDay/.test(html), "the once-a-day Joint Plans pass is gone");
+  const rf = html.slice(html.indexOf("function roomFor("), html.indexOf("function roomFor(") + 200);
+  assert.match(rf, /^function roomFor\(moved, s, e\)\{\s*return Promise\.resolve\(\);/, "roomFor writes nothing");
 });
 
 test("d41: the Add sheet, the suggestions and the idea sheet add to Joint Plans by default; the Add sheet can pick another", () => {
