@@ -223,7 +223,7 @@
   .fx-p.spark { width:6px; height:6px; border-radius:50%; }
   .fx-ring { position:absolute; width:40px; height:40px; border-radius:50%; border:2px solid rgba(127,208,255,.85); }
   .fx-tag { position:absolute; font-weight:800; font-size:17px; color:var(--gold); text-shadow:0 2px 8px rgba(0,0,0,.45); white-space:nowrap; }
-  .fx-tag.combo { color:#ff9ad5; font-size:14px; } .fx-tag.full { color:#fff; font-size:12px; }
+  .fx-tag.combo { color:#ff9ad5; font-size:14px; } .fx-tag.full { color:#fff; font-size:12px; } .fx-tag.back { color:#ff9b8a; }
   .warnline { margin-top:10px; font-size:13px; color:#ffcf8a; }
   .gear { flex:none; width:36px; height:36px; border-radius:50%; background:var(--glass); font-size:17px; }
   .gear.warn { box-shadow:0 0 0 2px var(--warn); }
@@ -731,15 +731,15 @@
 </style>
 <script src="keeps.js?v=20261009k"></script>
 <script src="bag.js?v=20261009k"></script>
-<script src="quest-merge.js?v=20261019w"></script>
+<script src="quest-merge.js?v=20261019x"></script>
 <script src="quest-levels.js?v=20261016b"></script>
 <script src="quest-gymlog.js?v=20261017a"></script>
 <script src="quest-meals.js?v=20261019f"></script>
 <script src="quest-trends.js?v=20261019c"></script>
 <script src="nvc-words.js?v=20261010a"></script>
-<script src="quest-fx.js?v=20261009b"></script>
+<script src="quest-fx.js?v=20261019x"></script>
 <script src="quest-night.js?v=20261019w"></script>
-<script src="quest-basics.js?v=20261019f"></script>
+<script src="quest-basics.js?v=20261019x"></script>
 <script src="quest-suggest.js?v=20261019a"></script>
 <script src="quest-water.js?v=20261019a"></script>
 <script src="quest-gym.js?v=20261016i"></script>
@@ -1074,6 +1074,7 @@
       await Promise.all([pullOps().catch(() => {}), pullTasks().catch(() => {}), pullState()]);
       seedFromOura();
       undoTimedPay();
+      settleTicks();
       pullSteps();
       pullBedtime();
       pullLastNight();
@@ -1343,10 +1344,14 @@
   const lvl = () => 1;   // no levels for now (Junyan, 2026-10-16): everyone plays at level 1
   const gainMult = () => 1.5 - (lvl() - 1) * 0.1;      // level 1: x1.5 ... level 10: x0.6
   const spendMult = () => 1 + (lvl() - 1) * 0.06;      // level 1: x1 (d189) ... level 10: x1.54
+  /* how many times a habit counts as done today: habits less voided, plus the checklist ticks paying it now
+     (quest-basics.js habitCount; those ticks live on their own step so two devices cannot lose one) */
+  const habitN = id => window.QuestBasics.habitCount(G.day, id);
+  const habitName = h => h[1].replace(/ \(.*$/, "");   // "Shambhavi Mahamudra (21 min)" reads "Shambhavi Mahamudra"
   function habitGain(id){
     const h = HABITS.find(x => x[0] === id); if (!h) return 0;
-    // habits only go up when devices merge, so a taken-back payment is counted off here (G.day.voided, undoTimedPay)
-    const n = Math.max(0, ((G.day.habits || {})[id] || 0) - ((G.day.voided || {})[id] || 0));
+    // habits only go up when devices merge, so a taken-back payment is counted off in G.day.voided (undoTimedPay)
+    const n = habitN(id);
     if (id === "heavy") return -h[2];
     // a practice pays exactly its listed value, no level multiplier (d25 d26, quest-basics.js PRACTICE_PAY)
     const exact = window.QuestBasics && window.QuestBasics.practicePay ? window.QuestBasics.practicePay(id, n, h[3]) : null;
@@ -1528,7 +1533,7 @@
     const all = blocks(), t = now();
     const health = all.filter(b => b.e <= t && isHealth(b));
     const lit = health.filter(b => ["in", "late"].includes(G.day.checks[gk(b)])).length;
-    const hDone = HABITS.filter(h => (G.day.habits[h[0]] || 0) > 0).length;
+    const hDone = HABITS.filter(h => habitN(h[0]) > 0).length;
     const done = all.filter(b => G.day.closes[gk(b)] === "done" || ["in", "late"].includes(G.day.checks[gk(b)])).map(b => `✓ ${shortName(b)}`)
       .concat(all.filter(b => G.day.checks[gk(b)] === "skip").map(b => `· ${shortName(b)}, didn't happen`));
     const next = new Date(Date.parse(gameYmd() + "T12:00:00Z") + 86400000).toISOString().slice(0, 10);
@@ -1702,7 +1707,7 @@
   const TILES = HABITS.filter(h => h[6] === "auto");   // water has its own card since 2026-10-19 (d23, waterHTML)
   const h7 = id => (HABITS.find(x => x[0] === id) || [])[7];
   function habitTile([id, full, , max, icon, short, flag]){
-    const n = G.day.habits[id] || 0, g = habitGain(id), auto = flag === "auto", earned = auto && (G.day.earn || {})[id];
+    const n = habitN(id), g = habitGain(id), auto = flag === "auto", earned = auto && (G.day.earn || {})[id];
     const cls = ["htile", !auto && !g ? "full" : "", auto ? "auto" : "", earned || (auto && n) ? "earned" : "", id === "water" ? "water" : ""].filter(Boolean).join(" ");
     const cnt = id === "xylitol" ? `<span class="hc">${n ? `${n} g${n < 6 ? " / 6" : ""}` : ""}</span>` : id === "water" ? `<span class="hc">${n ? `${n * 250} ml` : ""}</span>` : max > 1 && n ? `<span class="hc">${n}/${max}</span>` : n ? `<span class="hc">✓</span>` : "";
     const fill = max > 1 && n ? `<i class="glass" style="height:${Math.round(n / max * 100)}%"></i>` : "";
@@ -1744,8 +1749,8 @@
     const rect = bn.getBoundingClientRect();
     G.day.habits = G.day.habits || {};
     G.day.habits[id] = (G.day.habits[id] || 0) + 1;
-    const full = G.day.habits[id] >= h[3];
-    addHabit(id, g, h[1].replace(/ \(.*$/, ""), h[5], !!fx);
+    const full = habitN(id) >= h[3];
+    addHabit(id, g, habitName(h), h[5], !!fx);
     if (fx) fx.tap(rect, { icon:h[4], gain:g, full, water:id === "water", color:HCOL[h[7]] });
     render();
     if (fx) fx.pop($("habits").querySelector(`[data-habit="${id}"]`));
@@ -1773,7 +1778,7 @@
       if (id === "bedtime" || id === "late") continue;   // Oura says when he fell asleep now (pullBedtime)
       const g = habitGain(id); if (!g) continue;
       G.day.habits = G.day.habits || {}; G.day.habits[id] = 1;
-      addHabit(id, g, `${HABITS.find(x => x[0] === id)[1].replace(/ \(.*$/, "")} (last night)`, "last night");
+      addHabit(id, g, `${habitName(HABITS.find(x => x[0] === id))} (last night)`, "last night");
     }
     saveG();
   }
@@ -2268,6 +2273,8 @@
     if (isGym(b)) return openGym(b);
     if (isMeal(b)) return openMeal(b);
     if (basicId(b)) return openBasic(b);   // Morning Yoga, Domestics or Grooming, Wind-down from the calendar (2026-10-19)
+    // a confirmed outdoor check-in reopens on its checked view, so the barefoot tile can still be ticked or unticked (d27)
+    if ((G.day.mealq || {})[gk(b)] && QB().outdoorBlock(b.t)) return openActQuiz(b);
     if (["work", "major", "travel"].includes(groupOf(b)) || INSIGHTS[gk(b)]) return openWork(b);
     return openEdit(b);
   }
@@ -2331,9 +2338,12 @@
       (G.day.mealq = G.day.mealq || {})[k] = { ...r.rec, at:now().toISOString() };
       stampDay(); saveG();
       openMeal(b); $("sheet").scrollTop = top; render();
-      const on = r.ops.find(op => op.id === id && op.on);
+      const on = r.ops.find(op => op.id === id && op.on), off = r.ops.find(op => op.id === id && !op.on && op.d);
       if (fx && on) {
         fx.tap(rect, { icon:bn.dataset.icon, gain:on.d, color:on.d < 0 ? "#ff9b8a" : on.m === "b" ? "#8fe3b0" : "#ffd479" });
+        fx.pop($("sheet").querySelector(`[data-q="${id}"]`));
+      } else if (fx && off) {   // a second tap took it back: the same take-back animation as a checklist tile (d28)
+        fx.back(rect, { gain:-off.d });
         fx.pop($("sheet").querySelector(`[data-q="${id}"]`));
       }
     });
@@ -2377,16 +2387,31 @@
     AQ_BODY.forEach(([id, , , v]) => { if (sel[id]) b += aqVal(v); });
     return { p, b };
   }
+  /* After a walk, hike or other outdoor block (Junyan, 2026-10-19, d27): the barefoot walk is a habit tile at the top
+     of the check-in. It pays as he taps it (the barefoot habit's value, once a day, into prana) and a second tap takes
+     it back, the same as a checklist tile (tapStep). It is saved on the block's checklist (G.day.work), not the quiz. */
+  const BAREFOOT_I = "bf";   // its own key in the block's ticks, apart from any prep list
+  function barefootHTML(b){
+    if (!QB() || !QB().outdoorBlock(b.t)) return "";
+    const W = (G.day.work || {})[gk(b)] || {};   // read only: the tap creates the block's checklist
+    return `<div class="win-lb">Barefoot</div><div class="hgrid btiles">${stepTile(b, { ...W, tick:W.tick || {} }, QB().barefootStep(), BAREFOOT_I, MO_CTX.hour(now()), "outdoor")}</div>`;
+  }
+  function bindBarefoot(b, redraw){
+    $("sheet").querySelectorAll("[data-bstep]").forEach(bn => bn.onclick = e => { e.stopPropagation();
+      const top = $("sheet").scrollTop;
+      tapStep(bn, b, "outdoor", BAREFOOT_I, QB().barefootStep(), () => { redraw(); $("sheet").scrollTop = top; render(); }); });
+  }
   function openActQuiz(b, sel = {}){
     const k = gk(b), done = (G.day.mealq || {})[k], name = shortName(b);
     if (done) {
-      openSheet(`${winHead(b)}<h3>${esc(name)}: checked</h3><p>${esc(mqSum(done))}.</p>
-        <div class="actions"><button class="btn ghost" id="aqX">Done</button></div>`);
-      $("aqX").onclick = closeSheet; return;
+      openSheet(`${winHead(b)}<h3>${esc(name)}: checked</h3><p>${esc(mqSum(done))}.</p>${barefootHTML(b)}
+        <div class="actions"><button class="btn ghost" id="aqE">Change this block</button><button class="btn ghost" id="aqX">Done</button></div>`);
+      $("aqX").onclick = closeSheet; $("aqE").onclick = () => openEdit(b); bindBarefoot(b, () => openActQuiz(b, sel)); return;
     }
     const sc = aqScore(sel), sign = v => v > 0 ? `+${v}` : `${v}`;
     const row = ([id, icon, txt, v], cls) => `<button class="wck${sel[id] ? " on" : ""}" data-q="${id}"><span class="bx">${sel[id] ? "✓" : ""}</span><span>${icon} ${esc(txt)}</span><b class="${cls}" style="margin-left:auto;font-size:12px">${sign(aqVal(v))}</b></button>`;
     openSheet(`${winHead(b)}<h3>How was ${esc(name)}?</h3>
+      ${barefootHTML(b)}
       <p>Tap what fits, then confirm.</p>
       <div class="win-lb">Prana (Sadhguru)</div>
       ${AQ_PRANA.map(x => row(x, "mp")).join("")}
@@ -2400,6 +2425,7 @@
       openActQuiz(b, sel); $("sheet").scrollTop = top;
     });
     $("aqX").onclick = closeSheet;
+    bindBarefoot(b, () => openActQuiz(b, sel));
     $("aqOk").onclick = () => {
       const q = aqScore(sel);
       (G.day.mealq = G.day.mealq || {})[k] = { kind:"act", at:now().toISOString(), sel:Object.keys(sel).filter(x => sel[x]), p:q.p, b:q.b };
@@ -3252,7 +3278,7 @@
     if (id === "nvc") return { id, icon:"🫶", label:name, small:"Check in: the feeling and the need under it", action:true };
     const h = HABITS.find(x => x[0] === id); if (!h) return null;
     const at = schedFor(id);
-    return { id, icon:h[4], label:name || h[5], name:name || h[5], mins:mins || 0, done:!!(G.day.habits || {})[id], auto:h[6] === "auto", cal:h[6] !== "flat",   // ticked in its block (2026-10-19)
+    return { id, icon:h[4], label:name || h[5], name:name || h[5], mins:mins || 0, done:habitN(id) > 0, auto:h[6] === "auto", cal:h[6] !== "flat",   // ticked in its block (2026-10-19)
       gain:habitGain(id), at: at ? fmtT(at.s) : "", small: at ? `On the plan at ${fmtT(at.s)}` : mins ? `${mins} min` : h[1].replace(/\s*\(.*\)$/, "") };
   }
   // a skill with stages that name daily practices (Yoga, d240 "based on the stages") shows those, then its
@@ -3266,7 +3292,7 @@
   function weekDays(){ const t = Date.parse(gameYmd() + "T12:00:00Z"), dow = (new Date(t).getUTCDay() + 6) % 7;
     return { days: Array.from({ length:7 }, (_, i) => new Date(t + (i - dow) * 86400000).toISOString().slice(0, 10)), left: 7 - dow }; }
   const mondayOf = ymdStr => { const t = Date.parse(ymdStr + "T12:00:00Z"), dow = (new Date(t).getUTCDay() + 6) % 7; return new Date(t - dow * 86400000).toISOString().slice(0, 10); };
-  const doneToday = h => (G.day.habits || {})[h] > 0;
+  const doneToday = h => habitN(h) > 0;
   function weekDone(h, pr){
     const { days } = weekDays(), today = gameYmd();
     return days.filter(d => d === today ? doneToday(h) || ((pr.did || {})[d] || []).includes(h) : ((pr.did || {})[d] || []).includes(h)).length;
@@ -3681,6 +3707,31 @@
       <div class="mo-sched soon-det">${moDetail(b, true)}</div>
       <div class="actions"><button class="btn ghost" data-soonfull="1">Open the full window</button></div></div>`;
   }
+  /* One tap on a checklist tile (a basic's step, or the barefoot walk in an outdoor check-in). A tick pays its Prana
+     action once; an untick takes back exactly what that tick paid (Junyan, 2026-10-19, d28), the way a meal tile does.
+     The day's bookkeeping is quest-basics.js tapDay; this writes the pay or take-back line with its key and plays it. */
+  function tapStep(btn, blk, kind, i, st, redraw){
+    const t = QB().tapDay(G.day, gk(blk), kind, i, st, MO_CTX.hour(now()), habitGain, now().toISOString());
+    const fx = window.QuestFx, rect = btn.getBoundingClientRect(), tile = btn.classList.contains("htile");
+    if (t.pay) { const h = HABITS.find(x => x[0] === t.pay.h);
+      addEnergy(meterOf(t.pay.h), t.pay.d, `${habitName(h)} (${shortName(blk)})`, h[5], !!fx, { k:t.pay.k });
+      // the habit tile burst, sound and float, as the old Prana action tiles did (d23); full reads the live count
+      if (fx) fx.tap(rect, { icon:h[4], gain:t.pay.d, full:habitGain(t.pay.h) === 0, color:HCOL[h[7]] }); }
+    else if (t.back) { const h = HABITS.find(x => x[0] === t.back.h);
+      addEnergy(meterOf(t.back.h), -t.back.d, `${h ? habitName(h) : t.back.h} (${shortName(blk)}, taken back)`, h && h[5], !!fx, { k:t.back.k });
+      if (fx) fx.back(rect, { gain:t.back.d }); }
+    else if (t.r.on && tile && fx && t.r.why) fx.nope(btn);   // already paid today: the little shake
+    if (t.W.tick[i] && st.wind && !G.day.windDown) G.day.windDown = now().toISOString();
+    saveG(); redraw();
+    if (fx && (t.pay || t.back)) fx.pop(document.querySelector(`[data-bstep="${i}"][data-k="${CSS.escape(btn.dataset.k)}"]`));
+  }
+  /* After every pull: a checklist payment whose tick is gone and was never taken back (an untick on a device that had
+     not seen the re-tick, or the same step ticked on two devices) is taken back now. Keyed, so two devices write it once. */
+  function settleTicks(){
+    if (!G.day || DRY || !QB()) return;
+    QB().owedBacks(G.day.work, G.day.log).forEach(o =>
+      addEnergy(o.m === "b" ? "b" : "p", o.xp, `${o.msg.replace(/\)$/, "")}, taken back)`, "", true, { k:o.k }));
+  }
   // checklists and folds inside a detail block (the morning's schedule and the coming-up card)
   function bindDetail(root, redraw){
     const blkOf = key => blocks().find(x => x.key === key);
@@ -3690,24 +3741,11 @@
     root.querySelectorAll("[data-meal]").forEach(b => b.onclick = e => { e.stopPropagation(); const blk = blkOf(b.dataset.meal); if (blk) openMeal(blk); });
     root.querySelectorAll("[data-tick]").forEach(b => b.onclick = e => { e.stopPropagation();
       const i = b.dataset.tick, blk = blkOf(b.dataset.k); if (!blk) return;
-      const W = G.day.work[gk(blk)]; W.tick[i] = !W.tick[i]; saveG(); redraw(); });
+      // stamped (W.t) so the step merges by itself across devices (quest-merge.js mergeWork)
+      const W = G.day.work[gk(blk)]; W.tick[i] = !W.tick[i]; (W.t = W.t || {})[i] = now().toISOString(); saveG(); redraw(); });
     root.querySelectorAll("[data-bstep]").forEach(b => b.onclick = e => { e.stopPropagation();
       const blk = blkOf(b.dataset.k), B = basicOf(blk); if (!B) return;
-      const i = b.dataset.bstep, W = G.day.work[gk(blk)], st = B.steps[i] || {};
-      // each ticked step pays its Prana action once (quest-basics.js tickStep); unticking takes nothing back
-      const r = QB().tickStep(W, G.day.work, basicId(blk), i, st, MO_CTX.hour(now()), habitGain);
-      W.tick[i] = r.on; if (W.tick[i] === false) delete W.tick[i];
-      const fx = window.QuestFx, rect = b.getBoundingClientRect(), tile = b.classList.contains("htile");
-      if (r.pay) { const h = HABITS.find(x => x[0] === r.pay.h);
-        G.day.habits = G.day.habits || {}; G.day.habits[r.pay.h] = (G.day.habits[r.pay.h] || 0) + 1;
-        (W.paid = W.paid || {})[i] = r.pay;
-        addHabit(r.pay.h, r.pay.d, `${h[1].replace(/ \(.*$/, "")} (${shortName(blk)})`, h[5], !!fx);
-        // the habit tile burst, sound and float, as the old Prana action tiles did (d23)
-        if (fx) fx.tap(rect, { icon:h[4], gain:r.pay.d, full:G.day.habits[r.pay.h] >= h[3], color:HCOL[h[7]] }); }
-      else if (r.on && tile && fx && r.why) fx.nope(b);   // already paid today: the little shake
-      if (W.tick[i] && st.wind && !G.day.windDown) G.day.windDown = now().toISOString();
-      saveG(); redraw();
-      if (fx && r.on) fx.pop(document.querySelector(`[data-bstep="${i}"][data-k="${CSS.escape(b.dataset.k)}"]`)); });
+      tapStep(b, blk, basicId(blk), b.dataset.bstep, B.steps[b.dataset.bstep] || {}, redraw); });
     root.querySelectorAll("[data-bskip]").forEach(b => b.onclick = e => { e.stopPropagation();   // "travelling, skip" on a home-only step
       const blk = blkOf(b.dataset.k); if (!blk) return; const W = G.day.work[gk(blk)];
       (W.skip = W.skip || {})[b.dataset.bskip] = true; log(`Skipped today (travelling): ${b.dataset.t || "a home step"}`); saveG(); redraw(); });
@@ -3953,7 +3991,7 @@
       return { now:t, today:tzYmd(t), greet:d.greet, place:d.place, date:d.date, prana:d.prana, body:body(), wx:moWx(), plan:G.day.plan,
         mode: G.day.plan.mode || tg.mode, modeWhy: tg.why, modeSet: !!G.day.plan.mode, basics: basicsLeft(all),
         recovery: recoveryReasons(),
-        practiced: all.some(b => isSadhana(b) && ["in", "late"].includes(G.day.checks[gk(b)])) || HABITS.some(h => h[7] === "Practice" && (G.day.habits || {})[h[0]]),
+        practiced: all.some(b => isSadhana(b) && ["in", "late"].includes(G.day.checks[gk(b)])) || HABITS.some(h => h[7] === "Practice" && habitN(h[0]) > 0),
         items: all.map(b => ({ key:b.key, name:moName(b), s:b.s, e:b.e, kind:b.kind, open:b.kind === "open", brk:b.kind === "break", meal:isMeal(b), sleep:isSleep(b),
           sadhana:isSadhana(b), strength:STRENGTH(b), flight:/flight|\b[A-Z]{2}\d{2,4}\b/.test(b.t) && b.kind === "travel", extra:!!b.extra, taskId:b.taskId || null, basic:b.basic || null,
           cost:energy(b).rate * spendMult() * Math.max(0, (b.e - b.s) / 3600000), badge:badge(b, 30) })),
@@ -4098,10 +4136,10 @@
     if (si.ready) return { text:`Stage ${si.n} done. Ready for stage ${si.n + 1}: ${si.pl.stages[si.n].name}`, go:"open" };
     const k = (si.st.target || {}).kind;
     if (k === "runs") return { text:`Do the routine ${slot} with the guide (${si.have} of ${si.need})`, go:"guide" };
-    if (k === "weeks") { const left = (si.st.dayHabits || []).filter(h => !((G.day.habits || {})[h] > 0)).map(h => (HABITS.find(x => x[0] === h) || [])[5] || h);
+    if (k === "weeks") { const left = (si.st.dayHabits || []).filter(h => !(habitN(h) > 0)).map(h => (HABITS.find(x => x[0] === h) || [])[5] || h);
       const wk = Object.entries(si.st.weekly || {}).map(([h, q]) => `${(HABITS.find(x => x[0] === h) || [])[5] || h} ${weekDone(h, si.pr)} of ${q}`).join(", ");
       return { text:`${left.length ? `Today: ${left.join(" and ")}. ` : ""}This week: ${wk}${si.need ? ` (${si.have} of ${si.need} weeks)` : ""}`, go:"open" }; }
-    if (k === "days" && si.st.dayHabits) { const left = si.st.dayHabits.filter(h => !((G.day.habits || {})[h] > 0)).map(h => (HABITS.find(x => x[0] === h) || [])[5] || h);
+    if (k === "days" && si.st.dayHabits) { const left = si.st.dayHabits.filter(h => !(habitN(h) > 0)).map(h => (HABITS.find(x => x[0] === h) || [])[5] || h);
       return { text: left.length ? `Today: ${left.join(" and ")} (${si.have} of ${si.need} days)` : `Today counts (${si.have} of ${si.need} days)`, go:"open" }; }
     if (k === "days") return { text:`Routine ${slot} without the guide, then tick Dr Ellie ${slot === "tonight" ? "PM" : "AM"} (${si.have} of ${si.need} days)`, go:"open" };
     if (k === "ticks") { const left = (si.pl.finetune || []).find(x => !(si.pr.ticks || {})[x]); if (left) return { text:`Make this a habit: ${left}`, go:"open" }; }
@@ -4120,12 +4158,12 @@
     for (const [id, pl] of Object.entries(PRACTICE.plans || {})) {   // a weekly practice done today is kept on its day
       const si = stageInfo(id), pr = progOf(id), d = gameYmd();
       for (const h of Object.keys((si && si.st.weekly) || {})) {
-        if (!((G.day.habits || {})[h] > 0) || ((pr.did || {})[d] || []).includes(h)) continue;
+        if (!(habitN(h) > 0) || ((pr.did || {})[d] || []).includes(h)) continue;
         ((pr.did = pr.did || {})[d] = (pr.did[d] || [])).push(h); practiceOp(id, { op:"did", date:d, item:h });
       }
     }
     for (const [id, pl] of Object.entries(PRACTICE.plans || {})) {
-      const si = stageInfo(id), hs = (si && si.st.dayHabits) || pl.dayHabits || []; if (!hs.length || !hs.every(h => (G.day.habits || {})[h] > 0)) continue;
+      const si = stageInfo(id), hs = (si && si.st.dayHabits) || pl.dayHabits || []; if (!hs.length || !hs.every(h => habitN(h) > 0)) continue;
       const pr = progOf(id), d = gameYmd(); if ((pr.days || {})[d]) continue;
       (pr.days = pr.days || {})[d] = true; practiceOp(id, { op:"day", date:d });
     }

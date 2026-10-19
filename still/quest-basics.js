@@ -89,18 +89,83 @@
   const stepAt = (st, hour) => st && st.pm && (hour >= PM_HOUR || hour < 4) ? { ...st, ...st.pm } : st;
   /* What ticking step i of a block pays. W: that block's { tick, paid } (G.day.work[key]); all: every block's W today;
      kind: the block's basic id. A step pays once per kind a day (the lamp: once in Morning Yoga and once in the
-     Wind-down, d9) and never past the habit's daily limit (gain(h) is 0 then). Unticking takes nothing back, as
-     before: habits only ever go up when two devices merge. Returns { on, pay:{ h, d, kind } | null, why }. */
+     Wind-down, d9) and never past the habit's daily limit (gain(h) is 0 then). Unticking takes back exactly what
+     that tick paid (Junyan, 2026-10-19, d28), the way a meal tile does: back is the paid record, and the page counts it
+     off in G.day.voided (habits only ever go up when two devices merge). A tick that paid nothing takes nothing back.
+     Returns { on, pay:{ h, d, kind } | null, back:{ h, d, kind, at } | null, why }. */
   function tickStep(W, all, kind, i, st, hour, gain){
     const on = !(W.tick || {})[i];
-    if (!on) return { on, pay:null, why:"" };
-    if ((W.paid || {})[i]) return { on, pay:null, why:"paid" };
+    if (!on) { const p = (W.paid || {})[i]; return { on, pay:null, back: p && p.d ? p : null, why:"" }; }
+    if ((W.paid || {})[i]) return { on, pay:null, back:null, why:"paid" };
     const s = stepAt(st, hour), h = s && s.h; if (!h) return { on, pay:null, why:"" };
     const had = Object.values(all || {}).some(w => w && Object.values(w.paid || {}).some(p => p && p.h === h && p.kind === kind));
     if (had) return { on, pay:null, why:"done" };
     const d = gain(h); if (!d) return { on, pay:null, why:"full" };
     return { on, pay:{ h, d, kind }, why:"" };
   }
+  /* Writes one tap into the block's W: the tick, what it paid (with the time, so its take-back has a key), and when
+     this step last changed (W.t), so two devices merge each step on its own and the later change wins (quest-merge.js).
+     A take-back removes the paid record; a later tick can pay it again. */
+  function applyTick(W, i, r, at){
+    W.tick = W.tick || {}; W.paid = W.paid || {}; W.t = W.t || {};
+    if (r.on) W.tick[i] = true; else delete W.tick[i];
+    if (r.pay) W.paid[i] = { ...r.pay, at };
+    if (r.back) delete W.paid[i];
+    W.t[i] = at;
+    return W;
+  }
+  /* How many times habit h counts as done today. A checklist tick's payment lives on its own step (W.paid[i] with a
+     time, "at"), and the step merges by itself across devices (quest-merge.js mergeWork), so those ticks are counted
+     from the live paid records and never touch G.day.habits: a counter merged by max lost a tick on one device when
+     the other device took a different tick back (review of d28). Everything else (meals, the timed rule, paid
+     records from an older page, which have no time) still counts in habits less voided. */
+  function liveTicks(work, h){
+    let n = 0;
+    for (const W of Object.values(work || {})) for (const p of Object.values((W && W.paid) || {})) if (p && p.at && p.h === h) n++;
+    return n;
+  }
+  function habitCount(day, h){
+    const d = day || {};
+    return Math.max(0, ((d.habits || {})[h] || 0) - ((d.voided || {})[h] || 0)) + liveTicks(d.work, h);
+  }
+  // log line keys: a pay names its tick (block, step, tick time); its take-back names the same tick, so two devices
+  // that take back the same tick write it once (quest-merge.js onceKey). An older paid record has no tick time: its
+  // take-back is keyed by the untick time instead.
+  const payKey = (blockKey, i, at) => `pay:${blockKey}:${i}:${at}`;
+  const backKey = (blockKey, i, p, at) => `back:${blockKey}:${i}:${(p && p.at) || "u" + at}`;
+  /* One tap on a checklist tile, applied to the day (G.day): ticks or unticks step i of block blockKey, at time at.
+     Returns { r, W, pay:{ h, d, kind, k } | null, back:{ h, d, kind, k } | null }; the page writes pay and back to the
+     log with their keys. Only an older paid record's take-back goes in day.voided (it was counted in habits). */
+  function tapDay(day, blockKey, kind, i, st, hour, gain, at){
+    const work = (day.work = day.work || {}), W = (work[blockKey] = work[blockKey] || { tick:{}, goal:"" });
+    const r = tickStep(W, work, kind, i, st, hour, gain);
+    applyTick(W, i, r, at);
+    if (r.back && !r.back.at) (day.voided = day.voided || {})[r.back.h] = (day.voided[r.back.h] || 0) + 1;
+    return { r, W, pay: r.pay ? { ...r.pay, k:payKey(blockKey, i, at) } : null,
+      back: r.back ? { h:r.back.h, d:r.back.d, kind:r.back.kind, k:backKey(blockKey, i, r.back, at) } : null };
+  }
+  /* The take-backs the log still owes, checked after every merge: a checklist pay line whose tick is no longer live
+     on its step and that has no take-back yet. That covers an untick on a device that never saw the re-tick (its
+     take-back names the first tick, which was already taken back), and two devices that ticked the same step (the
+     later tick wins the step, the other pay comes back). Returns [{ k, xp, m, msg }], keys as backKey writes them. */
+  function owedBacks(work, log){
+    const L = Array.isArray(log) ? log : [], keys = new Set(L.map(e => e && e.k).filter(Boolean)), out = [];
+    for (const e of L) {
+      const k = String((e && e.k) || ""); if (!k.startsWith("pay:") || k.length < 30) continue;
+      const at = k.slice(-24), pre = k.slice(4, -25), c = pre.lastIndexOf(":"), blk = pre.slice(0, c), i = pre.slice(c + 1);
+      const p = ((((work || {})[blk]) || {}).paid || {})[i];
+      if (p && p.at === at) continue;   // still ticked: it stays paid
+      const bk = `back:${blk}:${i}:${at}`; if (keys.has(bk)) continue;
+      keys.add(bk); out.push({ k:bk, xp:-(+e.xp || 0), m:e.m, msg:e.msg || "" });
+    }
+    return out;
+  }
+  /* The barefoot walk (Junyan, 2026-10-19, d27): a tile in the check-in that opens after a walk, hike or other outdoor
+     block ends. It pays the barefoot habit (its value, once a day, into prana) the same way a checklist tile does.
+     Whole words only, so "Call with Hillary", "Madison Square Garden", "Parks Canada" or "Trailer" never match. */
+  const OUTDOOR = /\b(walks?|walking|hikes?|hiking|treks?|trekking|beach|forest|trails?|sandboard(ing)?|picnic|camping|meadow)\b|\b(in|at|to) the park\b|\bpark walk\b|\bnational park\b|\bbotanical gardens?\b|\bdesert (tour|safari|walk)\b|^(park|garden)\b/i;
+  const outdoorBlock = title => OUTDOOR.test(String(title || ""));
+  const barefootStep = () => ({ t:"Walk barefoot on natural ground: soil, grass or sand", h:"barefoot" });
   // what a block's ticks paid: { p, b } by meter (meter(h) is "p" or "b")
   function paidOf(W, meter){
     let p = 0, b = 0;
@@ -214,5 +279,5 @@
     return { t: t[0].toUpperCase() + t.slice(1), min };
   }
 
-  root.QuestBasics = { PRACTICE_PAY, practicePay, domestics, windDown, yoga, groom, basic, blockBasic, stepAt, tickStep, paidOf, PM_HOUR, guessMode, placeBasics, growCaney, fitList, parseQuick, IDS:["caney", "domestics", "winddown"] };
+  root.QuestBasics = { PRACTICE_PAY, practicePay, domestics, windDown, yoga, groom, basic, blockBasic, stepAt, tickStep, applyTick, tapDay, owedBacks, liveTicks, habitCount, payKey, backKey, outdoorBlock, barefootStep, paidOf, PM_HOUR, guessMode, placeBasics, growCaney, fitList, parseQuick, IDS:["caney", "domestics", "winddown"] };
 })(typeof window !== "undefined" ? window : globalThis);

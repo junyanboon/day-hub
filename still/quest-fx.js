@@ -117,11 +117,21 @@
     if (el && el.animate) el.animate([{ transform: "translateX(0)" }, { transform: "translateX(-4px)" }, { transform: "translateX(4px)" }, { transform: "translateX(0)" }], { duration: 220 });
     if (soundOn()) { const a = ctx(); if (a) note(-5, a.currentTime + 0.01, 0.18, 0.08, "triangle"); }
   }
+  /* back(rect, {gain, color}): a tap that takes a payment back (2026-10-19, d28), on a meal tile or a checklist
+     tile: the minus amount floats up from the tile, a few sparks fall, and a soft falling note. */
+  function back(rect, o) {
+    const x = rect.left + rect.width / 2, y = rect.top + rect.height / 2;
+    const reduce = root.matchMedia && root.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (!reduce) for (let i = 0; i < 6; i++) particle(x, y, "", { color: o.color || "#ff9b8a", speed: 40, lift: -10, fall: 80, scale: 0.8, dur: 600 });
+    if (o.gain) tag(x, rect.top - 6, `${o.gain > 0 ? "-" : "+"}${Math.abs(o.gain)}`, "back");
+    if (soundOn()) { const a = ctx(); if (a) { note(-2, a.currentTime + 0.01, 0.12, 0.07, "triangle"); note(-7, a.currentTime + 0.1, 0.18, 0.06, "triangle"); } }
+    if (navigator.vibrate) navigator.vibrate(10);
+  }
   // the new tile after the redraw gets a springy pop
   function pop(el) {
     if (el && el.animate) el.animate([{ transform: "scale(.82)" }, { transform: "scale(1.12)", offset: 0.45 }, { transform: "scale(.97)", offset: 0.75 }, { transform: "scale(1)" }],
       { duration: 420, easing: "ease-out" });
   }
 
-  root.QuestFx = { tap, nope, pop, soundOn, setSound };
+  root.QuestFx = { tap, back, nope, pop, soundOn, setSound };
 })(window);
