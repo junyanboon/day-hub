@@ -1090,8 +1090,8 @@
       if (SAVED_AT == null) {
         lastPull = new Date();
         // every day, without him typing (d1): the basics go in on each full pull, once (placeBasics only adds what is missing)
-        placeBasics().then(() => { if (window.QuestMorning) QuestMorning.redraw(); }).catch(e => console.warn("basics", e))
-          .then(() => settleDay()).catch(e => console.warn("settle", e));   // once a day: Joint Plans overlaps pushed apart (d40)
+        placeBasics().then(() => { if (window.QuestMorning) QuestMorning.redraw(); }).catch(e => console.warn("basics", e));
+        // no once-a-day overlap pass: Day Quest never moves a block he did not move (Junyan, 2026-10-19, "nothing should be pushed")
         planGym().catch(e => console.warn("gym", e));   // this week's and next week's gym, on his calendar (at most every 2 hours)
       }   // offline: both wait for a fresh calendar, so nothing is placed twice or against an old day
       saveSnap();
@@ -2178,9 +2178,10 @@
      a Joint Plans event or Quest block it lands on starts again at the next 15-minute mark after it, and the rest of the
      day follows (quest-agenda.js roomJoint). Junyan calendar events overlap freely and never move. Past bedtime is fine
      (d31). d38 "it needs to move everything together": the pushed Joint Plans events move in Google Calendar too (Caney
-     sees it), in one /cal/shift batch, only from here (his own move or add) and settleDay. moved: the block moved or
+     sees it), in one /cal/shift batch, only from here (his own move or add). moved: the block moved or
      added ({ key, calId? | extra? }); its key is left out of the shift. */
   function roomFor(moved, s, e){
+    return Promise.resolve();   // switched off (Junyan, 2026-10-19): "don't push any plans only move the things that I'm moving"
     if (!AGD() || gameDayOf(s) !== gameYmd()) return Promise.resolve();
     const moves = AGD().roomJoint(blocks(), { ...moved, s:new Date(s), e:new Date(e) });
     return moves.length ? shiftBlocks(moves, `${moved.t || "a block"} at ${fmtT(new Date(s))}`) : Promise.resolve();
@@ -2215,19 +2216,6 @@
     if (done.length) await pullAll();
   }
   const canShift = () => !!(questKey() && !DRY);
-  /* Overlaps already there among Joint Plans (d40, "push apart overlaps that already exist"): once a game day, on the first
-     fresh pull of that day with the page in front of him. Only blocks that have not started yet; the earlier one stays.
-     Marked done for the day before anything is written (on this device and in the synced game, G.day.settled), so a
-     failure, a reload or the pull it triggers never runs it again: it cannot loop. */
-  async function settleDay(){
-    const ymd = gameYmd(), mark = "dq-settled-" + ymd;
-    if (!AGD() || !canShift() || !PLAN || !G.day || document.visibilityState !== "visible") return;
-    if (store.get(mark) || G.day.settled) return;
-    store.set(mark, now().toISOString()); G.day.settled = now().toISOString(); saveG();
-    const moves = AGD().settle(blocks(), now());
-    if (!moves.length) { log("Checked Joint Plans for overlaps: none"); return; }
-    await shiftBlocks(moves, "pushed apart overlaps on opening the day");
-  }
   /* Calendar writes: a block that came from Google Calendar (it has an id) can
      be moved or renamed in the calendar itself. Blocks moved along with it
      ("move everything after") stay today-only, so a flight or a shared Joint
