@@ -110,3 +110,10 @@ test("the old timed payments are recognised for the take-back, and nothing else 
   assert.match(html, /undoTimedPay\(\);/);
   assert.match(html, /k:"undo:" \+ e\.at/);   // one take-back per payment, whichever device writes it
 });
+
+test("undoTimedPay keeps voided at or under the habit's count", () => {
+  const html = fs.readFileSync(fileURLToPath(new URL("../quest.html", import.meta.url)), "utf8");
+  const i = html.indexOf("function undoTimedPay"), body = html.slice(i, i + 900);
+  assert.match(body, /if \(n > c\) G\.day\.voided\[id\] = c;/);
+  assert.ok(body.indexOf("if (n > c)") < body.indexOf("if (!hits.length) return;"), "the cap runs even when nothing is left to take back");
+});

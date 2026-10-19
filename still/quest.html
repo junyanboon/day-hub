@@ -1341,6 +1341,9 @@
   const TIMED_PAY = /^((?:Shambhavi|Surya Kriya|Angamardana|Yogasanas|Upa Yoga|Bhuta Shuddhi|Isha Kriya|Nadi Shuddhi 5')(?:, (?:Shambhavi|Surya Kriya|Angamardana|Yogasanas|Upa Yoga|Bhuta Shuddhi|Isha Kriya|Nadi Shuddhi 5'))*): \d+ min$/;
   function undoTimedPay(){
     if (!G.day || !Array.isArray(G.day.log) || DRY) return;
+    // never more taken back than was counted: an old page that logged the same payment twice (2026-10-19, 11:10 and
+    // 11:45 UTC) left voided at 2 over a count of 1, which would let one tick count as not done
+    for (const [id, n] of Object.entries(G.day.voided || {})) { const c = (G.day.habits || {})[id] || 0; if (n > c) G.day.voided[id] = c; }
     const done = new Set(G.day.log.filter(e => e.k && String(e.k).startsWith("undo:")).map(e => e.k));
     const hits = G.day.log.filter(e => e.m !== "b" && +e.xp > 0 && TIMED_PAY.test(e.msg || "") && !done.has("undo:" + e.at));
     if (!hits.length) return;
