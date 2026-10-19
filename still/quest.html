@@ -179,7 +179,6 @@
   .htile.water .glass { background:linear-gradient(180deg, rgba(127,208,255,.45), rgba(127,208,255,.18)); }
   .htile.full { background:linear-gradient(160deg, rgba(255,212,121,.30), rgba(255,212,121,.08)); border-color:rgba(255,212,121,.6); }
   .htile.full .hc { color:var(--gold); }
-  .htile.auto { border-style:dashed; } .htile.auto b { color:var(--ink-faint); } .htile.earned { border-color:rgba(143,227,176,.7); }
   .sq { display:flex; gap:12px; align-items:center; margin-top:12px; padding:12px 14px; border-radius:16px; background:var(--glass); border:1px solid var(--glass-border); }
   .sq.done { border-color:rgba(143,227,176,.65); background:linear-gradient(135deg, rgba(143,227,176,.18), rgba(127,208,255,.10)); }
   .sq-i { font-size:22px; } .sq-t { flex:1; font-weight:600; font-size:14px; }
@@ -197,7 +196,6 @@
     color:var(--ink); font:inherit; font-weight:600; font-size:14px; cursor:pointer; position:relative; }
   .wq-btn:active { transform:scale(.97); }
   .wq-note { width:100%; font-size:12px; color:var(--ink-soft); margin-top:7px; }
-  .hgrid.sugg { grid-template-columns:repeat(3, 1fr); }
   .sugw { margin:14px 0 4px; padding:10px 12px; border-radius:14px; background:var(--glass); border:1px solid var(--glass-border); }
   .sugr { display:flex; align-items:center; gap:6px; padding:8px 0; border-top:1px solid var(--glass-border); }
   .sugr:first-of-type { border-top:0; }
@@ -206,7 +204,6 @@
   .hgrid.btiles, .hgrid.mqg { grid-template-columns:repeat(3, 1fr); margin:4px 0 10px; }
   .hgrid.btiles .htile, .hgrid.mqg .htile { min-height:78px; padding:14px 4px 6px; }
   .hgrid.mqg .hl { font-size:10px; }
-  .hgrid.sugg .htile { min-height:76px; }
   .why-tip { position:fixed; z-index:300; display:none; padding:9px 11px; border-radius:12px; background:#0f1230; border:1px solid var(--glass-border);
     color:var(--ink); font-size:12.5px; line-height:1.35; box-shadow:0 10px 30px rgba(0,0,0,.45); pointer-events:none; }
   .htile { -webkit-touch-callout:none; }
@@ -420,8 +417,13 @@
   .cal-pts.neg { color:#ff9e9e; }
   .bedline { margin:0 0 10px; padding:10px 12px; border-radius:14px; font-size:13px; line-height:1.35; color:#dfe3ff;
     background:rgba(120,110,220,.18); border:1px solid rgba(170,160,255,.35); }
-  .cal-ask { color:#14183a; background:var(--gold); border-radius:999px; padding:1px 8px; font-size:11px; opacity:1; }
-  .cal-ev.past:has(.cal-ask) { opacity:.9; }
+  /* a started block he has not opened yet (d32): a small gold dot that pulses, gone once he opens it */
+  .cal-tap { position:absolute; right:8px; top:6px; width:9px; height:9px; border-radius:50%; background:var(--gold);
+    box-shadow:0 0 0 0 rgba(255,212,121,.7); animation:calTap 1.8s ease-out infinite; }
+  .cal-ev.one .cal-tap { top:50%; margin-top:-4.5px; }
+  .cal-ev.past:has(.cal-tap) { opacity:.9; }
+  @keyframes calTap { 0% { box-shadow:0 0 0 0 rgba(255,212,121,.7); } 70%, 100% { box-shadow:0 0 0 7px rgba(255,212,121,0); } }
+  @media (prefers-reduced-motion: reduce) { .cal-tap { animation:none; } }
   .cal-now { position:absolute; left:var(--cal-l); right:0; height:2px; margin-top:-1px; background:#ff8f9e; z-index:2; pointer-events:none; }
   .cal-now::before { content:""; position:absolute; left:-5px; top:-4px; width:10px; height:10px; border-radius:50%; background:#ff8f9e; }
   .cal-now span { position:absolute; left:calc(-1 * var(--cal-l) - 6px); width:calc(var(--cal-l) - 4px); top:-7px; text-align:right; white-space:nowrap; font-size:10.5px; font-weight:700; color:#ff8f9e; }
@@ -727,7 +729,7 @@
 </style>
 <script src="keeps.js?v=20261009k"></script>
 <script src="bag.js?v=20261009k"></script>
-<script src="quest-merge.js?v=20261019x"></script>
+<script src="quest-merge.js?v=20261019y"></script>
 <script src="quest-levels.js?v=20261016b"></script>
 <script src="quest-gymlog.js?v=20261017a"></script>
 <script src="quest-meals.js?v=20261019f"></script>
@@ -735,7 +737,7 @@
 <script src="nvc-words.js?v=20261010a"></script>
 <script src="quest-fx.js?v=20261019x"></script>
 <script src="quest-night.js?v=20261019w"></script>
-<script src="quest-basics.js?v=20261019x"></script>
+<script src="quest-basics.js?v=20261019y"></script>
 <script src="quest-suggest.js?v=20261019a"></script>
 <script src="quest-water.js?v=20261019a"></script>
 <script src="quest-gym.js?v=20261019x"></script>
@@ -1532,6 +1534,10 @@
     const hDone = HABITS.filter(h => habitN(h[0]) > 0).length;
     const done = all.filter(b => G.day.closes[gk(b)] === "done" || ["in", "late"].includes(G.day.checks[gk(b)])).map(b => `✓ ${shortName(b)}`)
       .concat(all.filter(b => G.day.checks[gk(b)] === "skip").map(b => `· ${shortName(b)}, didn't happen`));
+    // the two automatic ones left Right now (d35) and show here by name: tonight's last meal, last night's sleep time
+    const auto = [(G.day.earn || {}).early ? "✓ Last meal 3 hr before bed, paid tomorrow morning" : null,
+      habitN("bedtime") ? `✓ Asleep by 11 last night${BED ? ` (${BED.asleep})` : ""}` : BED ? `· Asleep after 11 last night (${BED.asleep})` : null].filter(Boolean);
+    done.unshift(...auto);
     const next = new Date(Date.parse(gameYmd() + "T12:00:00Z") + 86400000).toISOString().slice(0, 10);
     let items = [], note = "", ahead = null;
     try {
@@ -1698,19 +1704,8 @@
 
   /* No free-floating tiles (Junyan, 2026-10-19, d6 d11: "Everything needs to be directly connected to what I'm doing
      right now"). Prana and body actions are ticked inside their calendar block (Morning Yoga, Domestics or Grooming,
-     Wind-down, the meal quiz). Water has its own card (waterHTML, d23 and d24); only the two automatic tiles stay
-     out here, and they only show their state. */
-  const TILES = HABITS.filter(h => h[6] === "auto");   // water has its own card since 2026-10-19 (d23, waterHTML)
-  const h7 = id => (HABITS.find(x => x[0] === id) || [])[7];
-  function habitTile([id, full, , max, icon, short, flag]){
-    const n = habitN(id), g = habitGain(id), auto = flag === "auto", earned = auto && (G.day.earn || {})[id];
-    const cls = ["htile", !auto && !g ? "full" : "", auto ? "auto" : "", earned || (auto && n) ? "earned" : "", id === "water" ? "water" : ""].filter(Boolean).join(" ");
-    const cnt = id === "xylitol" ? `<span class="hc">${n ? `${n} g${n < 6 ? " / 6" : ""}` : ""}</span>` : id === "water" ? `<span class="hc">${n ? `${n * 250} ml` : ""}</span>` : max > 1 && n ? `<span class="hc">${n}/${max}</span>` : n ? `<span class="hc">✓</span>` : "";
-    const fill = max > 1 && n ? `<i class="glass" style="height:${Math.round(n / max * 100)}%"></i>` : "";
-    const sb = !auto && !n && g > 0 && h7(id) === "Practice" ? schedFor(id) : null;
-    const tg = id === "bedtime" && BED ? `${n ? "✓" : "✗"} ${BED.asleep}` : auto ? (n ? "✓ last night" : earned ? "✓ tonight" : "auto") : sb ? `📅 ${fmtT(sb.s)}` : g ? (g > 0 ? `+${g}` : `${g}`) : "";
-    return `<button class="${cls}" data-habit="${id}" data-why="${esc(WHY[id] || full)}">${fill}<span class="hi">${hIcon(id, icon)}</span><span class="hl">${esc(short)}</span>${cnt}<b class="${meterOf(id) === "b" ? "mb" : "mp"}">${tg}</b></button>`;
-  }
+     Wind-down, the meal quiz). Water has its own card (waterHTML, d23 and d24). The two automatic ones (Last meal 3 hr,
+     Asleep by 11) left Right now too (d35): they count and pay by themselves and show on the day's end screen. */
   // days from a known new moon (2000-01-06 18:14 UTC), synodic month 29.53 days
   const nearNewMoon = t => { const a = (((+t - Date.UTC(2000, 0, 6, 18, 14)) / 86400000) % 29.530588 + 29.530588) % 29.530588; return a < 1.5 || a > 28; };
   // minutes past 11 PM where he is, from 11 PM to the end of the game day at 4 AM; null otherwise (d223, d225)
@@ -1719,38 +1714,19 @@
     return h >= 23 ? (h - 23) * 60 + m : h < 4 ? (h + 1) * 60 + m : null;
   }
   function suggestHTML(){
-    const aq = unratedActivity();   // meals are rated from their calendar block only (Junyan, 2026-10-19, d3)
+    // no check-ins, auto tiles or "where to tick" note here (Junyan, 2026-10-19, d32 d35): every block's tiles
+    // open from the block itself. Last meal 3 hr and Asleep by 11 still count and pay by themselves (day's end shows them).
     return `<div class="hhead"><span class="eyebrow">Right now</span>` +
       `<button class="hsnd" data-hsnd aria-label="Tap sounds">${window.QuestFx && QuestFx.soundOn() ? "🔊" : "🔇"}</button></div>` +
       (pastBed(now()) != null ? `<div class="bedline">🌙 Past bedtime: body drops 3 every half hour you stay up${G.day.lateBody ? ` (−${G.day.lateBody} so far)` : ""}. Time to wind down.</div>` : "") +
-      (aq ? `<button class="pa-all" style="margin:0 0 10px" data-actq="${esc(gk(aq))}">🧍 How was ${esc(shortName(aq))}?<span>Check it ›</span></button>` : "") +
-      (nvDue() ? `<button class="pa-all" style="margin:0 0 10px" data-nvc="checkin">🫶 How are you, really?<span>Check in ›</span></button>` : "") +
-      `<div class="hgrid sugg">${TILES.map(habitTile).join("")}</div>` +
-      `<div class="hint" style="margin:8px 2px">Practices, Dr Ellie, the lamp and the rest are ticked inside their block on the calendar.</div>` +
       `<div class="actions" style="margin-top:8px"><button class="btn" data-nvc="checkin">🫶 How am I?</button><button class="btn" data-nvc="conflict">⚡ Conflict</button><button class="btn" data-nvc="journal">📓 Journal</button></div>`;
   }
   function bindHabits(root){
     root.querySelectorAll("[data-nvc]").forEach(bn => bn.onclick = () => bn.dataset.nvc === "conflict" ? openConflict() : bn.dataset.nvc === "journal" ? openJournal() : openCheckin());
-    root.querySelectorAll("[data-actq]").forEach(bn => bn.onclick = () => { const b = blocks().find(x => gk(x) === bn.dataset.actq); if (b) openActQuiz(b); });
-    root.querySelectorAll("[data-habit]").forEach(bn => bn.onclick = () => tapHabit(bn));
     root.querySelectorAll("[data-hsnd]").forEach(bn => bn.onclick = () => { QuestFx.setSound(!QuestFx.soundOn()); render(); });
   }
-  // a habit tile tapped: count it, burst, sound, then the springy redraw
+  // a tile's burst colour by its habit group (checklist tiles, tapStep)
   const HCOL = { Morning:"#ffd479", Practice:"#c9a7ff", Food:"#8fe3b0", Move:"#7fd0ff", Mind:"#ffb3c7", Evening:"#a7b4ff" };
-  function tapHabit(bn){
-    const id = bn.dataset.habit, h = HABITS.find(x => x[0] === id), fx = window.QuestFx; if (!h) return;
-    if (h[6] === "auto") { if (fx) fx.nope(bn); floatXp(0, h[0] === "bedtime" ? "Your Oura ring checks this one each morning" : "This one counts itself from your calendar, paid next morning"); return; }
-    const g = habitGain(id);
-    if (!g) { if (fx) fx.nope(bn); else floatXp(0, `${h[5]}: full for today`); return; }
-    const rect = bn.getBoundingClientRect();
-    G.day.habits = G.day.habits || {};
-    G.day.habits[id] = (G.day.habits[id] || 0) + 1;
-    const full = habitN(id) >= h[3];
-    addHabit(id, g, habitName(h), h[5], !!fx);
-    if (fx) fx.tap(rect, { icon:h[4], gain:g, full, water:id === "water", color:HCOL[h[7]] });
-    render();
-    if (fx) fx.pop($("habits").querySelector(`[data-habit="${id}"]`));
-  }
   // a new day: keep the carry, check the level, wait for sleep to refill
   function rollDay(){
     const prev = G.day;
@@ -2279,15 +2255,38 @@
      Tapping a stop opens a window made for that situation. Built live with
      Junyan through 2026-10-06, one situation at a time; anything not built
      yet opens the plain edit box. */
+  /* A tap on a block opens its own list and nothing else (Junyan, 2026-10-19, d32: "let's drop all the check in stuff.
+     When I click on the block it should just automatically go to the set list only"). What that list is: */
+  function blockList(b){
+    if (!b) return null;
+    if (b.basic) return "basic";
+    if (isGym(b)) return "gym";
+    if (isMeal(b)) return "meal";
+    if (basicId(b)) return "basic";   // Morning Yoga, Domestics or Grooming, Wind-down from the calendar (2026-10-19)
+    if (INSIGHTS[gk(b)]) return "work";   // the prep list the insight agent wrote (a hike's also carries its barefoot tile)
+    if (QB() && QB().outdoorBlock(b.t)) return "outdoor";   // the barefoot walk (d27), on the walk or hike's own list
+    return null;
+  }
+  // opened on this device or another (G.day.opened merges from both): the calendar's tap symbol goes
+  function markOpened(b){
+    if (!b || !G.day || (G.day.opened || {})[gk(b)]) return;   // callers only pass today's blocks
+    (G.day.opened = G.day.opened || {})[gk(b)] = now().toISOString(); saveG();
+  }
   function openStop(b){
-    if (b.basic) return openBasic(b);
-    if (isGym(b)) return openGym(b);
-    if (isMeal(b)) return openMeal(b);
-    if (basicId(b)) return openBasic(b);   // Morning Yoga, Domestics or Grooming, Wind-down from the calendar (2026-10-19)
-    // a confirmed outdoor check-in reopens on its checked view, so the barefoot tile can still be ticked or unticked (d27)
-    if ((G.day.mealq || {})[gk(b)] && QB().outdoorBlock(b.t)) return openActQuiz(b);
-    if (["work", "major", "travel"].includes(groupOf(b)) || INSIGHTS[gk(b)]) return openWork(b);
-    return openEdit(b);
+    markOpened(b);
+    const l = blockList(b);
+    if (l === "basic") return openBasic(b);
+    if (l === "gym") return openGym(b);
+    if (l === "meal") return openMeal(b);
+    if (l === "outdoor") return openOutdoor(b);
+    if (l === "work") return openWork(b);
+    return openNoTiles(b);
+  }
+  // no tiles yet (d33 d36: "let's just do them one at a time as they come up")
+  function openNoTiles(b){
+    openSheet(`${winHead(b)}<p class="hint" style="margin:10px 2px">Tiles for this block aren't set up yet.</p>
+      <div class="actions"><button class="btn ghost" id="nEdit">Change time or name</button></div>`);
+    $("nEdit").onclick = () => openEdit(b);
   }
   function winHead(b){
     const st = G.day.checks[gk(b)];
@@ -2361,90 +2360,26 @@
     $("mEdit").onclick = () => openEdit(b);
   }
 
-  /* ---------- the activity check (Junyan, 2026-10-10: "after each activity there should also be some
-     assessment on my prana (posture, etc.)") ----------
-     After any activity ends (not meals, which have their own quiz; not sleep, rest, open time or the
-     practices the calendar already pays), a few taps say how it went. Prana by what Sadhguru names:
-     a straight spine, easy nose breathing, full involvement and contact with the elements lift it;
-     slumping and doing things on autopilot (compulsively, not consciously) lower it. Body by Bryan
-     Johnson: breaking up sitting and getting daylight help, a long unbroken sit costs. Kept in
-     G.day.mealq under the block's key with kind "act", so the server merges it like a meal rating. */
-  const AQ_PRANA = [
-    ["spine", "🧍", "Spine upright: sat or stood tall", 2],
-    ["breath", "🌬️", "Breath easy, through the nose", 1],
-    ["invol", "🔥", "Fully involved: did it with attention and joy", 2],
-    ["elem", "🌳", "Outdoors with earth, water, sun or open air", 2],
-    ["slump", "🪑", "Slumped or hunched much of the time", -2],
-    ["auto", "🌀", "Rushed or on autopilot, mind somewhere else", -2],
-  ];
-  const AQ_BODY = [
-    ["moved", "🚶", "Got up and moved at least every 30 to 60 min", 2],
-    ["daylight", "☀️", "Daylight outside", 1],
-    ["sat", "🛋️", "Sat still over an hour without a break", -2],
-  ];
-  const AQ_ONEOF = { spine:"slump", slump:"spine", invol:"auto", auto:"invol", moved:"sat", sat:"moved" };
-  // no check-in for gym: the gym log already records how it went (Junyan, 2026-10-17: "I already recorded the details")
-  const actRatable = b => !!b && !isMeal(b) && !isSleep(b) && !isGym(b) && !["rest", "open", "break"].includes(b.kind)
-    && !blockHabits(b).length && !basicId(b) && b.e - b.s >= 20 * 60000;
-  // an activity that ended in the last 4 hours and has not been checked
-  function unratedActivity(){
-    const t = now(), q = G.day.mealq || {};
-    return blocks().filter(b => actRatable(b) && b.e <= t && t - b.e < 4 * 3600000 && !q[gk(b)]).pop() || null;
-  }
-  const aqVal = v => v > 0 ? Math.round(v * gainMult()) : v;
-  function aqScore(sel){
-    let p = 0, b = 0;
-    AQ_PRANA.forEach(([id, , , v]) => { if (sel[id]) p += aqVal(v); });
-    AQ_BODY.forEach(([id, , , v]) => { if (sel[id]) b += aqVal(v); });
-    return { p, b };
-  }
-  /* After a walk, hike or other outdoor block (Junyan, 2026-10-19, d27): the barefoot walk is a habit tile at the top
-     of the check-in. It pays as he taps it (the barefoot habit's value, once a day, into prana) and a second tap takes
-     it back, the same as a checklist tile (tapStep). It is saved on the block's checklist (G.day.work), not the quiz. */
+  /* A walk, hike or other outdoor block (Junyan, 2026-10-19, d27, d32): its list is the barefoot walk tile. It pays as he
+     taps it (the barefoot habit's value, once a day, into prana) and a second tap takes it back, the same as a checklist
+     tile (tapStep). It is saved on the block's checklist (G.day.work). The old "How was X?" check-in is gone (d32). */
   const BAREFOOT_I = "bf";   // its own key in the block's ticks, apart from any prep list
-  function barefootHTML(b){
+  function barefootTile(b){
     if (!QB() || !QB().outdoorBlock(b.t)) return "";
     const W = (G.day.work || {})[gk(b)] || {};   // read only: the tap creates the block's checklist
-    return `<div class="win-lb">Barefoot</div><div class="hgrid btiles">${stepTile(b, { ...W, tick:W.tick || {} }, QB().barefootStep(), BAREFOOT_I, MO_CTX.hour(now()), "outdoor")}</div>`;
+    return `<div class="win-lb">Barefoot</div>
+      <div class="hgrid btiles">${stepTile(b, { ...W, tick:W.tick || {} }, QB().barefootStep(), BAREFOOT_I, MO_CTX.hour(now()), "outdoor")}</div>`;
   }
-  function bindBarefoot(b, redraw){
+  function bindBarefootTile(b, reopen){
     $("sheet").querySelectorAll("[data-bstep]").forEach(bn => bn.onclick = e => { e.stopPropagation();
       const top = $("sheet").scrollTop;
-      tapStep(bn, b, "outdoor", BAREFOOT_I, QB().barefootStep(), () => { redraw(); $("sheet").scrollTop = top; render(); }); });
+      tapStep(bn, b, "outdoor", BAREFOOT_I, QB().barefootStep(), () => { reopen(b); $("sheet").scrollTop = top; render(); }); });
   }
-  function openActQuiz(b, sel = {}){
-    const k = gk(b), done = (G.day.mealq || {})[k], name = shortName(b);
-    if (done) {
-      openSheet(`${winHead(b)}<h3>${esc(name)}: checked</h3><p>${esc(mqSum(done))}.</p>${barefootHTML(b)}
-        <div class="actions"><button class="btn ghost" id="aqE">Change this block</button><button class="btn ghost" id="aqX">Done</button></div>`);
-      $("aqX").onclick = closeSheet; $("aqE").onclick = () => openEdit(b); bindBarefoot(b, () => openActQuiz(b, sel)); return;
-    }
-    const sc = aqScore(sel), sign = v => v > 0 ? `+${v}` : `${v}`;
-    const row = ([id, icon, txt, v], cls) => `<button class="wck${sel[id] ? " on" : ""}" data-q="${id}"><span class="bx">${sel[id] ? "✓" : ""}</span><span>${icon} ${esc(txt)}</span><b class="${cls}" style="margin-left:auto;font-size:12px">${sign(aqVal(v))}</b></button>`;
-    openSheet(`${winHead(b)}<h3>How was ${esc(name)}?</h3>
-      ${barefootHTML(b)}
-      <p>Tap what fits, then confirm.</p>
-      <div class="win-lb">Prana (Sadhguru)</div>
-      ${AQ_PRANA.map(x => row(x, "mp")).join("")}
-      <div class="win-lb">Body (Bryan Johnson)</div>
-      ${AQ_BODY.map(x => row(x, "mb")).join("")}
-      <div class="actions" style="position:sticky;bottom:0"><button class="btn primary" id="aqOk">Confirm · ${esc(mqSum(sc))}</button></div>
-      <div class="actions"><button class="btn ghost" id="aqX">Not now</button></div>`, true);
-    $("sheet").querySelectorAll("[data-q]").forEach(bn => bn.onclick = () => {
-      const id = bn.dataset.q, top = $("sheet").scrollTop;
-      sel[id] = !sel[id]; if (sel[id] && AQ_ONEOF[id]) sel[AQ_ONEOF[id]] = false;
-      openActQuiz(b, sel); $("sheet").scrollTop = top;
-    });
-    $("aqX").onclick = closeSheet;
-    bindBarefoot(b, () => openActQuiz(b, sel));
-    $("aqOk").onclick = () => {
-      const q = aqScore(sel);
-      (G.day.mealq = G.day.mealq || {})[k] = { kind:"act", at:now().toISOString(), sel:Object.keys(sel).filter(x => sel[x]), p:q.p, b:q.b };
-      if (q.p) addPrana(q.p, `${name}: how it went`, "activity");
-      if (q.b) addBody(q.b, `${name}: how it went`, "activity");
-      log(`Checked ${name}: ${mqSum(q)}`); saveG();
-      closeSheet(); render();
-    };
+  function openOutdoor(b){
+    openSheet(`${winHead(b)}${barefootTile(b)}
+      <div class="actions"><button class="btn ghost" id="oEdit">Change time or name</button></div>`, true);
+    bindBarefootTile(b, openOutdoor);
+    $("oEdit").onclick = () => openEdit(b);
   }
 
   /* ---------- feelings and needs (Junyan, 2026-10-10: "I want it to actually help me with my
@@ -2738,7 +2673,7 @@
     const linkRow = l => `<a class="wck" href="${esc(l.url)}" target="_blank" rel="noopener"><span class="bx">▶</span><span>${esc(l.title)}${l.note ? `<br><small style="color:var(--ink-faint)">${esc(l.note)}</small>` : ""}</span></a>`;
     const W = ((G.day.work = G.day.work || {})[k] = G.day.work[k] || { tick:{}, goal:"" });
     const n = I.items.length, done = I.items.filter((_, i) => W.tick[i]).length;
-    openSheet(`${winHead(b)}${bk ? bookingHtml(bk) : ""}
+    openSheet(`${winHead(b)}${bk ? bookingHtml(bk) : ""}${barefootTile(b)}
       ${I.know.length ? `<div class="knowcard"><div class="win-lb" style="margin-top:0">What to know</div>${I.know.map(x =>
         `<p><b>${esc(x.t)}</b>${x.why ? `<br><span>${esc(x.why)}</span>` : ""}</p>`).join("")}</div>` : ""}
       <div class="win-lb">${I.packing ? "Pack" : "Prep"} ${n ? `${done}/${n}` : ""}</div>
@@ -2752,6 +2687,7 @@
       ${I.links.length ? `<div class="win-lb">Learn</div>${I.links.map(linkRow).join("")}` : ""}
       <div class="actions"><button class="btn ghost" id="wEdit">Change time or name</button></div>`, true);
     $("wGoal").onchange = e => { W.goal = e.target.value.trim(); saveG(); };
+    bindBarefootTile(b, openWork);
     $("sheet").querySelectorAll("[data-tick]").forEach(bn => bn.onclick = () => {
       W.tick[bn.dataset.tick] = !W.tick[bn.dataset.tick];
       if (n && I.items.every((_, i) => W.tick[i]) && !W.scout) { W.scout = true; giveItem("scout", `Prepped ${shortName(b)}.`); }
@@ -4671,14 +4607,16 @@
       const c = st.free ? "" : calColor(b0), top = y(s) + 1, h = Math.max(18, y(e) - y(s) - 2);
       const rq = st.free || !game ? null : (G.day.mealq || {})[gk(b0)];
       const pts = st.free || !game ? 0 : st.blocks.reduce((a, b) => a + blockPaid(b).p, 0) + (rq ? rq.p || 0 : 0);
-      const ask = game && !rq && past && actRatable(b0) && t - st.e < 4 * 3600000;
+      // the tap symbol (d32): today's block with its own list, started, not opened yet; none for a block with no tiles (d36)
+      const fb = st.free ? null : st.blocks.find(b => b.kind !== "open" && b.kind !== "break");   // the block a tap opens
+      const ask = game && !!fb && QB() && QB().unopened(G.day, gk(fb), !!blockList(fb), +st.s <= +t);
       // ✓ only when it is complete: closed as done, or checked in and over (not while it is still running)
       const done = game && (!st.free && st.blocks.some(b => G.day.closes[gk(b)] === "done") || (st.lit && past));
       const dk = st.free ? { kind:"free" } : win ? { kind:"view" } : AGD().dragKind(b0, ctx), drag = dk.kind === "cal" || dk.kind === "day";
       const tick = done ? "✓ " : "", time = `${fmtT(st.s)} to ${fmtT(st.e)}`;
       const cls = `cal-ev${st.free ? " free" : ""}${past ? " past" : ""}${isCur ? " now" : ""}${st.skipped ? " gone" : ""}${h < 36 ? " one" : ""}${drag ? " drag" : dk.kind === "lock" ? " ro" : ""}${b0.pending ? " pend" : ""}${FRESH.key && game && b0.key === FRESH.key && Date.now() - FRESH.at < 6000 ? " fresh" : ""}`;
       out += `<button class="${cls}" data-stop="${i}" style="${c ? `--c:${c};` : ""}top:${top}px;height:${h}px;left:calc(var(--cal-l) + (100% - var(--cal-l)) * ${lane} / ${n});width:calc((100% - var(--cal-l)) / ${n} - 3px)" aria-label="${esc(st.t)}, ${time}">` +
-        `<b>${calIcon(b0, c || "rgba(255,255,255,.45)")}<span>${tick}${esc(st.t)}</span></b><span class="cal-t">${h < 36 ? fmtT(st.s) : time}</span>${ask ? `<span class="cal-pts cal-ask" data-actq="${esc(gk(b0))}">Check ›</span>` : pts ? `<span class="cal-pts${pts < 0 ? " neg" : ""}">${pts > 0 ? "+" : ""}${pts}</span>` : ""}` +
+        `<b>${calIcon(b0, c || "rgba(255,255,255,.45)")}<span>${tick}${esc(st.t)}</span></b><span class="cal-t">${h < 36 ? fmtT(st.s) : time}</span>${ask ? `<i class="cal-tap" title="Tap to open" aria-hidden="true"></i>` : pts ? `<span class="cal-pts${pts < 0 ? " neg" : ""}">${pts > 0 ? "+" : ""}${pts}</span>` : ""}` +
         `${drag ? `${h >= 24 ? `<i class="cal-h top" data-h="top"></i>` : ""}<i class="cal-h bot" data-h="bottom"></i>` : ""}</button>`;
     }
     if (t >= a0 && t <= z0) out += `<div class="cal-now" style="top:${y(+t)}px"><span>${fmtT(t).replace(/\s?[AP]M$/i, "")}</span></div>`;
@@ -4747,7 +4685,7 @@
     m.addEventListener("pointerdown", e => {
       if (e.button > 0) return;
       if (DRAG) { if (DRAG.live) return; clearTimeout(DRAG.timer); DRAG = null; }   // a press that never ended (released outside the window)
-      const el = e.target.closest(".cal-ev"); if (!el || e.target.closest("[data-actq]")) return;
+      const el = e.target.closest(".cal-ev"); if (!el) return;
       const st = CAL.stops[+el.dataset.stop]; if (!st || st.free || !AGD()) return;
       const b = st.blocks[0], dk = AGD().dragKind(b, dragCtx());
       const hd = e.target.closest(".cal-h"), touch = e.pointerType !== "mouse";
@@ -5075,13 +5013,13 @@
     calDayLine();
     mt.querySelectorAll("[data-stop]").forEach(n => n.onclick = e => {
       const st = CAL.stops[+n.dataset.stop]; if (!st) return;   // the stops the column on screen was drawn from
-      const aq = e.target.closest("[data-actq]");
-      if (aq) { const b = blocks().find(x => gk(x) === aq.dataset.actq); if (b) return openActQuiz(b); }
       const fixed = st.blocks.find(b => b.kind !== "open" && b.kind !== "break");
       // another day of the agenda: what it is and how to change it; open space there takes a new calendar event
       if (!st.blocks[0].game) { if (fixed) return openAgendaItem(fixed); if (st.e > now()) openAdd(new Date(Math.max(+st.s, +now()))); return; }
-      if (fixed && isGym(fixed) && fixed.s - now() < 3 * 3600000) return openGym(blocks().find(x => x.key === fixed.key) || fixed);
-      if (fixed) openStop(blocks().find(x => x.key === fixed.key) || fixed); else openMove(st);
+      if (!fixed) return openMove(st);
+      const b = blocks().find(x => x.key === fixed.key) || fixed;
+      if (isGym(b) && b.s - now() < 3 * 3600000) { markOpened(b); return openGym(b); }
+      openStop(b);
     });
 
     // the Quest log card is gone (Junyan, 2026-10-19: "drop the quest log"); G.day.log stays, the night screen and the merge read it
@@ -5132,6 +5070,6 @@
   pullAll();
 })();
 </script>
-<script src="quest-dash.js?v=20261019x"></script>
+<script src="quest-dash.js?v=20261019y"></script>
 </body>
 </html>

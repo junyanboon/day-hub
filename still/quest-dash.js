@@ -96,8 +96,11 @@
       body.dash .w-quick > #questQuick { flex:1; min-height:0; margin:0 !important; }
       body.dash .w-quick .bag-qbar { height:100%; max-height:70px; padding:6px; }
       body.dash .w-quick .bag-qbar .bag-sock { flex:0 0 auto; height:100%; width:auto; aspect-ratio:1; max-height:56px; }
-      body.dash .w-being { padding:6px; overflow:hidden; } body.dash .w-being > #being { height:100%; margin:0; }
-      body.dash .w-being .bg-stage { height:100%; border:0; }
+      body.dash .w-being { padding:6px; overflow:hidden; } body.dash .w-being > #being { height:100%; margin:0; display:flex; flex-direction:column; }
+      /* the stage takes what the Last night box leaves: a full-height stage pushed that box below the card's edge,
+         where overflow:hidden cut it off (Junyan, 2026-10-19: "I'm missing my oura ring stats") */
+      body.dash .w-being .bg-stage { flex:1; min-height:0; border:0; }
+      body.dash .w-being .bg-night { flex:none; margin-top:6px; }
       .dash-reset { position:fixed; left:14px; bottom:14px; z-index:50; background:var(--glass); border:1px solid var(--glass-border);
         color:var(--ink-soft); font-size:12px; padding:7px 12px; border-radius:999px; backdrop-filter:blur(10px); opacity:.35; transition:opacity .2s; }
       .dash-reset:hover { opacity:1; }

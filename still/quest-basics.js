@@ -270,6 +270,16 @@
       [{ kind:"rest", id:"rest", t:"Rest", min:Math.min(min, 30) }]);
   }
 
+  /* The tap symbol on a calendar block (Junyan, 2026-10-19, d32: "If I haven't clicked on the block then there can be a
+     symbol to indicate for me to click on it"). Only a block with its own list, once it has started, and until he opens
+     it: an open on any device (day.opened, merged from both), a ticked tile or a tapped meal tile all count. */
+  function unopened(day, key, hasList, started){
+    if (!hasList || !started || !key) return false;
+    const d = day || {}, W = (d.work || {})[key];
+    if ((d.opened || {})[key] || (d.mealq || {})[key]) return false;
+    return !(W && (Object.values(W.tick || {}).some(Boolean) || Object.keys(W.paid || {}).length));
+  }
+
   // "shower 15" -> { t:"Shower", min:15 }; no number means 15 min
   function parseQuick(text){
     const m = /^(.*?)(?:\s+(\d{1,3})\s*(?:m|min|mins|minutes)?)?\s*$/i.exec(String(text || "").trim());
@@ -279,5 +289,5 @@
     return { t: t[0].toUpperCase() + t.slice(1), min };
   }
 
-  root.QuestBasics = { PRACTICE_PAY, practicePay, domestics, windDown, yoga, groom, basic, blockBasic, stepAt, tickStep, applyTick, tapDay, owedBacks, liveTicks, habitCount, payKey, backKey, outdoorBlock, barefootStep, paidOf, PM_HOUR, guessMode, placeBasics, growCaney, fitList, parseQuick, IDS:["caney", "domestics", "winddown"] };
+  root.QuestBasics = { PRACTICE_PAY, practicePay, domestics, windDown, yoga, groom, basic, blockBasic, stepAt, tickStep, applyTick, tapDay, owedBacks, liveTicks, habitCount, payKey, backKey, outdoorBlock, barefootStep, unopened, paidOf, PM_HOUR, guessMode, placeBasics, growCaney, fitList, parseQuick, IDS:["caney", "domestics", "winddown"] };
 })(typeof window !== "undefined" ? window : globalThis);
