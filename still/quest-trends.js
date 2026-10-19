@@ -55,30 +55,116 @@
       ...move(t, avg, better) };
   }
   const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
-  /* The one thing to beat tomorrow. In order: drains crept up, prana ended under his week, fewer pranic foods than
-     usual, body ended under his week, last night's heart rate or HRV off his week; else what went well. */
-  function beatLine(t) {
+  const lc = (x) => String(x || "").toLowerCase();
+  const list = (xs) => xs.length < 2 ? xs.join("") : xs.slice(0, -1).join(", ") + " and " + xs[xs.length - 1];
+  /* The one thing to beat tomorrow (Junyan, 2026-10-19, d65): his weakest area today among sleep and bedtime, HRV
+     against his week, resting heart rate, water against his aim, prana against his week and drains. Each area gets
+     a weight for how far off it is; the heaviest wins, and when two are close the day picks between them, so the tip
+     varies. Each area has more than one wording, also picked by the day.
+     t: { rows (dayRow list), oura (ouraRows), water ({ today, aim }), bedLate (true: asleep after 11 last night),
+     drainNames ([labels]), seed (a number for the day) } */
+  const pickOf = (arr, seed) => arr[Math.abs(Math.floor(seed || 0)) % arr.length];
+  function weakest(t) {
     const r = Object.fromEntries((t.rows || []).map((x) => [x.k, x]));
     const o = Object.fromEntries((t.oura || []).map((x) => [x.k, x]));
-    const dr = r.dr, pf = r.pf, p = r.prana, b = r.body;
-    if (dr && num(dr.today) && dr.today > 0 && (dr.yesterday == null || dr.today > dr.yesterday)) {
-      const what = t.topDrain ? `Skip the ${t.topDrain.toLowerCase()} tomorrow` : "Pick one to skip tomorrow";
-      return `${plural(dr.today, "drain", "drains")} today${dr.yesterday == null ? "" : ` vs ${dr.yesterday} yesterday`}. ${what} to win the day back.`;
+    const out = [];
+    const sc = o.score, sleepOff = sc && num(sc.last) && num(sc.avg) && sc.last < sc.avg ? (sc.avg - sc.last) / 10 : 0;
+    if (t.bedLate || sleepOff > 0) out.push({ area: "sleep", w: (t.bedLate ? 0.6 : 0) + sleepOff, lines: t.bedLate ? [
+      "You fell asleep after 11 last night. Lights out by 10:30 tonight gives Body a full start tomorrow.",
+      "Last night ran past 11. Phone away an hour before bed tonight and let sleep come early.",
+    ] : [
+      `Sleep score ${sc.last}, under your week's ${sc.avg}. A dark, cool room and screens off an hour before bed help.`,
+      `Sleep score ${sc.last} against your week's ${sc.avg}. A light dinner and an early night tonight bring it back.`,
+    ] });
+    const hv = o.hrv;
+    if (hv && num(hv.last) && num(hv.avg) && hv.avg > 0 && hv.last < hv.avg) out.push({ area: "hrv", w: (hv.avg - hv.last) / hv.avg * 5, lines: [
+      `HRV ${hv.last}, under your week's ${hv.avg}. A calm evening and an early night help it come back.`,
+      `HRV ${hv.last} against your week's ${hv.avg}. Five minutes of Nadi Shuddhi before bed helps your system settle.`,
+    ] });
+    const rh = o.rhr;
+    if (rh && num(rh.last) && num(rh.avg) && rh.avg > 0 && rh.last > rh.avg) out.push({ area: "rhr", w: (rh.last - rh.avg) / rh.avg * 10, lines: [
+      `Resting heart rate ${rh.last}, above your week's ${rh.avg}. A light dinner and bed by 11 help it settle.`,
+      `Resting heart rate ${rh.last} against your week's ${rh.avg}. Go easy tomorrow and drink water early.`,
+    ] });
+    const wt = t.water, aim = (wt && wt.aim) || 8, glasses = wt && num(wt.today) ? wt.today : 0;
+    if (wt && glasses < aim) out.push({ area: "water", w: (aim - glasses) / aim, lines: [
+      `${plural(glasses, "glass", "glasses")} of water today, your aim is ${aim}. Two glasses before noon tomorrow is a good start.`,
+      `Water ended at ${glasses} of ${aim}. Keep a full bottle beside you tomorrow morning.`,
+    ] });
+    const p = r.prana;
+    if (p && num(p.today) && num(p.avg) && p.today < p.avg - 2) out.push({ area: "prana", w: (p.avg - p.today) / 30, lines: [
+      `Prana ended at ${p.today}, your week averages ${Math.round(p.avg)}. A sadhana block early tomorrow is the quickest way back up.`,
+      `Prana ${p.today} against your week's ${Math.round(p.avg)}. Shambhavi first thing, before the phone, lifts the whole day.`,
+    ] });
+    const dr = r.dr;
+    if (dr && num(dr.today) && dr.today > 0) {
+      const names = (t.drainNames || []).map(lc), first = names[0];
+      const said = names.length ? list(names) : plural(dr.today, "drain", "drains");
+      out.push({ area: "drains", w: dr.today * 0.2 + (dr.yesterday != null && dr.today > dr.yesterday ? 0.2 : 0), lines: [
+        `Drains today: ${said}. ${first ? `Skip the ${first}` : "Pick one to skip"} tomorrow to win the day back.`,
+        `${names.length ? `${list(names).replace(/^./, (c) => c.toUpperCase())} drained you today` : `${plural(dr.today, "drain", "drains")} today`}. Choose one to leave out tomorrow.`,
+      ] });
     }
-    if (p && num(p.today) && num(p.avg) && p.today < p.avg - 2)
-      return `Prana ended at ${p.today}, your week averages ${Math.round(p.avg)}. A sadhana block early tomorrow is the quickest way back up.`;
-    if (pf && num(pf.today) && num(pf.avg) && pf.today < pf.avg - 0.5)
-      return `${plural(pf.today, "pranic food", "pranic foods")} today, your week averages ${Math.round(pf.avg)}. Add fresh fruit or sprouts to breakfast tomorrow.`;
-    if (b && num(b.today) && num(b.avg) && b.today < b.avg - 2)
-      return `Body ended at ${b.today}, your week averages ${Math.round(b.avg)}. An earlier night tonight gives tomorrow a better start.`;
-    if (o.rhr && o.rhr.good === false)
-      return `Your resting heart rate was ${o.rhr.last}, above your week's ${o.rhr.avg}. A light dinner and bed by 11 help it settle.`;
-    if (o.hrv && o.hrv.good === false)
-      return `Your HRV was ${o.hrv.last}, under your week's ${o.hrv.avg}. Rest and an early night help it recover.`;
+    return out.sort((a, b) => b.w - a.w);
+  }
+  function beatLine(t) {
+    const seed = num(t.seed) ? t.seed : 0;
+    const weak = weakest(t).filter((x) => x.w > 0.1);
+    if (weak.length) {
+      const close = weak.filter((x) => weak[0].w - x.w <= 0.1);
+      const top = pickOf(close, seed);
+      return pickOf(top.lines, Math.floor(seed / close.length));
+    }
+    const p = Object.fromEntries((t.rows || []).map((x) => [x.k, x])).prana;
     if (p && p.best && p.best.isToday && num(p.today)) return `Prana ${p.today} is your best day lately. Same again tomorrow.`;
     if (p && num(p.today) && num(p.avg)) return `Prana ${p.today} against your week's ${Math.round(p.avg)}. Beat ${Math.max(p.today, Math.round(p.avg)) + 1} tomorrow.`;
     return "A new day tomorrow. One sadhana block and one pranic food make a good start.";
   }
+  /* One short line of encouragement from his trends (d66): the area that moved most the right way against his week,
+     said kindly and specifically. Never a nudge about what went wrong (that is beatLine's job). */
+  const CHEER = {
+    prana: (x) => `Prana ended at ${x.now}, above your week's ${x.avg}. Your practice is showing.`,
+    body: (x) => `Body ended at ${x.now}, above your week's ${x.avg}. You looked after yourself today.`,
+    pf: (x) => `${plural(x.now, "pranic food", "pranic foods")} today, more than your week's ${x.avg}. Good eating.`,
+    dr: (x) => `${plural(x.now, "drain", "drains")} today, fewer than your week's ${x.avg}. That takes real care.`,
+    rhr: (x) => `Resting heart rate ${x.now}, down from your week's ${x.avg}. Your body is recovering well.`,
+    hrv: (x) => `HRV ${x.now}, up on your week's ${x.avg}. Your system is calmer.`,
+    score: (x) => `Sleep score ${x.now}, better than your week's ${x.avg}. Good rest is paying off.`,
+    wt: (x) => `${plural(x.now, "glass", "glasses")} of water, more than your week's ${x.avg}. Nicely done.`,
+  };
+  function encourage(t) {
+    const cand = [];
+    const add = (k, now, avg, good) => { if (good === true && num(now) && num(avg) && CHEER[k]) cand.push({ k, now, avg: Math.round(avg * 10) / 10, gain: Math.abs(now - avg) / Math.max(1, Math.abs(avg)) }); };
+    for (const x of t.rows || []) add(x.k, x.today, x.avg, x.good);
+    for (const x of t.oura || []) add(x.k, x.last, x.avg, x.good);
+    if (t.water) add("wt", t.water.today, t.water.avg, t.water.good);
+    if (!cand.length) return "You came to the end of your day and looked at it honestly. That is how better days begin.";
+    const c = cand.sort((a, b) => b.gain - a.gain)[0];
+    return CHEER[c.k]({ ...c, avg: Number.isInteger(c.avg) || Math.abs(c.avg) >= 10 ? Math.round(c.avg) : c.avg.toFixed(1) });
+  }
+  // the names of what he picked in today's meals, from a list of [id, icon, label]: "Fresh vegetables, raw..." reads "Fresh vegetables"
+  const SHORT = { heavy: "Heavy meal", stale: "Leftovers" };
+  function namesOf(ids, rows) {
+    const out = [];
+    for (const id of ids || []) {
+      const row = (rows || []).find((x) => x[0] === id);
+      const name = row ? SHORT[id] || String(row[2]).split(/,| \(/)[0] : id === "pos" ? "Pranic food" : null;
+      if (name && !out.includes(name)) out.push(name);
+    }
+    return out;
+  }
+  /* The done list at the bottom of Day's end (d67): the 3 that mattered most. Sadhana first, then health blocks,
+     then the rest, meals and rest blocks last, longer first. A yoga block shows only when a practice was ticked in it.
+     items: [{ name, rank (0 sadhana, 1 health, 2 other), mins, yoga, practiced }] */
+  function topDone(items, n = 3) {
+    return (items || []).filter((x) => !x.yoga || x.practiced)
+      .map((x, i) => ({ ...x, i })).sort((a, b) => a.rank - b.rank || b.mins - a.mins || a.i - b.i).slice(0, n).map((x) => x.name);
+  }
+  /* Past days' Body for the 7-day average and the best (d68). A day's Body is kept only when it was worked out from
+     its logged lines (bk), or the day is not one known to hold an unlogged jump (2026-10-19, the merge bug PR 44 fixed). */
+  const BAD_BODY = ["2026-10-19"];
+  const bodyOk = (day, v) => !!v && (v.bk === 1 || !BAD_BODY.includes(day));
+
   // a small line of the last days, today as the dot at the end
   function spark(values, colour) {
     const v = (values || []).map((x) => (num(x) ? x : null));
@@ -90,5 +176,5 @@
     return `<svg class="tr-spark" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" aria-hidden="true"><path d="${d}" fill="none" stroke="${colour}" stroke-width="1.5" stroke-linejoin="round"/><circle cx="${X(li)}" cy="${Y(ly)}" r="2.2" fill="${colour}"/></svg>`;
   }
 
-  root.QuestTrends = { OURA, mean, move, ouraRows, dayRow, beatLine, spark };
+  root.QuestTrends = { OURA, mean, move, ouraRows, dayRow, weakest, beatLine, encourage, namesOf, topDone, bodyOk, BAD_BODY, spark };
 })(typeof window !== "undefined" ? window : globalThis);

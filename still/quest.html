@@ -742,10 +742,10 @@
 <script src="quest-levels.js?v=20261016b"></script>
 <script src="quest-gymlog.js?v=20261019a"></script>
 <script src="quest-meals.js?v=20261019f"></script>
-<script src="quest-trends.js?v=20261019c"></script>
+<script src="quest-trends.js?v=20261019end3"></script>
 <script src="nvc-words.js?v=20261010a"></script>
 <script src="quest-fx.js?v=20261019x"></script>
-<script src="quest-night.js?v=20261019w"></script>
+<script src="quest-night.js?v=20261019end1"></script>
 <script src="quest-basics.js?v=20261019z"></script>
 <script src="quest-suggest.js?v=20261019a"></script>
 <script src="quest-water.js?v=20261019m"></script>
@@ -1496,19 +1496,14 @@
       try { localStorage.setItem("quest-keeps-seen", JSON.stringify(seen.concat(fresh))); } catch {}
     } catch {}
   }
-  // the blocks of a day worth keeping: effort first (the big outings), then the rest he did
-  function keepCandidates(all){
-    const did = all.filter(b => ["in", "late"].includes(G.day.checks[gk(b)]) && !isSleep(b) && !isMeal(b) && b.kind !== "open" && b.kind !== "break" && !/^rest\b|laundry|shower|check.?in|check.?out/i.test(b.t));
-    const made = new Set((KEEP.items || []).map(k => k.key)), want = new Set((KEEP.wants || []).map(w => w.key));
-    return did.sort((a, b) => energy(b).rate - energy(a).rate || a.s - b.s).slice(0, 6)
-      .map(b => ({ key:gk(b), title:b.t, name:moName(b), time:`${fmtT(b.s)} to ${fmtT(b.e)}`, state:made.has(gk(b)) ? "made" : want.has(gk(b)) ? "asked" : "", s:b.s, e:b.e }));
-  }
   /* How today went, against his recent days (Junyan, 2026-10-19: "show how I performed today and my trends and
      ... help encourage me to be better each day"): prana and body at day's end, pranic foods and drains, last
      night's Oura numbers, each with the 7-day trend and his best day, and the one thing to beat tomorrow. */
   function dayTrends(){
     const QM = window.QuestMeals, history = Object.entries(G.days || {}).filter(([k]) => k !== G.day.date)
-      .map(([k, v]) => { const d = new Date(k); return isNaN(d) || !v ? null : { day:ymd(d), prana:v.prana, body:v.body, pf:v.pf, dr:v.dr }; })
+      // d68: a past day's Body counts only when it came from its logged lines, or the day had no unlogged jump
+      .map(([k, v]) => { const d = new Date(k); if (isNaN(d) || !v) return null; const day = ymd(d);
+        return { day, prana:v.prana, body:TR.bodyOk(day, v) ? v.body : null, pf:v.pf, dr:v.dr }; })
       .filter(Boolean).sort((a, b) => a.day.localeCompare(b.day)).slice(-30);
     const today = { day:gameYmd(), prana:Math.round(prana()), body:Math.round(body()), ...foodStamp() };
     const rows = [["prana", "Prana"], ["body", "Body"], ["pf", "Pranic foods"], ["dr", "Drains", "down"]].map(([k, l, w]) => TR.dayRow(k, l, history, today, w));
@@ -1518,10 +1513,15 @@
       .filter(Boolean).sort((a, b) => a.day.localeCompare(b.day)).slice(-30);
     const ws = QW() ? QW().summary(G.day.glasses) : { total:0, before4:0 };
     const water = { ...TR.dayRow("wt", "Water", wh, { day:gameYmd(), wt:ws.total }), before4:ws.before4, aim:QW() ? QW().AIM : 8 };
+    // d63: the drains and pranic foods by name, in the order he ate them
     const hit = Object.values(G.day.mealq || {}).flatMap(q => q && !q.kind && Array.isArray(q.sel) ? q.sel : []);
-    const top = QM.DRAINS.find(([id]) => hit.includes(id));
-    const topDrain = top ? top[2] : G.day.lateBody ? "late night" : null;
-    return { rows, oura, water, beat:TR.beatLine({ rows, oura, topDrain }) };
+    const drainNames = TR.namesOf(hit, QM.DRAINS).concat(G.day.lateBody ? ["Up past 11"] : []);
+    rows.find(r => r.k === "dr").names = drainNames;
+    rows.find(r => r.k === "pf").names = TR.namesOf(hit, QM.PRANA_FOODS);
+    // d65 and d66: tomorrow's tip from his weakest area today, and one line on what went better than his week
+    const bedLate = BED ? !habitN("bedtime") : null, seed = Math.floor(Date.parse(gameYmd() + "T12:00:00Z") / 86400000);
+    const t = { rows, oura, water, bedLate, drainNames, seed };
+    return { rows, oura, water, beat:TR.beatLine(t), cheer:TR.encourage(t) };
   }
   async function openNight(){
     if (!window.QuestNight || !G.day) return;
@@ -1530,9 +1530,15 @@
     const health = all.filter(b => b.e <= t && isHealth(b));
     const lit = health.filter(b => ["in", "late"].includes(G.day.checks[gk(b)])).length;
     const hDone = HABITS.filter(h => habitN(h[0]) > 0).length;
-    const done = all.filter(b => G.day.closes[gk(b)] === "done" || ["in", "late"].includes(G.day.checks[gk(b)])).map(b => `✓ ${shortName(b)}`)
-      .concat(all.filter(b => G.day.checks[gk(b)] === "skip").map(b => `· ${shortName(b)}, didn't happen`));
-    // the two automatic ones left Right now (d35) and show here by name: tonight's last meal, last night's sleep time
+    /* d67: only the 3 that mattered most, sadhana and health first; a yoga block only when a practice was ticked in it */
+    const PRACTICES = ["shambhavi", "surya", "angam", "yogasana", "upa", "bhuta", "kriya", "nadi"];
+    const ysteps = QuestBasics.yoga().steps;
+    const practiced = b => { const W = (G.day.work || {})[gk(b)] || {};
+      return Object.keys(W.tick || {}).some(i => W.tick[i] && PRACTICES.includes((ysteps[+i] || {}).h)) || Object.values(W.paid || {}).some(p => p && PRACTICES.includes(p.h)); };
+    const done = TR.topDone(all.filter(b => G.day.closes[gk(b)] === "done" || ["in", "late"].includes(G.day.checks[gk(b)])).filter(b => !isSleep(b))
+      .map(b => ({ name:`✓ ${shortName(b)}`, rank:isSadhana(b) ? 0 : isMeal(b) || b.kind === "rest" ? 3 : isHealth(b) ? 1 : 2, mins:(b.e - b.s) / 60000,
+        yoga:QuestBasics.blockBasic(b.t, b.kind) === "yoga", practiced:practiced(b) })));
+    // the two automatic ones left Right now (d35) and still show here by name, above the 3 blocks
     const auto = [(G.day.earn || {}).early ? "✓ Last meal 3 hr before bed, paid tomorrow morning" : null,
       habitN("bedtime") ? `✓ Asleep by 11 last night${BED ? ` (${BED.asleep})` : ""}` : BED ? `· Asleep after 11 last night (${BED.asleep})` : null].filter(Boolean);
     done.unshift(...auto);
@@ -1549,18 +1555,15 @@
       ahead = { use, start, end, top:costs.sort((a, b) => b.d - a.d).slice(0, 3),
         verdict: end >= 40 ? "Room to spare." : end >= 15 ? "Tight. Rest where you can, and keep the evening light." : "More than you will likely have. Something may need to move." };
     } catch { note = "Could not read tomorrow's calendar."; }
-    const days = {};
-    for (const [k, v] of Object.entries(G.days || {})) if (v && typeof v.prana === "number") { const d = new Date(k); if (!isNaN(d)) days[ymd(d)] = Math.round(v.prana); }
-    days[gameYmd()] = Math.round(prana());
     const night = (G.night || {})[G.day.date] || {};
     QuestNight.open({
-      today: { stats: [[`${Math.round(prana())}%`, "prana"], [`${Math.round(body())}%`, "body"], [`${lit}/${health.length}`, "fires lit"], [`${hDone}`, "actions"], [STEPS != null ? STEPS.toLocaleString() : "·", "steps"]],
-        line: pranaLine(), done: done.slice(0, 12), trends: dayTrends() },
+      today: { stats: [[`${Math.round(prana())}%`, "prana"], [`${Math.round(body())}%`, "body"], [`${lit}/${health.length}`, "health blocks done"], [`${hDone}`, "habits ticked"], [STEPS != null ? STEPS.toLocaleString() : "·", "steps"]],
+        line: pranaLine(), done, trends: dayTrends() },
       tomorrow: { label: new Date(next + "T12:00:00Z").toLocaleDateString("en-US", { timeZone:"UTC", weekday:"long", month:"short", day:"numeric" }), items, note, ahead },
       prana: Math.round(body()), feel: night.feel || null,
       onFeel: n => { const o = (G.night = G.night || {})[G.day.date] || {}; G.night[G.day.date] = { ...o, feel:n, feelBody:Math.round(body()), feelPrana:Math.round(prana()), feelAt:now().toISOString() };
         log(`Feeling ${n} of 5 at day's end (body ${Math.round(body())}%)`); },
-      days, birth: G.birth || null, note: night.note || "",
+      birth: G.birth || null, note: night.note || "",
       exerciseIndex: Math.floor(Date.parse(gameYmd() + "T12:00:00Z") / 86400000),
       deathbedDone: !!G.day.deathbed,
       onDeathbed: () => { G.day.deathbed = now().toISOString(); log("Sat as if on my deathbed"); saveG(); },
@@ -1570,18 +1573,6 @@
         if (bed.answer && (!o.bed || o.bed.answer !== bed.answer)) log(`Deathbed: was today worthwhile? ${({ yes:"Yes", partly:"Partly", no:"Not really" })[bed.answer]}`);
         saveG(); },
       onNote: (text, prompt) => { const o = (G.night = G.night || {})[G.day.date] || {}; G.night[G.day.date] = { ...o, note:text, prompt, at:now().toISOString() }; saveG(); },
-      onBirth: v => { G.birth = v; saveG(); },
-      keeps: keepCandidates(all),
-      onKeep: async c => {
-        await qfetch("/quest/keeps", { method:"POST", body:JSON.stringify({ op:"want", want:{ key:c.key, date:gameYmd(), title:c.title, place:placeNow(),
-          s:c.s.toISOString(), e:c.e.toISOString() } }) });
-        (KEEP.wants = KEEP.wants || []).push({ key:c.key }); log(`Keepsake asked for: ${c.name}`);
-      },
-      // a second tap takes it back (Junyan, 2026-10-11: "I can't unclick these")
-      onUnkeep: async c => {
-        await qfetch("/quest/keeps", { method:"POST", body:JSON.stringify({ op:"unwant", key:c.key }) });
-        KEEP.wants = (KEEP.wants || []).filter(w => w.key !== c.key); log(`Keepsake taken back: ${c.name}`);
-      },
     });
   }
 
@@ -1792,7 +1783,9 @@
   }
   // today's line in the day history: the meters, pranic foods and drains (for the day-end trends, 2026-10-19)
   function stampDay(){
-    (G.days = G.days || {})[G.day.date] = { place:placeNow(), prana:G.day.prana, body:G.day.body, level:lvl(), ...foodStamp(), ...gymDayStamp(), ...waterStamp() };
+    // bk:1 marks a Body worked out from the day's logged lines (d68), the only kind the trends trust for 2026-10-19
+    const bd = QuestMerge.bodyOf ? QuestMerge.bodyOf(G.day) : null;
+    (G.days = G.days || {})[G.day.date] = { place:placeNow(), prana:G.day.prana, body:bd ?? G.day.body, ...(bd != null ? { bk:1 } : {}), level:lvl(), ...foodStamp(), ...gymDayStamp(), ...waterStamp() };
   }
   // drains: the meal quiz ones, and staying up past 11 (it took body: G.day.lateBody)
   function foodStamp(){ const t = window.QuestMeals.tally(G.day.mealq); return { pf:t.foods, dr:t.drains + (G.day.lateBody ? 1 : 0) }; }
@@ -4941,7 +4934,7 @@
           <div class="quest-title"><span class="em">${P2 >= 70 ? "🌕" : P2 >= 40 ? "🌗" : "🌑"}</span><span>Your day so far</span></div>
           ${pranaLine()}
           <div class="summary"><div><b>${all.filter(isSadhana).some(b => ["in","late"].includes(G.day.checks[gk(b)])) ? "✓" : "·"}</b><span>sadhana</span></div>
-          <div><b>${health.filter(b => ["in","late"].includes(G.day.checks[gk(b)])).length}/${health.length}</b><span>fires lit</span></div>
+          <div><b>${health.filter(b => ["in","late"].includes(G.day.checks[gk(b)])).length}/${health.length}</b><span>health blocks done</span></div>
           <div><b>${sk2}</b><span>days at 70+</span></div></div>
           <div class="quest-time" style="margin-top:8px">${P2 >= 70 ? "A 70+ day. The streak grows." : `Finish at 70% or more to grow the streak.`}</div></div>`;
       } else {
