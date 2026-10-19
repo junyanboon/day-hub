@@ -130,7 +130,7 @@
     // practice: something for prana still ahead
     if (!f.some((i) => i.sadhana) && !D.practiced) {
       const g = firstGap(D, 15, t);
-      if (g) out.push({ id: "sadhana", icon: "🪷", text: "No practice left on the plan today.", why: "Prana only rises through sadhana.",
+      if (g) out.push({ id: "sadhana", icon: "🪷", text: "No practice left on the plan today.", why: "Prana rises through sadhana and pranic food.",
         fixes: [[`Isha Kriya at ${T(g.s)}`, () => C.add("Isha Kriya", g.s, new Date(+g.s + 15 * MIN))],
           [`Nadi Shuddhi at ${T(g.s)}`, () => C.add("Nadi Shuddhi", g.s, new Date(+g.s + 10 * MIN))]] });
     }
