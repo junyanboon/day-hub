@@ -71,8 +71,13 @@
   }
 
   /* A booking (a car rental, a stay: anything over 12 hours, or a whole-day event) is not a block of his
-     time, so the day column leaves it out and real blocks keep their full width (Junyan, 2026-10-20, d71). */
-  const isLong = x => +x.e - +x.s > 12 * MIN * 60;
+     time, so the day column leaves it out and real blocks keep their full width (Junyan, 2026-10-20, d71).
+     The one rule every check uses (Day's end, Right now, free time, the column, the morning planner's step 2).
+     Judged on the event's full length: the calendar's own times (cs/ce) when the block carries them, so an edit
+     in today's plan or a day-sized slice never turns a 51 hour car rental into a 3 hour block (2026-10-20). */
+  const spanOf = (s, e) => { const a = +new Date(s), b = +new Date(e); return a === a && b === b ? b - a : 0; };
+  const isBooking = x => !!x && (!!x.allDay || Math.max(spanOf(x.s, x.e), x.cs && x.ce ? spanOf(x.cs, x.ce) : 0) > 12 * HR);
+  const isLong = isBooking;
   function timelineLanes(items){ return lanes(items.filter(x => !isLong(x.st || x))); }
 
   /* A change waiting for the calendar to agree: shown at its new place until the plan read back has
@@ -231,7 +236,7 @@
   // the calendars Day Quest can add to (still-api's CALS), the default first (d41)
   const ADD_CALS = [{ id:JOINT, name:"Joint Plans" }, { id:JUNYAN, name:"Junyan" }];
   const onJoint = b => !!b && (b.calId === JOINT || (!b.calId && b.cal === "Joint Plans"));
-  const inRoom = b => !!b && !isGap(b) && (onJoint(b) || !!b.extra) && +b.e - +b.s <= 12 * HR;
+  const inRoom = b => !!b && !isGap(b) && (onJoint(b) || !!b.extra) && !isBooking(b);
   /* Where the block he moves or adds goes. moved: { key, id?, calId? | extra?, s, e } at the place he put it. If it lands
      on another Joint Plans or Quest block, it starts at the next 15-minute mark after that one ends, and again after
      whatever it lands on there, until a gap fits its length. Past bedtime is fine (d31). Nothing else moves. A block
@@ -311,7 +316,7 @@
     return x && y && x[1] === y[1] ? `${a.replace(m, "")} to ${b}` : `${a} to ${b}`;
   }
 
-  root.QuestAgenda = { addDays, agendaDays, mergeAgenda, snap, dragResult, dragKind, lanes, isLong, timelineLanes, applyPending,
+  root.QuestAgenda = { addDays, agendaDays, mergeAgenda, snap, dragResult, dragKind, lanes, isBooking, isLong, timelineLanes, applyPending,
     pickSpan, blankTap, calItems, sleepSpans, sleepText,
     addKey, samePick, placePick, undoPick, carveFree, rangeText, overlaps, freeSlot, clampEdge,
     JOINT, JUNYAN, ADD_CALS, onJoint, inRoom, GESTURE, pressStep, hitBox, edgeHandles, withGhosts };
