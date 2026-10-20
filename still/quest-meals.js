@@ -10,6 +10,15 @@
        Drains (gold, minus): coffee or tea, onion or garlic, alcohol, leftover or reheated food, a heavy meal.
          They lower PRANA. Eating within 3 hours of bed and staying up past 11 stay automatic (the calendar and
          the Oura ring), never a tap.
+   2026-10-20 (Junyan, d12 to d16, "Fill the Plate"):
+     - How he ate is tips, not points (d15): the three PRANA_WAYS tiles left the sheet and their words became the "How to eat"
+       box (TIPS). PRANA_WAYS stays here only so a meal rated before today still names and takes back what it paid; those
+       past points stay. Leftover no longer takes back a "Freshly made" from before, since fresh can no longer be tapped.
+     - Blueprint dishes (d13): Super Veggie and Nutty Pudding (DISHES) and tonight's three recipes for 2 people (IDEAS) are
+       checklists. A dish pays body as its ingredients are ticked, its share of the Blueprint meal's value (6, times the
+       level multiplier: +9 at level 1), each dish on its own. Super Veggie has no garlic (d12: garlic is a Drain).
+     - Supplements, fermented food and xylitol moved to the water card (d16, quest-water.js DAY3). blueprint, ferment,
+       xylitol and supps left BODY; LEGACY_BODY keeps their meter for records from before.
    Pure, so it can be tested (node --test still/test). */
 (function (root) {
   "use strict";
@@ -21,7 +30,7 @@
     ["pnuts", "🌰", "Nuts (soaked is best)", 1],
     ["honey", "🍯", "Honey", 1],
   ];
-  // how he ate: still gold, still Sadhguru (kept from the 2026-10-10 quiz)
+  // how he ate (2026-10-10 quiz): no longer tiles (2026-10-20, d15). Kept so an older record names and values them.
   const PRANA_WAYS = [
     ["fresh", "🌿", "Freshly made: cooked within 1.5 hr", 3],
     ["light", "🪶", "Stopped before full, light 30 min after", 2],
@@ -35,10 +44,55 @@
     ["stale", "🧊", "Leftover or reheated food", -2],
     ["heavy", "🥘", "Heavy, or ate too much", -5],
   ];
-  // xylitol joined the body foods on 2026-10-19 (d11): one tick is one gram after the meal
-  const BODY = ["blueprint", "protein", "legumes", "veg", "greens", "evoo", "nuts", "berries", "seeds", "ferment", "xylitol", "supps"];   // supplements after the meal (2026-10-19)
-  const JUNK = ["junk", "🍟", "Ultra-processed, fried or added sugar", -3];
-  const ONEOF = { fresh: "stale", stale: "fresh" };
+  // shorter words on the compact tiles (2026-10-20); the trends keep the full labels above
+  const SHORT = { fveg: "Fresh veg, raw or just cooked", pnuts: "Nuts (soaked)", stale: "Leftover or reheated" };
+  const tileLabel = (row) => SHORT[row[0]] || row[2];
+  // the "How to eat" box at the top of the meal (2026-10-20, d15): [icon, words]; tips, no points
+  const TIPS = [
+    ["🌿", "Eat it fresh, within 1.5 hours of cooking."],
+    ["🙏", "Sit two minutes before the first bite, phone face down."],
+    ["🪶", "Stop before full. You should feel light 30 minutes after."],
+  ];
+  // the body food tiles (2026-10-20, d16): the Blueprint dishes have their own checklists, and supplements, fermented
+  // food and xylitol are on the water card, so those four left this list. Same values and daily limits as before.
+  const BODY = ["protein", "legumes", "veg", "greens", "evoo", "nuts", "berries", "seeds"];
+  const LEGACY_BODY = ["blueprint", "ferment", "xylitol", "supps"];   // tiles before 2026-10-20: still body in old records
+  const JUNK = ["junk", "🍟", "Ultra-processed or fried", -3];
+  // fresh is a tip now (d15), so nothing is one-of any more; toggle and tap keep the hook for a pair that comes back
+  const ONEOF = {};
+
+  /* The Blueprint dishes and tonight's ideas (2026-10-20, d13). { id, icon, name, items:[[ingredient, amount for 2]],
+     time?, how? }. A dish pays up to the Blueprint meal's value (DISH_VALUE times the level multiplier), in proportion
+     to the ingredients ticked. Super Veggie has no garlic (d12). */
+  const DISH_VALUE = 6;   // the "blueprint" habit's value in quest.html, used when the page passes none (opt.dish)
+  const DISHES = [
+    { id: "sv", icon: "🥗", name: "Super Veggie", items: [
+      ["Black lentils, dry", "90 g"], ["Broccoli", "500 g"], ["Cauliflower", "300 g"], ["Shiitake mushrooms", "100 g"],
+      ["Fresh ginger, grated", "2 tbsp"], ["Lime", "1"], ["Ground cumin", "2 tsp"], ["Apple cider vinegar", "2 tbsp"],
+      ["Hemp seeds", "4 tbsp"], ["Extra virgin olive oil", "30 ml"]] },
+    { id: "np", icon: "🍮", name: "Nutty Pudding", items: [
+      ["Macadamia milk", "240 ml"], ["Macadamia nuts, ground", "4 tbsp"], ["Walnuts", "2 tbsp"], ["Brazil nuts", "2"],
+      ["Chia seeds", "2 tbsp"], ["Ground flaxseed", "2 tbsp"], ["Sunflower lecithin", "2 tsp"], ["Cocoa powder", "2 tbsp"],
+      ["Cinnamon", "½ tsp"], ["Pomegranate juice", "120 ml"], ["Blueberries", "100 g"], ["Cherries", "100 g"]] },
+  ];
+  /* Tonight's ideas, for 2 people. ONE list on purpose: a later job will write three a day from what is in his fridge,
+     and only this list (or what the page passes in its place) needs to change. Ids must stay unique per day. */
+  const IDEAS = [
+    { id: "r1", icon: "🫘", name: "Lentil bowl with roasted peppers", time: "35 min", items: [
+      ["Green or brown lentils, dry", "140 g"], ["Red peppers", "2"], ["Courgette", "1 medium"], ["Baby spinach", "100 g"],
+      ["Extra virgin olive oil", "30 ml"], ["Lemon", "1"], ["Ground cumin", "1 tsp"], ["Smoked paprika", "1 tsp"],
+      ["Fresh parsley", "20 g"], ["Almonds, soaked", "30 g"]],
+      how: "Simmer the lentils 20 min. Roast the peppers and courgette at 220°C for 25 min. Wilt the spinach into the hot lentils, then top with veg, lemon, oil, parsley and almonds." },
+    { id: "r2", icon: "🍲", name: "Chickpea and spinach stew", time: "30 min", items: [
+      ["Chickpeas, cooked", "400 g"], ["Spinach", "200 g"], ["Tomatoes", "3 medium"], ["Carrot", "1"],
+      ["Extra virgin olive oil", "30 ml"], ["Smoked paprika", "1 tsp"], ["Ground cumin", "1 tsp"], ["Saffron", "a pinch"],
+      ["Sherry vinegar", "1 tbsp"], ["Pumpkin seeds", "30 g"]],
+      how: "Soften the grated carrot in oil, add the spices and chopped tomatoes for 10 min, then the chickpeas and saffron for 10 more. Fold in the spinach, finish with vinegar and seeds." },
+    { id: "r3", icon: "🥦", name: "Quinoa, broccoli and white beans", time: "25 min", items: [
+      ["Quinoa, dry", "150 g"], ["White beans, cooked", "300 g"], ["Broccoli", "400 g"], ["Rocket", "80 g"],
+      ["Cherry tomatoes", "150 g"], ["Tahini", "2 tbsp"], ["Lemon", "1"], ["Extra virgin olive oil", "30 ml"], ["Hemp seeds", "2 tbsp"]],
+      how: "Cook the quinoa 15 min. Steam the broccoli 5 min. Whisk tahini, lemon, oil and a little water. Toss everything with the beans, rocket and tomatoes, top with hemp seeds." },
+  ];
   const FOOD_IDS = PRANA_FOODS.map((x) => x[0]);
   const DRAIN_IDS = DRAINS.map((x) => x[0]);
   // the automatic drains, named in the quiz so he knows they are counted without a tap
@@ -84,9 +138,9 @@
      G.day.mealq: { sel:[ids], v:{ id:[meter, paid] }, p, b }. A tap on a picked tile takes back exactly what it paid;
      fresh and leftover cannot both stand, so picking one takes the other back. Returns { rec, ops:[{ id, on, m, d }] }
      (m "p" or "b"); the page moves the meters by each d. A record from before (no v) takes back today's value. */
-  const meterOf = (id) => (BODY.includes(id) || id === JUNK[0] ? "b" : "p");
+  const meterOf = (id) => (BODY.includes(id) || LEGACY_BODY.includes(id) || id === JUNK[0] || String(id).startsWith("dish:") ? "b" : "p");
   function tap(rec, id, opt) {
-    const r = { sel: [...((rec && Array.isArray(rec.sel)) ? rec.sel : [])], v: { ...((rec && rec.v) || {}) }, p: +((rec && rec.p) || 0), b: +((rec && rec.b) || 0) };
+    const r = { ...(rec || {}), sel: [...((rec && Array.isArray(rec.sel)) ? rec.sel : [])], v: { ...((rec && rec.v) || {}) }, p: +((rec && rec.p) || 0), b: +((rec && rec.b) || 0) };   // keeps the dish ticks (2026-10-20)
     const ops = [];
     const off = (x) => {
       const i = r.sel.indexOf(x); if (i < 0) return;
@@ -105,5 +159,45 @@
     return { rec: r, ops };
   }
 
-  root.QuestMeals = { PRANA_FOODS, PRANA_WAYS, DRAINS, BODY, JUNK, ONEOF, FOOD_IDS, DRAIN_IDS, AUTO_NOTE, value, score, toggle, tally, tap, meterOf };
+  /* Dish checklists (2026-10-20, d13). The ticks live on the meal's record beside the tiles: rec.dish = { <dish id>:
+     [ingredient names] }, and what the dish paid in rec.v["dish:<id>"] = ["b", paid]. So they save, sync and merge
+     exactly as the tiles do (G.day.mealq, one record per meal). Ingredients are kept by name, so a later change to a list
+     never ticks the wrong row. */
+  const ALL_DISHES = DISHES.concat(IDEAS);
+  const dishOf = (id, list) => (list || ALL_DISHES).find((d) => d.id === id) || null;
+  const gotOf = (rec, d) => { const g = rec && rec.dish && Array.isArray(rec.dish[d.id]) ? rec.dish[d.id] : [];
+    return d.items.map((x) => x[0]).filter((n) => g.includes(n)); };
+  // the most a dish pays: the Blueprint meal's value at today's level
+  const dishMax = (opt) => Math.round(((opt && opt.dish) || DISH_VALUE) * ((opt && opt.mult) ?? 1));   // opt.dish: the page's HABITS value
+  // what n of the dish's ingredients are worth: its share of the full value
+  const dishPay = (d, n, opt) => (d.items.length ? Math.round(dishMax(opt) * Math.min(n, d.items.length) / d.items.length) : 0);
+  // "3 of 10 ingredients", what is missing, and whether it is all in
+  function dishStatus(rec, d) {
+    const got = gotOf(rec, d), m = d.items.length, n = got.length;
+    const missing = d.items.map((x) => x[0]).filter((x) => !got.includes(x));
+    const all = n === m && m > 0;
+    const text = all ? "All in. Full points." : n ? `Missing: ${missing.slice(0, 2).join(", ")}${missing.length > 2 ? ` and ${missing.length - 2} more` : ""}` : "";
+    return { n, m, all, missing, pct: m ? Math.round((n / m) * 100) : 0, text };
+  }
+  /* Tick or untick one ingredient (how = its name), or "all" (Got everything) or "none" (Clear). Pays the difference
+     between what the dish is worth now and what it had paid, so an untick takes back exactly its share and Clear takes
+     back all of it. Returns { rec, ops } like tap(). */
+  function tick(rec, d, how, opt) {
+    const r = { ...(rec || {}), sel: [...((rec && Array.isArray(rec.sel)) ? rec.sel : [])], v: { ...((rec && rec.v) || {}) },
+      p: +((rec && rec.p) || 0), b: +((rec && rec.b) || 0), dish: { ...((rec && rec.dish) || {}) } };
+    let got = gotOf(r, d);
+    if (how === "all") got = d.items.map((x) => x[0]);
+    else if (how === "none") got = [];
+    else if (d.items.some((x) => x[0] === how)) got = got.includes(how) ? got.filter((x) => x !== how) : got.concat(how);
+    const key = "dish:" + d.id, was = r.v[key] ? +r.v[key][1] || 0 : 0, now = dishPay(d, got.length, opt), dd = now - was;
+    if (got.length) r.dish[d.id] = d.items.map((x) => x[0]).filter((x) => got.includes(x)); else delete r.dish[d.id];
+    if (now) r.v[key] = ["b", now]; else delete r.v[key];
+    r.b += dd;
+    return { rec: r, ops: dd ? [{ id: key, on: dd > 0, m: "b", d: dd }] : [] };
+  }
+  // what one dish has paid on this record (shown on its card)
+  const dishPaid = (rec, d) => (rec && rec.v && rec.v["dish:" + d.id] ? +rec.v["dish:" + d.id][1] || 0 : 0);
+
+  root.QuestMeals = { PRANA_FOODS, PRANA_WAYS, TIPS, DRAINS, BODY, LEGACY_BODY, JUNK, ONEOF, FOOD_IDS, DRAIN_IDS, AUTO_NOTE,
+    DISH_VALUE, DISHES, IDEAS, SHORT, tileLabel, value, score, toggle, tally, tap, meterOf, dishOf, dishMax, dishPay, dishStatus, tick, dishPaid };
 })(typeof window !== "undefined" ? window : globalThis);

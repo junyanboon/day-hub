@@ -108,10 +108,13 @@ test("quest.html: no free-floating action tiles, no time pay, every action ticke
   assert.ok(!/All prana actions|Prana actions · right now|data-all>/.test(html), "the All prana actions sheet is gone");
   assert.ok(!/PRACTICE_PER_MIN|payBlock\(/.test(html), "practice blocks no longer pay by time");
   assert.ok(!/const TILES = /.test(html), "no tiles on Right now at all (d35): the auto ones left too");
-  // every habit but water (its own card) and the automatic ones is ticked in a block or the meal quiz
+  // every habit but water (its own card) and the automatic ones is ticked in a block, the meal sheet or the water card
   const rows = [...html.matchAll(/^\s*\["(\w+)", "[^"]*", [\d.]+, \d+, "[^"]*", "[^"]*", "(\w*)", "\w+"\],$/gm)].map(m => [m[1], m[2]]);
   assert.ok(rows.length > 25, "HABITS rows found");
-  for (const [id, flag] of rows) if (id !== "water") assert.ok(["blk", "quiz", "auto"].includes(flag), `${id} has flag "${flag}"`);
+  // 2026-10-20 (d13, d16): "card" = the water card's through-the-day buttons, "dish" = the meal's Blueprint dish checklists
+  for (const [id, flag] of rows) if (id !== "water") assert.ok(["blk", "quiz", "auto", "card", "dish"].includes(flag), `${id} has flag "${flag}"`);
+  assert.deepEqual(rows.filter(r => r[1] === "card").map(r => r[0]).sort(), ["ferment", "supps", "xylitol"]);
+  assert.deepEqual(rows.filter(r => r[1] === "dish").map(r => r[0]), ["blueprint"]);
   // and each "blk" habit (but barefoot, which waits on Junyan) is on some block's checklist
   const steps = new Set(["home", "travel"].flatMap(m => ["yoga", "groom", "domestics", "winddown"].flatMap(id => B.basic(id, m, 2).steps.flatMap(x => [x.h, x.pm && x.pm.h]))));
   for (const [id, flag] of rows) if (flag === "blk" && id !== "barefoot") assert.ok(steps.has(id), `${id} is on no checklist`);

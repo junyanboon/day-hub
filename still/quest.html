@@ -214,14 +214,29 @@
     pointer-events:none; animation:wq-plus 1.1s ease-out forwards; }
   @keyframes wq-plus { 0% { transform:translateY(4px) scale(.7); opacity:0; } 25% { transform:translateY(-6px) scale(1.15); opacity:1; } 100% { transform:translateY(-26px) scale(1); opacity:0; } }
   @media (prefers-reduced-motion: reduce) { .wq-drop.hit { animation:none; } .wq-drop.hit::after, .wq-plus { display:none; } }
+  /* through the day (2026-10-20, d16): three tap buttons under the water bar */
+  .wq { flex-direction:column; align-items:stretch; gap:10px; }
+  .wq-top { display:flex; gap:12px; align-items:center; min-width:0; }
+  .wq-day { display:grid; grid-template-columns:repeat(3, 1fr); gap:6px; border-top:1px solid var(--glass-border); padding-top:10px; }
+  .wq-it { display:flex; flex-direction:column; align-items:center; gap:1px; padding:7px 4px; border-radius:12px; background:var(--glass);
+    border:1px solid var(--glass-border); color:var(--ink); font:inherit; cursor:pointer; -webkit-tap-highlight-color:transparent;
+    touch-action:manipulation; transition:transform .12s, border-color .25s; }
+  .wq-it:active { transform:scale(.92); } .wq-it:focus-visible { outline:2px solid #8fe3b0; outline-offset:2px; }
+  .wq-it .e { font-size:20px; line-height:1; } .wq-it b { font-size:12px; font-weight:600; }
+  .wq-it small { font-size:10.5px; line-height:1.2; color:var(--ink-soft); text-align:center; font-variant-numeric:tabular-nums; }
+  .wq-it.met { border-color:rgba(143,227,176,.75); } .wq-it.met small { color:#8fe3b0; font-weight:600; }
   .sugw { margin:14px 0 4px; padding:10px 12px; border-radius:14px; background:var(--glass); border:1px solid var(--glass-border); }
   .sugr { display:flex; align-items:center; gap:6px; padding:8px 0; border-top:1px solid var(--glass-border); }
   .sugr:first-of-type { border-top:0; }
   .sugr > span { flex:1; min-width:0; } .sugr small { display:block; color:var(--ink-dim, rgba(255,255,255,.78)); font-size:12px; margin-top:2px; }
   .sugr .btn { flex:0 0 auto; width:auto; padding:6px 12px; font-size:13px; min-height:0; }
-  .hgrid.btiles, .hgrid.mqg { grid-template-columns:repeat(3, 1fr); margin:4px 0 10px; }
-  .hgrid.btiles .htile, .hgrid.mqg .htile { min-height:78px; padding:14px 4px 6px; }
-  .hgrid.mqg .hl { font-size:10px; }
+  .hgrid.btiles { grid-template-columns:repeat(3, 1fr); margin:4px 0 10px; }
+  .hgrid.btiles .htile { min-height:78px; padding:14px 4px 6px; }
+  /* the meal's tiles are compact, about four to a row on a phone (Junyan, 2026-10-20: the tiles were too big) */
+  .hgrid.mqg { grid-template-columns:repeat(4, 1fr); gap:5px; margin:4px 0 8px; }
+  @media (max-width:340px) { .hgrid.mqg { grid-template-columns:repeat(3, 1fr); } }
+  .hgrid.mqg .htile { min-height:58px; padding:13px 3px 5px; border-radius:12px; gap:1px; }
+  .hgrid.mqg .hi { font-size:17px; } .hgrid.mqg .hl { font-size:10px; } .hgrid.mqg .hc { position:absolute; top:3px; left:6px; font-size:9.5px; }
   .hgrid.ptiles { grid-template-columns:repeat(2, 1fr); } .hgrid.ptiles .hl { font-size:11.5px; padding:0 4px; }
   .why-tip { position:fixed; z-index:300; display:none; padding:9px 11px; border-radius:12px; background:#0f1230; border:1px solid var(--glass-border);
     color:var(--ink); font-size:12.5px; line-height:1.35; box-shadow:0 10px 30px rgba(0,0,0,.45); pointer-events:none; }
@@ -537,6 +552,39 @@
   .wck b.mp, .mq-lb.mp { color:var(--gold); } .wck b.mb, .mq-lb.mb { color:#5fd3c4; }
   .mq-lb { border-left:3px solid currentColor; padding-left:8px; font-weight:700; }
   .mq-sub { font-size:12px; color:var(--ink-faint); margin:10px 2px 4px; }
+  /* Fill the Plate (2026-10-20, d13 d15): the heading keeps to one line with this meal's points for it on the right
+     (his screenshot had "+5" stranded on a second line); the tips box; the dish cards and their checklists */
+  .mq-lb { display:flex; justify-content:space-between; align-items:baseline; gap:8px; white-space:nowrap; }
+  .mq-lb > span { min-width:0; overflow:hidden; text-overflow:ellipsis; }
+  .mq-lb > b, .mq-subl > b { flex:none; letter-spacing:0; font-variant-numeric:tabular-nums; }
+  .mq-subl { display:flex; justify-content:space-between; gap:8px; } .mq-subl > b { color:#5fd3c4; }
+  .mq-tips { margin:10px 0 2px; padding:9px 12px; border-radius:14px; background:rgba(0,0,0,.22); font-size:13px; line-height:1.35; }
+  .mq-tips p { margin:4px 0 0; display:flex; gap:8px; align-items:flex-start; } .mq-tips p span { flex:none; width:18px; text-align:center; }
+  .mq-tl { font-size:10.5px; letter-spacing:.12em; text-transform:uppercase; color:var(--ink-faint); font-weight:700; }
+  .mq-dishes { display:flex; flex-direction:column; gap:6px; margin:6px 0 4px; }
+  .mq-dish { border-radius:14px; background:var(--glass); border:1px solid var(--glass-border); overflow:hidden; transition:border-color .25s; }
+  .mq-dish.open { border-color:rgba(95,211,196,.7); } .mq-dish.done { border-color:rgba(143,227,176,.8); }
+  .mq-dbtn { width:100%; display:flex; align-items:center; gap:10px; padding:8px 12px 6px; background:none; border:0; color:inherit; font:inherit; text-align:left; cursor:pointer; -webkit-tap-highlight-color:transparent; }
+  .mq-de { font-size:22px; flex:none; line-height:1; } .mq-dn { min-width:0; flex:1; }
+  .mq-dn b { display:block; font-size:14px; font-weight:600; } .mq-dn small { display:block; font-size:11.5px; color:var(--ink-soft); font-variant-numeric:tabular-nums; }
+  .mq-dp { flex:none; font-weight:700; color:#5fd3c4; font-variant-numeric:tabular-nums; white-space:nowrap; } .mq-dp small { font-weight:400; font-size:10.5px; color:var(--ink-soft); }
+  .mq-dbar { display:block; height:4px; margin:0 12px 8px; border-radius:3px; background:rgba(0,0,0,.25); overflow:hidden; }
+  .mq-dbar b { display:block; height:100%; background:#5fd3c4; border-radius:3px; transition:width .3s; } .mq-dish.done .mq-dbar b { background:#8fe3b0; }
+  .mq-dlist { padding:0 12px 10px; display:flex; flex-direction:column; gap:7px; }
+  .mq-serves, .mq-how { margin:0; font-size:12px; color:var(--ink-soft); line-height:1.45; }
+  .mq-ings { display:grid; grid-template-columns:1fr 1fr; gap:5px; }
+  @media (max-width:360px) { .mq-ings { grid-template-columns:1fr; } }
+  .mq-ing { display:flex; align-items:center; gap:7px; padding:6px 8px; border-radius:10px; background:rgba(0,0,0,.2); border:1px solid var(--glass-border);
+    color:var(--ink); font:inherit; font-size:12.5px; line-height:1.2; text-align:left; cursor:pointer; -webkit-tap-highlight-color:transparent; }
+  .mq-ing .bx { flex:none; width:15px; height:15px; border-radius:4px; border:1.5px solid var(--ink-soft); display:grid; place-items:center; font-size:10px; font-weight:800; color:#0e2f2a; }
+  .mq-ing .n { flex:1; min-width:0; } .mq-ing .qty { color:var(--ink-soft); font-size:11.5px; white-space:nowrap; font-variant-numeric:tabular-nums; }
+  .mq-ing[aria-pressed="true"] { border-color:rgba(95,211,196,.8); background:rgba(95,211,196,.18); }
+  .mq-ing[aria-pressed="true"] .bx { background:#5fd3c4; border-color:#5fd3c4; } .mq-ing[aria-pressed="true"] .bx::after { content:"✓"; }
+  .mq-drow { display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
+  .mq-mini { font:inherit; font-size:12.5px; font-weight:600; padding:6px 12px; border-radius:10px; border:1px solid var(--glass-border); background:transparent; color:var(--ink); cursor:pointer; }
+  .mq-mini.go { background:#5fd3c4; border-color:#5fd3c4; color:#0e2f2a; }
+  .mq-dst { margin-left:auto; font-size:12px; color:var(--ink-soft); } .mq-dst.ok { color:#8fe3b0; font-weight:700; }
+  .mq-dbtn:focus-visible, .mq-ing:focus-visible, .mq-mini:focus-visible { outline:2px solid #5fd3c4; outline-offset:2px; }
   .wck { display:flex; gap:10px; align-items:center; width:100%; text-align:left; padding:11px 2px; border-top:1px solid rgba(255,255,255,.08); font-size:15px; color:var(--ink); background:none; }
   .wck .bx { width:22px; height:22px; border-radius:6px; border:2px solid var(--ink-faint); flex:none; display:flex; align-items:center; justify-content:center; font-size:14px; }
   .wck.on .bx { background:#85B7EB; border-color:#85B7EB; color:#0c3a66; }
@@ -766,14 +814,14 @@
 <script src="quest-oura.js?v=20261019a"></script>
 <script src="quest-levels.js?v=20261016b"></script>
 <script src="quest-gymlog.js?v=20261019a"></script>
-<script src="quest-meals.js?v=20261019f"></script>
+<script src="quest-meals.js?v=20261020r"></script>
 <script src="quest-trends.js?v=20261019end3"></script>
 <script src="nvc-words.js?v=20261010a"></script>
 <script src="quest-fx.js?v=20261019x"></script>
 <script src="quest-night.js?v=20261020end2"></script>
 <script src="quest-basics.js?v=20261020a"></script>
 <script src="quest-suggest.js?v=20261019a"></script>
-<script src="quest-water.js?v=20261020d"></script>
+<script src="quest-water.js?v=20261020p"></script>
 <script src="quest-gym.js?v=20261019x"></script>
 <script src="quest-morning.js?v=20261019a"></script>
 <script src="quest-agenda.js?v=20261020c"></script>
@@ -1323,9 +1371,12 @@
      250 ml cup a tap). [id, full label, prana, max a day, icon, tile label, flags, group].
      2026-10-19 (d6 d9 d11): "blk" = no tile, ticked inside a calendar block's checklist (Morning Yoga, Domestics or
      Grooming, Wind-down; quest-basics.js). Only water keeps a tile. The lamp counts twice a day: once in Morning
-     Yoga and once in the Wind-down. Xylitol moved into the meal quiz. Shower and the copper pot are new.
+     Yoga and once in the Wind-down. Xylitol moved into the meal quiz (and on 2026-10-20 to the water card). Shower and the copper pot are new.
      flags: "flat" = every tap gives the same, "quiz" = no tile, the meal quiz counts it
-     (2026-10-10), "auto" = the game counts it from the
+     (2026-10-10), "card" = a through-the-day button on the water card (2026-10-20, d16: supplements, fermented food,
+     xylitol; same values and limits, xylitol's limit stays 10), "dish" = the Blueprint meal, now paid by the meal's
+     Super Veggie and Nutty Pudding checklists (2026-10-20, d13; the id stays so past days' history still reads it; dishes do not count it as done),
+     "auto" = the game counts it from the
      calendar and check-ins (evening ones pay out the next morning). Ids that existed
      before keep their meaning except water, now 250 ml. No movement here: training,
      cardio, cold and walks take energy, and their calendar blocks spend it (Junyan,
@@ -1335,7 +1386,7 @@
   const HABITS = [
     ["water", "Water, one 250 ml cup", 0.6, 12, "💧", "250 ml water", "flat", "Morning"],
     ["protein", "30 g protein at breakfast", 3, 1, "🍳", "30 g protein AM", "quiz", "Morning"],
-    ["supps", "Supplements, taken after a meal", 1, 1, "💊", "Supplements", "quiz", "Food"],
+    ["supps", "Supplements, taken after a meal", 1, 1, "💊", "Supplements", "card", "Food"],
     ["neem", "Neem and turmeric, every morning", 3, 1, "🌿", "Neem + turmeric", "blk", "Morning"],
     ["mouthAm", "Dr Ellie's mouthcare routine in the morning, the whole routine in one tap", 2, 1, "🦷", "Dr Ellie AM", "blk", "Morning"],
     ["shower", "Shower, face wash, moisturizer with SPF", 2, 1, "🚿", "Shower", "blk", "Morning"],
@@ -1351,7 +1402,7 @@
     ["bhuta", "Bhuta Shuddhi", 8, 1, "🔥", "Bhuta Shuddhi", "blk", "Practice"],
     ["barefoot", "Walk barefoot on natural ground (soil, grass or sand), daily, any length; most important around the new moon", 3, 1, "🦶", "Barefoot walk", "blk", "Practice"],
     ["nadi", "Nadi Shuddhi, 5 min", 4, 2, "🌬️", "Nadi Shuddhi 5'", "blk", "Practice"],
-    ["blueprint", "Blueprint meal: Super Veggie or Nutty Pudding", 6, 2, "🥗", "Veggie / Pudding", "quiz", "Food"],
+    ["blueprint", "Blueprint meal: Super Veggie or Nutty Pudding", 6, 2, "🥗", "Veggie / Pudding", "dish", "Food"],
     ["legumes", "150 g cooked beans or lentils", 3, 1, "🫘", "150 g lentils", "quiz", "Food"],
     ["veg", "250 g vegetables (about 2 big handfuls)", 3, 2, "🥦", "250 g veg", "quiz", "Food"],
     ["greens", "50 g leafy greens (a big handful)", 2, 1, "🥬", "50 g greens", "quiz", "Food"],
@@ -1359,9 +1410,9 @@
     ["nuts", "30 g nuts (walnuts, almonds, macadamia)", 2, 1, "🥜", "30 g nuts", "quiz", "Food"],
     ["berries", "100 g berries", 2, 1, "🫐", "100 g berries", "quiz", "Food"],
     ["seeds", "1 tbsp ground flax or chia", 1, 1, "🌱", "1 tbsp flax/chia", "quiz", "Food"],
-    ["ferment", "Fermented food: 100 g yogurt, kefir or sauerkraut", 2, 1, "🥛", "100 g fermented food", "quiz", "Food"],
+    ["ferment", "Fermented food: 100 g yogurt, kefir or sauerkraut", 2, 1, "🥛", "100 g fermented food", "card", "Food"],
     ["heavy", "Heavy meal: tap it honestly when you ate too much or too heavy (lowers prana)", 5, 1, "🥘", "Heavy meal", "quiz", "Food"],
-    ["xylitol", "Xylitol, 1 g (one mint or gum) after eating or drinking; Dr Ellie: 6 to 10 g a day", 0.6, 10, "🍬", "Xylitol 1 g", "quiz", "Food"],
+    ["xylitol", "Xylitol, 1 g (one mint or gum) after eating or drinking; Dr Ellie: 6 to 10 g a day", 0.6, 10, "🍬", "Xylitol 1 g", "card", "Food"],
     ["lamp", "Light an oil lamp (natural oil, like sesame or ghee)", 3, 2, "🪔", "Oil lamp", "blk", "Evening"],
     ["mouth", "Dr Ellie's mouthcare routine at night, the whole routine in one tap", 2, 1, "🦷", "Dr Ellie PM", "blk", "Evening"],
     ["early", "Last meal 3+ hr before bed (counts itself from the calendar, paid next morning)", 5, 1, "🍽️", "Last meal 3 hr", "auto", "Evening"],
@@ -1467,12 +1518,47 @@
     const sub = s.total >= W.AIM ? `${s.total} glasses, ${(s.ml / 1000).toLocaleString()} L. The aim is met.`
       : `${s.ml.toLocaleString()} ml so far${!after && s.total < W.BY4 ? `, ${W.BY4 - s.total} more by 4 PM` : `, ${left} to the aim`}`;
     const from = waterBarFrom != null ? waterBarFrom : pct; waterBarFrom = null;   // the bar fills from the last count after a tap
-    return `<div class="sq wq${s.total >= W.AIM ? " done" : ""}">` +
+    return `<div class="sq wq${s.total >= W.AIM ? " done" : ""}"><div class="wq-top">` +
       `<button type="button" class="wq-drop" data-glass aria-label="Add one glass" title="${esc(W.button(nm, hourNow()))}">💧</button>` +
       `<span class="sq-t">Water · <span class="wq-n">${s.total} / ${W.AIM}</span> glasses` +
       `<small class="wq-sub"><span>${esc(sub)}</span>${W.tail(nm, hourNow(), s.total).map(x =>
         `<span${x.blk ? ' class="wq-blk"' : ""}>&nbsp;· ${esc(x.t)}</span>`).join("")}</small>` +
-      `<i class="sq-bar wq-bar"><b style="width:${from}%" data-to="${pct}"></b><i style="left:${W.markerPct()}%"></i><em style="left:${W.markerPct()}%">by 4 PM</em></i></span></div>`;
+      `<i class="sq-bar wq-bar"><b style="width:${from}%" data-to="${pct}"></b><i style="left:${W.markerPct()}%"></i><em style="left:${W.markerPct()}%">by 4 PM</em></i></span></div>${dayItemsHTML()}</div>`;
+  }
+  /* Through the day (Junyan, 2026-10-20, d16): supplements, fermented food and xylitol, moved here from the meal sheet.
+     The count is how many times the habit counts today (habitN), so a tile tapped in a meal earlier today still shows. */
+  function dayItemsHTML(){
+    if (!QW().DAY3) return "";   // an older cached quest-water.js: the glasses still work
+    return `<div class="wq-day">${QW().DAY3.map(row => { const [id, icon, nm, aim] = row, n = habitN(id), met = n >= aim;
+      return `<button type="button" class="wq-it${met ? " met" : ""}" data-day="${id}" data-icon="${esc(icon)}" aria-label="${esc(nm)}: ${esc(QW().itemLine(row, n))}">` +
+        `<span class="e">${icon}</span><b>${esc(nm)}</b><small>${esc(QW().itemLine(row, n))}</small></button>`; }).join("")}</div>`;
+  }
+  /* One tap pays the habit's own value (habitGain: same value, meter and daily limit as before). It is saved like a glass,
+     with a kind, so it syncs and can be undone (marked off, never deleted) the same way. Past the daily limit it pays
+     nothing and only shakes, as a full meal tile does. */
+  function addDayItem(id, el){
+    if (!QW() || !G.day) return;
+    const row = QW().DAY3.find(x => x[0] === id), h = HABITS.find(x => x[0] === id); if (!row || !h) return;
+    const fx = window.QuestFx, g = habitGain(id);
+    if (!g) { if (fx && el) fx.nope(el); return; }
+    const rect = el ? el.getBoundingClientRect() : null, rid = "d" + (+now()) + Math.random().toString(36).slice(2, 6);
+    G.day.habits = G.day.habits || {};
+    G.day.habits[id] = (G.day.habits[id] || 0) + 1;
+    G.day.glasses = QW().addItem(G.day.glasses, { id:rid, kind:id, at:now().toISOString(), hour:hourNow(), d:g, c:1 });
+    addHabit(id, g, h[5], row[2].toLowerCase(), !!fx);
+    if (fx && rect) fx.tap(rect, { icon:row[1], gain:g, full:habitN(id) >= row[3], color:"#8fe3b0" });
+    render();
+    if (fx) fx.pop(document.querySelector(`[data-day="${id}"]`));
+    calToast(`${row[2]} logged.`, 6000, () => undoDayItem(rid));
+  }
+  function undoDayItem(rid){
+    const x = ((G.day && G.day.glasses) || {})[rid]; if (!x || x.off || !x.kind) return;
+    G.day.glasses = QW().undo(G.day.glasses, rid);
+    // habits only go up when devices merge, so the take-back is counted off in G.day.voided
+    if (x.c) (G.day.voided = G.day.voided || {})[x.kind] = ((G.day.voided || {})[x.kind] || 0) + 1;
+    const row = QW().DAY3.find(r => r[0] === x.kind);
+    addHabit(x.kind, -(x.d || 0), `${row ? row[2] : x.kind}: taken back (tapped by mistake)`, "undo", true);
+    render();
   }
   // after a tap redraws the card: the drop bounces with a splash ring, "+1" floats off the count, the bar fills
   function waterCheer(focused){
@@ -2315,43 +2401,76 @@
   }
   /* ---------- a meal block (Junyan, 2026-10-19: "how do I even interact with this?") ----------
      Tapping a meal block opens ONE screen, and it is the meal: his habit tiles in three groups (quest-meals.js),
-     Prana foods in gold (Sadhguru's pranic foods and how he ate, the two minutes and the phone face down folded into
-     "Ate with attention"), Body foods in teal (Bryan Johnson's Blueprint, the old plate's protein and vegetables,
-     xylitol and the supplements, taken after a meal), and Drains in gold that lower prana. Each tile pays as he taps
-     it, with the burst and pop; a second tap takes it back. No plate checklist, no separate rating step, no Confirm.
-     Water is its own widget (the next job). Eating within 3 hours of bed and staying up past 11 stay automatic. */
+     Prana foods in gold (Sadhguru's pranic foods), Body foods in teal (Bryan Johnson's Blueprint, the old plate's
+     protein and vegetables), and Drains in gold that lower prana. Each tile pays as he taps it, with the burst and
+     pop; a second tap takes it back. No plate checklist, no separate rating step, no Confirm.
+     Eating within 3 hours of bed and staying up past 11 stay automatic.
+     2026-10-20 ("Fill the Plate", d12 to d16):
+     - How he ate is a "How to eat" tip box at the top, no points (d15). A meal rated before keeps what it paid.
+     - Blueprint dishes first (d13): Super Veggie and Nutty Pudding, then tonight's three ideas for 2 people, each a card
+       that opens its ingredient checklist with amounts. A dish pays body as its ingredients are ticked, up to the
+       Blueprint meal's value (+9 at level 1), each dish on its own; an untick or Clear takes its share back
+       (QuestMeals.tick). The ticks live on the meal's record in G.day.mealq, so they save and sync like the tiles.
+     - Supplements, fermented food and xylitol moved to the water card (d16). The tiles are smaller, about four to a row
+       on a phone, and each heading stays on one line with this meal's points for it on the right. */
   const QM = window.QuestMeals;
   const mqSum = q => [q.p ? `prana ${q.p > 0 ? "+" : ""}${q.p}` : "", q.b ? `body ${q.b > 0 ? "+" : ""}${q.b}` : ""].filter(Boolean).join(", ") || "no change";
-  const mqOpt = () => ({ mult:gainMult(), heavy:habitGain("heavy"), bodyGain:habitGain });
+  // dish: the Blueprint meal habit's value, the most a dish pays before the level multiplier (d13)
+  const mqOpt = () => ({ mult:gainMult(), heavy:habitGain("heavy"), bodyGain:habitGain, dish:(HABITS.find(x => x[0] === "blueprint") || [])[2] });
   const mqCounted = id => QM.BODY.includes(id) || id === "heavy";   // daily-limit habits
+  const mqOpen = new Set();   // "<meal key>|<dish id>": the dish cards he has opened (the sheet redraws on every tap)
   function openMeal(b){
     if (!b) return;
-    const all = blocks(), k = gk(b), name = shortName(b), q = (G.day.mealq || {})[k] || null;
-    const sel = new Set(q && !q.kind && Array.isArray(q.sel) ? q.sel : []), paid = (q && q.v) || {};
+    const all = blocks(), k = gk(b), name = shortName(b), q = (G.day.mealq || {})[k] || null, rec = q && !q.kind ? q : null;
+    const sel = new Set(rec && Array.isArray(rec.sel) ? rec.sel : []), paid = (rec && rec.v) || {};
     const warn = mealWarn(b, all), lastFood = lastMealBefore(b.s, all), o = mqOpt();
     const sign = v => v > 0 ? `+${v}` : `${v}`;
     const row = (id, icon, txt, tag, cls) => `<button class="htile mqt${sel.has(id) ? " full" : ""}" data-q="${id}" data-icon="${esc(icon)}"><span class="hi">${icon}</span><span class="hl">${esc(txt)}</span>${sel.has(id) ? `<span class="hc">✓</span>` : ""}<b class="${cls}">${tag}</b></button>`;
     const tagOf = (id, now) => sel.has(id) && paid[id] ? sign(paid[id][1]) : now;
     const grid = rows => `<div class="hgrid mqg">${rows.join("")}</div>`;
-    const gold = ([id, icon, txt]) => row(id, icon, txt, tagOf(id, sign(QM.value(id, o))), "mp");
+    const gold = r => row(r[0], r[1], QM.tileLabel(r), tagOf(r[0], sign(QM.value(r[0], o))), "mp");
+    // what this meal has paid in a group, shown at the end of its heading (one line, never wrapped)
+    const got = ids => ids.reduce((a, id) => a + (sel.has(id) && paid[id] ? +paid[id][1] || 0 : 0), 0);
+    const dishGot = list => list.reduce((a, d) => a + QM.dishPaid(rec, d), 0);
+    const lb = (txt, cls, n) => `<div class="win-lb mq-lb ${cls}"><span>${esc(txt)}</span>${n ? `<b>${sign(n)}</b>` : ""}</div>`;
+    const dishCard = d => {
+      const st = QM.dishStatus(rec, d), open = mqOpen.has(k + "|" + d.id), pd = QM.dishPaid(rec, d), on = new Set(st.n ? rec.dish[d.id] : []);
+      return `<div class="mq-dish${open ? " open" : ""}${st.all ? " done" : ""}">` +
+        `<button type="button" class="mq-dbtn" data-dopen="${d.id}" aria-expanded="${open}"><span class="mq-de">${d.icon}</span>` +
+        `<span class="mq-dn"><b>${esc(d.name)}</b><small>${st.n ? `${st.n} of ${st.m} ingredients` : `${st.m} ingredients · tap to open`}${d.time ? ` · ${esc(d.time)}` : ""}</small></span>` +
+        `<span class="mq-dp">${pd ? sign(pd) : `<small>up to</small> +${QM.dishMax(o)}`}</span></button>` +
+        `<i class="mq-dbar"><b style="width:${st.pct}%"></b></i>` +
+        (open ? `<div class="mq-dlist"><p class="mq-serves">For 2 people${d.time ? ` · ${esc(d.time)}` : ""}. Tick what went in.</p>` +
+          `<div class="mq-ings">${d.items.map(([n, amt], i) => `<button type="button" class="mq-ing" data-ding="${d.id}" data-i="${i}" aria-pressed="${on.has(n)}">` +
+            `<span class="bx"></span><span class="n">${esc(n)}</span><span class="qty">${esc(amt)}</span></button>`).join("")}</div>` +
+          (d.how ? `<p class="mq-how">${esc(d.how)}</p>` : "") +
+          `<div class="mq-drow"><button type="button" class="mq-mini go" data-dall="${d.id}">Got everything</button><button type="button" class="mq-mini" data-dnone="${d.id}">Clear</button>` +
+          `<span class="mq-dst${st.all ? " ok" : ""}">${esc(st.text)}</span></div></div>` : "") +
+        `</div>`;
+    };
     openSheet(`${winHead(b)}
       ${warn ? `<div class="warnline">${esc(warn)}</div>` : ""}
       ${lastFood ? `<p>Last food ended ${fmtT(lastFood)} (${fmtHM(Math.round((b.s - lastFood) / 60000))} before this).</p>` : ""}
-      <p>⏳ Sit with the food two minutes before the first bite, phone face down. Then tap what you ate. Each tile counts as you tap it.</p>
-      <div class="win-lb mq-lb mp">Prana foods · fill prana (Sadhguru)</div>
+      <div class="mq-tips"><div class="mq-tl">How to eat</div>${QM.TIPS.map(([i, t]) => `<p><span>${i}</span>${esc(t)}</p>`).join("")}</div>
+      ${lb("Blueprint dishes", "mb", dishGot(QM.DISHES))}
+      <div class="mq-dishes">${QM.DISHES.map(dishCard).join("")}</div>
+      <div class="mq-sub mq-subl"><span>Tonight's ideas · for 2 people</span>${dishGot(QM.IDEAS) ? `<b>${sign(dishGot(QM.IDEAS))}</b>` : ""}</div>
+      <div class="mq-dishes">${QM.IDEAS.map(dishCard).join("")}</div>
+      ${lb("Prana foods · Sadhguru", "mp", got(QM.FOOD_IDS))}
       ${grid(QM.PRANA_FOODS.map(gold))}
-      <div class="mq-sub">How you ate</div>
-      ${grid(QM.PRANA_WAYS.map(gold))}
-      <div class="win-lb mq-lb mb">Body foods · fill body (Bryan Johnson)</div>
+      ${lb("Body foods · Bryan Johnson", "mb", got(QM.BODY.concat(QM.JUNK[0])))}
       ${grid(QM.BODY.map(id => { const h = HABITS.find(x => x[0] === id), g = habitGain(id); return row(id, h[4], h[5], tagOf(id, g ? sign(g) : "full"), "mb"); })
         .concat(row(QM.JUNK[0], QM.JUNK[1], QM.JUNK[2], tagOf(QM.JUNK[0], sign(QM.JUNK[3])), "mb")))}
-      <div class="win-lb mq-lb mp">Drains · lower prana</div>
+      ${lb("Drains · lower prana", "mp", got(QM.DRAIN_IDS))}
       ${grid(QM.DRAINS.map(gold))}
       <div class="mq-sub">${esc(QM.AUTO_NOTE)}</div>
       <div class="hint" style="margin:10px 2px">${q && (q.p || q.b) ? `This meal so far: ${esc(mqSum(q))}.` : "Nothing counted yet."}</div>
       <div class="actions"><button class="btn ghost" id="mEdit">Change time or name</button></div>`, true);
-    $("sheet").querySelectorAll("[data-q]").forEach(bn => bn.onclick = () => {
-      const top = $("sheet").scrollTop, id = bn.dataset.q, fx = window.QuestFx, rect = bn.getBoundingClientRect();
+    const sh = $("sheet");
+    // the sheet redraws on every tap and keeps its scroll
+    const redraw = quiet => { const top = sh.scrollTop; openMeal(b); sh.scrollTop = top; if (!quiet) render(); };
+    sh.querySelectorAll("[data-q]").forEach(bn => bn.onclick = () => {
+      const id = bn.dataset.q, fx = window.QuestFx, rect = bn.getBoundingClientRect();
       if (mqCounted(id) && !sel.has(id) && id !== "heavy" && !habitGain(id)) { if (fx) fx.nope(bn); return; }   // full for today
       const cur = (G.day.mealq || {})[k];
       const r = QM.tap(cur && !cur.kind ? cur : null, id, mqOpt());
@@ -2367,16 +2486,42 @@
       });
       (G.day.mealq = G.day.mealq || {})[k] = { ...r.rec, at:now().toISOString() };
       stampDay(); saveG();
-      openMeal(b); $("sheet").scrollTop = top; render();
+      redraw();
       const on = r.ops.find(op => op.id === id && op.on), off = r.ops.find(op => op.id === id && !op.on && op.d);
       if (fx && on) {
         fx.tap(rect, { icon:bn.dataset.icon, gain:on.d, color:on.d < 0 ? "#ff9b8a" : on.m === "b" ? "#8fe3b0" : "#ffd479" });
-        fx.pop($("sheet").querySelector(`[data-q="${id}"]`));
+        fx.pop(sh.querySelector(`[data-q="${id}"]`));
       } else if (fx && off) {   // a second tap took it back: the same take-back animation as a checklist tile (d28)
         fx.back(rect, { gain:-off.d });
-        fx.pop($("sheet").querySelector(`[data-q="${id}"]`));
+        fx.pop(sh.querySelector(`[data-q="${id}"]`));
       }
     });
+    // a dish card opens and closes its checklist
+    sh.querySelectorAll("[data-dopen]").forEach(bn => bn.onclick = () => {
+      const key = k + "|" + bn.dataset.dopen;
+      if (mqOpen.has(key)) mqOpen.delete(key); else mqOpen.add(key);
+      redraw(true);
+    });
+    // tick an ingredient, Got everything, or Clear: the dish pays (or takes back) the difference
+    const dishTap = (bn, id, how, popSel) => {
+      const d = QM.dishOf(id); if (!d) return;
+      const fx = window.QuestFx, rect = bn.getBoundingClientRect(), cur = (G.day.mealq || {})[k];
+      const r = QM.tick(cur && !cur.kind ? cur : null, d, how, mqOpt());
+      r.ops.forEach(op => addEnergy("b", op.d, `${name}: ${d.name}${op.on ? "" : " (taken back)"}`, d.name, !!fx));
+      (G.day.mealq = G.day.mealq || {})[k] = { ...r.rec, at:now().toISOString() };
+      stampDay(); saveG();
+      redraw();
+      const op = r.ops[0];
+      if (fx && op && op.on) fx.tap(rect, { icon:d.icon, gain:op.d, color:"#8fe3b0" });
+      else if (fx && op) fx.back(rect, { gain:-op.d });
+      if (fx && popSel) fx.pop(sh.querySelector(popSel));
+    };
+    sh.querySelectorAll("[data-ding]").forEach(bn => bn.onclick = () => {
+      const d = QM.dishOf(bn.dataset.ding), it = d && d.items[+bn.dataset.i]; if (!it) return;
+      dishTap(bn, d.id, it[0], `[data-ding="${d.id}"][data-i="${bn.dataset.i}"]`);
+    });
+    sh.querySelectorAll("[data-dall]").forEach(bn => bn.onclick = () => dishTap(bn, bn.dataset.dall, "all"));
+    sh.querySelectorAll("[data-dnone]").forEach(bn => bn.onclick = () => dishTap(bn, bn.dataset.dnone, "none"));
     $("mEdit").onclick = () => openEdit(b);
   }
 
@@ -4993,6 +5138,7 @@
     if (nightNow && !G.day.nightShown && !$("sheet").classList.contains("open") && !$("night")) { G.day.nightShown = true; saveG(); openNight(); }
     put("habits", PLAN ? (nightNow ? `<button class="pa-all nt-open" data-night>🌙 Day's end<span>tomorrow, deathbed, reflection ›</span></button>` : "") + stepsHTML() + waterHTML() + suggestHTML() + sugHTML() : ""); bindHabits($("habits")); bindSug($("habits"));
     $("habits").querySelectorAll("[data-glass]").forEach(bn => bn.onclick = () => addGlass(bn));
+    $("habits").querySelectorAll("[data-day]").forEach(bn => bn.onclick = () => addDayItem(bn.dataset.day, bn));
     $("habits").querySelectorAll("[data-night]").forEach(bn => bn.onclick = openNight);
     if (PLAN && !z && body() < 40 && !G.day.lotusGiven) { G.day.lotusGiven = true; giveItem("lotus", "Your energy is low today."); }
     if ($("bMorning")) $("bMorning").onclick = () => openMorning();
