@@ -83,18 +83,21 @@
   const iconFor = (name) => ICONS[keyOf(name)] || "🛒";
   const shelfOf = (k, id) => (KITCHENS[k] ? KITCHENS[k].shelves.find((s) => s.id === id) : null) || null;
 
+  // a level read from saved (synced) state: 0 to 3, else not checked
+  const okLv = (v) => (v === 0 || v === 1 || v === 2 || v === 3 ? v : null);
+  const clean = (it) => ({ ...it, lv: okLv(it.lv) });
   // every item of the kitchen, the catalogue under what he changed, deleted ones left out, in shelf then catalogue order
   function items(K, k) {
     const st = obj(obj(K).items), out = [], seen = new Set();
-    for (const s of SEED_ITEMS) { seen.add(s.id); const it = st[s.id] ? { ...s, ...st[s.id] } : s; if (!it.del && it.k === k) out.push(it); }
-    for (const [id, it] of Object.entries(st)) if (!seen.has(id) && it && !it.del && it.k === k) out.push({ ...it, id });
+    for (const s of SEED_ITEMS) { seen.add(s.id); const it = st[s.id] ? clean({ ...s, ...st[s.id] }) : s; if (!it.del && it.k === k) out.push(it); }
+    for (const [id, it] of Object.entries(st)) if (!seen.has(id) && it && !it.del && it.k === k && typeof it.name === "string") out.push(clean({ ...it, id }));
     const order = (KITCHENS[k] || { shelves: [] }).shelves.map((s) => s.id);
     return out.sort((a, b) => (order.indexOf(a.shelf) - order.indexOf(b.shelf)) || ((a.seed ?? 1e6) - (b.seed ?? 1e6)) || ms(b.added) - ms(a.added));
   }
   function item(K, id) {
     const st = obj(obj(K).items)[id], s = SEED_ITEMS.find((x) => x.id === id);
     if (!st && !s) return null;
-    return st ? { ...(s || {}), ...st, id } : s;
+    return st ? clean({ ...(s || {}), ...st, id }) : s;
   }
   // write one item back (a change always carries its time, which is what the merge compares)
   function put(K, it, at) {
@@ -123,7 +126,7 @@
     }
     hist.push([iso(t), lv, src || "tap"]);
     const n = { ...it, lv, since: iso(t), hist: hist.slice(-HIST_MAX) };
-    if (was == null || (lv === 3 && (was ?? -1) < 3)) n.fresh = iso(t);
+    if (was == null || (lv === 3 && was < 3)) n.fresh = iso(t);
     return put(K, n, t);
   }
   // one tap: not checked yet -> Plenty, then Plenty, Half, Low, Out, and back to Plenty (d25)

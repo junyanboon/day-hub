@@ -249,3 +249,10 @@ test("the day word reads in his zone", () => {
   assert.equal(K.dayWord(now + 3 * D, now, "Europe/Madrid"), "Fri");
   assert.equal(K.dayWord(now - D, now, "Europe/Madrid"), "today");
 });
+
+test("a bad level in synced state reads as not checked, never throws", () => {
+  const k = { items: { "h:kale": { id: "h:kale", k: "home", shelf: "fridge", name: "Kale", lv: 7, at: at(0) }, x: { id: "x", k: "home", shelf: "fridge", lv: 2 } } };
+  assert.equal(lv(k, "Kale"), null);
+  assert.equal(K.item(k, "h:kale").lv, null);
+  assert.equal(K.items(k, "home").length, K.SEED.length);   // a nameless item is skipped
+});

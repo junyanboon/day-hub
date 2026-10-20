@@ -877,7 +877,7 @@
 <script src="quest-levels.js?v=20261016b"></script>
 <script src="quest-gymlog.js?v=20261019a"></script>
 <script src="quest-meals.js?v=20261020s"></script>
-<script src="quest-kitchen.js?v=20261020k3"></script>
+<script src="quest-kitchen.js?v=20261020k4"></script>
 <script src="quest-trends.js?v=20261019end3"></script>
 <script src="nvc-words.js?v=20261010a"></script>
 <script src="quest-fx.js?v=20261019x"></script>
@@ -2678,7 +2678,7 @@
       if (!S.home) S.home = new Set(end.items.filter(x => x.lv !== 0).map(x => x.id));
       ask = `<div class="kt-ask"><b>Bring any of this home?</b><p>The trip is over. Tick what comes home; the travel fridge is emptied after.</p>` +
         `<div class="mq-ings">${end.items.map(x => `<button type="button" class="mq-ing" data-khome="${esc(x.id)}" aria-pressed="${S.home.has(x.id)}">` +
-          `<span class="bx"></span><span class="n">${x.em} ${esc(x.name)}</span><span class="qty">${x.lv == null ? "" : KLV[x.lv]}</span></button>`).join("")}</div>` +
+          `<span class="bx"></span><span class="n">${esc(x.em)} ${esc(x.name)}</span><span class="qty">${x.lv == null ? "" : KLV[x.lv]}</span></button>`).join("")}</div>` +
         `<div class="mq-drow"><button type="button" class="mq-mini go" id="kHomeGo">Bring ticked home</button><button type="button" class="mq-mini" id="kHomeNone">Nothing to bring</button></div></div>`;
     }
     const head = `<div class="win-hd"><span class="kt-ico">🧺</span><div><div class="tt">Kitchen</div><div class="sb">${kn.icon} ${esc(kn.name)} · ${esc(when)}</div></div></div>` +
@@ -2691,7 +2691,7 @@
         `<div class="kt-tools"><input class="kt-q" id="kQ" type="search" placeholder="Find an item" autocomplete="off" value="${esc(S.q)}">` +
         `<button type="button" class="kt-chip" id="kLow" aria-pressed="${S.low}">Low or out</button><button type="button" class="kt-chip" id="kEdit" aria-pressed="${S.edit}">Edit</button></div>` +
         `<div class="kt-key"><span><i class="l3"></i>Plenty</span><span><i class="l2"></i>Half</span><span><i class="l1"></i>Low</span><span><i class="l0"></i>Out</span><span><i class="ln"></i>Not checked</span></div>` +
-        `<p class="kt-hint">${S.edit ? "Edit: tap an item to rename it, move it or take it off." : "Tap an item to step it down. Out goes back to Plenty."}</p>` +
+        `<p class="kt-hint">${S.edit ? "Edit: tap an item to rename it, move it to another shelf or delete it." : "Tap an item to step it down. Out goes back to Plenty."}</p>` +
         `<div id="kShelves">${kitShelves(S, K, k, shop, t)}</div>` +
         `<div class="kt-add"><input class="kt-q" id="kNew" placeholder="Add something new" autocomplete="off" maxlength="40">` +
         `<select class="kt-sel" id="kNewShelf" aria-label="Which shelf">${kn.shelves.map(s => `<option value="${s.id}">${esc(s.name)}</option>`).join("")}</select>` +
@@ -2705,7 +2705,7 @@
         (L.groups.length ? L.groups.map(g => `<div class="kt-lb ${g.shelf.cls}"><span>${esc(g.shelf.name)}</span><b>${g.list.filter(r => r.on).length} / ${g.list.length}</b></div>` +
           `<div class="kt-list">${g.list.map(r => { const why = r.why === "out" ? "out" : r.why === "low" ? "running low" : `will run low by ${QK().dayWord(r.at, t, TZ())}`;
             const uses = r.uses.slice(0, 2).map(u => `${u.dish} ${u.amt}`).join(", ");
-            return `<button type="button" class="kt-li" data-kbuy="${esc(r.it.id)}" aria-pressed="${r.on}"><span class="bx"></span><span class="e">${r.it.em}</span>` +
+            return `<button type="button" class="kt-li" data-kbuy="${esc(r.it.id)}" aria-pressed="${r.on}"><span class="bx"></span><span class="e">${esc(r.it.em)}</span>` +
               `<span class="n">${esc(r.it.name)}<small>${esc(why)}${uses ? ` · ${esc(uses)}` : ""}</small></span>` +
               `<span class="q">${r.amt ? esc(r.amt) : ""}${r.dinners ? `<small>${r.dinners} dinner${r.dinners === 1 ? "" : "s"}</small>` : ""}</span></button>`; }).join("")}</div>`).join("")
           : `<p class="kt-hint">Nothing is low. Nothing to buy.${all.some(x => x.lv == null) ? " Items not checked yet stay off the list until you tap them." : ""}</p>`) +
@@ -2761,7 +2761,7 @@
           const tag = x.lv === 0 ? "Out" : x.lv === 1 ? "Low" : soon ? `low by ${QK().dayWord(QK().lowAt(x, t), t, TZ())}` : "";
           return `<button type="button" class="ki L${x.lv == null ? "n" : x.lv}${use ? " turn" : ""}${soon ? " soon" : ""}" data-kit="${esc(x.id)}" ` +
             `aria-label="${esc(x.name)}, ${x.lv == null ? "not checked yet" : KLV[x.lv].toLowerCase()}. ${S.edit ? "Tap to edit." : "Tap to change."}">` +
-            `<span class="e">${x.em}</span>${esc(x.name)}<span class="lv"><i></i></span>${tag ? `<span class="tag">${esc(tag)}</span>` : ""}</button>`; }).join("") ||
+            `<span class="e">${esc(x.em)}</span>${esc(x.name)}<span class="lv"><i></i></span>${tag ? `<span class="tag">${esc(tag)}</span>` : ""}</button>`; }).join("") ||
           `<span class="kt-hint">Nothing here yet.</span>`}</div></div>`;
     }).join("");
     return html || `<p class="kt-hint">${q ? "Nothing matches." : "Nothing is low or out."}</p>`;
@@ -2770,10 +2770,10 @@
   function openKitchenItem(id){
     const it = QK().item(G.kitchen, id); if (!it) return openKitchen();
     const kn = QK().KITCHENS[it.k];
-    openSheet(`<div class="win-hd"><span class="kt-ico">${it.em}</span><div><div class="tt">${esc(it.name)}</div><div class="sb">${kn.icon} ${esc(kn.name)}</div></div></div>
+    openSheet(`<div class="win-hd"><span class="kt-ico">${esc(it.em)}</span><div><div class="tt">${esc(it.name)}</div><div class="sb">${kn.icon} ${esc(kn.name)}</div></div></div>
       <div class="win-lb">Name</div><input id="kiName" value="${esc(it.name)}" maxlength="40" autocomplete="off">
       <div class="win-lb">Shelf</div><div class="kt-tools">${kn.shelves.map(s => `<button type="button" class="kt-chip" data-kish="${s.id}" aria-pressed="${s.id === it.shelf}">${esc(s.name)}</button>`).join("")}</div>
-      <div class="actions"><button class="btn danger" id="kiDel">Take it off the list</button></div>
+      <div class="actions"><button class="btn danger" id="kiDel">Delete this item</button></div>
       <div class="actions"><button class="btn ghost" id="kiBack">Back</button><button class="btn primary" id="kiSave">Save</button></div>`, true);
     let shelf = it.shelf;
     $("sheet").querySelectorAll("[data-kish]").forEach(bn => bn.onclick = () => { shelf = bn.dataset.kish;
@@ -2784,7 +2784,7 @@
       if (shelf !== it.shelf) K = QK().move(K, id, shelf, now());
       if (K !== G.kitchen) kitSave(K);
       openKitchen(); render(); };
-    $("kiDel").onclick = () => { kitSave(QK().remove(G.kitchen, id, now())); log(`Kitchen: ${it.name} taken off`); openKitchen(); render(); };
+    $("kiDel").onclick = () => { kitSave(QK().remove(G.kitchen, id, now())); log(`Kitchen: ${it.name} deleted`); openKitchen(); render(); };
   }
   /* A dinner tick (d21, d28): each ingredient ticked in a dish steps the kitchen's matching item down one level, each one
      unticked steps it back. before and after: the dish's ticked ingredient names. */
