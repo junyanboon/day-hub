@@ -402,6 +402,7 @@
     color:var(--ink-soft); background:rgba(25,29,60,.88); backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px); }
   .cal-ro { font-size:12px; color:var(--ink-faint); margin:4px 2px 2px; }
   .cal { position:relative; --cal-l:50px; margin:6px 0 4px; }
+  .cal-bk { font-size:12px; color:rgba(255,255,255,.6); margin:4px 0 0 50px; }
   .cal-hr { position:absolute; left:var(--cal-l); right:0; height:0; border-top:1px solid rgba(255,255,255,.09); }
   .cal-hr span { position:absolute; left:calc(-1 * var(--cal-l)); width:calc(var(--cal-l) - 8px); top:-8px; text-align:right; font-size:11px; color:var(--ink-faint); }
   .cal-ev { position:absolute; box-sizing:border-box; padding:4px 9px; border-radius:10px; text-align:left; overflow:hidden;
@@ -751,7 +752,7 @@
 <script src="quest-water.js?v=20261019m"></script>
 <script src="quest-gym.js?v=20261019x"></script>
 <script src="quest-morning.js?v=20261019a"></script>
-<script src="quest-agenda.js?v=20261019zc"></script>
+<script src="quest-agenda.js?v=20261020a"></script>
 <script src="quest-offline.js?v=20261017a"></script>
 <script src="quest-nearby.js?v=20261016k"></script>
 </head>
@@ -4580,7 +4581,10 @@
     const a0 = win ? win.a0 : +dayStart(days[0]), z0 = win ? win.z0 : +dayStart(AGD() ? AGD().addDays(days[days.length - 1], 1) : days[0]) || a0 + 24 * HR;
     if (!win) CAL = { stops, a0, z0, days, today };
     const y = ms => Math.round((ms - a0) / HR * CAL_PX), H = y(z0);
-    let out = `<div class="cal" style="height:${H + 8}px">`;
+    // bookings sit out of the column (d71): one quiet line above it says what is booked and until when
+    const bk = AGD() ? stops.filter(st => !st.free && AGD().isLong(st) && +st.e > a0 && +st.s < z0) : [];
+    let out = bk.map(st => `<div class="cal-bk">Booking: ${esc(st.t)} until ${new Date(st.e).toLocaleDateString("en-US", { weekday:"short" })} ${fmtT(st.e)}</div>`).join("") +
+      `<div class="cal" style="height:${H + 8}px">`;
     // each day from its own midnight (a clock change makes a day 23 or 25 hours): a day line with the date, then hour lines;
     // an hour label right next to the now line would sit under its time, so that one is left off
     days.forEach((d, i) => {
@@ -4594,7 +4598,7 @@
       out += `<div class="cal-hr" style="top:${y(h)}px">${Math.abs(h - t) < 15 * 60000 ? "" : `<span>${fmtT(new Date(h)).replace(":00", "")}</span>`}</div>`;
     const ctx = dragCtx();
     // open space under 15 minutes is left off: drawn at its minimum height it spilled over the block below (Junyan, 2026-10-16)
-    const ev = AGD() ? AGD().lanes(stops.map((st, i) => ({ st, i, s:Math.max(+st.s, a0), e:Math.min(+st.e, z0) })).filter(x => x.e > x.s && !(x.st.free && x.e - x.s < 15 * 60000))) : [];
+    const ev = AGD() ? AGD().timelineLanes(stops.map((st, i) => ({ st, i, s:Math.max(+st.s, a0), e:Math.min(+st.e, z0) })).filter(x => x.e > x.s && !(x.st.free && x.e - x.s < 15 * 60000))) : [];
     for (const { st, i, s, e, lane, n } of ev) {
       const b0 = st.blocks[0], isCur = cur && st.blocks.some(b => b.key === cur.key) && (!st.free || (t >= st.s && t < st.e)), past = st.e <= t && !isCur, game = !!b0.game;
       const c = st.free ? "" : calColor(b0), top = y(s) + 1, h = Math.max(18, y(e) - y(s) - 2);
