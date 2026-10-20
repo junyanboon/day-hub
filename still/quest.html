@@ -2763,7 +2763,7 @@
     sh.querySelectorAll("[data-kv]").forEach(bn => bn.onclick = () => { S.view = bn.dataset.kv; S.msg = ""; S.keep.clear(); redraw(); });
     // switching kitchens is his pick for today: dinner ticks use it too
     sh.querySelectorAll("[data-kk]").forEach(bn => bn.onclick = () => { const x = bn.dataset.kk; if (x === S.k) return;
-      S.k = x; S.msg = ""; S.fill = null; S.keep.clear(); if (x !== kitToday()) { kitSave(QK().pick(G.kitchen, x, gameYmd(), now())); log(`Kitchen in use today: ${QK().KITCHENS[x].name}`); } redraw(); });
+      S.k = x; S.msg = ""; S.fill = null; S.noBring = false; S.keep.clear(); if (x !== kitToday()) { kitSave(QK().pick(G.kitchen, x, gameYmd(), now())); log(`Kitchen in use today: ${QK().KITCHENS[x].name}`); } redraw(); });
     sh.querySelectorAll("[data-khome]").forEach(bn => bn.onclick = () => { const x = bn.dataset.khome; S.home.has(x) ? S.home.delete(x) : S.home.add(x); redraw(); });
     if ($("kHomeGo")) $("kHomeGo").onclick = () => { const n = S.home.size; kitSave(QK().bringHome(G.kitchen, [...S.home], now()));
       log(`Trip over: ${n} item${n === 1 ? "" : "s"} brought home, travel fridge emptied`); S.home = null; S.k = kitToday(); redraw(); };
@@ -2848,7 +2848,7 @@
     const F = S.fill, q = F.q.trim().toLowerCase(), k = S.k, shelves = QK().KITCHENS[k].shelves;
     const rows = kitFillRows(S).filter(r => F.on.has(r.id) || !q || r.name.toLowerCase().includes(q));
     const shelfName = id => (shelves.find(x => x.id === id) || {}).name || "";
-    const note = r => r.item ? (r.lv == null ? "Not checked" : KLV[r.lv]) : r.src === "home" ? "From Home" : r.src === "starter" ? "Often packed" : "New";
+    const note = r => r.item ? (r.lv == null ? "Not checked" : KLV[r.lv]) : r.src === "home" ? (F.use === "bring" ? "From Home" : "Not here yet") : r.src === "starter" ? "Often packed" : "New";
     const row = r => `<button type="button" class="kt-li kt-pk" data-kpk="${esc(r.id)}" aria-pressed="${F.on.has(r.id)}"><span class="bx"></span><span class="e">${esc(r.em || "🛒")}</span>` +
       `<span class="n">${esc(r.name)}<small>${esc(note(r))}</small></span><span class="q">${esc(shelfName(r.shelf))}</span></button>`;
     const top = rows.filter(r => r.top), rest = rows.filter(r => !r.top);
@@ -2877,14 +2877,14 @@
     });
     bindRows();
     $("kFq").oninput = e => { F.q = e.target.value; $("kFl").innerHTML = kitFillList(S); bindRows(); };
-    $("kFback").onclick = () => { S.fill = null; S.noBring = true; redraw(); };
+    $("kFback").onclick = () => { if (F.use === "bring") S.noBring = true; S.fill = null; redraw(); };
     $("kFgo").onclick = () => {
       const picks = kitFillRows(S).filter(r => F.on.has(r.id)), bring = F.use === "bring";
       const r = QK().fill(G.kitchen, S.k, picks, now(), bring ? "bring" : "buy"); if (!r.n) return;
       kitSave(r.K);
       const what = `${r.n} item${r.n === 1 ? "" : "s"}`, kn = QK().KITCHENS[S.k].name;
       log(`Kitchen: ${what} ${bring ? "brought" : "bought"} (${kn})`);
-      S.fill = null; S.noBring = true; S.view = "have"; S.f = "all"; S.q = ""; S.keep.clear();
+      S.fill = null; S.view = "have"; S.f = "all"; S.q = ""; S.keep.clear();
       redraw(); $("sheet").scrollTop = 0;
       undoToast(`${what} ${bring ? "in the travel fridge" : "set to plenty"}`, () => { kitSave(QK().unfill(G.kitchen, r.undo, now())); log(`Kitchen: ${what} taken back`); kitRedraw(); }, 8000);
     };
