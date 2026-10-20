@@ -586,7 +586,7 @@
   .mq-dst { margin-left:auto; font-size:12px; color:var(--ink-soft); } .mq-dst.ok { color:#8fe3b0; font-weight:700; }
   .mq-dbtn:focus-visible, .mq-ing:focus-visible, .mq-mini:focus-visible { outline:2px solid #5fd3c4; outline-offset:2px; }
   /* the kitchen (2026-10-20, d25 to d30): the Kitchen card under the water card, and its sheet. Levels: Plenty green, Half
-     lime, Low amber, Out red and dashed, not checked yet grey and dashed. Chips stay small: there are a lot of items. */
+     lime, Low gold, Out soft red, not checked yet grey and dashed. */
   .kq { width:100%; text-align:left; color:var(--ink); font:inherit; cursor:pointer; }
   .kq.ask { border-color:rgba(255,194,122,.7); }
   .kq-go { flex:none; font-size:20px; color:var(--ink-soft); }
@@ -616,24 +616,46 @@
   .kt-lb.f { color:#7fd0ff; } .kt-lb.p { color:var(--gold); }
   .kt-lb small, .kt-lb b { letter-spacing:0; text-transform:none; font-weight:500; color:var(--ink-soft); font-size:11.5px; }
   .kt-lb b { margin-left:auto; font-variant-numeric:tabular-nums; }
-  .kt-ok { flex:none; font:inherit; font-size:12px; font-weight:600; color:#8fe3b0; background:transparent; border:1px solid #8fe3b0; border-radius:999px; padding:4px 10px; white-space:nowrap; }
-  .kt-ok.done { color:var(--ink-soft); border-color:var(--glass-border); }
-  .kt-items { display:flex; flex-wrap:wrap; gap:5px; }
-  .ki { font:inherit; font-size:12.5px; color:var(--ink); background:var(--glass); border:1px solid transparent; border-radius:999px; padding:3px 9px 3px 5px;
-    display:flex; align-items:center; gap:5px; -webkit-tap-highlight-color:transparent; touch-action:manipulation; transition:transform .1s; }
-  .ki:active { transform:scale(.93); }
-  .ki .e { font-size:15px; line-height:1; }
-  .ki .lv { width:24px; height:7px; border-radius:4px; background:rgba(0,0,0,.3); overflow:hidden; flex:none; }
-  .ki .lv i { display:block; height:100%; border-radius:4px; width:0; }
-  .ki .tag { font-size:10.5px; font-weight:700; }
-  .ki.L3 .lv i { width:100%; background:#8fe3b0; } .ki.L2 .lv i { width:55%; background:#c7e07a; }
-  .ki.L1 .lv i { width:22%; background:var(--warn); } .ki.L1 .tag, .ki.soon .tag { color:var(--warn); }
-  .ki.L0 { background:transparent; border:1px dashed rgba(255,156,156,.7); } .ki.L0 .tag { color:var(--bad); }
-  .ki.Ln { background:transparent; border:1px dashed var(--glass-border); color:var(--ink-soft); } .ki.Ln .e { opacity:.6; } .ki.Ln .lv { display:none; }
-  .ki.turn { border-color:var(--warn); }
+  /* fixed tiles (2026-10-20, d34: "When I click on the ingredient the whole pill changes size with the text"): a grid, 2 across
+     on a phone and 3 when wider, every tile the same size. A tap changes colours and the status line only; nothing resizes
+     or moves. The 3-bar meter fills like a battery. Low: gold outline. Out: soft red. Not checked: dashed. */
+  .kt-grp { margin:0 -4px; padding:0 4px 4px; border-radius:12px; transition:background .12s, box-shadow .12s; }
+  .kt-gh { font-size:11.5px; font-weight:600; color:var(--ink-soft); margin:6px 2px 4px; }
+  .kt-sh { border-radius:10px; }
+  .kt-grp.over, .kt-sh.over, .kt-tray .kt-chip.over { background:rgba(95,211,196,.18); box-shadow:inset 0 0 0 1.5px #5fd3c4; }
+  .kt-items { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:6px; }
+  @media (min-width:480px) { .kt-items { grid-template-columns:repeat(3, minmax(0, 1fr)); } }
+  .ki { font:inherit; color:var(--ink); background:var(--glass); border:1.5px solid transparent; border-radius:12px; padding:0 8px; height:52px; width:100%; min-width:0;
+    display:grid; grid-template-columns:22px minmax(0, 1fr) 22px; align-items:center; gap:7px; text-align:left; cursor:pointer;
+    -webkit-tap-highlight-color:transparent; -webkit-touch-callout:none; -webkit-user-select:none; user-select:none; touch-action:manipulation;
+    transition:background .15s, border-color .15s; }
+  .ki:active { background:rgba(255,255,255,.2); }
+  .ki .e { font-size:18px; line-height:1; text-align:center; }
+  .ki .tx { min-width:0; display:flex; flex-direction:column; line-height:1.25; }
+  .ki .nm { font-size:13px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .ki .st { font-size:11px; color:var(--ink-soft); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .ki .pips { display:grid; grid-template-rows:repeat(3, 6px); gap:3px; justify-items:end; }
+  .ki .pips i { width:20px; height:6px; border-radius:3px; background:rgba(0,0,0,.28); border:1px solid rgba(255,255,255,.16); }
+  .ki.L3 .pips i { background:#8fe3b0; border-color:#8fe3b0; }
+  .ki.L2 .pips i:nth-child(n+2) { background:#c7e07a; border-color:#c7e07a; }
+  .ki.L1 .pips i:nth-child(3) { background:var(--gold); border-color:var(--gold); }
+  .ki.L1 { border-color:rgba(255,212,121,.75); } .ki.L1 .st, .ki.soon .st { color:var(--gold); }
+  .ki.L0 { background:rgba(0,0,0,.16); border-color:rgba(255,156,156,.6); } .ki.L0 .st { color:var(--bad); } .ki.L0 .nm { color:var(--ink-soft); }
+  .ki.Ln { background:transparent; border:1.5px dashed var(--glass-border); } .ki.Ln .nm { color:var(--ink-soft); } .ki.Ln .e { opacity:.6; }
+  /* hold and drag a tile onto another group or shelf (d34): the tile lifts, the group under the finger lights up */
+  .ki.held { opacity:.35; }
+  .ki-ghost { position:fixed; z-index:90; pointer-events:none; background:#57509a; box-shadow:0 12px 28px rgba(0,0,0,.45); transition:transform .14s ease-out; }
+  .ki-ghost.up { transform:scale(1.06) rotate(-1.5deg); }
+  .kt-tray { position:fixed; left:50%; bottom:0; transform:translateX(-50%); width:min(480px, 100%); z-index:85; padding:10px 12px calc(env(safe-area-inset-bottom) + 12px);
+    background:#2c2860; border-radius:18px 18px 0 0; box-shadow:0 -8px 24px rgba(0,0,0,.4); }
+  .kt-tray p { margin:0 0 6px; font-size:12px; color:var(--ink-soft); }
+  .kt-tray .kt-tools { margin-top:0; gap:5px; }
+  .kt-tray .kt-chip { padding:5px 9px; font-size:12px; }
+  @media (prefers-reduced-motion: reduce) { .ki, .kt-grp { transition:none; } .ki-ghost, .ki-ghost.up { transition:none; transform:none; } }
+  .kt-pick { margin-top:4px; }
+  .kt-pick .kt-tools { margin-top:4px; gap:5px; }
+  .kt-pick .win-lb { margin-top:10px; }
   .kt-add { display:flex; gap:6px; margin-top:14px; align-items:center; }
-  .kt-sel { flex:none; max-width:110px; font:inherit; font-size:13px; padding:8px 6px; border-radius:12px; border:1px solid var(--glass-border); background:rgba(255,255,255,.08); color:var(--ink); }
-  .kt-sel option { color:#111; }
   .kt-ask { margin-top:12px; padding:10px 12px; border-radius:14px; background:rgba(0,0,0,.22); border:1px solid rgba(255,194,122,.7); display:flex; flex-direction:column; gap:8px; }
   .kt-ask p { margin:0; font-size:12.5px; }
   .kt-list { display:flex; flex-direction:column; gap:5px; margin-top:6px; }
@@ -646,7 +668,7 @@
   .kt-li[aria-pressed="true"] { border-color:rgba(95,211,196,.8); background:rgba(95,211,196,.18); }
   .kt-li[aria-pressed="true"] .bx { background:#5fd3c4; border-color:#5fd3c4; } .kt-li[aria-pressed="true"] .bx::after { content:"✓"; }
   .kt-toast { margin-top:8px; padding:8px 12px; border-radius:12px; border:1px solid #5fd3c4; color:#8fe3b0; font-size:13px; font-weight:600; }
-  .ki:focus-visible, .kt-li:focus-visible, .kt-ok:focus-visible, .kt-chip:focus-visible, .kt-seg button:focus-visible, .kq:focus-visible { outline:2px solid var(--gold); outline-offset:2px; }
+  .ki:focus-visible, .kt-li:focus-visible, .kt-chip:focus-visible, .kt-seg button:focus-visible, .kq:focus-visible { outline:2px solid var(--gold); outline-offset:2px; }
   .wck { display:flex; gap:10px; align-items:center; width:100%; text-align:left; padding:11px 2px; border-top:1px solid rgba(255,255,255,.08); font-size:15px; color:var(--ink); background:none; }
   .wck .bx { width:22px; height:22px; border-radius:6px; border:2px solid var(--ink-faint); flex:none; display:flex; align-items:center; justify-content:center; font-size:14px; }
   .wck.on .bx { background:#85B7EB; border-color:#85B7EB; color:#0c3a66; }
@@ -877,7 +899,7 @@
 <script src="quest-levels.js?v=20261016b"></script>
 <script src="quest-gymlog.js?v=20261019a"></script>
 <script src="quest-meals.js?v=20261020s"></script>
-<script src="quest-kitchen.js?v=20261020k4"></script>
+<script src="quest-kitchen.js?v=20261020k5"></script>
 <script src="quest-trends.js?v=20261019end3"></script>
 <script src="nvc-words.js?v=20261010a"></script>
 <script src="quest-fx.js?v=20261019x"></script>
@@ -2659,12 +2681,14 @@
       `<span class="sq-t">Kitchen · ${kn.icon} ${esc(kn.name)}<small>${esc(bits.join(" · ") || "Nothing low")}</small></span><span class="kq-go">›</span></button>`;
   }
   /* The kitchen sheet. KS keeps what he chose while it is open (the sheet redraws on every tap): which kitchen he is
-     looking at, the tab, the search, the Low or out filter, edit mode, the trip-end ticks. */
+     looking at, the tab, the search, the filter (f: all, buy, new; d34), edit mode, the trip-end ticks, the add pickers
+     (add: the group and shelf, guessed until he picks one), and keep: the items he tapped under a filter, which stay on
+     screen until the filter changes so a tile never vanishes from under his finger. */
   let KS = null;
   const KLV = ["Out", "Low", "Half", "Plenty"];
   function openKitchen(o){
     if (!QK()) return;
-    if (o || !KS) KS = { k:kitToday(), view:"have", q:"", low:false, edit:false, block:null, home:null, msg:"", ...(o || {}) };
+    if (o || !KS) KS = { k:kitToday(), view:"have", q:"", f:"all", keep:new Set(), add:{ g:null, sh:null, gT:false, shT:false }, edit:false, block:null, home:null, msg:"", ...(o || {}) };
     const S = KS, K = G.kitchen, k = S.k, kn = QK().KITCHENS[k], today = kitToday(), shop = kitShop(k), t = now();
     const all = QK().items(K, k), L = QK().shopList(K, k, t, shop.at, kitDishes()), end = kitTripEnd();
     const sw = b => `${QK().dayWord(+b.s, t, TZ())} ${fmtT(new Date(b.s))}`;
@@ -2689,13 +2713,18 @@
       const first = QK().useFirst(K, k, t);
       body = (first.length ? `<div class="kt-first"><b>Use first:</b> ${first.map(x => `${esc(x.it.name)} (${x.at <= +t ? "check it" : QK().dayWord(x.at, t, TZ())})`).join(", ")}</div>` : "") +
         `<div class="kt-tools"><input class="kt-q" id="kQ" type="search" placeholder="Find an item" autocomplete="off" value="${esc(S.q)}">` +
-        `<button type="button" class="kt-chip" id="kLow" aria-pressed="${S.low}">Low or out</button><button type="button" class="kt-chip" id="kEdit" aria-pressed="${S.edit}">Edit</button></div>` +
+        `<button type="button" class="kt-chip" id="kEdit" aria-pressed="${S.edit}">Edit</button></div>` +
+        // the filters (d34): All, To buy, Not checked (d32: the Not checked filter is the way through first setup)
+        `<div class="kt-tools" role="group" aria-label="Show">${[["all", "All", all.length], ["buy", "To buy", all.filter(x => QK().shows(x, "buy", t, shop.at)).length],
+          ["new", "Not checked", all.filter(x => x.lv == null).length]].map(([f, n, c]) =>
+          `<button type="button" class="kt-chip" data-kf="${f}" aria-pressed="${S.f === f}">${n} ${c}</button>`).join("")}</div>` +
         `<div class="kt-key"><span><i class="l3"></i>Plenty</span><span><i class="l2"></i>Half</span><span><i class="l1"></i>Low</span><span><i class="l0"></i>Out</span><span><i class="ln"></i>Not checked</span></div>` +
-        `<p class="kt-hint">${S.edit ? "Edit: tap an item to rename it, move it to another shelf or delete it." : "Tap an item to step it down. Out goes back to Plenty."}</p>` +
+        `<p class="kt-hint">${S.edit ? "Edit: tap an item to rename it, change its group or shelf, or delete it."
+          : S.f === "new" ? "Tap each one you have: one tap marks it Plenty, the next steps it down. Hold one to drag it to another group."
+          : "Tap an item to step it down. Out goes back to Plenty. Hold one to drag it to another group or shelf."}</p>` +
         `<div id="kShelves">${kitShelves(S, K, k, shop, t)}</div>` +
         `<div class="kt-add"><input class="kt-q" id="kNew" placeholder="Add something new" autocomplete="off" maxlength="40">` +
-        `<select class="kt-sel" id="kNewShelf" aria-label="Which shelf">${kn.shelves.map(s => `<option value="${s.id}">${esc(s.name)}</option>`).join("")}</select>` +
-        `<button type="button" class="mq-mini go" id="kAdd">Add</button></div>`;
+        `<button type="button" class="mq-mini go" id="kAdd">Add</button></div><div class="kt-pick" id="kPick" hidden></div>`;
     } else {
       const sized = L.dinners === 1 ? "the day" : `the ${L.dinners} days`;
       const upto = shop.block ? `before ${shop.soon ? "the shop after this one" : "your next shop"} (${sw(shop.block)})`
@@ -2725,63 +2754,188 @@
     if ($("kHomeNone")) $("kHomeNone").onclick = () => { kitSave(QK().bringHome(G.kitchen, [], now())); log("Trip over: travel fridge emptied"); S.home = null; S.k = kitToday(); redraw(); };
     if ($("kEditBlk")) $("kEditBlk").onclick = () => openEdit(S.block);
     if (S.view === "have") {
-      $("kQ").oninput = e => { S.q = e.target.value; $("kShelves").innerHTML = kitShelves(S, G.kitchen, S.k, kitShop(S.k), now()); bindShelves(); };
-      $("kLow").onclick = () => { S.low = !S.low; redraw(); };
+      $("kQ").oninput = e => { S.q = e.target.value; S.keep.clear(); $("kShelves").innerHTML = kitShelves(S, G.kitchen, S.k, kitShop(S.k), now()); bindShelves(); };
+      sh.querySelectorAll("[data-kf]").forEach(bn => bn.onclick = () => { S.f = bn.dataset.kf; S.keep.clear(); redraw(); });
       $("kEdit").onclick = () => { S.edit = !S.edit; redraw(); };
-      const addIt = () => { const nm = $("kNew").value.trim(); if (!nm) return;
-        const r = QK().add(G.kitchen, S.k, $("kNewShelf").value, nm, now()); kitSave(r.K); redraw(); };
-      $("kAdd").onclick = addIt;
-      $("kNew").onkeydown = e => { if (e.key === "Enter") addIt(); };
-      const bindShelves = () => {
-        sh.querySelectorAll("[data-kit]").forEach(bn => bn.onclick = () => {
-          if (S.edit) return openKitchenItem(bn.dataset.kit);
-          kitSave(QK().tap(G.kitchen, bn.dataset.kit, now())); redraw();
-          const el = sh.querySelector(`[data-kit="${CSS.escape(bn.dataset.kit)}"]`); if (el && window.QuestFx) QuestFx.pop(el);
-        });
-        sh.querySelectorAll("[data-kok]").forEach(bn => bn.onclick = () => { kitSave(QK().looksRight(G.kitchen, S.k, bn.dataset.kok, now())); redraw(); });
+      /* adding (d34): as he types, the guessed group and shelf show as picked chips among all of them, changeable before Add */
+      const A = S.add, kn_ = QK().KITCHENS[S.k];
+      const fillPick = () => {
+        const v = $("kNew").value.trim(), P = $("kPick");
+        if (!v) { P.hidden = true; P.innerHTML = ""; A.gT = A.shT = false; return; }
+        if (!A.gT) A.g = QK().guessGroup(v);
+        if (!A.shT || !kn_.shelves.some(x => x.id === A.sh)) A.sh = QK().guessShelf(S.k, A.g);
+        P.hidden = false;
+        P.innerHTML = `<div class="win-lb">Group</div><div class="kt-tools">${QK().GROUP_NAMES.map(g => `<button type="button" class="kt-chip" data-kag="${esc(g)}" aria-pressed="${g === A.g}">${esc(g)}</button>`).join("")}</div>` +
+          `<div class="win-lb">Shelf</div><div class="kt-tools">${kn_.shelves.map(x => `<button type="button" class="kt-chip" data-kash="${x.id}" aria-pressed="${x.id === A.sh}">${esc(x.name)}</button>`).join("")}</div>`;
+        P.querySelectorAll("[data-kag]").forEach(bn => bn.onclick = () => { A.g = bn.dataset.kag; A.gT = true; if (!A.shT) A.sh = QK().guessShelf(S.k, A.g); fillPick(); });
+        P.querySelectorAll("[data-kash]").forEach(bn => bn.onclick = () => { A.sh = bn.dataset.kash; A.shT = true; fillPick(); });
       };
+      $("kNew").oninput = fillPick;
+      const addIt = (refocus) => { const nm = $("kNew").value.trim(); if (!nm) return;
+        fillPick();
+        const r = QK().add(G.kitchen, S.k, A.sh, nm, now(), A.g); kitSave(r.K);
+        const it = r.id && QK().item(G.kitchen, r.id);
+        S.add = { g:null, sh:null, gT:false, shT:false }; redraw();
+        if (it) calToast(`${it.name}: ${(kn_.shelves.find(x => x.id === it.shelf) || {}).name || ""} · ${it.group}`);
+        if (refocus && $("kNew")) $("kNew").focus(); };
+      $("kAdd").onclick = () => addIt(false);
+      $("kNew").onkeydown = e => { if (e.key === "Enter") addIt(true); };
+      function bindShelves(){
+        sh.querySelectorAll("#kShelves [data-kit]").forEach(bn => bn.onclick = () => {
+          if (S.edit) return openKitchenItem(bn.dataset.kit);
+          if (S.f !== "all") S.keep.add(bn.dataset.kit);   // it stays in view until the filter changes
+          kitSave(QK().tap(G.kitchen, bn.dataset.kit, now())); redraw();
+        });
+      }
       bindShelves();
+      wireKitchenDrag();
     } else {
       sh.querySelectorAll("[data-kbuy]").forEach(bn => bn.onclick = () => { S.msg = ""; kitSave(QK().tick(G.kitchen, bn.dataset.kbuy, now())); redraw(); });
       $("kBought").onclick = () => { const r = QK().buyTicked(G.kitchen, S.k, now()); kitSave(r.K);
         S.msg = r.n ? `${r.n} item${r.n === 1 ? "" : "s"} set to plenty.` : ""; if (r.n) log(`Kitchen: ${r.n} item${r.n === 1 ? "" : "s"} bought`); redraw(); };
     }
   }
-  // the shelves (redrawn on their own while he types in the search box, so it keeps focus)
+  /* the shelves (redrawn on their own while he types in the search box, so it keeps focus). Inside each shelf, food groups
+     in a fixed order, each alphabetical (d34), so nothing jumps when a level changes. Each group and each shelf heading is
+     a place a held tile can be dropped (data-kdrop: "shelf|group"; an empty group keeps the item's own). */
   function kitShelves(S, K, k, shop, t){
-    const q = S.q.trim().toLowerCase(), checkedToday = x => { const a = QK().shelfAt(K, k, x); return !!a && tzYmd(new Date(a)) === tzYmd(t); };
-    const all = QK().items(K, k);
+    const q = S.q.trim().toLowerCase(), tz = TZ();
+    const all = QK().items(K, k), shown_ = x => S.keep.has(x.id) || ((!q || x.name.toLowerCase().includes(q)) && QK().shows(x, S.f, t, shop.at));
     const html = QK().KITCHENS[k].shelves.map(sh => {
-      const mine = all.filter(x => x.shelf === sh.id), shown = mine.filter(x => (!q || x.name.toLowerCase().includes(q)) && (!S.low || (x.lv != null && x.lv <= 1)));
-      if (!shown.length && (q || S.low)) return "";
-      const low = mine.filter(x => x.lv != null && x.lv <= 1).length, grey = mine.filter(x => x.lv == null).length, ok = checkedToday(sh.id);
-      return `<div class="kt-shelf"><div class="kt-sh"><div class="kt-lb ${sh.cls}"><span>${esc(sh.name)}</span><small>${mine.length} item${mine.length === 1 ? "" : "s"}${low ? `, ${low} low or out` : ""}${grey ? `, ${grey} not checked` : ""}</small></div>` +
-        `<button type="button" class="kt-ok${ok ? " done" : ""}" data-kok="${sh.id}">${ok ? "Checked ✓" : "Looks right"}</button></div>` +
-        `<div class="kt-items">${shown.map(x => { const soon = QK().lowSoon(x, t, shop.at), turn = QK().turnAt(x), use = turn != null && turn - +t <= 2 * 86400000;
-          const tag = x.lv === 0 ? "Out" : x.lv === 1 ? "Low" : soon ? `low by ${QK().dayWord(QK().lowAt(x, t), t, TZ())}` : "";
-          return `<button type="button" class="ki L${x.lv == null ? "n" : x.lv}${use ? " turn" : ""}${soon ? " soon" : ""}" data-kit="${esc(x.id)}" ` +
-            `aria-label="${esc(x.name)}, ${x.lv == null ? "not checked yet" : KLV[x.lv].toLowerCase()}. ${S.edit ? "Tap to edit." : "Tap to change."}">` +
-            `<span class="e">${esc(x.em)}</span>${esc(x.name)}<span class="lv"><i></i></span>${tag ? `<span class="tag">${esc(tag)}</span>` : ""}</button>`; }).join("") ||
-          `<span class="kt-hint">Nothing here yet.</span>`}</div></div>`;
+      const mine = all.filter(x => x.shelf === sh.id), shown = mine.filter(shown_);
+      if (!shown.length && (q || S.f !== "all")) return "";
+      const buy = mine.filter(x => QK().shows(x, "buy", t, shop.at)).length, grey = mine.filter(x => x.lv == null).length;
+      return `<div class="kt-shelf" data-ksh="${sh.id}"><div class="kt-sh" data-kdrop="${sh.id}|"><div class="kt-lb ${sh.cls}"><span>${esc(sh.name)}</span>` +
+        `<small>${mine.length} item${mine.length === 1 ? "" : "s"}${buy ? `, ${buy} to buy` : ""}${grey ? `, ${grey} not checked` : ""}</small></div></div>` +
+        (shown.length ? QK().grouped(shown).map(g => `<div class="kt-grp" data-kdrop="${sh.id}|${esc(g.group)}"><p class="kt-gh">${esc(g.group)}</p>` +
+          `<div class="kt-items">${g.list.map(x => kitTile(x, S, t, shop, tz)).join("")}</div></div>`).join("")
+          : `<p class="kt-hint" data-kdrop="${sh.id}|">Nothing here yet.</p>`) + `</div>`;
     }).join("");
-    return html || `<p class="kt-hint">${q ? "Nothing matches." : "Nothing is low or out."}</p>`;
+    return html || `<p class="kt-hint">${q ? "Nothing matches." : S.f === "buy" ? "Nothing to buy." : "Everything has been checked."}</p>`;
   }
-  // edit one item: rename, move to another shelf, take it off
+  // one tile (d34): icon, name on one line, the status line, and the 3-bar meter. The same size whatever it says.
+  function kitTile(x, S, t, shop, tz){
+    const st = QK().status(x, t, shop.at, tz), soon = x.lv != null && x.lv >= 2 && QK().lowSoon(x, t, shop.at);
+    return `<button type="button" class="ki L${x.lv == null ? "n" : x.lv}${soon ? " soon" : ""}" data-kit="${esc(x.id)}" ` +
+      `aria-label="${esc(x.name)}, ${esc(st)}. ${S.edit ? "Tap to edit." : "Tap to change, hold to move."}">` +
+      `<span class="e">${esc(x.em)}</span><span class="tx"><span class="nm">${esc(x.name)}</span><span class="st">${esc(st)}</span></span>` +
+      `<span class="pips" aria-hidden="true"><i></i><i></i><i></i></span></button>`;
+  }
+  // redraw the kitchen sheet where it was (when it is the sheet on screen), and the main screen
+  function kitRedraw(){
+    const sh = $("sheet");
+    if ($("kShelves") && KS) { const top = sh.scrollTop; openKitchen(); sh.scrollTop = top; }
+    render();
+  }
+  /* Move an item to a group and shelf (a drag or Edit, d34), with a toast that can undo it. */
+  function kitPlace(id, shelf, group){
+    const it = QK().item(G.kitchen, id); if (!it) return;
+    const K2 = QK().place(G.kitchen, id, shelf, group, now()); if (K2 === G.kitchen) return;
+    kitSave(K2); kitRedraw();
+    const n = QK().item(K2, id), shn = QK().KITCHENS[n.k].shelves.find(x => x.id === n.shelf);
+    log(`Kitchen: ${n.name} to ${n.group}${n.shelf !== it.shelf ? `, ${shn.name}` : ""}`);
+    undoToast(`${n.name}: ${n.group}${n.shelf !== it.shelf ? ` · ${shn.name}` : ""}`, () => { kitSave(QK().place(G.kitchen, id, it.shelf, it.group, now())); kitRedraw(); }, 6000);
+  }
+  /* Hold and drag a tile onto another group or shelf (Junyan, 2026-10-20: "Maybe I can drag things into the correct
+     category?"). On a phone a drag starts only after a still press of KHOLD_MS, so a swipe still scrolls and a tap still
+     steps the level; a mouse drags after a small move. While held: the tile lifts, the group under the finger lights up,
+     and a tray at the bottom offers every group (for groups that have nothing on that shelf yet). Dropping saves the
+     group, and the shelf when it moved across shelves, with an Undo toast. Wired once on the sheet element (its
+     innerHTML is replaced on every redraw). Pointer events, no library. */
+  const KHOLD_MS = 400;
+  let KD = null, kdEnded = 0;
+  function wireKitchenDrag(){
+    const sh = $("sheet"); if (sh._kd) return; sh._kd = true;
+    const shelfName = (k, id) => ((QK().KITCHENS[k] || { shelves:[] }).shelves.find(x => x.id === id) || {}).name || "";
+    const at = (x, y) => { const el = document.elementFromPoint(x, y); return el && el.closest("#kShelves [data-kdrop], .kt-tray [data-kdrop]"); };
+    const follow = () => {
+      const d = KD; if (!d || !d.live) return;
+      d.ghost.style.left = (d.x - d.dx) + "px"; d.ghost.style.top = (d.y - d.dy) + "px";
+      const el = at(d.x, d.y), inShelf = el && el.closest("[data-ksh]");
+      if (inShelf && inShelf.dataset.ksh !== d.shelf) { d.shelf = inShelf.dataset.ksh; d.tray.querySelector("b").textContent = shelfName(d.k, d.shelf); }
+      if (d.over !== el) { if (d.over) d.over.classList.remove("over"); d.over = el; if (el) el.classList.add("over"); }
+    };
+    const begin = () => {
+      const d = KD; if (!d || d.live || !document.body.contains(d.el)) { KD = null; return; }
+      clearTimeout(d.timer);
+      const it = QK().item(G.kitchen, d.kid); if (!it) { KD = null; return; }
+      const r = d.el.getBoundingClientRect();
+      Object.assign(d, { live:true, k:it.k, shelf:it.shelf, dx:d.x0 - r.left, dy:d.y0 - r.top, over:null });
+      const g = d.el.cloneNode(true); g.classList.add("ki-ghost"); g.removeAttribute("data-kit"); g.setAttribute("aria-hidden", "true");
+      Object.assign(g.style, { left:r.left + "px", top:r.top + "px", width:r.width + "px" });
+      document.body.appendChild(g); d.ghost = g;
+      requestAnimationFrame(() => g.classList.add("up"));
+      const tray = document.createElement("div"); tray.className = "kt-tray"; tray.setAttribute("aria-hidden", "true");
+      tray.innerHTML = `<p>Drop on a group · <b>${esc(shelfName(it.k, it.shelf))}</b></p><div class="kt-tools">${QK().GROUP_NAMES.map(x =>
+        `<span class="kt-chip" data-kdrop="|${esc(x)}"${x === it.group ? ' aria-pressed="true"' : ""}>${esc(x)}</span>`).join("")}</div>`;
+      document.body.appendChild(tray); d.tray = tray;
+      d.el.classList.add("held");
+      try { d.el.setPointerCapture(d.id); } catch {}
+      if (d.touch && navigator.vibrate) try { navigator.vibrate(15); } catch {}
+      // near the top of the sheet or just above the tray, the sheet scrolls by itself
+      const loop = () => { if (KD !== d || !d.live) return;
+        const top = sh.getBoundingClientRect().top, bottom = tray.getBoundingClientRect().top, edge = 48;
+        const v = d.y < top + edge ? -Math.ceil((top + edge - d.y) / 5) : d.y > bottom - edge && d.y < bottom ? Math.ceil((d.y - bottom + edge) / 5) : 0;
+        if (v) { sh.scrollTop += v; follow(); }
+        requestAnimationFrame(loop); };
+      requestAnimationFrame(loop);
+      follow();
+    };
+    const end = (cancel) => {
+      const d = KD; KD = null; if (!d) return;
+      clearTimeout(d.timer);
+      if (!d.live) return;
+      kdEnded = Date.now();
+      if (d.over) d.over.classList.remove("over");
+      d.ghost.remove(); d.tray.remove(); d.el.classList.remove("held");
+      if (cancel || !d.over) return;
+      const [s0, g0] = d.over.dataset.kdrop.split("|");
+      kitPlace(d.kid, s0 || d.shelf, g0 || null);
+    };
+    sh.addEventListener("pointerdown", e => {
+      if (e.button > 0) return;
+      if (KD) { if (KD.live) return; clearTimeout(KD.timer); KD = null; }
+      const el = e.target.closest("#kShelves .ki[data-kit]"); if (!el) return;
+      const touch = e.pointerType !== "mouse";
+      KD = { el, kid:el.dataset.kit, id:e.pointerId, x0:e.clientX, y0:e.clientY, x:e.clientX, y:e.clientY, touch, live:false };
+      if (touch) KD.timer = setTimeout(() => { if (KD && !KD.live) begin(); }, KHOLD_MS);
+    });
+    addEventListener("pointermove", e => {
+      const d = KD; if (!d || e.pointerId !== d.id) return;
+      d.x = e.clientX; d.y = e.clientY;
+      if (d.live) { e.preventDefault(); follow(); return; }
+      const far = Math.hypot(d.x - d.x0, d.y - d.y0);
+      if (d.touch) { if (far > 8) { clearTimeout(d.timer); KD = null; } }   // the finger moved first: a scroll, not a hold
+      else if (far > 6) begin();
+    }, { passive:false });
+    addEventListener("pointerup", e => { if (KD && e.pointerId === KD.id) end(false); });
+    addEventListener("pointercancel", e => { if (KD && e.pointerId === KD.id) end(true); });
+    addEventListener("blur", () => { if (KD) end(true); });
+    // once a tile is held, the finger moves it instead of scrolling the sheet
+    sh.addEventListener("touchmove", e => { if (KD && KD.live) e.preventDefault(); }, { passive:false });
+    sh.addEventListener("contextmenu", e => { if (e.target.closest("#kShelves .ki")) e.preventDefault(); });
+    // the click that ends a hold or a drag is not a tap
+    sh.addEventListener("click", e => { if (Date.now() - kdEnded < 450 && e.target.closest("#kShelves")) { e.stopPropagation(); e.preventDefault(); } }, true);
+  }
+  // edit one item: rename, its group and shelf (the way that is not a drag, d34), take it off
   function openKitchenItem(id){
     const it = QK().item(G.kitchen, id); if (!it) return openKitchen();
     const kn = QK().KITCHENS[it.k];
     openSheet(`<div class="win-hd"><span class="kt-ico">${esc(it.em)}</span><div><div class="tt">${esc(it.name)}</div><div class="sb">${kn.icon} ${esc(kn.name)}</div></div></div>
       <div class="win-lb">Name</div><input id="kiName" value="${esc(it.name)}" maxlength="40" autocomplete="off">
+      <div class="win-lb">Group</div><div class="kt-tools">${QK().GROUP_NAMES.map(g => `<button type="button" class="kt-chip" data-kig="${esc(g)}" aria-pressed="${g === it.group}">${esc(g)}</button>`).join("")}</div>
       <div class="win-lb">Shelf</div><div class="kt-tools">${kn.shelves.map(s => `<button type="button" class="kt-chip" data-kish="${s.id}" aria-pressed="${s.id === it.shelf}">${esc(s.name)}</button>`).join("")}</div>
       <div class="actions"><button class="btn danger" id="kiDel">Delete this item</button></div>
       <div class="actions"><button class="btn ghost" id="kiBack">Back</button><button class="btn primary" id="kiSave">Save</button></div>`, true);
-    let shelf = it.shelf;
+    let shelf = it.shelf, group = it.group;
     $("sheet").querySelectorAll("[data-kish]").forEach(bn => bn.onclick = () => { shelf = bn.dataset.kish;
       $("sheet").querySelectorAll("[data-kish]").forEach(x => x.setAttribute("aria-pressed", x.dataset.kish === shelf)); });
+    $("sheet").querySelectorAll("[data-kig]").forEach(bn => bn.onclick = () => { group = bn.dataset.kig;
+      $("sheet").querySelectorAll("[data-kig]").forEach(x => x.setAttribute("aria-pressed", x.dataset.kig === group)); });
     $("kiBack").onclick = () => openKitchen();
     $("kiSave").onclick = () => { let K = G.kitchen; const nm = $("kiName").value.trim();
       if (nm && nm !== it.name) K = QK().rename(K, id, nm, now());
-      if (shelf !== it.shelf) K = QK().move(K, id, shelf, now());
+      K = QK().place(K, id, shelf, group, now());
       if (K !== G.kitchen) kitSave(K);
       openKitchen(); render(); };
     $("kiDel").onclick = () => { kitSave(QK().remove(G.kitchen, id, now())); log(`Kitchen: ${it.name} deleted`); openKitchen(); render(); };
