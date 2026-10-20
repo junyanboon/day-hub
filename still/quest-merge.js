@@ -190,6 +190,34 @@
     return out;
   }
 
+  /* The kitchen (G.kitchen, 2026-10-20, d25 to d30, quest-kitchen.js): kept across days, so it never rolls with the day.
+     Item by item, the later change (at) wins, and a delete is a mark (del) that wins the same way, so two devices that
+     change different items both keep theirs and a deleted item never comes back. Each item's level history (hist, which
+     teaches his pace) is kept from both. Shelf checks: the later time. Shopping ticks, dinner records (used) and the
+     kitchen picked for a day: per key, the later change. The trip marks: the later day. */
+  function mergeKitchen(o, n) {
+    if (!o || typeof o !== "object") return n;
+    if (!n || typeof n !== "object") return o;
+    const later = (x, y) => (ms(y && y.at) >= ms(x && x.at) ? y : x);
+    const perKey = (a, b) => { const out = { ...obj(a) }; for (const [k, v] of Object.entries(obj(b))) out[k] = out[k] ? later(out[k], v) : v; return out; };
+    const items = { ...obj(o.items) };
+    for (const [id, v] of Object.entries(obj(n.items))) {
+      const a = items[id];
+      if (!a) { items[id] = v; continue; }
+      const w = later(a, v), h = new Map();
+      for (const x of [...arr(a.hist), ...arr(v.hist)]) if (Array.isArray(x)) h.set(x[0] + "|" + x[2], x);
+      // a dinner tick taken back is marked "dinner-off" (same time); the mark beats the line from a copy that missed it
+      const off = new Set([...h.values()].filter((x) => x[2] === "dinner-off").map((x) => x[0]));
+      const hist = [...h.values()].filter((x) => !(x[2] === "dinner" && off.has(x[0]))).sort((x, y) => ms(x[0]) - ms(y[0])).slice(-12);
+      items[id] = w.del ? w : { ...w, hist };
+    }
+    const shelves = { ...obj(o.shelves) };
+    for (const [k, v] of Object.entries(obj(n.shelves))) if (!shelves[k] || ms(v) > ms(shelves[k])) shelves[k] = v;
+    const trip = { ...obj(o.trip) };
+    for (const [k, v] of Object.entries(obj(n.trip))) if (!trip[k] || String(v) > String(trip[k])) trip[k] = v;
+    return { ...o, ...n, items, shelves, shop: perKey(o.shop, n.shop), used: perKey(o.used, n.used), pick: later(o.pick, n.pick) || null, trip };
+  }
+
   function mergeQuest(a, b) {
     const okA = a && typeof a.xp === "number", okB = b && typeof b.xp === "number";
     if (!okA) return okB ? b : a;
@@ -219,6 +247,7 @@
         for (const [k, c] of Object.entries(obj(v && v.needs))) nd[k] = Math.max(nd[k] || 0, +c || 0); }
       out.nvc = { words: w, needs: nd };
     }
+    if (o.kitchen || n.kitchen) out.kitchen = mergeKitchen(o.kitchen, n.kitchen);
     out.day = mergeDay(o.day, n.day);
     return out;
   }
@@ -232,5 +261,5 @@
   }
   const same = (a, b) => canon({ ...obj(a), ts: 0 }) === canon({ ...obj(b), ts: 0 });
 
-  root.QuestMerge = { mergeQuest, same, bodyOf, trimLog };
+  root.QuestMerge = { mergeQuest, mergeKitchen, same, bodyOf, trimLog };
 })(typeof self !== "undefined" ? self : globalThis);
