@@ -814,7 +814,7 @@
 <script src="quest-oura.js?v=20261019a"></script>
 <script src="quest-levels.js?v=20261016b"></script>
 <script src="quest-gymlog.js?v=20261019a"></script>
-<script src="quest-meals.js?v=20261020q"></script>
+<script src="quest-meals.js?v=20261020r"></script>
 <script src="quest-trends.js?v=20261019end3"></script>
 <script src="nvc-words.js?v=20261010a"></script>
 <script src="quest-fx.js?v=20261019x"></script>
@@ -1375,7 +1375,7 @@
      flags: "flat" = every tap gives the same, "quiz" = no tile, the meal quiz counts it
      (2026-10-10), "card" = a through-the-day button on the water card (2026-10-20, d16: supplements, fermented food,
      xylitol; same values and limits, xylitol's limit stays 10), "dish" = the Blueprint meal, now paid by the meal's
-     Super Veggie and Nutty Pudding checklists (2026-10-20, d13; the id stays so history and trends still read it),
+     Super Veggie and Nutty Pudding checklists (2026-10-20, d13; the id stays so past days' history still reads it; dishes do not count it as done),
      "auto" = the game counts it from the
      calendar and check-ins (evening ones pay out the next morning). Ids that existed
      before keep their meaning except water, now 250 ml. No movement here: training,
@@ -1528,6 +1528,7 @@
   /* Through the day (Junyan, 2026-10-20, d16): supplements, fermented food and xylitol, moved here from the meal sheet.
      The count is how many times the habit counts today (habitN), so a tile tapped in a meal earlier today still shows. */
   function dayItemsHTML(){
+    if (!QW().DAY3) return "";   // an older cached quest-water.js: the glasses still work
     return `<div class="wq-day">${QW().DAY3.map(row => { const [id, icon, nm, aim] = row, n = habitN(id), met = n >= aim;
       return `<button type="button" class="wq-it${met ? " met" : ""}" data-day="${id}" data-icon="${esc(icon)}" aria-label="${esc(nm)}: ${esc(QW().itemLine(row, n))}">` +
         `<span class="e">${icon}</span><b>${esc(nm)}</b><small>${esc(QW().itemLine(row, n))}</small></button>`; }).join("")}</div>`;
@@ -2414,7 +2415,8 @@
        on a phone, and each heading stays on one line with this meal's points for it on the right. */
   const QM = window.QuestMeals;
   const mqSum = q => [q.p ? `prana ${q.p > 0 ? "+" : ""}${q.p}` : "", q.b ? `body ${q.b > 0 ? "+" : ""}${q.b}` : ""].filter(Boolean).join(", ") || "no change";
-  const mqOpt = () => ({ mult:gainMult(), heavy:habitGain("heavy"), bodyGain:habitGain });
+  // dish: the Blueprint meal habit's value, the most a dish pays before the level multiplier (d13)
+  const mqOpt = () => ({ mult:gainMult(), heavy:habitGain("heavy"), bodyGain:habitGain, dish:(HABITS.find(x => x[0] === "blueprint") || [])[2] });
   const mqCounted = id => QM.BODY.includes(id) || id === "heavy";   // daily-limit habits
   const mqOpen = new Set();   // "<meal key>|<dish id>": the dish cards he has opened (the sheet redraws on every tap)
   function openMeal(b){
@@ -2501,7 +2503,7 @@
       redraw(true);
     });
     // tick an ingredient, Got everything, or Clear: the dish pays (or takes back) the difference
-    const dishTap = (bn, id, how, sel0) => {
+    const dishTap = (bn, id, how, popSel) => {
       const d = QM.dishOf(id); if (!d) return;
       const fx = window.QuestFx, rect = bn.getBoundingClientRect(), cur = (G.day.mealq || {})[k];
       const r = QM.tick(cur && !cur.kind ? cur : null, d, how, mqOpt());
@@ -2512,7 +2514,7 @@
       const op = r.ops[0];
       if (fx && op && op.on) fx.tap(rect, { icon:d.icon, gain:op.d, color:"#8fe3b0" });
       else if (fx && op) fx.back(rect, { gain:-op.d });
-      if (fx && sel0) fx.pop(sh.querySelector(sel0));
+      if (fx && popSel) fx.pop(sh.querySelector(popSel));
     };
     sh.querySelectorAll("[data-ding]").forEach(bn => bn.onclick = () => {
       const d = QM.dishOf(bn.dataset.ding), it = d && d.items[+bn.dataset.i]; if (!it) return;

@@ -64,7 +64,7 @@
   /* The Blueprint dishes and tonight's ideas (2026-10-20, d13). { id, icon, name, items:[[ingredient, amount for 2]],
      time?, how? }. A dish pays up to the Blueprint meal's value (DISH_VALUE times the level multiplier), in proportion
      to the ingredients ticked. Super Veggie has no garlic (d12). */
-  const DISH_VALUE = 6;   // the "blueprint" habit's value in quest.html
+  const DISH_VALUE = 6;   // the "blueprint" habit's value in quest.html, used when the page passes none (opt.dish)
   const DISHES = [
     { id: "sv", icon: "🥗", name: "Super Veggie", items: [
       ["Black lentils, dry", "90 g"], ["Broccoli", "500 g"], ["Cauliflower", "300 g"], ["Shiitake mushrooms", "100 g"],
@@ -168,7 +168,7 @@
   const gotOf = (rec, d) => { const g = rec && rec.dish && Array.isArray(rec.dish[d.id]) ? rec.dish[d.id] : [];
     return d.items.map((x) => x[0]).filter((n) => g.includes(n)); };
   // the most a dish pays: the Blueprint meal's value at today's level
-  const dishMax = (opt) => Math.round(DISH_VALUE * ((opt && opt.mult) ?? 1));
+  const dishMax = (opt) => Math.round(((opt && opt.dish) || DISH_VALUE) * ((opt && opt.mult) ?? 1));   // opt.dish: the page's HABITS value
   // what n of the dish's ingredients are worth: its share of the full value
   const dishPay = (d, n, opt) => (d.items.length ? Math.round(dishMax(opt) * Math.min(n, d.items.length) / d.items.length) : 0);
   // "3 of 10 ingredients", what is missing, and whether it is all in
