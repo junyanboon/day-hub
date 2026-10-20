@@ -82,3 +82,17 @@ test("the drop is the button: one compact row, no big +1 glass button, undo kept
   assert.match(html, /prefers-reduced-motion: reduce\) \{ \.wq-drop\.hit \{ animation:none; \} \.wq-drop\.hit::after, \.wq-plus \{ display:none; \} \}/);
   assert.match(html, /querySelectorAll\("\[data-glass\]"\)\.forEach\(bn => bn\.onclick = \(\) => addGlass\(bn\)\)/);
 });
+
+test("the small line names the block a glass counts toward, and reads thirsty? after 4 PM (d76)", () => {
+  assert.deepEqual(J(W.tail("Domestics", 10)), ["Domestics"]);
+  assert.deepEqual(J(W.tail("Domestics", 17)), ["Domestics", "thirsty?"]);
+  assert.deepEqual(J(W.tail("", 10)), []);                // no block: nothing added
+  assert.deepEqual(J(W.tail(null, 20)), ["thirsty?"]);
+  assert.deepEqual(J(W.tail("Work", 2)), ["Work", "thirsty?"]);   // the game day runs to 4 AM
+  const fn = html.slice(html.indexOf("function waterHTML()"), html.indexOf("function waterStamp()"));
+  assert.match(fn, /W\.tail\(b \? shortName\(b\) : "", hourNow\(\)\)/);
+  assert.match(fn, /<small class="wq-sub">/);
+  // one line on a phone: the line never wraps, and a long block name ends in an ellipsis
+  assert.match(html, /\.wq-sub \{[^}]*white-space:nowrap[^}]*\}/);
+  assert.match(html, /\.wq-blk \{[^}]*text-overflow:ellipsis[^}]*\}/);
+});
