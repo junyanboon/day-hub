@@ -412,7 +412,8 @@
   }
   /* One undo for the whole batch: a new item is deleted again, one that was there goes back to its level, clocks and
      tick, with this fill's history line marked "<src>-off" so it teaches the run-low pace nothing. Written at a new time,
-     so the merge keeps the undo over a copy that saw the fill. */
+     so the merge keeps the undo over a copy that saw the fill. Like a dinner untick, an item he changed again since the
+     fill (no longer Plenty from this fill) keeps what he set. */
   function unfill(K, u, at) {
     if (!u) return K;
     let out = clone(K);
@@ -420,6 +421,7 @@
       const was = u.prev[id];
       if (!was) { out = remove(out, id, at); continue; }
       const cur = item(out, id) || was;
+      if (cur.lv !== 3 || ms(cur.since) !== ms(u.t)) continue;
       const hist = arr(cur.hist).map((h) => (ms(h[0]) === ms(u.t) && h[2] === u.src ? [h[0], h[1], u.src + "-off"] : h));
       out = put(out, { ...was, hist }, at);
       const tk = u.ticks[id];

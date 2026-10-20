@@ -117,6 +117,9 @@ test("d35: one undo takes back the whole batch: new ones gone, old ones back to 
   assert.equal(byName(u, "Miso", "home"), undefined, "the new one is gone");
   assert.equal(K.shopList(u, "home", T0, T0 + 7 * D, DISHES).groups.flatMap((g) => g.list).find((x) => x.it.id === "h:spinach").on, true, "tick back");
   assert.equal(K.pace(K.item(u, "h:spinach")), K.pace(K.item(before, "h:spinach")), "the undone shop teaches nothing");
+  // an item he changed again after the fill keeps his change
+  const tapped = K.tap(r.K, "h:broccoli", at(0.005));
+  assert.equal(K.item(K.unfill(tapped, r.undo, at(0.01)), "h:broccoli").lv, 2, "his later tap stands");
   // the other device saw the shop before the undo: the merge keeps the undo (later) and the pace still ignores the shop
   const m = M.mergeKitchen(r.K, u);
   assert.equal(K.item(m, "h:spinach").lv, 2);

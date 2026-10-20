@@ -905,7 +905,7 @@
 <script src="quest-levels.js?v=20261016b"></script>
 <script src="quest-gymlog.js?v=20261019a"></script>
 <script src="quest-meals.js?v=20261020s"></script>
-<script src="quest-kitchen.js?v=20261020k7"></script>
+<script src="quest-kitchen.js?v=20261020k8"></script>
 <script src="quest-trends.js?v=20261019end3"></script>
 <script src="nvc-words.js?v=20261010a"></script>
 <script src="quest-fx.js?v=20261019x"></script>
@@ -2705,7 +2705,7 @@
     const when = QK().shopWhen(kitBlocks(), t, k, TZ(), ob, ft), SI = QK().shopInfo(kitBlocks(), t, k, TZ(), ob);
     /* the fill-in picker (d35): "What did you buy?" opens by itself on a Groceries block's sheet during or after the block,
        "What did you bring?" when the travel fridge is in use and empty (until he goes back from it) */
-    if (fresh && ob && SI.today) kitFillOpen(S, "buy");
+    if (fresh && ob && SI.today && !kitFilled.has(kitBlockKey(ob))) kitFillOpen(S, "buy");
     if (!S.fill && k === "travel" && today === "travel" && !all.length && !S.noBring) kitFillOpen(S, "bring");
     const tabs = `<div class="kt-seg" role="tablist"><button type="button" role="tab" data-kv="have" aria-selected="${S.view === "have"}">What we have<small>${all.length} items</small></button>` +
       `<button type="button" role="tab" data-kv="shop" aria-selected="${S.view === "shop"}">Shopping list<small>${L.count} to buy</small></button></div>`;
@@ -2755,7 +2755,7 @@
         `<div class="actions"><button class="btn primary" id="kBought"${L.groups.some(g => g.list.some(r => r.on)) ? "" : " disabled"}>Mark ticked items as plenty</button></div>` +
         `<button type="button" class="btn ghost kt-fillgo" id="kBuyPick">🛒 What did you buy?<small>Tick everything from the shop at once</small></button>`;
     }
-    if (S.fill) body = kitFillHTML(S, k, t, shop);
+    if (S.fill) body = kitFillHTML(S, k);
     openSheet(head + ask + kits + (k === "travel" ? `<p class="kt-hint">In use by itself when your calendar shows a trip, and emptied when the trip ends.</p>` : "") + (S.fill ? "" : tabs) + body +
       (S.block ? `<div class="actions"><button class="btn ghost" id="kEditBlk">Change time or name</button></div>` : ""), true);
     const sh = $("sheet");
@@ -2832,6 +2832,8 @@
      puts every ticked one in the kitchen at Plenty (QuestKitchen.fill), with one Undo toast for the batch.
      The seam for a later receipt photo (d29): kitFillOpen(S, "buy", names) pre-ticks the same picker from the names it read
      (QuestKitchen.preTick); names that match nothing come in as new rows, ticked. S.fill: { use, on (ticked row ids), q, extra }. */
+  // the Groceries blocks whose "What did you buy?" he already answered or closed (this page load), so it opens once per block
+  const kitFilled = new Set(), kitBlockKey = b => `${b.t}|${+b.s}`;
   function kitFillRows(S){
     const F = S.fill, shop = kitShop(S.k);
     return QK().pickList(G.kitchen, S.k, F.use, now(), shop.at, kitDishes()).concat(F.extra);
@@ -2877,14 +2879,16 @@
     });
     bindRows();
     $("kFq").oninput = e => { F.q = e.target.value; $("kFl").innerHTML = kitFillList(S); bindRows(); };
-    $("kFback").onclick = () => { if (F.use === "bring") S.noBring = true; S.fill = null; redraw(); };
+    const done = () => { if (isGroceries(S.block)) kitFilled.add(kitBlockKey({ t:S.block.t, s:+new Date(S.block.s) })); };
+    $("kFback").onclick = () => { if (F.use === "bring") S.noBring = true; done(); S.fill = null; redraw(); };
     $("kFgo").onclick = () => {
       const picks = kitFillRows(S).filter(r => F.on.has(r.id)), bring = F.use === "bring";
       const r = QK().fill(G.kitchen, S.k, picks, now(), bring ? "bring" : "buy"); if (!r.n) return;
       kitSave(r.K);
       const what = `${r.n} item${r.n === 1 ? "" : "s"}`, kn = QK().KITCHENS[S.k].name;
       log(`Kitchen: ${what} ${bring ? "brought" : "bought"} (${kn})`);
-      S.fill = null; S.view = "have"; S.f = "all"; S.q = ""; S.keep.clear();
+      // noBring: an undo that empties the travel fridge again must not pop the picker straight back up
+      done(); S.fill = null; S.noBring = true; S.view = "have"; S.f = "all"; S.q = ""; S.keep.clear();
       redraw(); $("sheet").scrollTop = 0;
       undoToast(`${what} ${bring ? "in the travel fridge" : "set to plenty"}`, () => { kitSave(QK().unfill(G.kitchen, r.undo, now())); log(`Kitchen: ${what} taken back`); kitRedraw(); }, 8000);
     };
