@@ -140,7 +140,7 @@ test("a dish pays its share of the Blueprint meal's +9 as ingredients are ticked
   let r = M.tick(null, sv(), "Broccoli", at15);
   assert.deepEqual(J(r.ops), [{ id:"dish:sv", on:true, m:"b", d:1 }]);
   for (const n of ["Cauliflower", "Lime", "Hemp seeds", "Ground cumin"]) r = M.tick(r.rec, sv(), n, at15);
-  assert.equal(r.rec.b, 5); assert.deepEqual(J(r.rec.v["dish:sv"]), ["b", 5]);   // 5 of 10: round(4.5)
+  assert.equal(r.rec.b, 5); assert.deepEqual(J(r.rec.v["dish:sv"]), ["b", 5, 9, 0]);   // [meter, paid, max, counted as done] (d17, d18)   // 5 of 10: round(4.5)
   const st = M.dishStatus(r.rec, sv());
   assert.equal(st.n, 5); assert.equal(st.m, 10); assert.equal(st.all, false); assert.equal(st.pct, 50);
   assert.equal(st.text, "Missing: Black lentils, dry, Shiitake mushrooms and 3 more");
@@ -198,4 +198,79 @@ test("the meal sheet: a How to eat box, Blueprint dishes and tonight's ideas fir
   assert.match(html, /\.hgrid\.mqg \{ grid-template-columns:repeat\(4, 1fr\)/);
   assert.equal(M.tileLabel(M.PRANA_FOODS[1]), "Fresh veg, raw or just cooked");   // short on the tile, full in the trends
   assert.equal(M.PRANA_FOODS[1][2], "Fresh vegetables, raw or just cooked");
+});
+
+// ---- the daily cap and "Blueprint meal done" (Junyan, 2026-10-20, "17 yes 18 yes") ----
+const PAGE = { mult:1.5, dish:6, dim:[1, .7, .5, .35, .25, .2], dishLimit:2 };
+const np = () => M.dishOf("np"), dayOf = recs => Object.fromEntries(recs.map((r, i) => ["m" + i, r]));
+
+test("d17: Blueprint dishes share two a day across meals: +9, then +6, then nothing", () => {
+  const lunch = M.tick(null, sv(), "all", { ...PAGE, used:M.slotsUsed({}, "m0", sv()) });
+  assert.deepEqual(J(lunch.ops), [{ id:"dish:sv", on:true, m:"b", d:9 }]);
+  let day = dayOf([lunch.rec]);
+  assert.equal(M.slotsUsed(day, "m1", np()), 1);
+  const dinner = M.tick(null, np(), "all", { ...PAGE, used:M.slotsUsed(day, "m1", np()) });
+  assert.deepEqual(J(dinner.ops), [{ id:"dish:np", on:true, m:"b", d:6 }]);   // round(6 x .7 x 1.5)
+  day = dayOf([lunch.rec, dinner.rec]);
+  const third = M.tick(null, sv(), "all", { ...PAGE, used:M.slotsUsed(day, "m2", sv()) });
+  assert.deepEqual(J(third.ops), []); assert.equal(third.rec.b, 0);
+  assert.equal(third.rec.v["dish:sv"], undefined, "a capped dish holds no slot");
+  assert.equal(third.rec.dish.sv.length, 10, "its ticks are still kept");
+  // the same dish's own slot is not counted against it
+  assert.equal(M.slotsUsed(day, "m0", sv()), 1);
+});
+
+test("d17: the max is kept, so later ticks and unticks use it and an untick takes back exactly what was paid", () => {
+  let r = M.tick(null, np(), "Walnuts", { ...PAGE, used:1 });   // second slot: max 6
+  assert.deepEqual(J(r.rec.v["dish:np"]), ["b", 1, 6, 0]);   // round(6 / 12) = 1
+  // the first slot is freed meanwhile; this dish keeps its max of 6
+  for (const n of ["Cocoa powder", "Cinnamon", "Cherries", "Blueberries", "Chia seeds"]) r = M.tick(r.rec, np(), n, { ...PAGE, used:0 });
+  assert.equal(r.rec.b, 3); assert.equal(r.rec.v["dish:np"][2], 6);
+  const paid = r.rec.b;
+  r = M.tick(r.rec, np(), "none", { ...PAGE, used:0 });
+  assert.deepEqual(J(r.ops), [{ id:"dish:np", on:false, m:"b", d:-paid }]);
+  assert.equal(r.rec.v["dish:np"], undefined, "Clear frees the slot");
+  // points never pass the max: the full dish pays its max exactly
+  assert.equal(M.tick(null, np(), "all", { ...PAGE, used:1 }).rec.b, 6);
+});
+
+test("d17: tonight's ideas have their own cap of the same shape and never use a Blueprint slot", () => {
+  const bp = M.tick(null, sv(), "all", { ...PAGE, used:0 }).rec;
+  const r1 = M.tick(null, M.dishOf("r1"), "all", { ...PAGE, used:M.slotsUsed(dayOf([bp]), "m1", M.dishOf("r1")) });
+  assert.equal(r1.rec.b, 9, "a recipe after a Blueprint dish still gets the first idea slot");
+  const day = dayOf([bp, r1.rec]);
+  assert.equal(M.slotsUsed(day, "m2", np()), 1);
+  assert.equal(M.slotsUsed(day, "m2", M.dishOf("r2")), 1);
+  const r2 = M.tick(null, M.dishOf("r2"), "all", { ...PAGE, used:1 }), r3 = M.tick(null, M.dishOf("r3"), "all", { ...PAGE, used:2 });
+  assert.equal(r2.rec.b, 6); assert.equal(r3.rec.b, 0);
+});
+
+test("d17: a Blueprint tile ticked before today's change still holds a slot", () => {
+  const old = { sel:["blueprint", "veg"], v:{ blueprint:["b", 9], veg:["b", 5] }, p:0, b:14 };
+  assert.equal(M.slotsUsed({ a:old }, "b", sv()), 1);
+  assert.equal(M.slotsUsed({ a:old }, "b", M.dishOf("r1")), 0);
+  assert.equal(M.slotsUsed({ a:{ kind:"gym", sel:["blueprint"] } }, "b", sv()), 0);
+});
+
+test("d18: a finished Super Veggie or Nutty Pudding counts as the Blueprint meal done; unfinishing takes it back", () => {
+  let r = M.tick(null, sv(), "Broccoli", PAGE);
+  assert.equal(r.done, 0);
+  r = M.tick(r.rec, sv(), "all", PAGE);
+  assert.equal(r.done, 1); assert.equal(r.rec.v["dish:sv"][3], 1);
+  assert.equal(M.tick(r.rec, sv(), "all", PAGE).done, 0, "ticking all again counts nothing more");
+  const un = M.tick(r.rec, sv(), "Lime", PAGE);
+  assert.equal(un.done, -1); assert.equal(un.rec.v["dish:sv"][3], 0);
+  assert.equal(M.tick(r.rec, sv(), "none", PAGE).done, -1);
+  // a recipe is not the Blueprint meal; a capped Blueprint dish pays nothing and is not counted either
+  assert.equal(M.tick(null, M.dishOf("r1"), "all", PAGE).done, 0);
+  assert.equal(M.tick(null, sv(), "all", { ...PAGE, used:2 }).done, 0);
+});
+
+test("d17 d18 on the page: the meal sheet passes the day's slots and counts a finished dish in the habit", () => {
+  const i = html.indexOf("function openMeal(b)"), body = html.slice(i, html.indexOf("A walk, hike or other outdoor block"));
+  assert.match(body, /const r = QM\.tick\(cur && !cur\.kind \? cur : null, d, how, dishOpt\(k, d\)\);/);
+  assert.match(body, /if \(r\.done > 0\) G\.day\.habits\.blueprint = \(G\.day\.habits\.blueprint \|\| 0\) \+ 1;/);
+  assert.match(body, /else if \(r\.done < 0\) \(G\.day\.voided = G\.day\.voided \|\| \{\}\)\.blueprint = \(\(G\.day\.voided \|\| \{\}\)\.blueprint \|\| 0\) \+ 1;/);
+  assert.match(html, /dish:h\[2\], dim:DIM, dishLimit:h\[3\] \}/);
+  assert.match(html, /const dishOpt = \(k, d\) => \(\{ \.\.\.mqOpt\(\), used:QM\.slotsUsed\(G\.day\.mealq, k, d\) \}\);/);
 });

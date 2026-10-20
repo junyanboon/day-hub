@@ -814,7 +814,7 @@
 <script src="quest-oura.js?v=20261019a"></script>
 <script src="quest-levels.js?v=20261016b"></script>
 <script src="quest-gymlog.js?v=20261019a"></script>
-<script src="quest-meals.js?v=20261020r"></script>
+<script src="quest-meals.js?v=20261020s"></script>
 <script src="quest-trends.js?v=20261019end3"></script>
 <script src="nvc-words.js?v=20261010a"></script>
 <script src="quest-fx.js?v=20261019x"></script>
@@ -1375,7 +1375,8 @@
      flags: "flat" = every tap gives the same, "quiz" = no tile, the meal quiz counts it
      (2026-10-10), "card" = a through-the-day button on the water card (2026-10-20, d16: supplements, fermented food,
      xylitol; same values and limits, xylitol's limit stays 10), "dish" = the Blueprint meal, now paid by the meal's
-     Super Veggie and Nutty Pudding checklists (2026-10-20, d13; the id stays so past days' history still reads it; dishes do not count it as done),
+     Super Veggie and Nutty Pudding checklists (2026-10-20, d13; a finished Super Veggie or Nutty Pudding counts it as done, d18, and its value, limit 2 and DIM
+     curve cap the dishes, d17),
      "auto" = the game counts it from the
      calendar and check-ins (evening ones pay out the next morning). Ids that existed
      before keep their meaning except water, now 250 ml. No movement here: training,
@@ -2416,7 +2417,11 @@
   const QM = window.QuestMeals;
   const mqSum = q => [q.p ? `prana ${q.p > 0 ? "+" : ""}${q.p}` : "", q.b ? `body ${q.b > 0 ? "+" : ""}${q.b}` : ""].filter(Boolean).join(", ") || "no change";
   // dish: the Blueprint meal habit's value, the most a dish pays before the level multiplier (d13)
-  const mqOpt = () => ({ mult:gainMult(), heavy:habitGain("heavy"), bodyGain:habitGain, dish:(HABITS.find(x => x[0] === "blueprint") || [])[2] });
+  // dim and dishLimit: the Blueprint meal's DIM curve and daily limit, which cap the dishes (d17)
+  const mqOpt = () => { const h = HABITS.find(x => x[0] === "blueprint") || [];
+    return { mult:gainMult(), heavy:habitGain("heavy"), bodyGain:habitGain, dish:h[2], dim:DIM, dishLimit:h[3] }; };
+  // the options for one dish on meal k: the slots other dishes of its group hold today (d17)
+  const dishOpt = (k, d) => ({ ...mqOpt(), used:QM.slotsUsed(G.day.mealq, k, d) });
   const mqCounted = id => QM.BODY.includes(id) || id === "heavy";   // daily-limit habits
   const mqOpen = new Set();   // "<meal key>|<dish id>": the dish cards he has opened (the sheet redraws on every tap)
   function openMeal(b){
@@ -2435,10 +2440,11 @@
     const lb = (txt, cls, n) => `<div class="win-lb mq-lb ${cls}"><span>${esc(txt)}</span>${n ? `<b>${sign(n)}</b>` : ""}</div>`;
     const dishCard = d => {
       const st = QM.dishStatus(rec, d), open = mqOpen.has(k + "|" + d.id), pd = QM.dishPaid(rec, d), on = new Set(st.n ? rec.dish[d.id] : []);
+      const max = QM.capOf(rec, d, dishOpt(k, d));   // its kept max once started, else what a start now gets (0: the day's cap is reached)
       return `<div class="mq-dish${open ? " open" : ""}${st.all ? " done" : ""}">` +
         `<button type="button" class="mq-dbtn" data-dopen="${d.id}" aria-expanded="${open}"><span class="mq-de">${d.icon}</span>` +
         `<span class="mq-dn"><b>${esc(d.name)}</b><small>${st.n ? `${st.n} of ${st.m} ingredients` : `${st.m} ingredients · tap to open`}${d.time ? ` · ${esc(d.time)}` : ""}</small></span>` +
-        `<span class="mq-dp">${pd ? sign(pd) : `<small>up to</small> +${QM.dishMax(o)}`}</span></button>` +
+        `<span class="mq-dp">${pd ? sign(pd) : max ? `<small>up to</small> +${max}` : `<small>full for today</small>`}</span></button>` +
         `<i class="mq-dbar"><b style="width:${st.pct}%"></b></i>` +
         (open ? `<div class="mq-dlist"><p class="mq-serves">For 2 people${d.time ? ` · ${esc(d.time)}` : ""}. Tick what went in.</p>` +
           `<div class="mq-ings">${d.items.map(([n, amt], i) => `<button type="button" class="mq-ing" data-ding="${d.id}" data-i="${i}" aria-pressed="${on.has(n)}">` +
@@ -2506,8 +2512,13 @@
     const dishTap = (bn, id, how, popSel) => {
       const d = QM.dishOf(id); if (!d) return;
       const fx = window.QuestFx, rect = bn.getBoundingClientRect(), cur = (G.day.mealq || {})[k];
-      const r = QM.tick(cur && !cur.kind ? cur : null, d, how, mqOpt());
+      const r = QM.tick(cur && !cur.kind ? cur : null, d, how, dishOpt(k, d));
       r.ops.forEach(op => addEnergy("b", op.d, `${name}: ${d.name}${op.on ? "" : " (taken back)"}`, d.name, !!fx));
+      // d18: a finished Super Veggie or Nutty Pudding is the Blueprint meal done today; unfinishing it counts it off
+      // (habits only go up when devices merge, so the take-back goes in G.day.voided, as the tiles do)
+      G.day.habits = G.day.habits || {};
+      if (r.done > 0) G.day.habits.blueprint = (G.day.habits.blueprint || 0) + 1;
+      else if (r.done < 0) (G.day.voided = G.day.voided || {}).blueprint = ((G.day.voided || {}).blueprint || 0) + 1;
       (G.day.mealq = G.day.mealq || {})[k] = { ...r.rec, at:now().toISOString() };
       stampDay(); saveG();
       redraw();
