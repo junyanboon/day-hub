@@ -115,5 +115,5 @@ test("d40: only Joint Plans blocks (and Quest adds) clash; his other calendars n
 test("the page hands the planner each block's calendar, its calendar times and all-day flag", () => {
   const page = fs.readFileSync(here + "quest.html", "utf8");
   assert.match(page, /items: all\.map\(b => \(\{[^]*?calId:b\.calId[^]*?cs:b\.cs, ce:b\.ce[^]*?allDay:!!b\.allDay/);
-  assert.match(page, /const isBooking = b => window\.QuestAgenda \? window\.QuestAgenda\.isBooking\(b\)/);
+  assert.match(page, /const isBooking = b => globalThis\.QuestAgenda \? globalThis\.QuestAgenda\.isBooking\(b\)/);
 });
