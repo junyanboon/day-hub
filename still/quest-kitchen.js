@@ -88,11 +88,11 @@
     "Drinks and ferments", "Other"];
   /* The first guess of an item's group from its name. The rules run in this order on whole words only, so
      "Chickpeas" is a legume before "peas" could make it a vegetable, and "Coconut yogurt" or "Macadamia milk" are drinks
-     before "nut" could make them nuts. A guess only: the item keeps whatever group it is given after. */
+     before "nut" could make them nuts; oils and vinegars come before grains so "Rice vinegar" is a vinegar. A guess only: the item keeps whatever group it is given after. */
   const GROUPS = [
     ["Drinks and ferments", /\b(milk|juices?|yogh?urts?|kefir|sauerkraut|kimchi|kombucha|tea|coffee|electrolytes?|miso)\b/i],
-    ["Legumes and grains", /\b(lentils?|chickpeas?|beans?|garbanzos?|hummus|tofu|tempeh|edamame|quinoa|rice|oats|bread|pasta|noodles|buckwheat|millet|flour|couscous|barley)\b/i],
     ["Oils, vinegars and sweet", /\b(oils?|vinegars?|honey|syrup|tahini|jam|sugar|chocolate)\b/i],
+    ["Legumes and grains", /\b(lentils?|chickpeas?|beans?|garbanzos?|hummus|tofu|tempeh|edamame|quinoa|rice|oats|bread|pasta|noodles|buckwheat|millet|flour|couscous|barley)\b/i],
     ["Spices", /\b(salt|paprika|cumin|turmeric|cinnamon|saffron|cocoa|(black|white) pepper|peppercorns?|asafoetida|cardamom|nutmeg|cloves|chilli flakes|curry powder|oregano)\b/i],
     ["Nuts and seeds", /\b(nuts?|peanuts?|walnuts?|almonds?|macadamias?|cashews?|pistachios?|hazelnuts?|pecans?|seeds?|flax|flaxseed|chia|hemp|sesame)\b/i],
     ["Herbs", /\b(parsley|coriander|cilantro|basil|mint|dill|rosemary|thyme|chives|sage)\b/i],
@@ -177,7 +177,7 @@
     const dead = Object.entries(obj(obj(K).items)).find(([, x]) => x && x.del && x.k === k && keyOf(x.name || (item(K, x.id) || {}).name) === key);
     const sd = k === "home" ? SEED_ITEMS.find((x) => keyOf(x.name) === key) : null;
     const id = dead ? dead[0] : sd ? sd.id : "u" + ms(at).toString(36) + Math.random().toString(36).slice(2, 6);
-    const base = { ...(item(K, id) || {}), id, k, shelf, name: nm, group: okGroup(group) || guessGroup(nm), em: (item(K, id) || {}).em || iconFor(nm), lv: null, hist: [], added: iso(at) };
+    const base = { ...(item(K, id) || {}), id, k, shelf, name: nm, group: okGroup(group) || okGroup((obj(obj(K).items)[id] || {}).group) || guessGroup(nm), em: (item(K, id) || {}).em || iconFor(nm), lv: null, hist: [], added: iso(at) };
     delete base.del;
     return { K: setLevel(put(K, base, at), id, 3, at, "add"), id };
   }
@@ -193,7 +193,7 @@
     return put(K, { ...it, shelf: sh, group: g }, at);
   }
   // a delete is kept as a mark (del), so the other device's copy cannot bring the item back
-  const remove = (K, id, at) => { const it = item(K, id); return it ? put(K, { id, k: it.k, shelf: it.shelf, name: it.name, del: true }, at) : K; };
+  const remove = (K, id, at) => { const it = item(K, id); return it ? put(K, { id, k: it.k, shelf: it.shelf, name: it.name, group: it.group, del: true }, at) : K; };
 
   /* Days per level step for this item: the default (fresh food 3, pantry, freezer and long-life food 15), averaged with what
      his own history shows: in each cycle since a restock, the time from the restock to its latest drop (a tap or a dinner),

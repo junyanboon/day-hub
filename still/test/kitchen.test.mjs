@@ -69,6 +69,8 @@ test("d34: the catalogue lands in the right food groups (ordered, whole-word rul
   assert.equal(K.guessGroup("Black pepper"), "Spices");
   assert.equal(K.guessGroup("Peanut butter"), "Nuts and seeds");
   assert.equal(K.guessGroup("Eggs"), "Other");
+  assert.equal(K.guessGroup("Rice vinegar"), "Oils, vinegars and sweet");
+  assert.equal(K.guessGroup("Oat milk"), "Drinks and ferments");
   assert.deepEqual(J(K.GROUP_NAMES), ["Vegetables", "Fruit", "Herbs", "Legumes and grains", "Nuts and seeds", "Spices",
     "Oils, vinegars and sweet", "Drinks and ferments", "Other"]);
 });
@@ -98,6 +100,9 @@ test("d34: each item keeps its own group; adding takes the picked group, else th
   assert.equal(K.item(r.K, r.id).group, "Other");
   r = K.add(r.K, "home", "fridge", "Eggs", at(5), "Not a group");
   assert.equal(K.item(r.K, r.id).group, "Other");
+  // a deleted item added back keeps the group he gave it when no group is picked
+  let d = K.place(r.K, "h:kale", null, "Herbs", at(6)); d = K.remove(d, "h:kale", at(7));
+  assert.equal(K.item(K.add(d, "home", "fridge", "Kale", at(8)).K, "h:kale").group, "Herbs");
   assert.equal(K.guessShelf("home", "Herbs"), "fridge");
   assert.equal(K.guessShelf("home", "Spices"), "pantry");
   assert.equal(K.guessShelf("travel", "Fruit"), "cool");

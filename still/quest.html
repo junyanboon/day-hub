@@ -900,7 +900,7 @@
 <script src="quest-levels.js?v=20261016b"></script>
 <script src="quest-gymlog.js?v=20261019a"></script>
 <script src="quest-meals.js?v=20261020s"></script>
-<script src="quest-kitchen.js?v=20261020k5"></script>
+<script src="quest-kitchen.js?v=20261020k6"></script>
 <script src="quest-trends.js?v=20261019end3"></script>
 <script src="nvc-words.js?v=20261010a"></script>
 <script src="quest-fx.js?v=20261019x"></script>
@@ -2745,10 +2745,10 @@
       (S.block ? `<div class="actions"><button class="btn ghost" id="kEditBlk">Change time or name</button></div>` : ""), true);
     const sh = $("sheet");
     const redraw = () => { const top = sh.scrollTop; openKitchen(); sh.scrollTop = top; render(); };
-    sh.querySelectorAll("[data-kv]").forEach(bn => bn.onclick = () => { S.view = bn.dataset.kv; S.msg = ""; redraw(); });
+    sh.querySelectorAll("[data-kv]").forEach(bn => bn.onclick = () => { S.view = bn.dataset.kv; S.msg = ""; S.keep.clear(); redraw(); });
     // switching kitchens is his pick for today: dinner ticks use it too
     sh.querySelectorAll("[data-kk]").forEach(bn => bn.onclick = () => { const x = bn.dataset.kk; if (x === S.k) return;
-      S.k = x; S.msg = ""; if (x !== kitToday()) { kitSave(QK().pick(G.kitchen, x, gameYmd(), now())); log(`Kitchen in use today: ${QK().KITCHENS[x].name}`); } redraw(); });
+      S.k = x; S.msg = ""; S.keep.clear(); if (x !== kitToday()) { kitSave(QK().pick(G.kitchen, x, gameYmd(), now())); log(`Kitchen in use today: ${QK().KITCHENS[x].name}`); } redraw(); });
     sh.querySelectorAll("[data-khome]").forEach(bn => bn.onclick = () => { const x = bn.dataset.khome; S.home.has(x) ? S.home.delete(x) : S.home.add(x); redraw(); });
     if ($("kHomeGo")) $("kHomeGo").onclick = () => { const n = S.home.size; kitSave(QK().bringHome(G.kitchen, [...S.home], now()));
       log(`Trip over: ${n} item${n === 1 ? "" : "s"} brought home, travel fridge emptied`); S.home = null; S.k = kitToday(); redraw(); };
@@ -2878,6 +2878,7 @@
       // near the top of the sheet or just above the tray, the sheet scrolls by itself (once the finger has moved, so a
       // tile lifted near an edge does not set it scrolling)
       const loop = () => { if (KD !== d || !d.live) return;
+        if (!$("kShelves") || !d.el.isConnected) return end(true);   // the sheet closed or changed under the finger
         if (Math.hypot(d.x - d.x0, d.y - d.y0) < 12) return requestAnimationFrame(loop);
         const top = sh.getBoundingClientRect().top, bottom = tray.getBoundingClientRect().top, edge = 48;
         const v = d.y < top + edge ? -Math.ceil((top + edge - d.y) / 5) : d.y > bottom - edge && d.y < bottom ? Math.ceil((d.y - bottom + edge) / 5) : 0;
