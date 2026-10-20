@@ -78,6 +78,7 @@ test("the drop is the button: one compact row, no big +1 glass button, undo kept
   assert.match(add, /addHabit\("water", d, `Water, one 250 ml glass\$\{where\}`/);   // same pay, names the block
   assert.match(add, /blk:b \? gk\(b\) : "none"/);
   assert.match(add, /calToast\(`1 glass of water logged\$\{where\}\.`, 6000, \(\) => undoGlass\(id\)\)/);
-  assert.match(add, /waterCheer\(\)/);
+  assert.match(add, /waterCheer\(focused\)/);
+  assert.match(html, /prefers-reduced-motion: reduce\) \{ \.wq-drop\.hit \{ animation:none; \} \.wq-drop\.hit::after, \.wq-plus \{ display:none; \} \}/);
   assert.match(html, /querySelectorAll\("\[data-glass\]"\)\.forEach\(bn => bn\.onclick = \(\) => addGlass\(bn\)\)/);
 });
