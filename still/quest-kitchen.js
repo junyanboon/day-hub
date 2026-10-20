@@ -4,7 +4,11 @@
    - Two kitchens (d26): Home (Fridge, Freezer, Pantry) and the Travel fridge (Cool box, Dry bag), each with its own items.
    - Levels, not grams (d25): Plenty, Half, Low, Out. One tap steps an item down, Out goes back to Plenty.
    - Home starts from the agreed catalogue (SEED) in a grey "not checked yet" state: no level, not low, not on the list,
-     until he taps the item or "Looks right" on its shelf. The travel fridge starts empty. No level is ever made up.
+     until he taps the item (the first tap means Plenty). The travel fridge starts empty. No level is ever made up.
+     The shelf "Looks right" button is gone (2026-10-20, d32): the sheet's "Not checked" filter is the way through first setup.
+   - Food groups inside each shelf (2026-10-20, d34): every item stores its own group (item.group, saved and merged with the
+     rest of the item). The word list (GROUPS) is only a first guess, for catalogue items and for new ones; he can change it
+     when adding, in Edit, or by dragging the item onto another group.
    - Use first: fresh food expected to turn within 2 days. The shelf life (FRESH) is internal only, never shown (d28).
    - Run-low estimate (d28: "once it's low I need to buy more.. it can estimate when I'll go low"): days per level step start
      from rough defaults (fresh food fast, pantry and freezer slow) and learn his pace from his own taps and dinner ticks.
@@ -79,17 +83,39 @@
   }
   const slug = (name) => String(name).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");   // "Red peppers" -> "red-peppers"
   const SEED_ITEMS = SEED.map(([shelf, em, name], i) => ({ id: "h:" + slug(name), k: "home", shelf, em, name, lv: null, seed: i }));
+  // Food groups (2026-10-20, d34), in the order a shelf shows them
+  const GROUP_NAMES = ["Vegetables", "Fruit", "Herbs", "Legumes and grains", "Nuts and seeds", "Spices", "Oils, vinegars and sweet",
+    "Drinks and ferments", "Other"];
+  /* The first guess of an item's group from its name. The rules run in this order on whole words only, so
+     "Chickpeas" is a legume before "peas" could make it a vegetable, and "Coconut yogurt" or "Macadamia milk" are drinks
+     before "nut" could make them nuts; oils and vinegars come before grains so "Rice vinegar" is a vinegar. A guess only: the item keeps whatever group it is given after. */
+  const GROUPS = [
+    ["Drinks and ferments", /\b(milk|juices?|yogh?urts?|kefir|sauerkraut|kimchi|kombucha|tea|coffee|electrolytes?|miso)\b/i],
+    ["Oils, vinegars and sweet", /\b(oils?|vinegars?|honey|syrup|tahini|jam|sugar|chocolate)\b/i],
+    ["Legumes and grains", /\b(lentils?|chickpeas?|beans?|garbanzos?|hummus|tofu|tempeh|edamame|quinoa|rice|oats|bread|pasta|noodles|buckwheat|millet|flour|couscous|barley)\b/i],
+    ["Spices", /\b(salt|paprika|cumin|turmeric|cinnamon|saffron|cocoa|(black|white) pepper|peppercorns?|asafoetida|cardamom|nutmeg|cloves|chilli flakes|curry powder|oregano)\b/i],
+    ["Nuts and seeds", /\b(nuts?|peanuts?|walnuts?|almonds?|macadamias?|cashews?|pistachios?|hazelnuts?|pecans?|seeds?|flax|flaxseed|chia|hemp|sesame)\b/i],
+    ["Herbs", /\b(parsley|coriander|cilantro|basil|mint|dill|rosemary|thyme|chives|sage)\b/i],
+    ["Fruit", /\b(lemons?|limes?|berry|berries|blueberries|raspberries|strawberries|apples?|pears?|cherry|cherries|bananas?|oranges?|figs?|dates|grapes?|kiwis?|mangoe?s?|pomegranates?|melons?|peach(es)?|plums?)\b/i],
+    ["Vegetables", /\b(broccoli|cauliflower|shiitake|mushrooms?|spinach|tomato(es)?|peppers?|courgettes?|zucchinis?|rocket|arugula|carrots?|kale|avocados?|peas|sprouts|ginger|garlic|olives?|onions?|leeks?|cucumbers?|beetroots?|beets?|lettuce|celery|cabbage|chard|squash|pumpkin|potato(es)?|sweet potato(es)?|aubergines?|eggplants?|asparagus|fennel)\b/i],
+  ];
+  const guessGroup = (name) => (GROUPS.find((g) => g[1].test(String(name || ""))) || ["Other"])[0];
+  const okGroup = (g) => (GROUP_NAMES.includes(g) ? g : null);
+  // the shelf a new item's group usually lives on: fresh food in the fridge or cool box, the rest in the pantry or dry bag
+  const FRESH_GROUPS = new Set(["Vegetables", "Fruit", "Herbs", "Drinks and ferments"]);
+  const guessShelf = (k, group) => (k === "travel" ? (FRESH_GROUPS.has(group) ? "cool" : "dry") : FRESH_GROUPS.has(group) ? "fridge" : "pantry");
   const ICONS = Object.fromEntries(SEED.map(([, em, name]) => [keyOf(name), em]));
   const iconFor = (name) => ICONS[keyOf(name)] || "🛒";
   const shelfOf = (k, id) => (KITCHENS[k] ? KITCHENS[k].shelves.find((s) => s.id === id) : null) || null;
 
   // a level read from saved (synced) state: 0 to 3, else not checked
   const okLv = (v) => (v === 0 || v === 1 || v === 2 || v === 3 ? v : null);
-  const clean = (it) => ({ ...it, lv: okLv(it.lv) });
+  // its group: the one it stores, else the first guess from its name (stored with the item at its next change)
+  const clean = (it) => ({ ...it, lv: okLv(it.lv), group: okGroup(it.group) || guessGroup(it.name) });
   // every item of the kitchen, the catalogue under what he changed, deleted ones left out, in shelf then catalogue order
   function items(K, k) {
     const st = obj(obj(K).items), out = [], seen = new Set();
-    for (const s of SEED_ITEMS) { seen.add(s.id); const it = st[s.id] ? clean({ ...s, ...st[s.id] }) : s; if (!it.del && it.k === k) out.push(it); }
+    for (const s of SEED_ITEMS) { seen.add(s.id); const it = clean(st[s.id] ? { ...s, ...st[s.id] } : s); if (!it.del && it.k === k) out.push(it); }
     for (const [id, it] of Object.entries(st)) if (!seen.has(id) && it && !it.del && it.k === k && typeof it.name === "string") out.push(clean({ ...it, id }));
     const order = (KITCHENS[k] || { shelves: [] }).shelves.map((s) => s.id);
     return out.sort((a, b) => (order.indexOf(a.shelf) - order.indexOf(b.shelf)) || ((a.seed ?? 1e6) - (b.seed ?? 1e6)) || ms(b.added) - ms(a.added));
@@ -97,7 +123,14 @@
   function item(K, id) {
     const st = obj(obj(K).items)[id], s = SEED_ITEMS.find((x) => x.id === id);
     if (!st && !s) return null;
-    return st ? clean({ ...(s || {}), ...st, id }) : s;
+    return clean(st ? { ...(s || {}), ...st, id } : s);
+  }
+  /* A shelf's items in food groups (d34): the groups in GROUP_NAMES order, each alphabetical, so a tile never jumps when
+     its level changes. list: the items to show. Returns [{ group, list }], empty groups left out. */
+  function grouped(list) {
+    const by = new Map(GROUP_NAMES.map((g) => [g, []]));
+    for (const it of arr(list)) by.get(okGroup(it.group) || guessGroup(it.name)).push(it);
+    return [...by].filter(([, l]) => l.length).map(([group, l]) => ({ group, list: l.sort((a, b) => a.name.localeCompare(b.name, "en", { sensitivity: "base" }) || (a.id < b.id ? -1 : 1)) }));
   }
   // write one item back (a change always carries its time, which is what the merge compares)
   function put(K, it, at) {
@@ -108,7 +141,7 @@
     return out;
   }
 
-  /* Set a level. src: "tap", "check" (Looks right), "dinner", "buy" (Mark ticked items as plenty), "home" (brought home),
+  /* Set a level. src: "tap", "check" (the old shelf "Looks right", gone since d32), "dinner", "buy" (Mark ticked items as plenty), "home" (brought home),
      "add", "undo", or a later bulk filler like "receipt". Any rise is a restock: it starts a new run-low cycle and, at
      Plenty or on a first level, a fresh shelf-life clock. Two taps on the same item within 10 minutes are one answer
      (the second corrects the first), so a quick "Plenty, no, Half" never teaches a pace of minutes. */
@@ -133,23 +166,9 @@
   const nextLevel = (lv) => (lv == null || lv === 0 ? 3 : lv - 1);
   const tap = (K, id, at) => { const it = item(K, id); return it ? setLevel(K, id, nextLevel(it.lv), at, "tap") : K; };
 
-  /* "Looks right" on a shelf: he has looked and it is as shown. Items not checked yet become Plenty (that is what "looks
-     right" says about a full shelf); the rest keep their level and only get a "seen" time, which pushes their run-low day
-     out a little. The shelf shows checked for the rest of the day. */
-  function looksRight(K, k, shelf, at) {
-    let out = clone(K);
-    for (const it of items(K, k).filter((x) => x.shelf === shelf)) {
-      if (it.lv == null) out = setLevel(out, it.id, 3, at, "check");
-      else out = put(out, { ...item(out, it.id), seen: iso(at) }, at);
-    }
-    out.shelves = { ...obj(out.shelves), [k + ":" + shelf]: iso(at) };
-    return out;
-  }
-  const shelfAt = (K, k, shelf) => obj(obj(K).shelves)[k + ":" + shelf] || null;
-
-  /* Add something new (Plenty: he just put it there). The same name already in that kitchen is set to Plenty instead of
-     making a second chip; a deleted one comes back on the chosen shelf. */
-  function add(K, k, shelf, name, at) {
+  /* Add something new (Plenty: he just put it there), in the group he picked (else the guess from its name). The same name
+     already in that kitchen is set to Plenty instead of making a second tile; a deleted one comes back on the chosen shelf. */
+  function add(K, k, shelf, name, at, group) {
     const nm = String(name || "").trim().slice(0, 40);
     if (!nm || !shelfOf(k, shelf)) return { K, id: null };
     const key = keyOf(nm);
@@ -158,15 +177,23 @@
     const dead = Object.entries(obj(obj(K).items)).find(([, x]) => x && x.del && x.k === k && keyOf(x.name || (item(K, x.id) || {}).name) === key);
     const sd = k === "home" ? SEED_ITEMS.find((x) => keyOf(x.name) === key) : null;
     const id = dead ? dead[0] : sd ? sd.id : "u" + ms(at).toString(36) + Math.random().toString(36).slice(2, 6);
-    const base = { ...(item(K, id) || {}), id, k, shelf, name: nm, em: (item(K, id) || {}).em || iconFor(nm), lv: null, hist: [], added: iso(at) };
+    const base = { ...(item(K, id) || {}), id, k, shelf, name: nm, group: okGroup(group) || okGroup((obj(obj(K).items)[id] || {}).group) || guessGroup(nm), em: (item(K, id) || {}).em || iconFor(nm), lv: null, hist: [], added: iso(at) };
     delete base.del;
     return { K: setLevel(put(K, base, at), id, 3, at, "add"), id };
   }
   const rename = (K, id, name, at) => { const it = item(K, id), nm = String(name || "").trim().slice(0, 40);
     return it && nm ? put(K, { ...it, name: nm, em: it.em && it.em !== "🛒" ? it.em : iconFor(nm) }, at) : K; };
   const move = (K, id, shelf, at) => { const it = item(K, id); return it && shelfOf(it.k, shelf) ? put(K, { ...it, shelf }, at) : K; };
+  /* Put an item in a group and on a shelf (d34: Edit's pickers, or a drag onto another group or shelf). Either may be left
+     out (null) to keep it. Nothing changes (K comes back as is) when both are already so, or a value is not a real one. */
+  function place(K, id, shelf, group, at) {
+    const it = item(K, id); if (!it) return K;
+    const sh = shelf == null ? it.shelf : shelf, g = group == null ? it.group : group;
+    if (!shelfOf(it.k, sh) || !okGroup(g) || (sh === it.shelf && g === it.group)) return K;
+    return put(K, { ...it, shelf: sh, group: g }, at);
+  }
   // a delete is kept as a mark (del), so the other device's copy cannot bring the item back
-  const remove = (K, id, at) => { const it = item(K, id); return it ? put(K, { id, k: it.k, shelf: it.shelf, name: it.name, del: true }, at) : K; };
+  const remove = (K, id, at) => { const it = item(K, id); return it ? put(K, { id, k: it.k, shelf: it.shelf, name: it.name, group: it.group, del: true }, at) : K; };
 
   /* Days per level step for this item: the default (fresh food 3, pantry, freezer and long-life food 15), averaged with what
      his own history shows: in each cycle since a restock, the time from the restock to its latest drop (a tap or a dinner),
@@ -351,7 +378,7 @@
           const lv = Math.max(home.lv ?? -1, t.lv ?? -1);
           if (lv >= 0 && lv !== home.lv) out = setLevel(out, home.id, lv, at, "home");
         } else {
-          const r = add(out, "home", HOME_SHELF[t.shelf] || "fridge", t.name, at);
+          const r = add(out, "home", HOME_SHELF[t.shelf] || "fridge", t.name, at, t.group);
           out = r.K;
           if (r.id) {
             const n = item(out, r.id);
@@ -376,6 +403,18 @@
     if (f(ms(now) + DAY) === b) return "tomorrow";
     return new Date(Math.max(ms(t), ms(now))).toLocaleDateString("en-US", { weekday: "short", timeZone: tz || undefined });
   }
+  /* The status line under a tile's name (d34): Plenty, Half, "Low · buy", "Out · buy", "Low by Thu" (a Half or Plenty that
+     runs low before the next shop), or "Not checked". */
+  function status(it, now, shopAt, tz) {
+    if (!it || it.lv == null) return "Not checked";
+    if (it.lv === 0) return "Out · buy";
+    if (it.lv === 1) return "Low · buy";
+    if (lowSoon(it, now, shopAt)) return `Low by ${dayWord(lowAt(it, now), now, tz)}`;
+    return LEVELS[it.lv];
+  }
+  // the sheet's filters (d34): "all", "buy" (what the shopping list holds: low, out, or low before the next shop), "new" (not checked)
+  const shows = (it, f, now, shopAt) => f === "buy" ? !!it && it.lv != null && (it.lv <= 1 || lowSoon(it, now, shopAt))
+    : f === "new" ? !!it && it.lv == null : !!it;
   // counts for the kitchen card: { low (low or out), soon, unchecked, total }
   function counts(K, k, now, shopAt) {
     const list = items(K, k);
@@ -383,7 +422,7 @@
       low: list.filter((x) => x.lv != null && x.lv <= 1).length, soon: list.filter((x) => lowSoon(x, now, shopAt)).length };
   }
 
-  root.QuestKitchen = { NEED, LEVELS, KITCHENS, SEED, FRESH, DEFAULT_SHOP, keyOf, iconFor, items, item, setLevel, nextLevel, tap,
-    looksRight, shelfAt, add, rename, move, remove, pace, lowAt, lowSoon, turnAt, useFirst, nextShop, parseAmt, usesOf, amountFor,
+  root.QuestKitchen = { NEED, LEVELS, KITCHENS, SEED, FRESH, DEFAULT_SHOP, GROUP_NAMES, keyOf, iconFor, guessGroup, guessShelf,
+    items, item, grouped, setLevel, nextLevel, tap, add, rename, move, place, remove, status, shows, pace, lowAt, lowSoon, turnAt, useFirst, nextShop, parseAmt, usesOf, amountFor,
     shopList, tick, buyTicked, match, dinner, active, pick, noteActive, tripEnd, bringHome, dayWord, counts };
 })(typeof window !== "undefined" ? window : globalThis);
