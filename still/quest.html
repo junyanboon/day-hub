@@ -1243,6 +1243,9 @@
   const peakName = () => PEAKS[placeNow()] || `${placeNow()} Ridge`;
   const isSadhana = b => b.kind === "practice" || /shambhavi|sadhana|kriya|angamardana|yogasana/i.test(b.t);
   const isSleep = b => b.kind === "rest" && /sleep(?!er)|\bbed\b/i.test(b.t);   // not "Sleeper Train"
+  // an event over 12 hours (a car rental, a stay) is a booking, not a block of his time (d70, 2026-10-20): it stays on
+  // the calendar view but never holds back Day's end, takes Right now or Next, or fills the day for the sadhana slot
+  const isBooking = b => +b.e - +b.s > 12 * 3600000;
   const isMeal = b => b.kind === "fuel";
   // what a block is worth in prana: [on time, late, "not today", missed]
   /* Prana is an energy reading (d102, NVC: no rewards, no punishment). Sadhana,
@@ -1483,7 +1486,7 @@
   /* ---------- Day's end: the bedtime screen (Junyan, 2026-10-09, d180) ----------
      Opens by itself once the day's last item ends (not sleep, not open time), and
      a 🌙 button reopens it. quest-night.js draws it; no prana is given there. */
-  const lastItemEnd = all => { const r = all.filter(b => !isSleep(b) && b.kind !== "open" && b.kind !== "break"); return r.length ? Math.max(...r.map(b => +b.e)) : null; };
+  const lastItemEnd = all => { const r = all.filter(b => !isSleep(b) && !isBooking(b) && b.kind !== "open" && b.kind !== "break"); return r.length ? Math.max(...r.map(b => +b.e)) : null; };
   /* keepsakes (keeps.js, still-api /quest/keeps): new ones are announced once per device */
   let KEEP = { items:[], wants:[] };
   async function pullKeeps(){
@@ -1876,7 +1879,7 @@
     const end = sl ? +sl.s - 30 * 60000 : +all[all.length - 1].e;
     for (let s = Math.max(Math.ceil(+now() / step) * step, +all[0].s - 3600000); s + len <= end; s += step) {
       const S = new Date(s), E = new Date(s + len);
-      if (all.some(b => b.kind !== "open" && b.kind !== "break" && b.s < E && b.e > S)) continue;
+      if (all.some(b => b.kind !== "open" && b.kind !== "break" && !isBooking(b) && b.s < E && b.e > S)) continue;
       if (emptyStomach(S, all)) return S;
     }
     return null;
@@ -1919,8 +1922,8 @@
   // latest-starting block containing now wins (same rule as Stillness)
   // a block added in Quest uses up the open space under it (Your move, 2026-10-14), so a free stretch that
   // starts while it runs does not take over the Right now card
-  function currentOf(all, t){ let hit = null; all.forEach(b => { if (t >= b.s && t < b.e && !(hit && hit.extra && hit.kind !== "open" && hit.kind !== "break" && (b.kind === "open" || b.kind === "break"))) hit = b; }); return hit; }
-  function nextOf(all, t){ return all.find(b => b.s > t) || null; }
+  function currentOf(all, t){ let hit = null; all.forEach(b => { if (t >= b.s && t < b.e && !isBooking(b) && !(hit && hit.extra && hit.kind !== "open" && hit.kind !== "break" && (b.kind === "open" || b.kind === "break"))) hit = b; }); return hit; }
+  function nextOf(all, t){ return all.find(b => b.s > t && !isBooking(b)) || null; }
   const needsCheck = b => b.kind !== "break" && b.kind !== "open";   // open time is a choice, not a check-in
   // Check-ins follow the calendar event, not its time: a block that moves (in
   // Google Calendar or in Stillness) keeps "started" and "closed". Blocks with
@@ -4869,7 +4872,7 @@
     // d82: the morning brief, until he taps "Got it"; d77: a Shambhavi slot when none is planned
     const slot = PLAN && !z ? sadhanaSlot(all) : null;
     const hourNow = +tzParts(t, { hour:"numeric", hourCycle:"h23" }).hour;
-    const ahead = all.filter(b => b.e > t && b.kind !== "open" && b.kind !== "break");
+    const ahead = all.filter(b => b.e > t && !isBooking(b) && b.kind !== "open" && b.kind !== "break");
     let bh = "";
     // the morning (2026-10-09): one button that opens a full-screen morning. Shambhavi is offered in
     // Prana actions only (Junyan: "drop the add shambhavi altogether").
