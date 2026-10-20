@@ -213,6 +213,11 @@ main>.empty,.pair .summary,.note{color:#fff;text-shadow:0 1px 2px rgba(9,22,50,.
 .btn.keep[aria-pressed="true"]{background:var(--mint-soft);border-color:var(--mint);color:var(--mint)}
 .how{font-size:12.5px;color:var(--faint)}
 .notebox{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px}
+.drafts{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
+.draft{display:grid;gap:8px;align-content:start}
+.draft label{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--faint)}
+.draft textarea{width:100%;box-sizing:border-box;resize:vertical;background:var(--glass-2);color:var(--ink);border:1px solid var(--line);border-radius:12px;padding:10px 12px;font:15px/1.5 var(--font)}
+.draft .btn{justify-content:center;text-align:center;min-height:48px}
 .notebox input{min-width:0;background:var(--glass-2);color:var(--ink);border:1px solid var(--line);border-radius:12px;padding:10px 12px;font:14px var(--font)}
 .notebox input::placeholder{color:var(--faint)}
 .noted{font-size:13px;color:var(--mint)} .noted a{color:var(--mint)}
@@ -294,6 +299,8 @@ main>.empty,.pair .summary,.note{color:#fff;text-shadow:0 1px 2px rgba(9,22,50,.
     catch (e) { S.error = e; }
     if (S.tab === "report") { try { S.report = await api("/inbox/report"); } catch {} }
     if (S.tab === "digest" || S.tab === "report") { try { S.dig = await api("/inbox/digest"); } catch {} }
+    // never re-draw under his fingers while he edits a reply draft
+    if (document.activeElement && document.activeElement.closest("#view .draft textarea")) { counts(); liveLine(); return; }
     if (S.tab === "digest") {
       // never re-draw under his fingers while he types a note; keep the open headline where it is
       if (document.activeElement && document.activeElement.closest("#view .notebox")) { counts(); liveLine(); return; }
@@ -460,6 +467,7 @@ main>.empty,.pair .summary,.note{color:#fff;text-shadow:0 1px 2px rgba(9,22,50,.
 
   function messagesView(){
     const rows = S.data.messages.map(x => {
+      if (x.host) return hostRow(x);
       const body = S.open === x.id ? `<div class="body">
           ${x.snippet ? `<p class="summary">${esc(x.snippet)}</p>` : ""}
           ${mailBlock(x)}
@@ -473,6 +481,32 @@ main>.empty,.pair .summary,.note{color:#fff;text-shadow:0 1px 2px rgba(9,22,50,.
       <div class="list">${rows || `<div class="empty">No emails from people right now.</div>`}</div>`;
   }
 
+  // a stay's host writing through Booking.com or Airbnb (d420): what they said, two drafts, reply on the platform
+  function hostRow(x){
+    const h = x.host, open = S.open === x.id, plat = h.platform || "the platform";
+    const draft = (lang, text) => {
+      const k = x.id + "|" + lang, v = S.hd && k in S.hd ? S.hd[k] : text;
+      return `<div class="draft"><label for="hd-${esc(k)}">${esc(lang)}</label>
+        <textarea id="hd-${esc(k)}" rows="3" data-hd="${esc(k)}">${esc(v)}</textarea>
+        <a class="btn ${lang === "English" && h.replyTheirs ? "" : "primary"}" href="${esc(h.url || "#")}" target="_blank" rel="noopener" data-hcopy="${esc(k)}">Copy and open ${esc(plat)}</a></div>`;
+    };
+    let inner;
+    if (h.state === "done") inner = `
+          <p class="gist">${esc(h.hostSaid)}</p>
+          ${h.asks ? `<p class="by">They want: ${esc(h.asks)}</p>` : ""}
+          <div class="drafts">${h.replyTheirs ? draft(h.language, h.replyTheirs) : ""}${draft("English", h.replyEnglish)}</div>
+          <p class="by">Fill in anything in [brackets], then paste it into the chat on ${esc(plat)}. Nothing is sent from here.</p>`;
+    else inner = `
+          ${x.snippet ? `<p class="summary">${esc(x.snippet)}</p>` : ""}
+          <p class="by">${h.state === "pending" ? "Claude is reading it and writing replies…" : "No drafts for this one. Reply on " + esc(plat) + "."}</p>
+          ${h.url ? `<div class="btns"><a class="btn primary" href="${esc(h.url)}" target="_blank" rel="noopener">Open ${esc(plat)}</a></div>` : ""}`;
+    const body = open ? `<div class="body">${inner}
+          ${mailBlock(x)}
+          <div class="big"><button class="btn" type="button" data-hdone="${esc(x.id)}">✓ Replied, file it</button><button class="btn" type="button" data-mktask="${esc(x.id)}"${S.mk && S.mk[x.id] ? " disabled" : ""}>${S.mk && S.mk[x.id] ? "Making it…" : "📋 Make a task"}</button></div>
+          <div class="links">${x.task ? `<a href="${esc(x.task.url)}" target="_blank" rel="noopener">Open the task</a>` : ""}</div>
+        </div>` : "";
+    return `<div class="row ${open?"open":""}">${head(x, "people", `<span class="pill ask">Your host · ${esc(plat)}</span>`)}${body}</div>`;
+  }
   function reportView(){
     const r = S.report;
     if (!r) return `<div class="empty">Loading…</div>`;
@@ -702,6 +736,15 @@ main>.empty,.pair .summary,.note{color:#fff;text-shadow:0 1px 2px rgba(9,22,50,.
         if (S.open === id) nextOpen(); }
       catch (err) { toastErr(err.message); }
       delete S.mk[id]; return load(); }
+    const hc = e.target.closest("[data-hcopy]");
+    if (hc){ const t = document.querySelector(`[data-hd="${CSS.escape(hc.dataset.hcopy)}"]`);
+      try { await navigator.clipboard.writeText(t ? t.value : ""); toast("Copied. Paste it into the chat."); } catch { toastErr("Could not copy. Select the text and copy it yourself."); }
+      if (hc.getAttribute("href") === "#") e.preventDefault();
+      return; }
+    const hd = e.target.closest("[data-hdone]");
+    if (hd){ const id = hd.dataset.hdone;
+      try { await post("/inbox/decide", { id, route:"travel" }); toast("Filed to Travel.", id); nextOpen(); } catch (err) { toastErr(err.message); }
+      return load(); }
     const sk = e.target.closest("[data-skip]");
     if (sk){ try { await post("/inbox/decide", { id: sk.dataset.skip, action:"skip" }); nextOpen(); } catch (err) { toastErr(err.message); } return load(); }
     const ts = e.target.closest("[data-tosort]");
@@ -714,7 +757,8 @@ main>.empty,.pair .summary,.note{color:#fff;text-shadow:0 1px 2px rgba(9,22,50,.
       if (S.error?.status === 401) { store.set("quest-key", null); toastErr("That code did not work."); render(); } }
   });
   // the note box: typed text survives a re-draw; Enter sends
-  document.addEventListener("input", e => { const d = e.target.closest("[data-draft]"); if (d) S.drafts[d.dataset.draft] = d.value; });
+  document.addEventListener("input", e => { const d = e.target.closest("[data-draft]"); if (d) S.drafts[d.dataset.draft] = d.value;
+    const h = e.target.closest("[data-hd]"); if (h) (S.hd ||= {})[h.dataset.hd] = h.value; });
   document.addEventListener("toggle", e => { const d = e.target.closest && e.target.closest("[data-deep]"); if (d) S.deepOpen[d.dataset.deep] = d.open; }, true);
   document.addEventListener("keydown", e => {
     if (e.key === "Enter" && e.target.matches(".notebox input")) { e.preventDefault(); e.target.nextElementSibling.click(); return; }
