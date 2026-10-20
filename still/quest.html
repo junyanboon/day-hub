@@ -546,6 +546,9 @@
   .nvc-tip { font-size:13px; color:var(--ink-soft); }
   .nvc-warn { font-size:13px; color:var(--gold); }
   .nvc-in { width:100%; box-sizing:border-box; padding:10px; border-radius:12px; border:1px solid var(--glass-border); background:rgba(0,0,0,.2); color:var(--ink); font:inherit; font-size:15px; }
+  .nvc-go .btn { overflow-wrap:normal; }   /* "Conflict" stays one word (d72) */
+  .nvc-past { margin-top:14px; border-top:1px solid var(--glass-border); padding-top:8px; }
+  .nvc-past > summary { cursor:pointer; padding:8px 2px; font-weight:600; color:var(--ink-soft); }
   .nvc-entry { padding:10px 2px; border-top:1px solid rgba(255,255,255,.08); font-size:15px; }
   .nvc-steps { display:flex; flex-wrap:wrap; gap:4px; margin:4px 0 10px; font-size:11px; }
   .nvc-steps span { padding:3px 7px; border-radius:999px; background:var(--glass); color:var(--ink-faint); }
@@ -1748,10 +1751,10 @@
     return `<div class="hhead"><span class="eyebrow">Right now</span>` +
       `<button class="hsnd" data-hsnd aria-label="Tap sounds">${window.QuestFx && QuestFx.soundOn() ? "🔊" : "🔇"}</button></div>` +
       (pastBed(now()) != null ? `<div class="bedline">🌙 Past bedtime: body drops 3 every half hour you stay up${G.day.lateBody ? ` (−${G.day.lateBody} so far)` : ""}. Time to wind down.</div>` : "") +
-      `<div class="actions" style="margin-top:8px"><button class="btn" data-nvc="checkin">🫶 How am I?</button><button class="btn" data-nvc="conflict">⚡ Conflict</button><button class="btn" data-nvc="journal">📓 Journal</button></div>`;
+      `<div class="actions nvc-go" style="margin-top:8px"><button class="btn" data-nvc="checkin">🫶 How am I?</button><button class="btn" data-nvc="conflict">⚡ Conflict</button></div>`;
   }
   function bindHabits(root){
-    root.querySelectorAll("[data-nvc]").forEach(bn => bn.onclick = () => bn.dataset.nvc === "conflict" ? openConflict() : bn.dataset.nvc === "journal" ? openJournal() : openCheckin());
+    root.querySelectorAll("[data-nvc]").forEach(bn => bn.onclick = () => bn.dataset.nvc === "conflict" ? openConflict() : openCheckin());   // the journal sits collapsed in both sheets (d72)
     root.querySelectorAll("[data-hsnd]").forEach(bn => bn.onclick = () => { QuestFx.setSound(!QuestFx.soundOn()); render(); });
   }
   // a tile's burst colour by its habit group (checklist tiles, tapStep)
@@ -2475,8 +2478,9 @@
       <div class="win-lb">What happened (what a camera would see)</div>
       <textarea id="nvNote" rows="2" class="nvc-in" placeholder="Optional">${esc(S.note)}</textarea>
       <div class="actions"><button class="btn ghost" data-back>‹ Back</button><button class="btn primary" id="nvOk" ${S.needs.length ? "" : "disabled"}>Save · ${esc(mqSum(sc))}</button></div>`;
-    openSheet(head + body + `<div class="actions"><button class="btn ghost" id="nvX">Not now</button></div>`, true);
+    openSheet(head + body + `<div class="actions"><button class="btn ghost" id="nvX">Not now</button></div>` + nvPastHTML(S), true);
     const sh = $("sheet"), keep = () => { const n = $("nvNote"); if (n) S.note = n.value; };
+    nvPastBind(S, sh);
     const again = () => { keep(); const top = sh.scrollTop; openCheckin(S); $("sheet").scrollTop = top; };
     sh.querySelectorAll("[data-side]").forEach(b => b.onclick = () => { S.side = b.dataset.side; S.open = ""; again(); });
     sh.querySelectorAll("[data-fam]").forEach(b => b.onclick = () => { S.open = S.open === b.dataset.fam ? "" : b.dataset.fam; again(); });
@@ -2541,8 +2545,9 @@
       <textarea id="nvSay" rows="5" class="nvc-in">${esc(S.say || nvTranslation(S))}</textarea>
       <p class="nvc-tip">Change any word so it sounds like you. Saving keeps it in your Feelings journal.</p>
       <div class="actions"><button class="btn ghost" data-back>‹ Back</button><button class="btn primary" id="nvSave">Save · ${esc(mqSum(nvScore(S.feel, S.strong)))}</button></div>`;
-    openSheet(`<h3>⚡ Conflict</h3>${pills}${body}<div class="actions"><button class="btn ghost" id="nvX">Close</button></div>`, true);
+    openSheet(`<h3>⚡ Conflict</h3>${pills}${body}<div class="actions"><button class="btn ghost" id="nvX">Close</button></div>` + nvPastHTML(S), true);
     const sh = $("sheet");
+    nvPastBind(S, sh);
     const keep = () => { if ($("nvWho")) S.who = $("nvWho").value; if ($("nvObs")) S.obs = $("nvObs").value; if ($("nvReq")) S.req = $("nvReq").value; if ($("nvSay")) S.say = $("nvSay").value; };
     const again = () => { keep(); const top = sh.scrollTop; openConflict(S); $("sheet").scrollTop = top; };
     const tog = (arr, w, max) => arr.includes(w) ? arr.filter(x => x !== w) : [...arr, w].slice(-max);
@@ -2574,13 +2579,16 @@
     };
   }
   /* The feelings journal (Junyan, 2026-10-10: "make a new Db somewhere easy"): every check-in
-     and conflict is kept on still-api (/quest/nvc), the one store (d15: not Notion). This sheet
-     reads it back with what his words show: how many he uses, the ones he leans on, the
-     families he has not touched, the needs that keep coming up. */
-  async function openJournal(){
+     and conflict is kept on still-api (/quest/nvc), the one store (d15: not Notion). Since d72
+     (2026-10-20) it has no tile of its own: it sits collapsed as "Past entries" at the bottom of the
+     How am I? and Conflict sheets and loads only when he opens it. It reads back what his words show:
+     how many he uses, the ones he leans on, the families he has not touched, the needs that keep coming up. */
+  async function nvJournalLoad(){
     let list = (G.day.feel || []).slice().reverse(), from = "today on this device";
-    openSheet(`<h3>📓 Feelings journal</h3><p class="nvc-tip">Loading…</p>`, true);
     if (questKey() && !DRY) try { const r = await qfetch("/quest/nvc"); if (Array.isArray(r.entries) && r.entries.length) { list = r.entries; from = "all your entries"; } } catch {}
+    return { list, from };
+  }
+  function nvJournalHTML({ list, from }){
     const V = nvVocab(), top = (o, n) => Object.entries(o).sort((a, b) => b[1] - a[1]).slice(0, n);
     const usedFams = new Set(Object.keys(V.words).map(w => NV_FAM(w)).filter(Boolean).map(f => f.name));
     const untouched = NV.families.filter(f => !usedFams.has(f.name)).map(f => `${f.icon} ${f.name}`);
@@ -2588,16 +2596,34 @@
     const row = e => `<div class="nvc-entry"><div class="nvc-tip">${esc(when(e.at))} · ${e.kind === "conflict" ? `⚡ Conflict${e.who ? " with " + esc(e.who) : ""}` : "🫶 Check-in"}${e.p ? ` · prana ${e.p > 0 ? "+" : ""}${e.p}` : ""}</div>
       <div>I feel <b>${esc(nvList(e.feelings || []))}</b>${(e.needs || []).length ? ` because I need <b>${esc(nvList(e.needs))}</b>` : ""}.</div>
       ${e.observation ? `<div class="nvc-tip">${esc(e.observation)}</div>` : ""}${e.request ? `<div class="nvc-tip">${esc(e.request)}</div>` : ""}</div>`;
-    openSheet(`<h3>📓 Feelings journal</h3>
-      <div class="win-lb">Your words</div>
+    return `<div class="win-lb">Your words</div>
       <p>${Object.keys(V.words).length} of ${nvTotal()} feeling words used, ${Object.keys(V.needs).length} needs named.</p>
       ${top(V.words, 5).length ? `<p class="nvc-tip">Most used: ${top(V.words, 5).map(([w, c]) => `${esc(nvLabel(w))} (${c})`).join(", ")}</p>` : ""}
       ${top(V.needs, 5).length ? `<p class="nvc-tip">Needs that keep coming up: ${top(V.needs, 5).map(([w, c]) => `${esc(nvLabel(w))} (${c})`).join(", ")}</p>` : ""}
       ${untouched.length ? `<p class="nvc-tip">Families you have not used yet: ${esc(untouched.join(", "))}</p>` : ""}
       <div class="win-lb">Entries (${esc(from)})</div>
-      ${list.length ? list.slice(0, 60).map(row).join("") : `<p>No entries yet.</p>`}
-      <div class="actions"><button class="btn ghost" id="nvJX">Close</button></div>`, true);
-    $("nvJX").onclick = closeSheet;
+      ${list.length ? list.slice(0, 60).map(row).join("") : `<p>No entries yet.</p>`}`;
+  }
+  // closed by default; S.past keeps it open across the sheet's redraws, S.pastData keeps the loaded entries
+  function nvPastHTML(S){
+    return `<details class="nvc-past"${S.past ? " open" : ""}><summary>📓 Past entries</summary>
+      <div id="nvPast">${S.pastData ? nvJournalHTML(S.pastData) : S.past ? `<p class="nvc-tip">Loading…</p>` : ""}</div></details>`;
+  }
+  let nvPastOwner = null;   // the sheet state now on screen; a late answer only fills its own sheet (redraws replace the element)
+  function nvPastBind(S, sh){
+    nvPastOwner = S;
+    const d = sh.querySelector(".nvc-past"); if (!d) return;
+    const fill = () => { const el = $("nvPast"); if (el && nvPastOwner === S && S.past) el.innerHTML = nvJournalHTML(S.pastData); };
+    const load = () => {
+      if (S.pastData || S.pastLoading) return;
+      S.pastLoading = nvJournalLoad().then(r => { S.pastData = r; S.pastLoading = null; fill(); });
+    };
+    d.ontoggle = () => {
+      S.past = d.open;
+      if (!d.open) return;
+      if (!S.pastData) { $("nvPast").innerHTML = `<p class="nvc-tip">Loading…</p>`; load(); }
+    };
+    if (S.past && !S.pastData) load();
   }
   // check-ins and conflicts go to still-api (d15: not Notion); anything that could not go yet waits in G.nvcOut
   async function nvSend(){
