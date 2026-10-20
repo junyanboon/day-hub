@@ -91,8 +91,12 @@ nav.tabs{display:flex;gap:24px;border-bottom:1px solid var(--line);overflow-x:au
 .dot{width:8px;height:8px;border-radius:50%;background:var(--faint)}
 .dot.people{background:var(--gold)} .dot.auto{background:var(--mint)} .dot.flag{background:var(--warn)} .dot.jev{background:var(--jev)}
 .who{min-width:0}
-.who .t1{font-weight:600;font-size:15px;display:block;overflow-wrap:anywhere}
-.who .t2{font-size:13px;color:var(--dim);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}
+/* pin each part of a card's header to its own column, so a long name or a wide pill can never squeeze the
+   sender into a one-letter column (Junyan's screenshot 2026-10-20: "Anthropic" written down the page) */
+.row>button.head>.when{grid-column:1;grid-row:1}.row>button.head>.dot{grid-column:2;grid-row:1}
+.row>button.head>.who{grid-column:3;grid-row:1}.row>button.head>.pill,.row>button.head>.seal{grid-column:4;grid-row:1;justify-self:end}
+.who .t1{font-weight:600;font-size:15px;display:block;overflow-wrap:break-word}
+.who .t2{font-size:13px;color:var(--dim);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:break-word}
 .pill{font:600 11.5px/1 var(--font);padding:6px 10px;border-radius:999px;white-space:nowrap;background:var(--sunk);color:var(--dim);border:1px solid var(--line)}
 .pill.jev{background:var(--jev-soft);color:var(--jev);border-color:transparent}
 .pill.auto{background:var(--mint-soft);color:var(--mint);border-color:transparent}
@@ -102,7 +106,7 @@ nav.tabs{display:flex;gap:24px;border-bottom:1px solid var(--line);overflow-x:au
 .row.skipped .who .t1::after{content:" · skipped";color:var(--dim);font-weight:400;font-size:12px}
 
 .body{padding:4px 14px 18px 84px;display:grid;gap:12px}
-@media (max-width:560px){.counter{margin-left:0;justify-items:start;text-align:left;width:100%;grid-template-columns:1fr auto;align-items:center}.body{padding-left:14px}.row>button.head{grid-template-columns:44px 8px minmax(0,1fr)}.row>button.head .pill,.row>button.head .seal{grid-column:3;justify-self:start}}
+@media (max-width:560px){.counter{margin-left:0;justify-items:start;text-align:left;width:100%;grid-template-columns:1fr auto;align-items:center}.body{padding-left:14px}.row>button.head{grid-template-columns:44px 8px minmax(0,1fr)}.row>button.head>.pill,.row>button.head>.seal{grid-column:3;grid-row:2;justify-self:start}}
 .why{font:600 11px var(--font);letter-spacing:.14em;text-transform:uppercase;color:var(--faint);margin-bottom:-6px}
 .summary{margin:0;max-width:62ch;color:var(--dim);overflow-wrap:anywhere}
 .jevline{display:flex;gap:10px;align-items:center;flex-wrap:wrap;background:var(--jev-soft);color:var(--jev);border-radius:14px;padding:9px 13px;font:600 13px var(--font)}
