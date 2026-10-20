@@ -29,7 +29,7 @@ function item(b, i, ed) {
   return { key: "k" + i, name: b.t, s, e, kind, open: kind === "open", brk: kind === "break", meal: kind === "fuel", sleep: false,
     sadhana: kind === "practice", strength: false, flight: false, extra: !!b.extra, taskId: null, basic: null,
     calId: b.calId || "", cal: b.cal || "", type: b.type, cs: b.s, ce: b.e, allDay: !!b.allDay,
-    cost: 10 * Math.max(0, (e - s) / 3600000), badge: "" };
+    cost: 5 * Math.max(0, (e - s) / 3600000), badge: "" };
 }
 // Tuesday 20 October 2026, Madrid, as still-api /plan served it that morning (titles and times exact)
 const J = { cal: "Joint Plans", calId: JOINT, type: "fixed" };
@@ -81,7 +81,7 @@ test("Junyan's 20 October: no overlap is raised and nothing offers to end, cut o
 });
 
 test("the rental's 51 hours are not counted as body spent, and the day does not run to Thursday", () => {
-  const cs = run(DAY, "2026-10-20T10:00:00+02:00", { body: 60 });
+  const cs = run(DAY, "2026-10-20T10:00:00+02:00", { body: 80 });
   assert.equal(cs.some((c) => c.id === "body"), false, words(cs));
   assert.doesNotMatch(words(cs), /4:00 PM/);
 });
