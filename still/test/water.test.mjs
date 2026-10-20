@@ -82,3 +82,24 @@ test("the drop is the button: one compact row, no big +1 glass button, undo kept
   assert.match(html, /prefers-reduced-motion: reduce\) \{ \.wq-drop\.hit \{ animation:none; \} \.wq-drop\.hit::after, \.wq-plus \{ display:none; \} \}/);
   assert.match(html, /querySelectorAll\("\[data-glass\]"\)\.forEach\(bn => bn\.onclick = \(\) => addGlass\(bn\)\)/);
 });
+
+test("the small line names the block a glass counts toward, and reads thirsty? after 4 PM (d76)", () => {
+  const T = (...a) => J(W.tail(...a)).map(x => (x.blk ? "[" + x.t + "]" : x.t));
+  assert.deepEqual(T("Domestics", 10, 2), ["[Domestics]"]);
+  assert.deepEqual(T("Domestics", 17, 2), ["[Domestics]", "thirsty?"]);
+  assert.deepEqual(T("", 10, 2), []);                // no block: nothing added
+  assert.deepEqual(T(null, 20, 2), ["thirsty?"]);   // no block after 4 PM: thirsty? is not the shrinking part
+  assert.deepEqual(T("Work", 2, 0), ["[Work]", "thirsty?"]);   // the game day runs to 4 AM
+  assert.deepEqual(T("Dinner", 18, 8), []);          // the aim is met: the line says so and stays short
+  const fn = html.slice(html.indexOf("function waterHTML()"), html.indexOf("function waterStamp()"));
+  assert.match(fn, /nm = b \? shortName\(b\) : ""/);
+  assert.match(fn, /W\.tail\(nm, hourNow\(\), s\.total\)/);
+  assert.match(fn, /title="\$\{esc\(W\.button\(nm, hourNow\(\)\)\)\}"/);
+  assert.match(fn, /<small class="wq-sub">/);
+  assert.match(fn, /x\.blk \? ' class="wq-blk"' : ""\}>&nbsp;· \$\{esc\(x\.t\)\}<\/span>/);   // a plain space would collapse at the flex item's edge
+  // one line on a phone: the line never wraps, only the block name shrinks, with an ellipsis
+  assert.match(html, /\.wq \.sq-t \{ min-width:0; \}/);
+  assert.match(html, /\.wq-sub span \{ flex:none; \}/);
+  assert.match(html, /\.wq-sub \{[^}]*white-space:nowrap[^}]*\}/);
+  assert.match(html, /\.wq-blk \{[^}]*min-width:0[^}]*text-overflow:ellipsis[^}]*\}/);
+});

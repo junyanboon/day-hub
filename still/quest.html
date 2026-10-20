@@ -190,6 +190,10 @@
   .sq-bar b { display:block; height:100%; width:0; background:linear-gradient(90deg, #7fd0ff, #8fe3b0); border-radius:4px; transition:width .8s cubic-bezier(.2,.8,.2,1); }
   /* the water card (2026-10-19, d23): like the steps side quest, with a "by 4 PM" marker on the bar */
   .wq.done { border-color:rgba(127,208,255,.65); background:linear-gradient(135deg, rgba(127,208,255,.18), rgba(143,227,176,.08)); }
+  /* the small line keeps to one line on a phone (Junyan, 2026-10-20, d76): only the block name gives way, with an ellipsis */
+  .wq .sq-t { min-width:0; }   /* or a long line widens the card instead of truncating */
+  .sq-t small.wq-sub { display:flex; white-space:nowrap; overflow:hidden; }
+  .wq-sub span { flex:none; } .wq-sub .wq-blk { flex:0 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; }
   .wq-bar { position:relative; height:10px; overflow:visible; margin-top:9px; }
   .wq-bar b { background:linear-gradient(90deg, #7fd0ff, #b8e6ff); }
   .wq-bar i { position:absolute; top:-3px; bottom:-3px; width:2px; background:#ffd479; border-radius:1px; }
@@ -769,7 +773,7 @@
 <script src="quest-night.js?v=20261020end2"></script>
 <script src="quest-basics.js?v=20261020a"></script>
 <script src="quest-suggest.js?v=20261019a"></script>
-<script src="quest-water.js?v=20261020b"></script>
+<script src="quest-water.js?v=20261020d"></script>
 <script src="quest-gym.js?v=20261019x"></script>
 <script src="quest-morning.js?v=20261019a"></script>
 <script src="quest-agenda.js?v=20261020c"></script>
@@ -1459,14 +1463,15 @@
   function waterHTML(){
     if (!QW() || !G.day) return "";
     const W = QW(), s = W.summary(G.day.glasses), b = waterBlock(), pct = Math.min(100, Math.round(s.total / W.AIM * 100));
-    const left = W.AIM - s.total, after = W.late(hourNow());
+    const left = W.AIM - s.total, after = W.late(hourNow()), nm = b ? shortName(b) : "";
     const sub = s.total >= W.AIM ? `${s.total} glasses, ${(s.ml / 1000).toLocaleString()} L. The aim is met.`
       : `${s.ml.toLocaleString()} ml so far${!after && s.total < W.BY4 ? `, ${W.BY4 - s.total} more by 4 PM` : `, ${left} to the aim`}`;
     const from = waterBarFrom != null ? waterBarFrom : pct; waterBarFrom = null;   // the bar fills from the last count after a tap
     return `<div class="sq wq${s.total >= W.AIM ? " done" : ""}">` +
-      `<button type="button" class="wq-drop" data-glass aria-label="Add one glass" title="${esc(W.button(b ? shortName(b) : "", hourNow()))}">💧</button>` +
+      `<button type="button" class="wq-drop" data-glass aria-label="Add one glass" title="${esc(W.button(nm, hourNow()))}">💧</button>` +
       `<span class="sq-t">Water · <span class="wq-n">${s.total} / ${W.AIM}</span> glasses` +
-      `<small>${esc(sub)}</small>` +
+      `<small class="wq-sub"><span>${esc(sub)}</span>${W.tail(nm, hourNow(), s.total).map(x =>
+        `<span${x.blk ? ' class="wq-blk"' : ""}>&nbsp;· ${esc(x.t)}</span>`).join("")}</small>` +
       `<i class="sq-bar wq-bar"><b style="width:${from}%" data-to="${pct}"></b><i style="left:${W.markerPct()}%"></i><em style="left:${W.markerPct()}%">by 4 PM</em></i></span></div>`;
   }
   // after a tap redraws the card: the drop bounces with a splash ring, "+1" floats off the count, the bar fills

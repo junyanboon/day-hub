@@ -5,6 +5,9 @@
      against the block he is in right now, or "none" in open time, and the logged line names that block. button()
      is the drop's tooltip: "+1 glass · <block>", and after 4 PM "+1 glass (thirsty)". Sadhguru's rule is to drink
      when thirsty, so that is a gentle reminder, never a block.
+   - Phones show no tooltip, so tail() puts the same two cues on the small grey line under the count (Junyan,
+     2026-10-20, d76): "500 ml so far, 4 more by 4 PM · Domestics", after 4 PM "· Domestics · thirsty?". No block,
+     no block part. Each part is { t, blk } so the page knows which one may shrink.
    - A glass pays what one cup of water paid before, into the same meter, up to the same daily limit.
    - G.day.glasses = { id: { at, blk, name, hour, d, off? } }: hour is his local hour when he drank, d what it paid.
      An undo marks the glass off (never deletes it), so two devices merging keep the undo (quest-merge.js).
@@ -20,6 +23,15 @@
   function button(name, hour) {
     if (late(hour)) return "+1 glass (thirsty)";
     return name ? `+1 glass · ${name}` : "+1 glass";
+  }
+  // the extra bits of the small line: the block the next glass counts toward, then "thirsty?" after 4 PM
+  // (none once the aim is met: the line already says so, and it would run long)
+  function tail(name, hour, total) {
+    if (total >= AIM) return [];
+    const out = [];
+    if (name) out.push({ t: name, blk: true });
+    if (late(hour)) out.push({ t: "thirsty?" });
+    return out;
   }
   // the glasses still counted, oldest first
   function active(g) {
@@ -46,5 +58,5 @@
   // what the next glass pays: water's old value per cup, nothing past the old daily limit
   const pay = (g, value, cap) => (active(g).length >= cap ? 0 : value);
 
-  root.QuestWater = { AIM, BY4, ML, CUT, markerPct, late, button, active, add, undo, summary, byBlock, pay };
+  root.QuestWater = { AIM, BY4, ML, CUT, markerPct, late, button, tail, active, add, undo, summary, byBlock, pay };
 })(typeof window !== "undefined" ? window : globalThis);
