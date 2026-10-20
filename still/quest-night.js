@@ -52,6 +52,11 @@
     const w = t.water;
     const water = w ? row("wt", "Water today, glasses", w.today == null ? "0" : `${w.today}`, w.avg == null ? null : Math.round(w.avg), w.arrow, cls(w), w.series,
       `${w.before4 || 0} before 4 PM · aim ${w.aim || 8}`) : "";
+    // the two automatic lines sit beside what they relate to (d69): last meal under Drains, bedtime first in Last night
+    const m = t.marks || {}, mark = (x) => x ? `<div class="tr-r tr-m"><span class="tr-l">${esc(x)}</span></div>` : "";
+    const di = t.rows.findIndex((x) => x.k === "dr");
+    if (m.meal) days.splice(di < 0 ? days.length : di + 1, 0, mark(m.meal));
+    if (m.bed) nights.unshift(mark(m.bed));
     return `<div class="tr">${days.join("")}${nights.length ? `<div class="tr-h">Last night</div>${nights.join("")}` : ""}${water}
       ${t.cheer ? `<div class="tr-cheer"><span>✨</span><span>${esc(t.cheer)}</span></div>` : ""}
       <div class="tr-beat"><span>🌱</span><span><b>Tomorrow's one thing</b>${esc(t.beat)}</span></div></div>`;
@@ -169,6 +174,7 @@
     .nt-sched span { width:72px; flex:none; color:var(--ink-soft); font-variant-numeric:tabular-nums; }
     .nt-hint { font-size:12px; color:var(--ink-faint); }
     .tr { margin-top:10px; background:var(--glass); border-radius:14px; padding:8px 12px; }
+    .tr-r.tr-m { grid-template-columns:1fr; color:rgba(255,255,255,.8); }
     .tr-r { display:grid; grid-template-columns:1fr 42px 64px 72px; gap:6px; align-items:center; padding:5px 0; border-bottom:1px solid rgba(255,255,255,.05); font-size:13px; }
     .tr-l { color:var(--ink-soft); } .tr-r b { font-size:15px; text-align:right; } .tr-spark { display:block; }
     .tr-a { font-weight:700; color:var(--ink-faint); white-space:nowrap; } .tr-a.good { color:#8fe3b0; } .tr-a.off { color:#ffb36b; }
