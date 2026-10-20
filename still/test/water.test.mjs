@@ -103,3 +103,62 @@ test("the small line names the block a glass counts toward, and reads thirsty? a
   assert.match(html, /\.wq-sub \{[^}]*white-space:nowrap[^}]*\}/);
   assert.match(html, /\.wq-blk \{[^}]*min-width:0[^}]*text-overflow:ellipsis[^}]*\}/);
 });
+
+// ---- through the day (Junyan, 2026-10-20, d16): supplements, fermented food and xylitol on the water card ----
+test("three through-the-day buttons: aims, hints and a green done", () => {
+  assert.deepEqual(J(W.DAY3.map(r => [r[0], r[2], r[3], r[4]])), [["supps", "Supplements", 1, ""], ["ferment", "Fermented", 1, ""], ["xylitol", "Xylitol", 6, "g"]]);
+  assert.equal(W.itemLine(W.DAY3[0], 0), "0 / 1 · after a meal");
+  assert.equal(W.itemLine(W.DAY3[1], 0), "0 / 1 · 100 g yogurt, kefir or kraut");
+  assert.equal(W.itemLine(W.DAY3[2], 3), "3 / 6g · 1 g after eating");
+  assert.equal(W.itemLine(W.DAY3[2], 6), "✓ done"); assert.equal(W.itemLine(W.DAY3[0], 2), "✓ done");
+  assert.doesNotMatch(W.DAY3.flat().join(" "), /[–—]/);
+});
+
+test("a through-the-day tap is saved beside the glasses but never counts as water, and an undo marks it off", () => {
+  let g = W.add({}, { id:"a", at:"2026-10-20T13:00:00Z", hour:9, d:1 });
+  g = W.addItem(g, { id:"s1", kind:"supps", at:"2026-10-20T14:00:00Z", hour:10, d:2, c:1 });
+  g = W.addItem(g, { id:"x1", kind:"xylitol", at:"2026-10-20T14:05:00Z", hour:10, d:1, c:1 });
+  assert.deepEqual(J(W.summary(g)), { total:1, before4:1, ml:250 });
+  assert.equal(W.pay(g, 1, 1), 0);   // the water cap counts glasses only
+  assert.deepEqual(J(W.entries(g, "supps").map(x => x.id)), ["s1"]);
+  const u = W.undo(g, "x1");
+  assert.equal(u.x1.off, true); assert.equal(W.entries(u, "xylitol").length, 0);
+  assert.deepEqual(J(W.byBlock(u)), { none:1 });
+});
+
+test("two devices: through-the-day taps from both are kept and an undo sticks (the glasses merge, no server change)", () => {
+  const o = { xp:1, ts:1, day:{ date:"2026-10-20", glasses:{ s1:{ at:"t1", kind:"supps", hour:9, d:2, c:1, off:true } } } };
+  const n = { xp:1, ts:2, day:{ date:"2026-10-20", glasses:{ s1:{ at:"t1", kind:"supps", hour:9, d:2, c:1 }, x1:{ at:"t2", kind:"xylitol", hour:9, d:1, c:1 } } } };
+  const m = M.mergeQuest(o, n).day.glasses;
+  assert.equal(m.s1.off, true); assert.equal(m.x1.kind, "xylitol");
+});
+
+test("the water card has the row; each tap pays its habit's value within its limit, and undo counts it off", () => {
+  const fn = html.slice(html.indexOf("function waterHTML()"), html.indexOf("function waterStamp()"));
+  assert.match(fn, /\$\{dayItemsHTML\(\)\}/);
+  const add = html.slice(html.indexOf("function addDayItem("), html.indexOf("function undoDayItem("));
+  assert.match(add, /const fx = window\.QuestFx, g = habitGain\(id\);\s*if \(!g\) \{ if \(fx && el\) fx\.nope\(el\); return; \}/);   // past the limit: no pay
+  assert.match(add, /G\.day\.habits\[id\] = \(G\.day\.habits\[id\] \|\| 0\) \+ 1;/);
+  assert.match(add, /addHabit\(id, g, h\[5\]/);
+  assert.match(add, /calToast\(`\$\{row\[2\]\} logged\.`, 6000, \(\) => undoDayItem\(rid\)\)/);
+  const undo = html.slice(html.indexOf("function undoDayItem("), html.indexOf("function undoDayItem(") + 800);
+  assert.match(undo, /QW\(\)\.undo\(G\.day\.glasses, rid\)/);
+  assert.match(undo, /G\.day\.voided/);
+  assert.match(undo, /addHabit\(x\.kind, -\(x\.d \|\| 0\)/);
+  assert.match(html, /querySelectorAll\("\[data-day\]"\)\.forEach\(bn => bn\.onclick = \(\) => addDayItem\(bn\.dataset\.day, bn\)\)/);
+});
+
+test("supps, ferment and xylitol keep their values and limits; the cap pays nothing past it (xylitol 10, aim 6)", () => {
+  const row = id => html.match(new RegExp(`\\["${id}", "[^"]*", ([\\d.]+), (\\d+), "[^"]*", "[^"]*", "(\\w+)"`)).slice(1);
+  assert.deepEqual(row("supps"), ["1", "1", "card"]);
+  assert.deepEqual(row("ferment"), ["2", "1", "card"]);
+  assert.deepEqual(row("xylitol"), ["0.6", "10", "card"]);
+  // habitGain's rule, run on its own: full value at level 1 (x1.5), then nothing at the limit
+  const src = html.slice(html.indexOf("function habitGain(id){"), html.indexOf("  /* The old timed rule"));
+  const HABITS = [["supps", "", 1, 1, "", "", "card"], ["ferment", "", 2, 1, "", "", "card"], ["xylitol", "", 0.6, 10, "", "", "card"]];
+  const run = (id, n) => vm.runInNewContext(`(${src.replace("function habitGain(id){", "function(id){")})(id)`,
+    { id, HABITS, habitN: () => n, DIM: [1, .7, .5, .35, .25, .2], gainMult: () => 1.5, window: {}, Math });
+  assert.equal(run("supps", 0), 2); assert.equal(run("supps", 1), 0);
+  assert.equal(run("ferment", 0), 3); assert.equal(run("ferment", 1), 0);
+  assert.equal(run("xylitol", 0), 1); assert.equal(run("xylitol", 9), 1); assert.equal(run("xylitol", 10), 0);
+});

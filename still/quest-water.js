@@ -12,6 +12,12 @@
    - G.day.glasses = { id: { at, blk, name, hour, d, off? } }: hour is his local hour when he drank, d what it paid.
      An undo marks the glass off (never deletes it), so two devices merging keep the undo (quest-merge.js).
    - Per-day totals go into G.days[date] as wt (glasses) and w4 (before 4 PM) for the day-end trend.
+   - Through the day (Junyan, 2026-10-20, d16): under the bar, three tap buttons (DAY3) for supplements (aim 1, after a
+     meal), fermented food (aim 1) and xylitol (aim 6 g, 1 g a tap). They moved here from the meal sheet. Each tap pays
+     its own habit's value (supps, ferment, xylitol in quest.html HABITS: same values, same meter, same daily limits;
+     xylitol's limit stays 10 though the aim shows 6). Each tap is saved in G.day.glasses with a kind ({ kind:"supps",
+     ... }), so it merges and undoes exactly like a glass with no change to quest-merge.js or the server; a glass is an
+     entry with no kind, and only those count as water.
    Pure, so it can be tested (node --test still/test). */
 (function (root) {
   "use strict";
@@ -33,10 +39,27 @@
     if (late(hour)) out.push({ t: "thirsty?" });
     return out;
   }
-  // the glasses still counted, oldest first
-  function active(g) {
-    return Object.entries(obj(g)).map(([id, x]) => ({ id, ...obj(x) })).filter((x) => x.at && !x.off)
+  // [habit id, icon, name, aim, unit, hint] (2026-10-20, d16)
+  const DAY3 = [
+    ["supps", "💊", "Supplements", 1, "", "after a meal"],
+    ["ferment", "🥛", "Fermented", 1, "", "100 g yogurt, kefir or kraut"],
+    ["xylitol", "🍬", "Xylitol", 6, "g", "1 g after eating"],
+  ];
+  // every entry still counted, oldest first; kind picks the through-the-day taps, none the glasses
+  function entries(g, kind) {
+    return Object.entries(obj(g)).map(([id, x]) => ({ id, ...obj(x) })).filter((x) => x.at && !x.off && (x.kind || null) === (kind || null))
       .sort((a, b) => String(a.at).localeCompare(String(b.at)));
+  }
+  // the glasses still counted, oldest first
+  const active = (g) => entries(g, null);
+  // one through-the-day tap: c marks that it counted toward the habit's daily limit (so an undo counts it off)
+  function addItem(g, o) {
+    return { ...obj(g), [o.id]: { at: o.at, kind: o.kind, hour: o.hour, d: o.d || 0, ...(o.c ? { c: 1 } : {}) } };
+  }
+  // the small line under a through-the-day button: n is how many times the habit counts today
+  function itemLine(row, n) {
+    const [, , , aim, unit, hint] = row;
+    return n >= aim ? "✓ done" : `${n} / ${aim}${unit} · ${hint}`;
   }
   function add(g, o) {
     return { ...obj(g), [o.id]: { at: o.at, blk: o.blk || "none", name: o.name || "", hour: o.hour, d: o.d || 0 } };
@@ -58,5 +81,5 @@
   // what the next glass pays: water's old value per cup, nothing past the old daily limit
   const pay = (g, value, cap) => (active(g).length >= cap ? 0 : value);
 
-  root.QuestWater = { AIM, BY4, ML, CUT, markerPct, late, button, tail, active, add, undo, summary, byBlock, pay };
+  root.QuestWater = { AIM, BY4, ML, CUT, DAY3, markerPct, late, button, tail, active, entries, add, addItem, itemLine, undo, summary, byBlock, pay };
 })(typeof window !== "undefined" ? window : globalThis);
