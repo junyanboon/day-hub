@@ -220,7 +220,7 @@
     const far = ev.x != null && Math.hypot(ev.x - p.x0, ev.y - p.y0) > (p.touch ? GESTURE.SLOP : GESTURE.MOUSE_SLOP);
     if (p.touch) {
       if (ev.type === "move") return far ? "scroll" : "wait";
-      if (ev.type === "timer") return ev.t - p.t0 >= GESTURE.LONG_MS - 20 ? "pickup" : "wait";
+      if (ev.type === "timer") return ev.t - p.t0 >= GESTURE.LONG_MS ? "pickup" : "wait";
       return far ? "scroll" : "tap";
     }
     if (ev.type === "move") return far ? "pickup" : "wait";
