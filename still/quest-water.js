@@ -7,7 +7,7 @@
      when thirsty, so that is a gentle reminder, never a block.
    - Phones show no tooltip, so tail() puts the same two cues on the small grey line under the count (Junyan,
      2026-10-20, d76): "500 ml so far, 4 more by 4 PM · Domestics", after 4 PM "· Domestics · thirsty?". No block,
-     no block part.
+     no block part. Each part is { t, blk } so the page knows which one may shrink.
    - A glass pays what one cup of water paid before, into the same meter, up to the same daily limit.
    - G.day.glasses = { id: { at, blk, name, hour, d, off? } }: hour is his local hour when he drank, d what it paid.
      An undo marks the glass off (never deletes it), so two devices merging keep the undo (quest-merge.js).
@@ -25,10 +25,12 @@
     return name ? `+1 glass · ${name}` : "+1 glass";
   }
   // the extra bits of the small line: the block the next glass counts toward, then "thirsty?" after 4 PM
-  function tail(name, hour) {
+  // (none once the aim is met: the line already says so, and it would run long)
+  function tail(name, hour, total) {
+    if (total >= AIM) return [];
     const out = [];
-    if (name) out.push(name);
-    if (late(hour)) out.push("thirsty?");
+    if (name) out.push({ t: name, blk: true });
+    if (late(hour)) out.push({ t: "thirsty?" });
     return out;
   }
   // the glasses still counted, oldest first
