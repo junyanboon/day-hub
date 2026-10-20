@@ -141,6 +141,13 @@
     return out;
   }
 
+  /* The history lines that still count: a line taken back is marked "<src>-off" at the same time (a dinner untick, the
+     undo of a fill), and both the mark and the line it takes back are left out. The merge keeps lines from both devices
+     (so a device that saw the line before the undo still has it); this filter is what makes the take-back stick. */
+  function liveHist(hist) {
+    const h = arr(hist), off = new Set(h.filter((x) => /-off$/.test(x[2])).map((x) => ms(x[0]) + "|" + x[2].slice(0, -4)));
+    return h.filter((x) => !/-off$/.test(x[2]) && !off.has(ms(x[0]) + "|" + x[2]));
+  }
   /* Set a level. src: "tap", "check" (the old shelf "Looks right", gone since d32), "dinner", "buy" (Mark ticked items as plenty), "home" (brought home),
      "add", "undo", or a later bulk filler like "receipt". Any rise is a restock: it starts a new run-low cycle and, at
      Plenty or on a first level, a fresh shelf-life clock. Two taps on the same item within 10 minutes are one answer
@@ -149,7 +156,7 @@
     const it = item(K, id); if (!it) return K;
     const t = ms(at), was = it.lv;
     const hist = arr(it.hist).slice();
-    const prev = hist.filter((h) => h[2] !== "dinner-off").pop();
+    const prev = liveHist(hist).pop();
     if (src === "tap" && prev && (prev[2] === "tap" || prev[2] === "check") && t - ms(prev[0]) < CORRECT_MS) {
       hist[hist.lastIndexOf(prev)] = [prev[0], lv, prev[2]];
       const first = hist.length === 1 || was == null;
@@ -205,8 +212,9 @@
   function pace(it) {
     const def = defaultStep(it), samples = [];
     let start = null, prevLv = null, cur = null;
-    for (const [at, lv, src] of arr(it.hist).filter((h) => h[2] !== "dinner-off").sort((a, b) => ms(a[0]) - ms(b[0]))) {
-      if (start == null || lv > prevLv) { if (cur != null) samples.push(cur); cur = null; start = [ms(at), lv]; prevLv = lv; continue; }
+    for (const [at, lv, src] of liveHist(it.hist).sort((a, b) => ms(a[0]) - ms(b[0]))) {
+      // a new cycle: any rise, or a restock to Plenty that was already Plenty (a fill: bought or brought again, d35)
+      if (start == null || lv > prevLv || (lv === 3 && src !== "tap" && src !== "dinner" && src !== "check")) { if (cur != null) samples.push(cur); cur = null; start = [ms(at), lv]; prevLv = lv; continue; }
       if (lv < start[1] && (src === "tap" || src === "dinner") && ms(at) - start[0] >= MIN_SAMPLE_MS) cur = (ms(at) - start[0]) / DAY / (start[1] - lv);
       prevLv = lv;
     }
@@ -316,6 +324,110 @@
     return { K: out, n };
   }
 
+  /* The "fill in" picker (Junyan, 2026-10-20, d35: "35 yes also I bought groceries today so what happens in that case?"):
+     one list of tick rows, two uses.
+     - "bring" (What did you bring?): the travel fridge filled from Home's items plus a short starter list of common travel
+       foods (TRAVEL_STARTER). A Home fridge or freezer item goes in the Cool box, a pantry item in the Dry bag. Bringing
+       never changes Home's levels (d36: "36 no").
+     - "buy" (What did you buy?): the shopping list first (top), then everything else in the kitchen, grey and Out ones
+       too, and for the travel fridge the Home catalogue as well (for what it does not have yet).
+     Rows: { id (the row's own key), name, em, group, shelf (in kitchen k), item (the kitchen item it fills, or null),
+     lv, src ("list" | "have" | "home" | "starter"), top }. Each food once (by its name key). */
+  const TRAVEL_STARTER = [
+    ["cool", "🍌", "Bananas"], ["cool", "🍎", "Apples"], ["cool", "🥑", "Avocados"], ["cool", "🍅", "Cherry tomatoes"],
+    ["cool", "🥒", "Cucumber"], ["cool", "🥕", "Carrots"], ["cool", "🫘", "Hummus"], ["cool", "🥥", "Coconut yogurt"],
+    ["dry", "🍞", "Seeded bread"], ["dry", "🌾", "Oats"], ["dry", "🥜", "Mixed nuts"], ["dry", "🍫", "Dark chocolate"],
+    ["dry", "🧂", "Electrolytes"],
+  ];
+  const TRAVEL_SHELF = { fridge: "cool", freezer: "cool", pantry: "dry" };
+  function pickList(K, k, use, now, shopAt, dishes) {
+    const rows = [], seen = new Set();
+    const push = (r) => { const key = keyOf(r.name); if (!key || seen.has(key)) return; seen.add(key); rows.push({ ...r, id: "p:" + key }); };
+    const mine = items(K, k), byKey = new Map(mine.map((x) => [keyOf(x.name), x]));
+    const row = (it, src, top) => ({ name: it.name, em: it.em, group: it.group, shelf: it.shelf, item: it.id, lv: it.lv, src, top: !!top });
+    // a food from Home (or the starter list) as a row of kitchen k: the item k already has, else where it would go
+    const from = (name, em, group, shelf, src) => { const have = byKey.get(keyOf(name));
+      return have ? row(have, src === "home" || src === "starter" ? "have" : src) : { name, em, group, shelf, item: null, lv: null, src, top: false }; };
+    if (use === "buy") {
+      for (const g of shopList(K, k, now, shopAt, dishes).groups) for (const r of g.list) push(row(r.it, "list", true));
+      for (const it of mine) push(row(it, "have"));
+    }
+    if (k === "travel") {
+      for (const h of items(K, "home")) push(from(h.name, h.em, h.group, TRAVEL_SHELF[h.shelf] || guessShelf(k, h.group), "home"));
+      if (use === "bring") for (const [shelf, em, name] of TRAVEL_STARTER) push(from(name, em, guessGroup(name), shelf, "starter"));
+    }
+    return rows;
+  }
+  /* The seam for later fillers (d29, a receipt photo): the names it read pre-tick the same picker. A name that matches a
+     row ticks it; any other becomes a new row (group and shelf guessed, changeable before he adds). Returns { on: row ids,
+     extra: new rows }. */
+  function preTick(rows, names, k) {
+    const on = [], extra = [], byKey = new Map(arr(rows).map((r) => [keyOf(r.name), r]));
+    for (const n of arr(names)) {
+      const nm = String(n || "").trim().slice(0, 40), key = keyOf(nm);
+      if (!key) continue;
+      const r = byKey.get(key);
+      if (r) { if (!on.includes(r.id)) on.push(r.id); continue; }
+      if (extra.some((x) => keyOf(x.name) === key)) continue;
+      const group = guessGroup(nm);
+      extra.push({ id: "p:" + key, name: nm, em: iconFor(nm), group, shelf: guessShelf(k || "home", group), item: null, lv: null, src: "new", top: false });
+    }
+    return { on, extra };
+  }
+  /* "Add N items": every picked food into kitchen k at Plenty. One already there is set to Plenty (its run-low clock and
+     shelf-life clock start again, its shopping tick clears); a new one is added on the shelf the row gives (else, at home,
+     its catalogue shelf or the group's guess). src: "buy" or "bring" (or a later filler's own). Only kitchen k is written,
+     so bringing from Home leaves Home alone (d36). Returns { K, n, ids, undo } (undo: what unfill needs). */
+  function fill(K, k, picks, at, src) {
+    if (!KITCHENS[k]) return { K, n: 0, ids: [], undo: null };
+    const t = iso(at), s = src || "buy";
+    let out = clone(K);
+    const ids = [], prev = {}, ticks = {}, keys = new Set();
+    for (const p of arr(picks)) {
+      const nm = String((p && p.name) || "").trim().slice(0, 40), key = keyOf(nm);
+      if (!key || keys.has(key)) continue;
+      keys.add(key);
+      const have = (p.item && item(out, p.item) && item(out, p.item).k === k && !item(out, p.item).del ? item(out, p.item) : null)
+        || items(out, k).find((x) => keyOf(x.name) === key);
+      if (have) {
+        prev[have.id] = clone(have);
+        ticks[have.id] = obj(out.shop)[have.id] ? clone(out.shop[have.id]) : null;
+        out = setLevel(out, have.id, 3, t, s);
+        out = put(out, { ...item(out, have.id), fresh: t }, t);
+        if (ticks[have.id] && ticks[have.id].on) out.shop = { ...obj(out.shop), [have.id]: { on: false, at: t } };
+        ids.push(have.id);
+        continue;
+      }
+      const sd = k === "home" ? SEED_ITEMS.find((x) => keyOf(x.name) === key) : null;
+      const group = okGroup(p.group) || (sd && clean(sd).group) || guessGroup(nm);
+      const shelf = shelfOf(k, p.shelf) ? p.shelf : sd ? sd.shelf : guessShelf(k, group);
+      const r = add(out, k, shelf, nm, t, group);
+      if (!r.id) continue;
+      out = r.K;
+      if (p.em && p.em !== "🛒") out = put(out, { ...item(out, r.id), em: p.em }, t);
+      prev[r.id] = null;
+      ids.push(r.id);
+    }
+    return { K: out, n: ids.length, ids, undo: { k, t, src: s, ids, prev, ticks } };
+  }
+  /* One undo for the whole batch: a new item is deleted again, one that was there goes back to its level, clocks and
+     tick, with this fill's history line marked "<src>-off" so it teaches the run-low pace nothing. Written at a new time,
+     so the merge keeps the undo over a copy that saw the fill. */
+  function unfill(K, u, at) {
+    if (!u) return K;
+    let out = clone(K);
+    for (const id of arr(u.ids)) {
+      const was = u.prev[id];
+      if (!was) { out = remove(out, id, at); continue; }
+      const cur = item(out, id) || was;
+      const hist = arr(cur.hist).map((h) => (ms(h[0]) === ms(u.t) && h[2] === u.src ? [h[0], h[1], u.src + "-off"] : h));
+      out = put(out, { ...was, hist }, at);
+      const tk = u.ticks[id];
+      if (tk) out.shop = { ...obj(out.shop), [id]: { ...tk, at: iso(at) } };
+    }
+    return out;
+  }
+
   /* Dinner ticks (d21, d28): ticking an ingredient in a dish on the meal sheet steps the matching item of the active kitchen
      down one level; unticking puts it back. key: one per meal, dish and ingredient. The record (K.used[key]) says what it
      changed, so an untick undoes exactly that, and only while the item still shows that level (a level he set by hand since
@@ -403,6 +515,36 @@
     if (f(ms(now) + DAY) === b) return "tomorrow";
     return new Date(Math.max(ms(t), ms(now))).toLocaleDateString("en-US", { weekday: "short", timeZone: tz || undefined });
   }
+  /* The shop line under the sheet's title and the shopping list's hint (2026-10-20, d37: "37 yes"). He opened the sheet
+     from today's Groceries block and read "no Groceries block in the next few days", which reads as wrong while he is in
+     one. So a Groceries block that is on now or was earlier today (the one the sheet was opened from first) reads
+     "Shopping today", followed by the next shop after it or "next shop not on the calendar yet". blocks: [{ t, s, e }];
+     opened: the block the sheet came from, or null; fmt: the page's time format (ms -> "10:00 AM"). */
+  const isShop = (b) => !!b && /grocer/i.test(b.t || "");
+  const ymdIn = (x, tz) => new Date(ms(x)).toLocaleDateString("en-CA", { timeZone: tz || undefined });
+  const fmtDef = (x) => new Date(x).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+  function shopInfo(blocks, now, k, tz, opened) {
+    const t = ms(now), all = arr(blocks).concat(isShop(opened) ? [opened] : []);
+    const started = (b) => isShop(b) && ms(b.s) <= t && ymdIn(b.s, tz) === ymdIn(t, tz);
+    const today = started(opened) ? opened : all.filter(started).sort((a, b) => ms(b.s) - ms(a.s))[0] || null;
+    const shop = nextShop(all, t, k);
+    if (!today) return { today, shop, next: null };
+    const after = Math.max(ms(today.e || today.s), t);
+    const next = all.filter((b) => isShop(b) && ms(b.s) >= after).sort((a, b) => ms(a.s) - ms(b.s))[0] || null;
+    return { today, shop, next };
+  }
+  function shopWhen(blocks, now, k, tz, opened, fmt) {
+    const I = shopInfo(blocks, now, k, tz, opened), sw = (b) => `${dayWord(ms(b.s), now, tz)} ${(fmt || fmtDef)(ms(b.s))}`;
+    if (I.today) return `Shopping today · ${I.next ? `next shop ${sw(I.next)}` : "next shop not on the calendar yet"}`;
+    const s = I.shop;
+    return s.soon ? (ms(s.soon.s) <= ms(now) ? "shopping now" : `shopping ${sw(s.soon)}`) : s.block ? `next shop ${sw(s.block)}` : "next shop not on the calendar yet";
+  }
+  // the shopping list hint's "what will run low ..." part, from the same reading
+  function shopUpto(blocks, now, k, tz, opened, fmt) {
+    const I = shopInfo(blocks, now, k, tz, opened), s = I.shop, sw = (b) => `${dayWord(ms(b.s), now, tz)} ${(fmt || fmtDef)(ms(b.s))}`;
+    return s.block ? `before ${s.soon ? "the shop after this one" : "your next shop"} (${sw(s.block)})`
+      : `in the next ${DEFAULT_SHOP[k] || 7} days (next shop not on the calendar yet)`;
+  }
   /* The status line under a tile's name (d34): Plenty, Half, "Low · buy", "Out · buy", "Low by Thu" (a Half or Plenty that
      runs low before the next shop), or "Not checked". */
   function status(it, now, shopAt, tz) {
@@ -424,5 +566,5 @@
 
   root.QuestKitchen = { NEED, LEVELS, KITCHENS, SEED, FRESH, DEFAULT_SHOP, GROUP_NAMES, keyOf, iconFor, guessGroup, guessShelf,
     items, item, grouped, setLevel, nextLevel, tap, add, rename, move, place, remove, status, shows, pace, lowAt, lowSoon, turnAt, useFirst, nextShop, parseAmt, usesOf, amountFor,
-    shopList, tick, buyTicked, match, dinner, active, pick, noteActive, tripEnd, bringHome, dayWord, counts };
+    shopList, tick, buyTicked, TRAVEL_STARTER, pickList, preTick, fill, unfill, shopInfo, shopWhen, shopUpto, match, dinner, active, pick, noteActive, tripEnd, bringHome, dayWord, counts };
 })(typeof window !== "undefined" ? window : globalThis);

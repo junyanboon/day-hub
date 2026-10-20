@@ -668,6 +668,11 @@
   .kt-li .bx { flex:none; width:18px; height:18px; border-radius:5px; border:1.5px solid var(--ink-soft); display:grid; place-items:center; font-size:11px; font-weight:800; color:#0e2f2a; }
   .kt-li[aria-pressed="true"] { border-color:rgba(95,211,196,.8); background:rgba(95,211,196,.18); }
   .kt-li[aria-pressed="true"] .bx { background:#5fd3c4; border-color:#5fd3c4; } .kt-li[aria-pressed="true"] .bx::after { content:"✓"; }
+  /* the fill-in picker (d35): compact tick rows, and the "What did you buy?" button on the shopping list */
+  .kt-li.kt-pk { padding:5px 10px; } .kt-pk .e { font-size:17px; } .kt-pk .n { font-size:13.5px; }
+  .kt-fill b { font-size:15px; }
+  .btn.kt-fillgo { display:block; width:100%; margin-top:10px; text-align:center; }
+  .btn.kt-fillgo small { display:block; font-size:11.5px; font-weight:500; color:var(--ink-soft); }
   .kt-toast { margin-top:8px; padding:8px 12px; border-radius:12px; border:1px solid #5fd3c4; color:#8fe3b0; font-size:13px; font-weight:600; }
   .ki:focus-visible, .kt-li:focus-visible, .kt-chip:focus-visible, .kt-seg button:focus-visible, .kq:focus-visible { outline:2px solid var(--gold); outline-offset:2px; }
   .wck { display:flex; gap:10px; align-items:center; width:100%; text-align:left; padding:11px 2px; border-top:1px solid rgba(255,255,255,.08); font-size:15px; color:var(--ink); background:none; }
@@ -900,7 +905,7 @@
 <script src="quest-levels.js?v=20261016b"></script>
 <script src="quest-gymlog.js?v=20261019a"></script>
 <script src="quest-meals.js?v=20261020s"></script>
-<script src="quest-kitchen.js?v=20261020k6"></script>
+<script src="quest-kitchen.js?v=20261020k7"></script>
 <script src="quest-trends.js?v=20261019end3"></script>
 <script src="nvc-words.js?v=20261010a"></script>
 <script src="quest-fx.js?v=20261019x"></script>
@@ -2689,11 +2694,19 @@
   const KLV = ["Out", "Low", "Half", "Plenty"];
   function openKitchen(o){
     if (!QK()) return;
-    if (o || !KS) KS = { k:kitToday(), view:"have", q:"", f:"all", keep:new Set(), add:{ g:null, sh:null, gT:false, shT:false }, edit:false, block:null, home:null, msg:"", ...(o || {}) };
+    const fresh = !!o || !KS;
+    if (fresh) KS = { k:kitToday(), view:"have", q:"", f:"all", keep:new Set(), add:{ g:null, sh:null, gT:false, shT:false }, edit:false, block:null, home:null, msg:"",
+      fill:null, noBring:false, ...(o || {}) };
     const S = KS, K = G.kitchen, k = S.k, kn = QK().KITCHENS[k], today = kitToday(), shop = kitShop(k), t = now();
     const all = QK().items(K, k), L = QK().shopList(K, k, t, shop.at, kitDishes()), end = kitTripEnd();
-    const sw = b => `${QK().dayWord(+b.s, t, TZ())} ${fmtT(new Date(b.s))}`;
-    const when = shop.soon ? (+shop.soon.s <= +t ? "shopping now" : `shopping ${sw(shop.soon)}`) : shop.block ? `next shop ${sw(shop.block)}` : "no Groceries block in the next few days";
+    /* the shop line (2026-10-20, d37): a Groceries block on now or earlier today (the one opened first) reads "Shopping today",
+       never "no Groceries block" */
+    const ob = isGroceries(S.block) ? { t:S.block.t, s:+new Date(S.block.s), e:+new Date(S.block.e) } : null, ft = x => fmtT(new Date(x));
+    const when = QK().shopWhen(kitBlocks(), t, k, TZ(), ob, ft), SI = QK().shopInfo(kitBlocks(), t, k, TZ(), ob);
+    /* the fill-in picker (d35): "What did you buy?" opens by itself on a Groceries block's sheet during or after the block,
+       "What did you bring?" when the travel fridge is in use and empty (until he goes back from it) */
+    if (fresh && ob && SI.today) kitFillOpen(S, "buy");
+    if (!S.fill && k === "travel" && today === "travel" && !all.length && !S.noBring) kitFillOpen(S, "bring");
     const tabs = `<div class="kt-seg" role="tablist"><button type="button" role="tab" data-kv="have" aria-selected="${S.view === "have"}">What we have<small>${all.length} items</small></button>` +
       `<button type="button" role="tab" data-kv="shop" aria-selected="${S.view === "shop"}">Shopping list<small>${L.count} to buy</small></button></div>`;
     const kits = `<div class="kt-seg" role="group" aria-label="Which kitchen">${["home", "travel"].map(x => { const n = QK().KITCHENS[x];
@@ -2714,7 +2727,8 @@
       const first = QK().useFirst(K, k, t);
       body = (first.length ? `<div class="kt-first"><b>Use first:</b> ${first.map(x => `${esc(x.it.name)} (${x.at <= +t ? "check it" : QK().dayWord(x.at, t, TZ())})`).join(", ")}</div>` : "") +
         `<div class="kt-tools"><input class="kt-q" id="kQ" type="search" placeholder="Find an item" autocomplete="off" value="${esc(S.q)}">` +
-        `<button type="button" class="kt-chip" id="kEdit" aria-pressed="${S.edit}">Edit</button></div>` +
+        `<button type="button" class="kt-chip" id="kEdit" aria-pressed="${S.edit}">Edit</button>` +
+        (k === "travel" ? `<button type="button" class="kt-chip" id="kBring">Add from Home</button>` : "") + `</div>` +
         // the filters (d34): All, To buy, Not checked (d32: the Not checked filter is the way through first setup)
         `<div class="kt-tools" role="group" aria-label="Show">${[["all", "All", all.length], ["buy", "To buy", all.filter(x => QK().shows(x, "buy", t, shop.at)).length],
           ["new", "Not checked", all.filter(x => x.lv == null).length]].map(([f, n, c]) =>
@@ -2728,8 +2742,7 @@
         `<button type="button" class="mq-mini go" id="kAdd">Add</button></div><div class="kt-pick" id="kPick" hidden></div>`;
     } else {
       const sized = L.dinners === 1 ? "the day" : `the ${L.dinners} days`;
-      const upto = shop.block ? `before ${shop.soon ? "the shop after this one" : "your next shop"} (${sw(shop.block)})`
-        : `in the next ${QK().DEFAULT_SHOP[k]} days (no ${shop.soon ? "later " : ""}Groceries block on the calendar yet)`;
+      const upto = QK().shopUpto(kitBlocks(), t, k, TZ(), ob, ft);
       body = `<p class="kt-hint">Everything low or out, plus what will run low ${esc(upto)}. Amounts are sized for ${sized} until then.</p>` +
         (S.msg ? `<div class="kt-toast">${esc(S.msg)}</div>` : "") +
         (L.groups.length ? L.groups.map(g => `<div class="kt-lb ${g.shelf.cls}"><span>${esc(g.shelf.name)}</span><b>${g.list.filter(r => r.on).length} / ${g.list.length}</b></div>` +
@@ -2739,25 +2752,38 @@
               `<span class="n">${esc(r.it.name)}<small>${esc(why)}${uses ? ` · ${esc(uses)}` : ""}</small></span>` +
               `<span class="q">${r.amt ? esc(r.amt) : ""}${r.dinners ? `<small>${r.dinners} dinner${r.dinners === 1 ? "" : "s"}</small>` : ""}</span></button>`; }).join("")}</div>`).join("")
           : `<p class="kt-hint">Nothing is low. Nothing to buy.${all.some(x => x.lv == null) ? " Items not checked yet stay off the list until you tap them." : ""}</p>`) +
-        `<div class="actions"><button class="btn primary" id="kBought"${L.groups.some(g => g.list.some(r => r.on)) ? "" : " disabled"}>Mark ticked items as plenty</button></div>`;
+        `<div class="actions"><button class="btn primary" id="kBought"${L.groups.some(g => g.list.some(r => r.on)) ? "" : " disabled"}>Mark ticked items as plenty</button></div>` +
+        `<button type="button" class="btn ghost kt-fillgo" id="kBuyPick">🛒 What did you buy?<small>Tick everything from the shop at once</small></button>`;
     }
-    openSheet(head + ask + kits + (k === "travel" ? `<p class="kt-hint">In use by itself when your calendar shows a trip, and emptied when the trip ends.</p>` : "") + tabs + body +
+    if (S.fill) body = kitFillHTML(S, k, t, shop);
+    openSheet(head + ask + kits + (k === "travel" ? `<p class="kt-hint">In use by itself when your calendar shows a trip, and emptied when the trip ends.</p>` : "") + (S.fill ? "" : tabs) + body +
       (S.block ? `<div class="actions"><button class="btn ghost" id="kEditBlk">Change time or name</button></div>` : ""), true);
     const sh = $("sheet");
     const redraw = () => { const top = sh.scrollTop; openKitchen(); sh.scrollTop = top; render(); };
     sh.querySelectorAll("[data-kv]").forEach(bn => bn.onclick = () => { S.view = bn.dataset.kv; S.msg = ""; S.keep.clear(); redraw(); });
     // switching kitchens is his pick for today: dinner ticks use it too
     sh.querySelectorAll("[data-kk]").forEach(bn => bn.onclick = () => { const x = bn.dataset.kk; if (x === S.k) return;
-      S.k = x; S.msg = ""; S.keep.clear(); if (x !== kitToday()) { kitSave(QK().pick(G.kitchen, x, gameYmd(), now())); log(`Kitchen in use today: ${QK().KITCHENS[x].name}`); } redraw(); });
+      S.k = x; S.msg = ""; S.fill = null; S.keep.clear(); if (x !== kitToday()) { kitSave(QK().pick(G.kitchen, x, gameYmd(), now())); log(`Kitchen in use today: ${QK().KITCHENS[x].name}`); } redraw(); });
     sh.querySelectorAll("[data-khome]").forEach(bn => bn.onclick = () => { const x = bn.dataset.khome; S.home.has(x) ? S.home.delete(x) : S.home.add(x); redraw(); });
     if ($("kHomeGo")) $("kHomeGo").onclick = () => { const n = S.home.size; kitSave(QK().bringHome(G.kitchen, [...S.home], now()));
       log(`Trip over: ${n} item${n === 1 ? "" : "s"} brought home, travel fridge emptied`); S.home = null; S.k = kitToday(); redraw(); };
     if ($("kHomeNone")) $("kHomeNone").onclick = () => { kitSave(QK().bringHome(G.kitchen, [], now())); log("Trip over: travel fridge emptied"); S.home = null; S.k = kitToday(); redraw(); };
     if ($("kEditBlk")) $("kEditBlk").onclick = () => openEdit(S.block);
-    if (S.view === "have") {
+    if (S.fill) kitFillBind(S, redraw);
+    else if (S.view === "have") {
       $("kQ").oninput = e => { S.q = e.target.value; S.keep.clear(); $("kShelves").innerHTML = kitShelves(S, G.kitchen, S.k, kitShop(S.k), now()); bindShelves(); };
       sh.querySelectorAll("[data-kf]").forEach(bn => bn.onclick = () => { S.f = bn.dataset.kf; S.keep.clear(); redraw(); });
       $("kEdit").onclick = () => { S.edit = !S.edit; redraw(); };
+      if ($("kBring")) $("kBring").onclick = () => { kitFillOpen(S, "bring"); redraw(); sh.scrollTop = 0; };
+      bindShelves();
+      wireKitchenDrag();
+    } else {
+      sh.querySelectorAll("[data-kbuy]").forEach(bn => bn.onclick = () => { S.msg = ""; kitSave(QK().tick(G.kitchen, bn.dataset.kbuy, now())); redraw(); });
+      $("kBought").onclick = () => { const r = QK().buyTicked(G.kitchen, S.k, now()); kitSave(r.K);
+        S.msg = r.n ? `${r.n} item${r.n === 1 ? "" : "s"} set to plenty.` : ""; if (r.n) log(`Kitchen: ${r.n} item${r.n === 1 ? "" : "s"} bought`); redraw(); };
+      $("kBuyPick").onclick = () => { kitFillOpen(S, "buy"); redraw(); sh.scrollTop = 0; };
+    }
+    if ($("kNew")) {
       /* adding (d34): as he types, the guessed group and shelf show as picked chips among all of them, changeable before Add */
       const A = S.add, kn_ = QK().KITCHENS[S.k];
       const fillPick = () => {
@@ -2774,6 +2800,12 @@
       $("kNew").oninput = fillPick;
       const addIt = (refocus) => { const nm = $("kNew").value.trim(); if (!nm) return;
         fillPick();
+        // in the picker (d35), something not in the list joins it ticked, on the group and shelf picked; Add N items adds it
+        if (S.fill) { const key = QK().keyOf(nm), F = S.fill, rows = kitFillRows(S);
+          const hit = rows.find(x => QK().keyOf(x.name) === key);
+          if (hit) F.on.add(hit.id);
+          else { const id = "p:" + key; F.extra.push({ id, name:nm, em:QK().iconFor(nm), group:A.g, shelf:A.sh, item:null, lv:null, src:"new", top:false }); F.on.add(id); }
+          S.add = { g:null, sh:null, gT:false, shT:false }; F.q = ""; redraw(); if (refocus && $("kNew")) $("kNew").focus(); return; }
         const r = QK().add(G.kitchen, S.k, A.sh, nm, now(), A.g); kitSave(r.K);
         const it = r.id && QK().item(G.kitchen, r.id);
         S.add = { g:null, sh:null, gT:false, shT:false }; redraw();
@@ -2781,22 +2813,81 @@
         if (refocus && $("kNew")) $("kNew").focus(); };
       $("kAdd").onclick = () => addIt(false);
       $("kNew").onkeydown = e => { if (e.key === "Enter") addIt(true); };
-      function bindShelves(){
-        sh.querySelectorAll("#kShelves [data-kit]").forEach(bn => bn.onclick = () => {
-          // the click that ends a hold or a drag is not a tap (it can land on the tile the drop just redrew away)
-          if (!bn.isConnected || Date.now() - kdEnded < 450) return;
-          if (S.edit) return openKitchenItem(bn.dataset.kit);
-          if (S.f !== "all") S.keep.add(bn.dataset.kit);   // it stays in view until the filter changes
-          kitSave(QK().tap(G.kitchen, bn.dataset.kit, now())); redraw();
-        });
-      }
-      bindShelves();
-      wireKitchenDrag();
-    } else {
-      sh.querySelectorAll("[data-kbuy]").forEach(bn => bn.onclick = () => { S.msg = ""; kitSave(QK().tick(G.kitchen, bn.dataset.kbuy, now())); redraw(); });
-      $("kBought").onclick = () => { const r = QK().buyTicked(G.kitchen, S.k, now()); kitSave(r.K);
-        S.msg = r.n ? `${r.n} item${r.n === 1 ? "" : "s"} set to plenty.` : ""; if (r.n) log(`Kitchen: ${r.n} item${r.n === 1 ? "" : "s"} bought`); redraw(); };
     }
+    function bindShelves(){
+      sh.querySelectorAll("#kShelves [data-kit]").forEach(bn => bn.onclick = () => {
+        // the click that ends a hold or a drag is not a tap (it can land on the tile the drop just redrew away)
+        if (!bn.isConnected || Date.now() - kdEnded < 450) return;
+        if (S.edit) return openKitchenItem(bn.dataset.kit);
+        if (S.f !== "all") S.keep.add(bn.dataset.kit);   // it stays in view until the filter changes
+        kitSave(QK().tap(G.kitchen, bn.dataset.kit, now())); redraw();
+      });
+    }
+  }
+  /* ---------- the fill-in picker (Junyan, 2026-10-20, d35: "35 yes also I bought groceries today so what happens in that
+     case?", d36: "36 no") ----------
+     One list of tick rows in food groups with a search on top, two uses: "What did you bring?" (the travel fridge from
+     Home's items and a short travel starter list; Home's levels never change, d36) and "What did you buy?" (the shopping
+     list first, then the rest of the kitchen, grey and Out too, and the Home catalogue for the travel fridge). "Add N items"
+     puts every ticked one in the kitchen at Plenty (QuestKitchen.fill), with one Undo toast for the batch.
+     The seam for a later receipt photo (d29): kitFillOpen(S, "buy", names) pre-ticks the same picker from the names it read
+     (QuestKitchen.preTick); names that match nothing come in as new rows, ticked. S.fill: { use, on (ticked row ids), q, extra }. */
+  function kitFillRows(S){
+    const F = S.fill, shop = kitShop(S.k);
+    return QK().pickList(G.kitchen, S.k, F.use, now(), shop.at, kitDishes()).concat(F.extra);
+  }
+  function kitFillOpen(S, use, names){
+    S.fill = { use, on:new Set(), q:"", extra:[] };
+    // what he ticked on the shopping list while shopping is ticked here already
+    const pre = Array.isArray(names) && names.length ? names : use === "buy" ? QK().items(G.kitchen, S.k).filter(x => ((G.kitchen || {}).shop || {})[x.id] && G.kitchen.shop[x.id].on).map(x => x.name) : [];
+    const p = QK().preTick(kitFillRows(S), pre, S.k);
+    S.fill.extra = p.extra;
+    for (const id of p.on.concat(p.extra.map(x => x.id))) S.fill.on.add(id);
+  }
+  function kitFillList(S){
+    const F = S.fill, q = F.q.trim().toLowerCase(), k = S.k, shelves = QK().KITCHENS[k].shelves;
+    const rows = kitFillRows(S).filter(r => F.on.has(r.id) || !q || r.name.toLowerCase().includes(q));
+    const shelfName = id => (shelves.find(x => x.id === id) || {}).name || "";
+    const note = r => r.item ? (r.lv == null ? "Not checked" : KLV[r.lv]) : r.src === "home" ? "From Home" : r.src === "starter" ? "Often packed" : "New";
+    const row = r => `<button type="button" class="kt-li kt-pk" data-kpk="${esc(r.id)}" aria-pressed="${F.on.has(r.id)}"><span class="bx"></span><span class="e">${esc(r.em || "🛒")}</span>` +
+      `<span class="n">${esc(r.name)}<small>${esc(note(r))}</small></span><span class="q">${esc(shelfName(r.shelf))}</span></button>`;
+    const top = rows.filter(r => r.top), rest = rows.filter(r => !r.top);
+    const html = (top.length ? `<p class="kt-gh">On your shopping list</p><div class="kt-list">${top.map(row).join("")}</div>` : "") +
+      QK().grouped(rest).map(g => `<p class="kt-gh">${esc(g.group)}</p><div class="kt-list">${g.list.map(row).join("")}</div>`).join("");
+    return html || `<p class="kt-hint">${q ? "Nothing matches. Add it below." : "Nothing to pick yet. Add it below."}</p>`;
+  }
+  function kitFillHTML(S, k){
+    const F = S.fill, n = F.on.size, bring = F.use === "bring";
+    return `<div class="kt-ask kt-fill"><b>${bring ? "What did you bring?" : "What did you buy?"}</b>` +
+      `<p>${bring ? (QK().items(G.kitchen, k).length ? "Tick what else is in the travel fridge." : "The travel fridge is empty. Tick what you brought.") + " Home stays as it is."
+        : "Tick everything you bought. Each one goes to Plenty."}</p></div>` +
+      `<div class="kt-tools"><input class="kt-q" id="kFq" type="search" placeholder="Find" autocomplete="off" value="${esc(F.q)}"></div>` +
+      `<div id="kFl">${kitFillList(S)}</div>` +
+      `<div class="kt-add"><input class="kt-q" id="kNew" placeholder="Something not on the list" autocomplete="off" maxlength="40">` +
+      `<button type="button" class="mq-mini go" id="kAdd">Add</button></div><div class="kt-pick" id="kPick" hidden></div>` +
+      `<div class="actions"><button class="btn ghost" id="kFback">Back</button><button class="btn primary" id="kFgo"${n ? "" : " disabled"}>${kitFillGo(n)}</button></div>`;
+  }
+  const kitFillGo = n => n ? `Add ${n} item${n === 1 ? "" : "s"}` : "Add items";
+  function kitFillBind(S, redraw){
+    const sh = $("sheet"), F = S.fill;
+    const bindRows = () => sh.querySelectorAll("[data-kpk]").forEach(bn => bn.onclick = () => {
+      const id = bn.dataset.kpk; F.on.has(id) ? F.on.delete(id) : F.on.add(id);
+      bn.setAttribute("aria-pressed", String(F.on.has(id)));
+      $("kFgo").disabled = !F.on.size; $("kFgo").textContent = kitFillGo(F.on.size);
+    });
+    bindRows();
+    $("kFq").oninput = e => { F.q = e.target.value; $("kFl").innerHTML = kitFillList(S); bindRows(); };
+    $("kFback").onclick = () => { S.fill = null; S.noBring = true; redraw(); };
+    $("kFgo").onclick = () => {
+      const picks = kitFillRows(S).filter(r => F.on.has(r.id)), bring = F.use === "bring";
+      const r = QK().fill(G.kitchen, S.k, picks, now(), bring ? "bring" : "buy"); if (!r.n) return;
+      kitSave(r.K);
+      const what = `${r.n} item${r.n === 1 ? "" : "s"}`, kn = QK().KITCHENS[S.k].name;
+      log(`Kitchen: ${what} ${bring ? "brought" : "bought"} (${kn})`);
+      S.fill = null; S.noBring = true; S.view = "have"; S.f = "all"; S.q = ""; S.keep.clear();
+      redraw(); $("sheet").scrollTop = 0;
+      undoToast(`${what} ${bring ? "in the travel fridge" : "set to plenty"}`, () => { kitSave(QK().unfill(G.kitchen, r.undo, now())); log(`Kitchen: ${what} taken back`); kitRedraw(); }, 8000);
+    };
   }
   /* the shelves (redrawn on their own while he types in the search box, so it keeps focus). Inside each shelf, food groups
      in a fixed order, each alphabetical (d34), so nothing jumps when a level changes. Each group and each shelf heading is
