@@ -1,0 +1,708 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Mail Router">
+<meta name="theme-color" content="#14336a">
+<meta name="robots" content="noindex">
+<title>Mail Router</title>
+<link rel="manifest" href="mail.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-180.png">
+<!--
+  Mail Router (ticket 17): Junyan's personal Gmail, one card per email, nothing moves
+  until he approves. Look: Day Quest (d357, 2026-10-16), the same family as still/quest.html:
+  its day sky, deep navy glass panels (readable palette, 2026-10-16), Figtree, gold, mint and lavender, with the sunset
+  gradient of the "Day Quest" skin in tickets/17-mail-router-prototype-two-looks.html on
+  Approve and the logo. Data: still-api /inbox/* behind the Day Quest pairing code (same
+  "quest-key" on this origin). This page is public and holds no secret. ?api= points it at
+  a local server (preview only).
+-->
+<style>
+/* Figtree (OFL), the Day Quest font, served from this repo so no Google lookup (quest.html d217) */
+@font-face{font-family:"Figtree";font-style:normal;font-weight:300 900;font-display:swap;src:url(../still/fonts/figtree-latin.woff2) format("woff2")}
+/* tokens: quest.html :root, plus the prototype's Day Quest skin */
+:root{
+  /* readable palette (ticket 17, 2026-10-16): deep navy glass instead of milky white, so white text keeps 4.5:1 on the sky */
+  --ink:#ffffff; --dim:rgba(255,255,255,.86); --faint:rgba(255,255,255,.68); --tab:rgba(255,255,255,.7);
+  --glass:rgba(9,22,50,.58); --glass-2:rgba(9,22,50,.5); --chip:rgba(9,22,50,.5); --line:rgba(255,255,255,.18); --sunk:rgba(9,22,50,.42);
+  --gold:#ffd479; --gold-ink:#2a1d4a; --gold-soft:rgba(255,212,121,.2); --mint:#9cefbf; --mint-soft:rgba(143,227,176,.2);
+  --warn:#ffcb8a; --warn-soft:rgba(255,194,122,.2); --jev:#d6c8ff; --jev-soft:rgba(201,182,255,.2); --bad:#ff9c9c;
+  --claude:#a9dcff; --claude-soft:rgba(150,210,255,.18);
+  --sunset:linear-gradient(100deg,#f7a35c 0%,#e8618c 55%,#a45bc6 100%);
+  /* the same sunset under a plum veil, for white button text (the plain sunset's orange end is about 2:1) */
+  --sunset-deep:linear-gradient(rgba(58,14,52,.42),rgba(58,14,52,.42)),var(--sunset);
+  --sky:linear-gradient(180deg,#14336a 0%,#23548d 50%,#3f76a6 100%);
+  --font:"Figtree",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  color-scheme:dark;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html{min-height:100%;background:#23548d}
+/* the sky sits on a fixed layer, as quest.html's #sky (iOS ignores background-attachment:fixed) */
+body::before{content:"";position:fixed;inset:0;z-index:-1;background:var(--sky);pointer-events:none}
+body{margin:0;background:transparent;color:var(--ink);font:15px/1.6 var(--font);-webkit-font-smoothing:antialiased;
+  padding:calc(env(safe-area-inset-top) + 6px) 16px calc(env(safe-area-inset-bottom) + 72px)}
+.wrap{max-width:860px;margin:0 auto}
+button{font:inherit;cursor:pointer;color:inherit}
+button:disabled{cursor:not-allowed;opacity:.45}
+button:focus-visible,textarea:focus-visible,input:focus-visible,a:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+a{color:inherit}
+h1,h2,h3{margin:0;text-wrap:balance}
+.when,.tile b,.tab .n,.counter b{font-variant-numeric:tabular-nums}
+/* the gold check seal that stamps an approved card */
+.seal{width:36px;height:36px;border:2px solid var(--gold);color:var(--gold);background:var(--gold-soft);border-radius:50%;display:grid;place-items:center;font:800 17px/1 var(--font);flex:none;box-shadow:0 0 14px rgba(255,212,121,.35)}
+.seal.stamp{animation:stamp .35s ease-out}
+@keyframes stamp{from{transform:scale(1.8);opacity:0}to{transform:scale(1);opacity:1}}
+.logo{width:42px;height:42px;background:var(--sunset);color:#fff;display:grid;place-items:center;font:800 20px/1 var(--font);border-radius:12px;flex:none;box-shadow:0 6px 18px rgba(232,97,140,.35)}
+
+header{display:flex;align-items:flex-end;gap:12px;padding-block:16px 10px;flex-wrap:wrap}
+.brand{font:600 10px var(--font);letter-spacing:.22em;text-transform:uppercase;color:var(--dim)}
+.name{font:800 28px/1.1 var(--font);letter-spacing:.01em}
+.counter{margin-left:auto;font-size:13px;color:var(--dim);text-align:right;display:grid;gap:4px;justify-items:end}
+.counter b{color:var(--gold);font-weight:700}
+.live{display:inline-flex;align-items:center;gap:6px;font:500 12px var(--font);color:var(--dim)}
+.live i{width:7px;height:7px;border-radius:50%;background:var(--mint);display:inline-block;box-shadow:0 0 6px var(--mint)}
+.live.bad i{background:var(--warn);box-shadow:none} .live.bad{color:var(--warn)}
+.live.busy i{animation:pulse 1.2s infinite}
+@keyframes pulse{50%{opacity:.25}}
+.toggle{border:1px solid var(--line);background:var(--glass);border-radius:999px;padding:4px 11px;font:600 12px var(--font);color:var(--ink)}
+nav.tabs{display:flex;gap:24px;border-bottom:1px solid var(--line);overflow-x:auto}
+@media (max-width:430px){nav.tabs{gap:16px}.tab{letter-spacing:.12em}}
+.tab{background:none;border:0;border-bottom:2px solid transparent;padding:10px 0 9px;font:600 12px var(--font);letter-spacing:.18em;text-transform:uppercase;color:var(--tab);white-space:nowrap}
+.tab .n{font:600 11px var(--font);margin-left:6px;letter-spacing:0}
+.tab.on{color:#fff;border-bottom-color:var(--gold)}
+.tab.on .n{color:var(--gold)}
+
+/* small spaced uppercase labels, as quest.html's h2 and .eyebrow */
+.lane{font:600 11px var(--font);letter-spacing:.14em;text-transform:uppercase;color:#fff;text-shadow:0 1px 2px rgba(9,22,50,.45);margin:20px 4px 8px;display:flex;justify-content:space-between;gap:8px}
+/* glass panels: quest.html .card */
+.list,.tile{background:var(--glass);border:1px solid var(--line);border-radius:22px;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
+.list{overflow:hidden}
+.row{border-top:1px solid rgba(255,255,255,.14)}
+.row:first-child{border-top:0}
+.row>button.head{all:unset;box-sizing:border-box;display:grid;grid-template-columns:52px 8px minmax(0,1fr) auto;gap:10px;align-items:center;padding:14px 16px;width:100%;cursor:pointer}
+.row>button.head:active{background:rgba(9,22,50,.3)}
+.row>button.head:focus-visible{outline:2px solid var(--gold);outline-offset:-2px}
+.row.open{background:rgba(9,22,50,.22)}
+.when{font:600 12px var(--font);color:var(--dim)}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--faint)}
+.dot.people{background:var(--gold)} .dot.auto{background:var(--mint)} .dot.flag{background:var(--warn)} .dot.jev{background:var(--jev)}
+.who{min-width:0}
+.who .t1{font-weight:600;font-size:15px;display:block;overflow-wrap:anywhere}
+.who .t2{font-size:13px;color:var(--dim);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}
+.pill{font:600 11.5px/1 var(--font);padding:6px 10px;border-radius:999px;white-space:nowrap;background:var(--sunk);color:var(--dim);border:1px solid var(--line)}
+.pill.jev{background:var(--jev-soft);color:var(--jev);border-color:transparent}
+.pill.auto{background:var(--mint-soft);color:var(--mint);border-color:transparent}
+.pill.ask{background:var(--gold-soft);color:var(--gold);border-color:transparent}
+.pill.money{background:var(--warn-soft);color:var(--warn);border-color:transparent}
+.row.done .who,.row.done .when,.row.done .dot{opacity:.78}
+.row.skipped .who .t1::after{content:" · skipped";color:var(--dim);font-weight:400;font-size:12px}
+
+.body{padding:4px 14px 18px 84px;display:grid;gap:12px}
+@media (max-width:560px){.counter{margin-left:0;justify-items:start;text-align:left;width:100%;grid-template-columns:1fr auto;align-items:center}.body{padding-left:14px}.row>button.head{grid-template-columns:44px 8px minmax(0,1fr)}.row>button.head .pill,.row>button.head .seal{grid-column:3;justify-self:start}}
+.why{font:600 11px var(--font);letter-spacing:.14em;text-transform:uppercase;color:var(--faint);margin-bottom:-6px}
+.summary{margin:0;max-width:62ch;color:var(--dim);overflow-wrap:anywhere}
+.jevline{display:flex;gap:10px;align-items:center;flex-wrap:wrap;background:var(--jev-soft);color:var(--jev);border-radius:14px;padding:9px 13px;font:600 13px var(--font)}
+.jevline.money{background:var(--warn-soft);color:var(--warn)}
+.jevline.quiet{background:var(--sunk);color:var(--dim);font-weight:500}
+/* Claude's read of an unfamiliar sender (d361, d362): sky blue, separate from Jev's lavender */
+.claudeline{display:grid;gap:4px;background:var(--claude-soft);border:1px solid rgba(169,220,255,.35);border-radius:14px;padding:10px 13px;color:var(--ink)}
+.claudeline b{font:700 13px var(--font);color:var(--claude);letter-spacing:.02em}
+.claudeline p{margin:0;font-size:14.5px;line-height:1.45;max-width:62ch;overflow-wrap:anywhere}
+.claudeline small{color:var(--dim);font-size:12.5px}
+.pill.claude{background:var(--claude-soft);color:var(--claude);border-color:transparent}
+.dot.claude{background:var(--claude)}
+.jevline .conf{display:inline-block;width:80px;height:6px;background:rgba(9,22,50,.45);border-radius:4px;overflow:hidden;vertical-align:middle}
+.jevline .conf i{display:block;height:100%;background:var(--jev);border-radius:4px}
+.mail{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--sunk);border:1px solid var(--line);border-radius:16px;padding:12px 14px;font-size:14px;line-height:1.55;max-height:360px;overflow:auto;color:var(--ink)}
+.mail small{display:block;color:var(--faint);font-size:12px;margin-bottom:8px;white-space:normal}
+.btns{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+/* buttons: quest.html .btn, with the sunset gradient on the main one */
+.btn{border:1px solid var(--line);background:var(--glass-2);border-radius:14px;padding:11px 18px;font:600 15px/1.2 var(--font);min-height:44px;text-decoration:none;display:inline-flex;align-items:center;color:var(--ink)}
+.btn:active{transform:scale(.97)}
+.btn.primary{border:0;background:var(--sunset-deep);color:#fff;font-weight:700;text-shadow:0 1px 2px rgba(80,20,60,.45);box-shadow:0 6px 18px rgba(232,97,140,.3)}
+.btn.quiet{background:transparent;border:1px solid rgba(255,255,255,.3);color:var(--ink);font-weight:500}
+.routes{display:flex;flex-wrap:wrap;gap:6px}
+.routes button{border:1px solid var(--line);background:var(--chip);border-radius:999px;padding:7px 12px;font:600 12.5px var(--font);color:#fff}
+.routes button.pick{border-color:var(--gold);background:var(--gold);color:var(--gold-ink);box-shadow:0 0 0 2px rgba(255,212,121,.35)}
+.routes button.jevpick{border-color:var(--jev);color:var(--jev)}
+.routes button.pick.jevpick{color:var(--gold-ink);background:var(--gold);border-color:var(--gold);box-shadow:0 0 0 2px var(--jev)}
+.routes button.claudepick{border-color:var(--claude);color:var(--claude)}
+.routes button.pick.claudepick{color:var(--gold-ink);background:var(--gold);border-color:var(--gold);box-shadow:0 0 0 2px var(--claude)}
+.routes button .by{font:700 10px var(--font);letter-spacing:.06em;text-transform:uppercase;margin-left:6px;opacity:.85}
+.routes button kbd{font:inherit;opacity:.78;margin-right:5px}
+/* the 10-step auto meter, mint like quest.html's done tiles */
+.meter{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--dim);flex-wrap:wrap}
+.meter .bar{display:grid;grid-template-columns:repeat(10,1fr);gap:3px;width:150px}
+.meter .bar i{height:7px;border-radius:4px;background:rgba(9,22,50,.5)}
+.meter .bar i.on{background:var(--mint);box-shadow:0 0 6px rgba(143,227,176,.5)}
+/* the simple card (ticket 17, 2026-10-16: "I don't know what I'm even deciding"): what it is, one
+   question, two big buttons. Who guessed, the auto meter and the email itself sit behind small links. */
+.gist{margin:0;font:600 17px/1.45 var(--font);color:#fff;max-width:62ch;overflow-wrap:anywhere}
+.ask{background:var(--sunk);border:1px solid var(--line);border-radius:18px;padding:14px;display:grid;gap:12px}
+.ask h3{font:800 21px/1.25 var(--font)}
+.ask .by{margin:-6px 0 0;font-size:13.5px;color:var(--dim)}
+.big{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.big .btn{justify-content:center;min-height:54px;font-size:16px;text-align:center}
+.trays{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.trays button{border:1px solid var(--line);background:var(--chip);border-radius:14px;min-height:50px;padding:10px 14px;font:600 15px var(--font);color:#fff;text-align:left}
+.trays button:active{transform:scale(.97)}
+.trays button.sug{border-color:var(--gold);color:var(--gold)}
+.trays button kbd{font:inherit;opacity:.6;margin-right:6px}
+.links{display:flex;flex-wrap:wrap;gap:4px 18px}
+.links button,.links a{background:none;border:0;padding:8px 0;font:600 14px var(--font);color:var(--dim);text-decoration:underline;text-underline-offset:3px;cursor:pointer}
+.whybox{display:grid;gap:10px}
+/* quest.html .cal-toast */
+.toast{position:fixed;left:50%;bottom:calc(22px + env(safe-area-inset-bottom));transform:translateX(-50%);background:rgba(25,29,60,.94);color:var(--ink);border:1px solid var(--line);border-radius:14px;padding:10px 16px;font:500 13.5px var(--font);max-width:min(440px,92vw);z-index:5;display:flex;gap:12px;align-items:center;box-shadow:0 10px 30px rgba(0,0,0,.4)}
+.toast[hidden]{display:none}
+.toast.err{border-color:var(--bad);color:var(--bad)}
+.toast button{flex:none;border:0;background:rgba(255,255,255,.12);color:var(--gold);border-radius:10px;padding:5px 12px;font:600 13px var(--font)}
+.tiles{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:16px}
+.tile{padding:14px 16px;min-width:0}
+.tile b{display:block;font:800 28px/1.1 var(--font)}
+.tile:nth-child(1) b{color:var(--mint)} .tile:nth-child(2) b{color:var(--jev)} .tile:nth-child(3) b{color:var(--gold)}
+.tile span{font-size:12.5px;color:var(--dim)}
+.learned div{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;padding:10px 16px;border-top:1px solid rgba(255,255,255,.12);font-size:14px}
+.learned div:first-child{border-top:0}
+.learned b{font-weight:600}
+.learned span{font:600 12.5px var(--font);color:var(--jev)}
+.empty{padding:16px;color:var(--dim);font-size:14px}
+/* text that sits straight on the sky (no panel behind it) is solid white: .86 white on the lower sky is under 4:1 */
+main>.empty,.pair .summary,.note{color:#fff;text-shadow:0 1px 2px rgba(9,22,50,.45)}
+.note{font-size:12.5px;margin:14px 4px 0}
+.pair{max-width:420px;margin:40px auto;display:grid;gap:12px}
+.pair input::placeholder{color:var(--dim)}
+.pair input{background:rgba(9,22,50,.5);border:1px solid var(--line);border-radius:12px;color:var(--ink);font:15px var(--font);padding:12px}
+/* the Digest tab (ticket 17, look C "Headlines" v5, 2026-10-17): one panel of headlines in sections; one item open at a
+   time; a tap never moves the headline he touched (#view has no scroll anchoring; steady() scrolls by the difference) */
+#view{overflow-anchor:none}
+.reach{background:var(--glass);border:1px solid var(--line);border-radius:18px;padding:10px 14px;margin-top:16px;display:grid;grid-template-columns:52px minmax(0,1fr);gap:10px;align-items:center}
+.reach .t{font:600 12px var(--font);color:var(--dim);font-variant-numeric:tabular-nums}
+.reach .q{border-left:3px solid var(--gold);background:var(--gold-soft);border-radius:10px;padding:7px 12px}
+.reach .q b{display:block;font-size:14px} .reach .q span{font-size:12.5px;color:var(--dim)}
+.paper{background:var(--glass);border:1px solid var(--line);border-radius:22px;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);overflow:hidden;margin-top:12px}
+.paper .grp{padding:12px 16px 4px;font:600 11px var(--font);letter-spacing:.14em;text-transform:uppercase;color:var(--dim);border-top:1px solid var(--line)}
+.paper .grp:first-child{border-top:0}
+.paper .grp.look{color:var(--warn)}
+.hl{all:unset;box-sizing:border-box;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;width:100%;padding:11px 16px;cursor:pointer}
+.hl:focus-visible{outline:2px solid var(--gold);outline-offset:-2px}
+.hl b{font-weight:650;font-size:15px;display:block;overflow-wrap:anywhere}
+.hl small{color:var(--faint);font-size:12.5px}
+.hl .arrow{color:var(--faint);font-size:13px}
+.hlbody{padding:0 16px 14px;display:grid;gap:8px}
+.hlbody .gist{font:400 15px/1.55 var(--font);color:var(--dim)}
+.foryou{background:var(--warn-soft);border-radius:12px;padding:8px 12px;font-size:14px}
+.foryou b{color:var(--warn)}
+.act{color:var(--gold);font-weight:700;font-size:14px;margin:0}
+.deal-facts{display:grid;grid-template-columns:auto minmax(0,1fr);gap:2px 12px;font-size:14px;margin:0}
+.deal-facts dt{color:var(--faint)} .deal-facts dd{margin:0;overflow-wrap:anywhere}
+.deep{display:grid;gap:6px;background:var(--glass-2);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+.deep summary{cursor:pointer;padding:2px 0;font:600 11px var(--font);letter-spacing:.14em;text-transform:uppercase;color:var(--dim)}
+.deep ul{margin:0;padding-left:18px;display:grid;gap:3px;font-size:14px}
+.deep p{margin:0;font-size:14px;color:var(--dim)}
+.deep .dlinks{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:13.5px}
+.deep .dlinks a{color:var(--claude)}
+.btn.keep[aria-pressed="true"]{background:var(--mint-soft);border-color:var(--mint);color:var(--mint)}
+.how{font-size:12.5px;color:var(--faint)}
+.notebox{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px}
+.notebox input{min-width:0;background:var(--glass-2);color:var(--ink);border:1px solid var(--line);border-radius:12px;padding:10px 12px;font:14px var(--font)}
+.notebox input::placeholder{color:var(--faint)}
+.noted{font-size:13px;color:var(--mint)} .noted a{color:var(--mint)}
+.tripbox{background:var(--glass);border:1px solid var(--line);border-radius:22px;padding:12px 16px;display:grid;gap:6px;margin-top:12px}
+.tripbox .lbl{font:600 11px var(--font);letter-spacing:.14em;text-transform:uppercase;color:var(--dim)}
+.tripbox ul{margin:0;padding-left:18px;font-size:14px;color:var(--dim);display:grid;gap:3px}
+.fin{text-align:center;display:grid;gap:10px;justify-items:center;padding:30px 10px;background:var(--glass);border:1px solid var(--line);border-radius:22px;margin-top:12px}
+.fin .seal{width:64px;height:64px;font-size:28px}
+.showread{margin-top:10px}
+@media (prefers-reduced-motion:reduce){.seal.stamp,.live.busy i{animation:none}.btn:active{transform:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div style="display:flex;gap:12px;align-items:center"><span class="logo" aria-hidden="true">✓</span><div><div class="brand">junyan.boon@gmail.com</div><h1 class="name">Mail Router</h1></div></div>
+    <div class="counter">
+      <span><span class="live" id="live"><i></i><span id="liveText">Not checked yet</span></span> <button class="toggle" type="button" id="refresh">Check now</button></span>
+      <span><b id="leftCount">0</b> waiting on you</span>
+    </div>
+  </header>
+  <nav class="tabs" role="tablist" aria-label="Sections">
+    <button class="tab on" role="tab" aria-selected="true" data-tab="sort">Sort<span class="n" id="nSort"></span></button>
+    <button class="tab" role="tab" aria-selected="false" data-tab="messages">Messages<span class="n" id="nMessages"></span></button>
+    <button class="tab" role="tab" aria-selected="false" data-tab="digest">Digest<span class="n" id="nDigest"></span></button>
+    <button class="tab" role="tab" aria-selected="false" data-tab="report">Report<span class="n" id="nReport"></span></button>
+  </nav>
+  <main id="view"></main>
+</div>
+<div class="toast" id="toast" role="status" hidden></div>
+
+<script>
+(() => {
+  const qs = new URLSearchParams(location.search);
+  // ?api= is for the local preview only: any other host would receive the pairing code
+  const apiParam = qs.get("api") || "";
+  const API = /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(apiParam) ? apiParam : "https://still.srv1948070.hstgr.cloud";
+  const store = { get(k){ try { return localStorage.getItem(k); } catch { return null; } },
+                  set(k, v){ try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch {} } };
+  // same pairing as Day Quest: one code per device, kept on this origin ("quest-key"); #pair=CODE pairs in one tap
+  const hashPair = /[#&]pair=([^&]+)/.exec(location.hash);
+  // #digest opens the Digest tab (the evening ping and the calendar event link here)
+  const wantDigest = /^#(.*&)?digest(&|$)/.test(location.hash);
+  if (hashPair) { store.set("quest-key", decodeURIComponent(hashPair[1]).trim()); history.replaceState(null, "", location.pathname + location.search + (wantDigest ? "#digest" : "")); }
+  const key = () => store.get("quest-key") || "";
+  async function api(path, opts = {}){
+    const r = await fetch(API + path, { ...opts, cache:"no-store",
+      headers:{ "Content-Type":"application/json", "X-Quest-Key":key(), ...(opts.headers || {}) } });
+    const body = await r.json().catch(() => ({}));
+    if (!r.ok) { const e = new Error(body.error || "HTTP " + r.status); e.status = r.status; throw e; }
+    return body;
+  }
+  const post = (path, body) => api(path, { method:"POST", body:JSON.stringify(body || {}) });
+
+  const $ = s => document.querySelector(s);
+  const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+  const pad = n => String(n).padStart(2, "0");
+  const when = ms => { const d = new Date(ms), t = new Date();
+    return d.toDateString() === t.toDateString() ? `${pad(d.getHours())}:${pad(d.getMinutes())}` : `${pad(d.getMonth()+1)}.${pad(d.getDate())}`; };
+
+  const S = { tab: wantDigest ? "digest" : "sort", open:null, data:null, report:null, picks:{}, choose:{}, why:{}, done:{}, bodies:{}, busy:false, error:null,
+    // the Digest: its data, the one open item, read ones shown, typed notes, open deeper dives, local reads not yet confirmed
+    dig:null, dOpen:null, dShowRead:false, drafts:{}, deepOpen:{}, dLocal:{} };
+  const routeName = k => (S.data?.routes || []).find(r => r.key === k)?.name || k;
+
+  let toastT;
+  function toast(text, undoId){
+    const el = $("#toast");
+    el.className = "toast";
+    el.innerHTML = `<span>${esc(text)}</span>` + (undoId ? `<button type="button" data-undo="${esc(undoId)}">Undo</button>` : "");
+    el.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => el.hidden = true, undoId ? 8000 : 3500);
+  }
+  function toastErr(text){ toast(text); $("#toast").classList.add("err"); }
+
+  /* ---------- loading ---------- */
+  async function load(){
+    if (!key()) { render(); return; }
+    try { S.data = await api("/inbox/list"); S.error = null; }
+    catch (e) { S.error = e; }
+    if (S.tab === "report") { try { S.report = await api("/inbox/report"); } catch {} }
+    if (S.tab === "digest" || S.tab === "report") { try { S.dig = await api("/inbox/digest"); } catch {} }
+    if (S.tab === "digest") {
+      // never re-draw under his fingers while he types a note; keep the open headline where it is
+      if (document.activeElement && document.activeElement.closest("#view .notebox")) { counts(); liveLine(); return; }
+      if (S.dOpen === null && !S.dTouched) S.dOpen = digestOrder()[0] || null;
+      // the open item was read on another device: open the next one instead of nothing
+      else if (S.dOpen && !digestOrder().includes(S.dOpen)) S.dOpen = digestOrder().find(n => { const y = dItem(n); return y && !isRead(y); }) || null;
+      return steady(S.dOpen, S.dOpen);
+    }
+    const list = currentList();
+    if (!S.open || !list.some(x => x.id === S.open)) S.open = list.find(x => !S.done[x.id])?.id || null;
+    render();
+  }
+  async function checkNow(){
+    if (S.busy) return;
+    S.busy = true; liveLine();
+    try { await post("/inbox/sync"); } catch (e) { toastErr("Gmail check failed: " + e.message); }
+    S.busy = false; await load();
+  }
+  const currentList = () => !S.data ? [] : S.tab === "sort" ? sortList() : S.tab === "messages" ? S.data.messages : [...(S.report?.rules || []), ...(S.report?.auto || [])];
+  // approved cards stay on screen (sealed) until the next reload, so he sees what he just did
+  const sortList = () => [...S.data.sort, ...Object.values(S.done).filter(d => d.card.tab !== "messages" && !S.data.sort.some(c => c.id === d.card.id)).map(d => d.card)];
+
+  /* ---------- rendering ---------- */
+  function liveLine(){
+    const live = $("#live"), s = S.data?.sync || {};
+    live.classList.toggle("busy", S.busy);
+    live.classList.toggle("bad", !!(S.error || s.ok === false));
+    $("#liveText").textContent = S.busy ? "Checking Gmail…"
+      : S.error ? (S.error.status === 401 ? "Pairing code not accepted" : "Server not reachable")
+      : s.ok === false ? "Gmail check failed: " + (s.error || "unknown")
+      : s.at ? `Checked ${when(Date.parse(s.at))} · ${s.inbox} in inbox · every 2 min` : "Not checked yet";
+  }
+  function counts(){
+    const d = S.data?.counts || {};
+    $("#nSort").textContent = d.sort ?? ""; $("#nMessages").textContent = d.messages ?? ""; $("#nReport").textContent = d.report ?? "";
+    $("#nDigest").textContent = S.dig ? digestUnread().length : (d.digest ?? "");
+    $("#leftCount").textContent = (d.sort || 0) + (d.messages || 0);
+  }
+  const head = (x, dot, pill, extra = "") => `<button class="head" type="button" aria-expanded="${S.open===x.id}" data-open="${esc(x.id)}">
+      <span class="when">${esc(when(x.at))}</span><span class="dot ${dot}"></span>
+      <span class="who"><span class="t1">${esc(x.from)}</span><span class="t2">${esc(x.subject)}</span></span>${pill}</button>${extra}`;
+
+  function pillFor(x){
+    if (S.done[x.id]) return `<span class="seal stamp" title="${esc(S.done[x.id].label)}">✓</span>`;
+    if (x.rule) return `<span class="pill money">${x.rule.stopped ? "Rule stopped" : "Rule did not finish"}</span>`;
+    if (x.ruleUnverified) return `<span class="pill money">Not verified</span>`;
+    if (x.money) return `<span class="pill money">Money</span>`;
+    if (x.jevState === "pending") return `<span class="pill jev">Reading…</span>`;
+    if (x.suggest) return `<span class="pill ${x.suggestBy === "claude" ? "claude" : "jev"}">${esc(routeName(x.suggest))}?</span>`;
+    return `<span class="pill">You pick</span>`;
+  }
+  // a standing rule ran on this email but it is a card again: it did not finish, or he flagged it
+  const taskLink = t => t ? `<a href="${esc(t.url)}" target="_blank" rel="noopener">${esc(t.title)}</a>` : "";
+  function ruleLine(x){
+    const r = x.rule;
+    if (r.stopped) return `<div class="jevline money">You flagged the standing rule "${esc(r.name)}" for this email, so it is back here. ${r.task ? "Its task is still in your Tasks Inbox: " + taskLink(r.task) + ". " : ""}Claude will check it.</div>`;
+    return `<div class="jevline money">The standing rule "${esc(r.name)}" did not finish, so it was not archived: ${esc(r.error || "unknown error")}. ${r.task ? "Task: " + taskLink(r.task) + ". " : ""}Approve it to CRA, or leave it for now.</div>`;
+  }
+  // a standing rule matched this email but Gmail did not verify the sender (DMARC, d363): the rule did nothing
+  function skippedLine(x){
+    const k = x.ruleUnverified;
+    if (!k) return "";
+    return `<div class="jevline money">${esc(k.note)}. Gmail's check: ${esc(k.why || "not verified")}. Nothing was filed, no task was made. Do not use links in it.</div>`;
+  }
+  // Claude's suggestion in words: a tray, "Make a task: …", or "Reply needed"
+  function readWhat(r, short){
+    if (r.action === "task") return short ? "make a task" : "Make a task: " + r.task;
+    if (r.action === "reply") return short ? "reply needed" : "Reply needed";
+    return routeName(r.action);
+  }
+  // an unfamiliar sender (no mail from that address in 6 months): Claude read the email on the server.
+  // A suggestion only: nothing is filed until he approves. Nothing shows while it reads (the sender
+  // check comes first and most senders are familiar) or if Claude failed.
+  function claudeLine(x){
+    if (x.read) return `<div class="claudeline"><b>Claude suggests: ${esc(readWhat(x.read))}</b><p>${esc(x.read.summary)}</p>${x.read.reason ? `<small>Why: ${esc(x.read.reason)} You have no mail from this address in the last 6 months.</small>` : ""}</div>`;
+    return "";
+  }
+  function jevLine(x){
+    if (x.rule) return ruleLine(x);
+    if (x.money) return `<div class="jevline money">Money or travel email: Jev is not asked. Claude checks it against YNAB and Cindia.</div>`;
+    if (x.jevState === "pending") return `<div class="jevline">Jev is reading the sender and subject…</div>`;
+    if (x.jevState === "failed") return `<div class="jevline quiet">Jev did not answer this time. Pick a tray.</div>`;
+    if (x.jevState === "off") return `<div class="jevline quiet">Jev is not switched on yet. Pick a tray.</div>`;
+    if (!x.jev) return `<div class="jevline quiet">No guess yet. Pick a tray.</div>`;
+    const pct = Math.round(x.jev.conf * 100);
+    const what = x.jev.route ? routeName(x.jev.route) : x.jev.pick === "people" ? "a person" : "not sure";
+    return `<div class="jevline">Jev: ${esc(what)} <span class="conf" aria-hidden="true"><i style="width:${pct}%"></i></span> ${pct}% sure${x.jev.shown ? "" : " · too unsure to suggest"}</div>`;
+  }
+  function mailBlock(x){
+    const b = S.bodies[x.id];
+    if (!b) return `<button class="btn quiet" type="button" data-read="${esc(x.id)}" style="justify-self:start">Show the email</button>`;   // Messages tab
+    if (b === "loading") return `<div class="mail">Opening…</div>`;
+    if (b.error) return `<div class="mail">Could not open it: ${esc(b.error)}</div>`;
+    return `<div class="mail"><small>From ${esc(b.from)}${b.date ? " · " + esc(b.date) : ""}</small>${esc(b.text || "(no text in this email)")}</div>`;
+  }
+  function meter(x, route){
+    if (x.money) return "";
+    if (route === "claude") return `<div class="meter"><span>Claude handles it never runs by itself.</span></div>`;
+    const n = route && x.ladder.route === route ? x.ladder.count : 0;
+    const target = route ? " to " + esc(routeName(route)) : "";
+    return `<div class="meter"><span class="bar" aria-hidden="true">${Array.from({length:10},(_,i)=>`<i class="${i<n?"on":""}"></i>`).join("")}</span><span>${n} of 10 approvals in a row for ${esc(x.from)}${target}. At 10 it runs by itself.</span></div>`;
+  }
+
+  // the one question a card asks, and who is asking it, in plain words
+  function question(x){
+    const sug = x.suggest, tray = sug ? routeName(sug) : "";
+    const pct = x.jev ? Math.round(x.jev.conf * 100) : 0;
+    if (x.rule || x.ruleUnverified) return { q: sug ? `File it in ${tray}?` : "Where should it go?", by: "" };
+    if (x.money) return { q: "Hand it to Claude?", by: "Money or travel email. Claude always takes these and checks them against YNAB." };
+    if (x.suggestBy === "claude") return { q: `File it in ${tray}?`, by: "Claude's guess. This sender is new to you." };
+    if (x.suggestBy === "jev") return { q: `File it in ${tray}?`, by: `Jev's guess, ${pct}% sure.` };
+    if (x.read) return { q: "Where should it go?", by: `Claude says: ${readWhat(x.read)}.` };
+    return { q: "Where should it go?", by: "No guess for this one. Tap a tray." };
+  }
+  function trayButtons(x){
+    return `<div class="trays" role="group" aria-label="Where it goes">${S.data.routes.map((r, i) =>
+      `<button type="button" class="${r.key===x.suggest?"sug":""}" data-file="${r.key}" data-id="${esc(x.id)}"><kbd>${i+1}</kbd>${esc(r.name)}</button>`).join("")}</div>`;
+  }
+  function sortView(){
+    const rows = sortList().map(x => {
+      const done = S.done[x.id];
+      const open = S.open === x.id && !done;
+      let body = "";
+      if (open){
+        const { q, by } = question(x);
+        const choosing = S.choose[x.id] || !x.suggest;
+        const gist = x.read?.summary || x.snippet || "";
+        body = `<div class="body">
+          ${gist ? `<p class="gist">${esc(gist)}</p>` : ""}
+          ${x.rule ? ruleLine(x) : ""}${skippedLine(x)}
+          <div class="ask"><h3>${esc(choosing && x.suggest ? "Where should it go instead?" : q)}</h3>${by && !(choosing && x.suggest) ? `<p class="by">${esc(by)}</p>` : ""}
+            ${choosing ? trayButtons(x)
+              : `<div class="big"><button class="btn primary" type="button" data-approve="${esc(x.id)}">✓ Yes</button><button class="btn" type="button" data-choose="${esc(x.id)}">Somewhere else</button></div>`}
+          </div>
+          <div class="links"><button type="button" data-read="${esc(x.id)}">${S.bodies[x.id] ? "Hide the email" : "Show the email"}</button>
+            <button type="button" data-skip="${esc(x.id)}">Skip for now</button>
+            <button type="button" data-why="${esc(x.id)}">${S.why[x.id] ? "Hide details" : "Details"}</button>
+            <a href="${esc(x.gmail)}" target="_blank" rel="noopener">Open in Gmail</a></div>
+          ${S.bodies[x.id] ? mailBlock(x) : ""}
+          ${S.why[x.id] ? `<div class="whybox">${claudeLine(x)}${x.rule ? "" : jevLine(x)}${meter(x, S.picks[x.id] || x.suggest || "")}</div>` : ""}
+        </div>`;
+      }
+      return `<div class="row ${done?"done":""} ${open?"open":""} ${x.skipped?"skipped":""}">${head(x, x.money?"flag":x.read?"claude":"jev", pillFor(x))}${body}</div>`;
+    }).join("");
+    const c = S.data.counts;
+    return `<div class="lane"><span>One card per email · nothing moves until you tap</span><span>${c.sort}</span></div>
+      <div class="list">${rows || `<div class="empty">Nothing waiting. New mail shows up here within 2 minutes.</div>`}</div>
+      <p class="note">Tap ✓ Yes if the guess is right, or Somewhere else to pick. Every filing can be undone from the message at the bottom.${c.claude ? ` ${c.claude} waiting for Claude.` : ""}</p>`;
+  }
+
+  function messagesView(){
+    const rows = S.data.messages.map(x => {
+      const body = S.open === x.id ? `<div class="body">
+          ${x.snippet ? `<p class="summary">${esc(x.snippet)}</p>` : ""}
+          ${mailBlock(x)}
+          <div class="jevline quiet">Claude's "what's going on" and a draft reply come in the next build. Send will only go out when you tap it.</div>
+          <div class="btns"><a class="btn primary" href="${esc(x.gmail)}" target="_blank" rel="noopener">Open in Gmail</a>
+            <button class="btn" type="button" data-tosort="${esc(x.id)}">Sort it instead</button></div>
+        </div>` : "";
+      return `<div class="row ${S.open===x.id?"open":""}">${head(x, "people", `<span class="pill ask">From a person</span>`)}${body}</div>`;
+    }).join("");
+    return `<div class="lane"><span>From people · summary and reply coming soon</span><span>${S.data.messages.length}</span></div>
+      <div class="list">${rows || `<div class="empty">No emails from people right now.</div>`}</div>`;
+  }
+
+  function reportView(){
+    const r = S.report;
+    if (!r) return `<div class="empty">Loading…</div>`;
+    const pct = r.jev.shown ? Math.round(r.jev.agreed / r.jev.shown * 100) + "%" : "n/a";
+    const rules = (r.rules || []).map(x => {
+      const pill = x.flagged ? `<span class="pill money">Flagged</span>` : x.error ? `<span class="pill money">Did not finish</span>` : `<span class="pill auto">Rule</span>`;
+      const did = x.error ? `It did not finish (${esc(x.error)}), so it stayed in your inbox as a card.`
+        : `Filed to CRA${x.archived ? " and archived" : ""}${x.task ? `, and ${x.task.reused ? "it found the task already made" : "made a task"}: ${taskLink(x.task)}` : ""}.`;
+      const body = S.open === x.id ? `<div class="body"><p class="summary">Standing rule: ${esc(x.name)}. ${did}</p>
+        <div class="btns">${x.flagged ? `<span class="pill money">Rule stopped for this email. It is back in Sort, and Claude will check it.</span>`
+          : x.error ? "" : `<button class="btn primary" type="button" data-flag="${esc(x.id)}" data-kind="rule">Flag this</button><button class="btn quiet" type="button" data-open="${esc(x.id)}">Looks fine</button>`}
+          ${x.task ? `<a class="btn quiet" href="${esc(x.task.url)}" target="_blank" rel="noopener">Open the task</a>` : ""}
+          <a class="btn quiet" href="${esc(x.gmail)}" target="_blank" rel="noopener">Open in Gmail</a></div></div>` : "";
+      const row = { ...x, subject: `Standing rule: ${x.name}` };
+      return `<div class="row ${S.open===x.id?"open":""}">${head(row, x.flagged||x.error?"flag":"auto", pill)}${body}</div>`;
+    }).join("");
+    const rows = r.auto.map(x => {
+      const pill = x.flagged ? `<span class="pill money">Flagged</span>` : `<span class="pill auto">${esc(x.filedAs)}</span>`;
+      const body = S.open === x.id ? `<div class="body"><p class="summary">Filed to ${esc(x.filedAs)} by itself, because you approved this sender there 10 times in a row.</p>
+        <div class="btns">${x.flagged ? `<span class="pill money">Back to asking. Claude will check it.</span>`
+          : `<button class="btn primary" type="button" data-flag="${esc(x.id)}">Flag this</button><button class="btn quiet" type="button" data-open="${esc(x.id)}">Looks fine</button>`}
+          <a class="btn quiet" href="${esc(x.gmail)}" target="_blank" rel="noopener">Open in Gmail</a></div></div>` : "";
+      return `<div class="row ${S.open===x.id?"open":""}">${head(x, x.flagged?"flag":"auto", pill)}${body}</div>`;
+    }).join("");
+    return `<div class="tiles"><div class="tile"><b>${r.auto.length + (r.rules || []).filter(x => !x.error && !x.flagged).length}</b><span>handled by itself, last 14 days</span></div><div class="tile"><b>${pct}</b><span>Jev matched you (${r.jev.agreed} of ${r.jev.shown})</span></div><div class="tile"><b>${r.flagged}</b><span>flagged by you</span></div></div>
+      ${rules ? `<div class="lane"><span>Standing rules · rules you set once</span><span>${r.rules.length}</span></div><div class="list">${rules}</div>` : ""}
+      ${r.claude && (r.claude.read || r.claude.failed) ? `<p class="note">Claude read ${r.claude.read} email${r.claude.read===1?"":"s"} from new senders${r.claude.failed ? ` (${r.claude.failed} did not work and showed as normal cards)` : ""}, about $${r.claude.usd.toFixed(4)} in all. Its tray matched your pick ${r.claude.agreed} of ${r.claude.judged} times.</p>` : ""}
+      <div class="lane"><span>What Jev learned from you</span><span>${r.learned.length}</span></div>
+      <div class="list learned">${r.learned.length ? r.learned.map(l => `<div><b>${esc(l.who)}</b><span>${esc(l.from)} → ${esc(l.to)}</span></div>`).join("") : `<div><span style="color:var(--dim)">Nothing yet. When you pick a different tray than Jev, it shows here and Jev uses it next time.</span></div>`}</div>
+      <div class="lane"><span>Handled by itself · flag anything that looks off</span><span>${r.auto.length}</span></div>
+      <div class="list">${rows || `<div class="empty">Nothing on auto yet. A sender goes on auto after you approve it to the same tray 10 times in a row.</div>`}</div>`;
+  }
+
+  /* ---------- the Digest (ticket 17, build spec 2026-10-17) ---------- */
+  const KIND_ORDER = ["look", "terms", "deal", "newsletter"];
+  const digestUnread = () => (S.dig?.items || []).filter(x => !S.dLocal[x.id]);
+  const digestRead = () => [...(S.dig?.items || []).filter(x => S.dLocal[x.id]), ...(S.dig?.read || []).filter(x => !(S.dig.items || []).some(y => y.id === x.id))];
+  const shownDigest = () => { const u = digestUnread(), r = S.dShowRead ? digestRead() : [];
+    return KIND_ORDER.flatMap(k => [...u, ...r].filter(x => x.kind === k)); };
+  const digestOrder = () => shownDigest().map(x => x.id);
+  const dItem = id => [...(S.dig?.items || []), ...(S.dig?.read || [])].find(x => x.id === id);
+  const isRead = x => !!S.dLocal[x.id] || x.state !== "waiting";
+  const hdr = id => id && document.querySelector(`[data-dopen="${CSS.escape(id)}"]`);
+  // re-draw without moving the screen: the headline he touched (or the one that takes its place) stays put
+  // (Junyan, 2026-10-17: "it jumps around as I interact with it")
+  function steady(fromId, toId){
+    const a = hdr(fromId), top = a ? a.getBoundingClientRect().top : null;
+    render();
+    const b = hdr(toId);
+    if (top != null && b) window.scrollBy(0, b.getBoundingClientRect().top - top);
+  }
+  const hm = ms => { const d = new Date(ms); return `${pad(d.getHours())}:${pad(d.getMinutes())}`; };
+  function deepBlock(x){
+    const d = x.deep; if (!d) return "";
+    // collapsed by default, no research notes (Junyan, 2026-10-16: "too many words")
+    return `<details class="deep" data-deep="${esc(x.id)}" ${S.deepOpen[x.id] ? "open" : ""}><summary>Deeper dive</summary>
+      ${d.whatChanges?.length ? `<ul>${d.whatChanges.map(w => `<li>${esc(w)}</li>`).join("")}</ul>` : ""}
+      ${d.effective ? `<p><b style="color:#fff">Starts:</b> ${esc(d.effective)}</p>` : ""}
+      ${d.optOut ? `<p><b style="color:#fff">Opt out:</b> ${esc(d.optOut)}</p>` : ""}
+      ${d.links?.length ? `<div class="dlinks">${d.links.map(l => `<a href="${esc(l.url)}" target="_blank" rel="noopener">${esc(l.label)}</a>`).join("")}</div>` : ""}</details>`;
+  }
+  function digestDetails(x){
+    let h = `<p class="gist">${esc(x.gist)}</p>`;
+    if (x.kind === "deal" && x.deal) h += `<dl class="deal-facts">${[["Route",x.deal.route],["Cabin",x.deal.cabin],["Cost",x.deal.cost],["Points",x.deal.program],["When",x.deal.when],["Book by",x.deal.bookBy],["From",x.deal.from]]
+      .filter(r => r[1]).map(r => `<dt>${r[0]}</dt><dd>${esc(r[1])}</dd>`).join("")}</dl>`;
+    const forYou = (x.deep && x.deep.forYou) || x.forYou;
+    if (x.kind === "terms") { if (forYou) h += `<div class="foryou"><b>For you:</b> ${esc(forYou)}</div>`; h += deepBlock(x); }
+    else if (forYou) h += `<p class="gist"><b style="color:#fff">Why it matters:</b> ${esc(forYou)}</p>`;
+    if (x.action) h += `<p class="act">${esc(x.action)}</p>`;
+    return h;
+  }
+  function digestButtons(x){
+    if (isRead(x)) {
+      const back = x.state === "read" && x.putBackUntil && x.putBackUntil > Date.now() && !S.dLocal[x.id];
+      const what = x.stop ? (x.stop.how === "unsubscribe" ? "Unsubscribed and archived." : "Muted and archived.") : "Read and archived.";
+      return `<div class="btns"><span class="how">${what}</span>${back ? `<button class="btn" type="button" data-dputback="${esc(x.id)}">Put back</button>` : ""}
+        <a class="btn quiet" href="${esc(x.gmail)}" target="_blank" rel="noopener">Open in Gmail</a></div>`;
+    }
+    const look = x.kind === "look";
+    const stop = x.canUnsubscribe ? "Unsubscribe" : "Mute";
+    const how = look ? "" : x.canUnsubscribe ? "Unsubscribe asks the sender to stop, with the one-click link in the email. No email is sent. Their mail also skips your digest from now on."
+      : "No one-click unsubscribe here. Mute keeps this sender out of your digest and archives their mail when it arrives. Undo in Report.";
+    const notes = (x.notes || []).map(n => `<span class="noted">Task made: ${n.task ? `<a href="${esc(n.task.url)}" target="_blank" rel="noopener">${esc(n.task.title)}</a>` : esc(n.text)}</span>`).join("");
+    return `<div class="btns"><button class="btn primary" type="button" data-dread="${esc(x.id)}">✓ Read</button>
+      ${look ? "" : `<button class="btn keep" type="button" data-dkeep="${esc(x.id)}" aria-pressed="${!!x.keep}">Keep getting these</button>
+      <button class="btn" type="button" data-dstop="${esc(x.id)}">${stop}</button>`}
+      <a class="btn quiet" href="${esc(x.gmail)}" target="_blank" rel="noopener">Open in Gmail</a></div>
+      ${how ? `<span class="how">${how}</span>` : ""}
+      ${x.kind === "newsletter" ? `<div class="links"><button type="button" data-ddeal="${esc(x.id)}">This is a flight deal</button></div>` : ""}
+      <div class="notebox"><input id="note-${esc(x.id)}" data-draft="${esc(x.id)}" type="text" placeholder="Note for Claude, e.g. make this a task" aria-label="Note for Claude" value="${esc(S.drafts[x.id] || "")}"><button class="btn" type="button" data-dnote="${esc(x.id)}">Send</button></div>
+      ${notes}`;
+  }
+  function digestView(){
+    const d = S.dig;
+    if (!d) return `<div class="empty">Loading…</div>`;
+    const unread = digestUnread(), nRead = digestRead().length, list = shownDigest();
+    const ev = d.event ? `<div class="reach"><span class="t">${hm(d.event.s)}</span><div class="q"><b>Read today's digest</b><span>On your calendar tonight, ${Math.round((d.event.e - d.event.s) / 60000)} min. You get a ping when it starts.</span></div></div>`
+      : unread.length ? `<div class="reach"><span class="t">19:00+</span><div class="q"><b>Read today's digest</b><span>Goes in your first free evening slot on the calendar.</span></div></div>` : "";
+    const paper = list.length ? `<div class="paper">${KIND_ORDER.map(k => {
+      const rows = list.filter(x => x.kind === k); if (!rows.length) return "";
+      return `<div class="grp ${k}">${esc(d.kinds[k])} · ${rows.filter(x => !isRead(x)).length}</div>` + rows.map(x => {
+        const open = S.dOpen === x.id;
+        const tag = x.keep ? " · keep" : "";
+        return `<button class="hl" type="button" data-dopen="${esc(x.id)}" aria-expanded="${open}"><span><b>${esc(x.headline)}</b><small>${isRead(x) ? "read · " : ""}${esc(x.from)} · ${esc(when(x.at))}${tag}${(x.notes || []).length ? " · note" : ""}</small></span><span class="arrow" aria-hidden="true">${open ? "▲" : "▼"}</span></button>
+          ${open ? `<div class="hlbody">${digestDetails(x)}${digestButtons(x)}</div>` : ""}`;
+      }).join("");
+    }).join("")}</div>` : "";
+    const done = unread.length ? "" : `<div class="fin"><span class="seal">✓</span><h3>Digest done</h3><p class="summary">Everything is read and archived.${d.pending ? " Claude is still writing up " + d.pending + " new one" + (d.pending === 1 ? "" : "s") + "." : ""}</p></div>`;
+    const toggle = nRead ? `<button class="btn quiet showread" type="button" data-dshowread>${S.dShowRead ? "Hide" : "Show"} ${nRead} read</button>` : "";
+    const trip = d.trip?.length ? `<div class="tripbox"><span class="lbl">Not in your digest · went to your trip</span>
+      <p class="summary">${d.trip.length} trip email${d.trip.length === 1 ? "" : "s"}. Later these update the matching trip in your Travel Planner. They stay in your inbox for now.</p>
+      <ul>${d.trip.map(t => `<li><a href="${esc(t.gmail)}" target="_blank" rel="noopener">${esc(t.headline)}</a></li>`).join("")}</ul></div>` : "";
+    return ev + (unread.length || S.dShowRead ? paper : done) + toggle + trip;
+  }
+  // Report tab: senders he muted from the digest, with Unmute
+  function mutedView(){
+    const m = S.dig?.muted || [];
+    if (!m.length) return "";
+    return `<div class="lane"><span>Muted in your digest · their mail is archived when it arrives</span><span>${m.length}</span></div>
+      <div class="list learned">${m.map(x => `<div><b>${esc(x.name)}</b><button class="btn quiet" type="button" data-unmute="${esc(x.addr)}" style="min-height:36px;padding:6px 12px">Unmute</button></div>`).join("")}</div>`;
+  }
+  async function reloadDigest(fromId, toId){ try { S.dig = await api("/inbox/digest"); } catch {} counts(); steady(fromId, toId); }
+  // the next unread item after this one (or the nearest one above it when this was the last)
+  function nextUnread(id){
+    const order = digestOrder(), i = order.indexOf(id), unread = n => { const y = dItem(n); return y && !isRead(y) && n !== id; };
+    return order.slice(i + 1).find(unread) || order.slice(0, Math.max(i, 0)).reverse().find(unread) || null;
+  }
+  async function digestRead1(id){
+    // the next unread one opens in the same spot, so he can keep tapping without hunting
+    const next = nextUnread(id);
+    S.dLocal[id] = "read"; S.dOpen = next; S.dTouched = true; steady(id, next);
+    try { await post("/inbox/digest/read", { id }); }
+    catch (e) { delete S.dLocal[id]; S.dOpen = id; steady(next, id); toastErr("Not archived: " + e.message); return; }
+    try { S.dig = await api("/inbox/digest"); delete S.dLocal[id]; } catch {}
+    counts(); steady(S.dOpen, S.dOpen);
+  }
+
+  function pairView(){
+    return `<div class="pair"><h2 class="name" style="font-size:22px">Pair this device</h2>
+      <p class="summary">Use the same pairing code as Day Quest. It stays on this device only.</p>
+      <input id="pairCode" type="password" autocomplete="off" aria-label="Pairing code" placeholder="Pairing code">
+      <button class="btn primary" type="button" id="pairGo">Pair</button></div>`;
+  }
+
+  function render(){
+    document.querySelectorAll(".tab").forEach(t => { const on = t.dataset.tab === S.tab; t.classList.toggle("on", on); t.setAttribute("aria-selected", on); });
+    liveLine(); counts();
+    const v = $("#view");
+    if (!key() || S.error?.status === 401) { v.innerHTML = pairView(); return; }
+    if (!S.data) { v.innerHTML = `<div class="empty">${S.error ? "Server not reachable: " + esc(S.error.message) : "Loading…"}</div>`; return; }
+    if (!S.data.configured.gmail && S.tab !== "report") {
+      v.innerHTML = `<div class="lane"><span>Waiting for the Google sign-in</span></div><div class="list"><div class="empty">The server is not signed in to junyan.boon@gmail.com yet. Run the sign-in script on the Mac once, then this fills in.</div></div>`;
+      return;
+    }
+    v.innerHTML = S.tab === "sort" ? sortView() : S.tab === "messages" ? messagesView() : S.tab === "digest" ? digestView() : reportView() + mutedView();
+  }
+
+  /* ---------- actions ---------- */
+  const nextOpen = () => { S.open = currentList().find(x => !S.done[x.id] && x.id !== S.open && !x.skipped)?.id || currentList().find(x => !S.done[x.id] && x.id !== S.open)?.id || null; };
+  async function approve(id){
+    const x = S.data.sort.find(c => c.id === id); if (!x) return;
+    const route = S.picks[id] || x.suggest; if (!route) return;
+    const btn = document.querySelector(`[data-approve="${CSS.escape(id)}"]`); if (btn) btn.disabled = true;
+    try {
+      const r = await post("/inbox/decide", { id, route });
+      S.done[id] = { card:x, label:"Approved: " + r.filedAs };
+      nextOpen(); render();
+      toast(r.verified === false ? `Moved to ${r.filedAs}, but Gmail did not confirm it. Check in Gmail.` : `Filed to ${r.filedAs}.`, id);
+      load();
+    } catch (e) { toastErr("Not filed: " + e.message); if (btn) btn.disabled = false; load(); }
+  }
+  async function undo(id){
+    $("#toast").hidden = true;
+    try { await post("/inbox/undo", { id }); delete S.done[id]; S.open = id; toast("Put back in your inbox."); }
+    catch (e) { toastErr("Undo failed: " + e.message); }
+    load();
+  }
+
+  document.addEventListener("click", async e => {
+    const t = e.target.closest("[data-tab]");
+    if (t){ S.tab = t.dataset.tab; S.open = null;
+      history.replaceState(null, "", location.pathname + location.search + (S.tab === "digest" ? "#digest" : "")); render(); await load(); return; }
+    const u = e.target.closest("[data-undo]"); if (u) return undo(u.dataset.undo);
+    const dop = e.target.closest("[data-dopen]");
+    if (dop){ const id = dop.dataset.dopen; S.dOpen = S.dOpen === id ? null : id; S.dTouched = true; steady(id, id); return; }
+    const drd = e.target.closest("[data-dread]"); if (drd) return digestRead1(drd.dataset.dread);
+    const dpb = e.target.closest("[data-dputback]");
+    if (dpb){ const id = dpb.dataset.dputback; try { await post("/inbox/digest/putback", { id }); toast("Put back in your inbox and your digest."); } catch (err) { toastErr("Put back failed: " + err.message); }
+      return reloadDigest(id, id); }
+    const dst = e.target.closest("[data-dstop]");
+    if (dst){ const id = dst.dataset.dstop, next = nextUnread(id);
+      dst.disabled = true;
+      try { const r = await post("/inbox/digest/stop", { id });
+        const arch = r.archived === false ? " Gmail kept this one in your inbox; archive it there." : "";
+        toast((r.how === "unsubscribe" ? "Unsubscribed with one click." : `Muted${r.why ? " (" + r.why + ")" : ""}. Their mail skips your digest now.`) + (arch || (r.how === "unsubscribe" ? " Archived." : "")));
+        S.dLocal[id] = "read"; S.dOpen = next; steady(id, next); delete S.dLocal[id]; return reloadDigest(S.dOpen, S.dOpen); }
+      catch (err) { toastErr(err.message); dst.disabled = false; return; } }
+    const dk = e.target.closest("[data-dkeep]");
+    if (dk){ const id = dk.dataset.dkeep, x = dItem(id); if (!x) return;
+      try { const r = await post("/inbox/digest/keep", { id, on: !x.keep }); x.keep = r.keep; } catch (err) { toastErr(err.message); }
+      return steady(id, id); }
+    const dd = e.target.closest("[data-ddeal]");
+    if (dd){ const id = dd.dataset.ddeal; try { await post("/inbox/digest/deal", { id }); toast("Moved to Flight deals. Mail from this sender goes there from now on."); } catch (err) { toastErr(err.message); }
+      return reloadDigest(id, id); }
+    const dn = e.target.closest("[data-dnote]");
+    if (dn){ const id = dn.dataset.dnote, note = (document.getElementById("note-" + id)?.value || "").trim(); if (!note) return;
+      dn.disabled = true;
+      try { const r = await post("/inbox/digest/note", { id, note }); delete S.drafts[id];
+        toast(`Task made for Claude: ${r.task.title}`); return reloadDigest(id, id); }
+      catch (err) { toastErr("No task made: " + err.message); dn.disabled = false; return; } }
+    if (e.target.closest("[data-dshowread]")){ S.dShowRead = !S.dShowRead; return steady(S.dOpen, S.dOpen); }
+    const um = e.target.closest("[data-unmute]");
+    if (um){ try { await post("/inbox/digest/unmute", { addr: um.dataset.unmute }); toast("Unmuted. Their mail reaches your digest again."); } catch (err) { toastErr(err.message); } return load(); }
+    const o = e.target.closest("[data-open]"); if (o){ S.open = S.open === o.dataset.open ? null : o.dataset.open; render(); return; }
+    const r = e.target.closest("[data-route]"); if (r){ S.picks[r.dataset.id] = r.dataset.route; render(); return; }
+    const a = e.target.closest("[data-approve]"); if (a) return approve(a.dataset.approve);
+    const fl = e.target.closest("[data-file]"); if (fl){ S.picks[fl.dataset.id] = fl.dataset.file; return approve(fl.dataset.id); }
+    const ch = e.target.closest("[data-choose]"); if (ch){ S.choose[ch.dataset.choose] = true; render(); return; }
+    const wy = e.target.closest("[data-why]"); if (wy){ S.why[wy.dataset.why] = !S.why[wy.dataset.why]; render(); return; }
+    const rd = e.target.closest("[data-read]");
+    if (rd && S.tab === "sort" && S.bodies[rd.dataset.read]){ delete S.bodies[rd.dataset.read]; render(); return; }
+    if (rd){ const id = rd.dataset.read; S.bodies[id] = "loading"; render();
+      try { S.bodies[id] = await api("/inbox/item?id=" + encodeURIComponent(id)); } catch (err) { S.bodies[id] = { error: err.message }; }
+      render(); return; }
+    const sk = e.target.closest("[data-skip]");
+    if (sk){ try { await post("/inbox/decide", { id: sk.dataset.skip, action:"skip" }); nextOpen(); } catch (err) { toastErr(err.message); } return load(); }
+    const ts = e.target.closest("[data-tosort]");
+    if (ts){ try { await post("/inbox/decide", { id: ts.dataset.tosort, action:"to-sort" }); toast("Moved to Sort."); } catch (err) { toastErr(err.message); } return load(); }
+    const f = e.target.closest("[data-flag]");
+    if (f){ try { await post("/inbox/flag", { id: f.dataset.flag }); toast(f.dataset.kind === "rule" ? "Flagged. The rule is undone for this email: it is back in Sort, and Claude will check it." : "Flagged. That sender asks you again, and Claude will check this one."); } catch (err) { toastErr(err.message); } return load(); }
+    if (e.target.closest("#refresh")) return checkNow();
+    if (e.target.closest("#pairGo")){ const v = $("#pairCode").value.trim(); if (!v) return;
+      store.set("quest-key", v); S.error = null; await load();
+      if (S.error?.status === 401) { store.set("quest-key", null); toastErr("That code did not work."); render(); } }
+  });
+  // the note box: typed text survives a re-draw; Enter sends
+  document.addEventListener("input", e => { const d = e.target.closest("[data-draft]"); if (d) S.drafts[d.dataset.draft] = d.value; });
+  document.addEventListener("toggle", e => { const d = e.target.closest && e.target.closest("[data-deep]"); if (d) S.deepOpen[d.dataset.deep] = d.open; }, true);
+  document.addEventListener("keydown", e => {
+    if (e.key === "Enter" && e.target.matches(".notebox input")) { e.preventDefault(); e.target.nextElementSibling.click(); return; }
+    if (e.target.closest("textarea,input") || S.tab !== "sort" || !S.open || !S.data) return;
+    if (e.key === "Enter" && e.target.closest("button,a")) return;   // Enter on a focused button presses that button, never Approve
+    if (e.key === "Enter"){ const b = document.querySelector(`[data-approve="${CSS.escape(S.open)}"]`); if (b && !b.disabled){ e.preventDefault(); b.click(); } }
+    else if (/^[1-8]$/.test(e.key) && S.data.routes[+e.key - 1]){ S.picks[S.open] = S.data.routes[+e.key - 1].key; approve(S.open); }
+  });
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) load(); });
+  setInterval(() => { if (!document.hidden) load(); }, 60000);
+  load();
+})();
+</script>
+</body>
+</html>
