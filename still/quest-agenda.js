@@ -206,6 +206,40 @@
     return { s:new Date(s), e:new Date(e), hit };
   }
 
+  /* Touch and mouse on a calendar block, like Google Calendar (Junyan, 2026-10-20: "it's too easy to shift bookings
+     while scrolling across the calendar", and blocks under 30 minutes were near impossible to move or open).
+     A finger: a quick tap opens the block; a hold of LONG_MS with the finger still (within SLOP px) picks it up;
+     moving first is a scroll and never moves a block. A mouse: a click opens it; pressing and moving MOUSE_SLOP px drags.
+     The edges stretch the same way (hold first), and only blocks of HANDLE_MIN minutes or more have edges, so a short
+     block is all middle. Every block gets a tap area of at least HIT_MIN px tall. */
+  const GESTURE = { LONG_MS:400, SLOP:8, MOUSE_SLOP:5, HIT_MIN:44, HANDLE_MIN:30 };
+  /* press: { touch, x0, y0, t0 }; ev: { type:"move"|"up"|"timer", x, y, t }. Returns what the press is now:
+     "wait" (undecided), "tap" (open the block), "scroll" (let the page scroll, forget the press),
+     "pickup" (start moving or stretching the block), "none" (a mouse press that moved off and let go: nothing). */
+  function pressStep(p, ev){
+    const far = ev.x != null && Math.hypot(ev.x - p.x0, ev.y - p.y0) > (p.touch ? GESTURE.SLOP : GESTURE.MOUSE_SLOP);
+    if (p.touch) {
+      if (ev.type === "move") return far ? "scroll" : "wait";
+      if (ev.type === "timer") return ev.t - p.t0 >= GESTURE.LONG_MS - 20 ? "pickup" : "wait";
+      return far ? "scroll" : "tap";
+    }
+    if (ev.type === "move") return far ? "pickup" : "wait";
+    if (ev.type === "timer") return "wait";
+    return far ? "none" : "tap";
+  }
+  // a short block keeps its slim look, but the area that takes a finger is HIT_MIN px tall, centred on it; null when it is tall enough
+  function hitBox(top, h, min = GESTURE.HIT_MIN){
+    if (h >= min) return null;
+    return { top:Math.round(top - (min - h) / 2), h:min };
+  }
+  /* Does a block of these times, drawn h px tall, get stretch edges, and how tall is each edge's grab zone?
+     Under HANDLE_MIN minutes: none, a press anywhere moves it. Otherwise a quarter of the block at most, 14 px at most,
+     so the middle always stays the bigger part. */
+  function edgeHandles(s, e, h){
+    if (+e - +s < GESTURE.HANDLE_MIN * MIN) return { on:false, zone:0 };
+    return { on:true, zone:Math.max(4, Math.min(14, Math.floor(h / 4))) };
+  }
+
   // "7:25 PM" and "7:40 PM" read "7:25 to 7:40 PM"
   function rangeText(a, b){
     const m = /\s?([AP]M)$/i, x = a.match(m), y = b.match(m);
@@ -214,5 +248,5 @@
 
   root.QuestAgenda = { addDays, agendaDays, mergeAgenda, snap, dragResult, dragKind, lanes, isLong, timelineLanes, applyPending,
     pickSpan, addKey, samePick, placePick, undoPick, carveFree, rangeText, overlaps, freeSlot, clampEdge,
-    JOINT, JUNYAN, ADD_CALS, onJoint, inRoom };
+    JOINT, JUNYAN, ADD_CALS, onJoint, inRoom, GESTURE, pressStep, hitBox, edgeHandles };
 })(typeof window !== "undefined" ? window : globalThis);
