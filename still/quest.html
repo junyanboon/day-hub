@@ -191,9 +191,9 @@
   /* the water card (2026-10-19, d23): like the steps side quest, with a "by 4 PM" marker on the bar */
   .wq.done { border-color:rgba(127,208,255,.65); background:linear-gradient(135deg, rgba(127,208,255,.18), rgba(143,227,176,.08)); }
   /* the small line keeps to one line on a phone: the block (d76) gives way first, ending in an ellipsis */
+  .wq .sq-t { min-width:0; }   /* or a long line widens the card instead of truncating */
   .sq-t small.wq-sub { display:flex; white-space:nowrap; overflow:hidden; }
   .wq-sub span { flex:none; } .wq-sub .wq-blk { flex:0 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; }
-  .wq-sub .wq-s { flex:0 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; }
   .wq-bar { position:relative; height:10px; overflow:visible; margin-top:9px; }
   .wq-bar b { background:linear-gradient(90deg, #7fd0ff, #b8e6ff); }
   .wq-bar i { position:absolute; top:-3px; bottom:-3px; width:2px; background:#ffd479; border-radius:1px; }
@@ -1471,7 +1471,7 @@
       `<button type="button" class="wq-drop" data-glass aria-label="Add one glass" title="${esc(W.button(b ? shortName(b) : "", hourNow()))}">💧</button>` +
       `<span class="sq-t">Water · <span class="wq-n">${s.total} / ${W.AIM}</span> glasses` +
       `<small class="wq-sub"><span class="wq-s">${esc(sub)}</span>${W.tail(b ? shortName(b) : "", hourNow()).map((t, i, a) =>
-        `<span class="${i === 0 && b ? "wq-blk" : "wq-x"}"> · ${esc(t)}</span>`).join("")}</small>` +
+        `<span class="${i === 0 && b ? "wq-blk" : "wq-x"}">&nbsp;· ${esc(t)}</span>`).join("")}</small>` +
       `<i class="sq-bar wq-bar"><b style="width:${from}%" data-to="${pct}"></b><i style="left:${W.markerPct()}%"></i><em style="left:${W.markerPct()}%">by 4 PM</em></i></span></div>`;
   }
   // after a tap redraws the card: the drop bounces with a splash ring, "+1" floats off the count, the bar fills

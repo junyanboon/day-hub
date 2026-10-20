@@ -92,7 +92,11 @@ test("the small line names the block a glass counts toward, and reads thirsty? a
   const fn = html.slice(html.indexOf("function waterHTML()"), html.indexOf("function waterStamp()"));
   assert.match(fn, /W\.tail\(b \? shortName\(b\) : "", hourNow\(\)\)/);
   assert.match(fn, /<small class="wq-sub">/);
+  assert.match(fn, /">&nbsp;· \$\{esc\(t\)\}<\/span>/);   // a plain space would collapse at the flex item's edge
   // one line on a phone: the line never wraps, and a long block name ends in an ellipsis
   assert.match(html, /\.wq-sub \{[^}]*white-space:nowrap[^}]*\}/);
+  assert.match(html, /\.wq \.sq-t \{ min-width:0; \}/);
+  assert.match(html, /\.wq-sub span \{ flex:none; \}/);   // the count text never shrinks; only the block does
+  assert.doesNotMatch(html, /\.wq-s \{/);
   assert.match(html, /\.wq-blk \{[^}]*text-overflow:ellipsis[^}]*\}/);
 });
