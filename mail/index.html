@@ -213,6 +213,9 @@ main>.empty,.pair .summary,.note{color:#fff;text-shadow:0 1px 2px rgba(9,22,50,.
 .btn.keep[aria-pressed="true"]{background:var(--mint-soft);border-color:var(--mint);color:var(--mint)}
 .how{font-size:12.5px;color:var(--faint)}
 .notebox{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px}
+.prob{display:grid;gap:4px;padding:14px 16px;border-left:3px solid var(--gold)}
+.prob span{color:var(--dim)}
+.okline{margin:8px 0 4px;color:var(--mint);font-weight:600}
 .drafts{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
 .draft{display:grid;gap:8px;align-content:start}
 .draft label{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--faint)}
@@ -507,35 +510,38 @@ main>.empty,.pair .summary,.note{color:#fff;text-shadow:0 1px 2px rgba(9,22,50,.
         </div>` : "";
     return `<div class="row ${open?"open":""}">${head(x, "people", `<span class="pill ask">Your host · ${esc(plat)}</span>`)}${body}</div>`;
   }
+  // the Report tab (d417): what is broken first, then what it did today, then what to check, then how it is learning
   function reportView(){
     const r = S.report;
     if (!r) return `<div class="empty">Loading…</div>`;
-    const pct = r.jev.shown ? Math.round(r.jev.agreed / r.jev.shown * 100) + "%" : "n/a";
-    const rules = (r.rules || []).map(x => {
-      const pill = x.flagged ? `<span class="pill money">Flagged</span>` : x.error ? `<span class="pill money">Did not finish</span>` : `<span class="pill auto">Rule</span>`;
-      const did = x.error ? `It did not finish (${esc(x.error)}), so it stayed in your inbox as a card.`
-        : `Filed to CRA${x.archived ? " and archived" : ""}${x.task ? `, and ${x.task.reused ? "it found the task already made" : "made a task"}: ${taskLink(x.task)}` : ""}.`;
-      const body = S.open === x.id ? `<div class="body"><p class="summary">Standing rule: ${esc(x.name)}. ${did}</p>
-        <div class="btns">${x.flagged ? `<span class="pill money">Rule stopped for this email. It is back in Sort, and Claude will check it.</span>`
-          : x.error ? "" : `<button class="btn primary" type="button" data-flag="${esc(x.id)}" data-kind="rule">Flag this</button><button class="btn quiet" type="button" data-open="${esc(x.id)}">Looks fine</button>`}
+    const probs = r.problems || [];
+    const problems = probs.length
+      ? `<div class="lane"><span>Needs fixing</span><span>${probs.length}</span></div><div class="list">${probs.map(p => `<div class="prob"><b>${esc(p.what)}</b><span>${esc(p.fix)}</span></div>`).join("")}</div>`
+      : `<div class="okline">✓ Everything is working.</div>`;
+    const t = r.today || {}, sp = r.spend || { usd: 0, cap: 5 };
+    const tiles = `<div class="lane"><span>Last 24 hours</span><span></span></div>
+      <div class="tiles"><div class="tile"><b>${t.auto || 0}</b><span>filed by itself</span></div><div class="tile"><b>${t.you || 0}</b><span>filed by you</span></div><div class="tile"><b>${t.tasks || 0}</b><span>tasks made</span></div><div class="tile"><b>${t.waiting || 0}</b><span>still waiting on you</span></div></div>
+      <p class="note">Claude read ${t.claude || 0} email${t.claude === 1 ? "" : "s"}${t.hosts ? ` and drafted ${t.hosts} host repl${t.hosts === 1 ? "y" : "ies"}` : ""}. This month: $${Number(sp.usd || 0).toFixed(2)} of your $${sp.cap} limit.</p>`;
+    const why = x => x.ruleId ? `Standing rule: ${x.name}. ${x.error ? `It did not finish (${x.error}), so it stayed in your inbox.` : `Filed to CRA${x.archived ? " and archived" : ""}${x.task ? `, and ${x.task.reused ? "it found the task already made" : "made a task"}` : ""}.`}`
+      : x.why === "jev-mfa" ? `Filed to ${x.filedAs} by itself: Jev was sure it is a sign-in or security email.` : `Filed to ${x.filedAs} by itself, because you approved this sender there 10 times in a row.`;
+    const all = [...(r.rules || []), ...(r.auto || [])].sort((a, b) => (b.doneAt || 0) - (a.doneAt || 0));
+    const todo = all.filter(x => !x.fine && !x.flagged && !x.error), done = all.length - todo.length;
+    const rows = todo.map(x => {
+      const row = x.ruleId ? { ...x, subject: x.subject || `Standing rule: ${x.name}` } : x;
+      const body = S.open === x.id ? `<div class="body"><p class="summary">${esc(why(x))}</p>
+        <div class="btns"><button class="btn quiet" type="button" data-fine="${esc(x.id)}">✓ Looks fine</button><button class="btn" type="button" data-flag="${esc(x.id)}"${x.ruleId ? ` data-kind="rule"` : ""}>Flag this</button>
           ${x.task ? `<a class="btn quiet" href="${esc(x.task.url)}" target="_blank" rel="noopener">Open the task</a>` : ""}</div></div>` : "";
-      const row = { ...x, subject: `Standing rule: ${x.name}` };
-      return `<div class="row ${S.open===x.id?"open":""}">${head(row, x.flagged||x.error?"flag":"auto", pill)}${body}</div>`;
+      return `<div class="row ${S.open===x.id?"open":""}">${head(row, "auto", `<span class="pill auto">${esc(x.ruleId ? "Rule" : x.filedAs)}</span>`)}${body}</div>`;
     }).join("");
-    const rows = r.auto.map(x => {
-      const pill = x.flagged ? `<span class="pill money">Flagged</span>` : `<span class="pill auto">${esc(x.filedAs)}</span>`;
-      const body = S.open === x.id ? `<div class="body"><p class="summary">Filed to ${esc(x.filedAs)} by itself, because you approved this sender there 10 times in a row.</p>
-        <div class="btns">${x.flagged ? `<span class="pill money">Back to asking. Claude will check it.</span>`
-          : `<button class="btn primary" type="button" data-flag="${esc(x.id)}">Flag this</button><button class="btn quiet" type="button" data-open="${esc(x.id)}">Looks fine</button>`}</div></div>` : "";
-      return `<div class="row ${S.open===x.id?"open":""}">${head(x, x.flagged?"flag":"auto", pill)}${body}</div>`;
-    }).join("");
-    return `<div class="tiles"><div class="tile"><b>${r.auto.length + (r.rules || []).filter(x => !x.error && !x.flagged).length}</b><span>handled by itself, last 14 days</span></div><div class="tile"><b>${pct}</b><span>Jev matched you (${r.jev.agreed} of ${r.jev.shown})</span></div><div class="tile"><b>${r.flagged}</b><span>flagged by you</span></div></div>
-      ${rules ? `<div class="lane"><span>Standing rules · rules you set once</span><span>${r.rules.length}</span></div><div class="list">${rules}</div>` : ""}
-      ${r.claude && (r.claude.read || r.claude.failed) ? `<p class="note">Claude read ${r.claude.read} email${r.claude.read===1?"":"s"} from new senders${r.claude.failed ? ` (${r.claude.failed} did not work and showed as normal cards)` : ""}, about $${r.claude.usd.toFixed(4)} in all. Its tray matched your pick ${r.claude.agreed} of ${r.claude.judged} times.</p>` : ""}
-      <div class="lane"><span>What Jev learned from you</span><span>${r.learned.length}</span></div>
-      <div class="list learned">${r.learned.length ? r.learned.map(l => `<div><b>${esc(l.who)}</b><span>${esc(l.from)} → ${esc(l.to)}</span></div>`).join("") : `<div><span style="color:var(--dim)">Nothing yet. When you pick a different tray than Jev, it shows here and Jev uses it next time.</span></div>`}</div>
-      <div class="lane"><span>Handled by itself · flag anything that looks off</span><span>${r.auto.length}</span></div>
-      <div class="list">${rows || `<div class="empty">Nothing on auto yet. A sender goes on auto after you approve it to the same tray 10 times in a row.</div>`}</div>`;
+    const check = `<div class="lane"><span>Check these · filed by itself</span><span>${todo.length}</span></div>
+      <div class="list">${rows || `<div class="empty">Nothing to check.${done ? ` ${done} already checked or flagged.` : ""}</div>`}</div>
+      ${rows && done ? `<p class="note">${done} more already checked or flagged.</p>` : ""}`;
+    const pct = r.jev.shown ? Math.round(r.jev.agreed / r.jev.shown * 100) : null;
+    const smarter = `<div class="lane"><span>Getting smarter</span><span></span></div>
+      <p class="note">${pct === null ? "Jev has not guessed on enough of your picks yet." : `Jev's guess matched your pick ${r.jev.agreed} of ${r.jev.shown} times (${pct}%).`}
+      ${r.nearAuto ? ` ${r.nearAuto} sender${r.nearAuto === 1 ? " is" : "s are"} close to filing by themselves (10 approvals in a row to the same place).` : ""}
+      ${r.flagged ? ` You have flagged ${r.flagged}; those went back to asking you.` : ""}</p>`;
+    return problems + tiles + check + smarter;
   }
 
   /* ---------- the Digest (ticket 17, build spec 2026-10-17) ---------- */
@@ -749,6 +755,8 @@ main>.empty,.pair .summary,.note{color:#fff;text-shadow:0 1px 2px rgba(9,22,50,.
     if (sk){ try { await post("/inbox/decide", { id: sk.dataset.skip, action:"skip" }); nextOpen(); } catch (err) { toastErr(err.message); } return load(); }
     const ts = e.target.closest("[data-tosort]");
     if (ts){ try { await post("/inbox/decide", { id: ts.dataset.tosort, action:"to-sort" }); toast("Moved to Sort."); } catch (err) { toastErr(err.message); } return load(); }
+    const fn = e.target.closest("[data-fine]");
+    if (fn){ try { await post("/inbox/fine", { id: fn.dataset.fine }); S.open = null; } catch (err) { toastErr(err.message); } return load(); }
     const f = e.target.closest("[data-flag]");
     if (f){ try { await post("/inbox/flag", { id: f.dataset.flag }); toast(f.dataset.kind === "rule" ? "Flagged. The rule is undone for this email: it is back in Sort, and Claude will check it." : "Flagged. That sender asks you again, and Claude will check this one."); } catch (err) { toastErr(err.message); } return load(); }
     if (e.target.closest("#refresh")) return checkNow();
