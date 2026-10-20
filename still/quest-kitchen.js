@@ -104,14 +104,82 @@
   // the shelf a new item's group usually lives on: fresh food in the fridge or cool box, the rest in the pantry or dry bag
   const FRESH_GROUPS = new Set(["Vegetables", "Fruit", "Herbs", "Drinks and ferments"]);
   const guessShelf = (k, group) => (k === "travel" ? (FRESH_GROUPS.has(group) ? "cool" : "dry") : FRESH_GROUPS.has(group) ? "fridge" : "pantry");
+  /* Icons (Junyan, 2026-10-20, d38: "38 yes"): a new item showed 🛒. Now: the catalogue's icon for the same food, else a
+     word in its name (WORD_ICONS, whole words, first match), else its group's own icon (GROUP_ICONS). An icon that came
+     from the group is never stored (put leaves it out), so it follows the item when he moves it to another group. An old
+     stored 🛒 counts as no icon, so his items from before show a food icon too: worked out on every read, nothing is
+     written for it, and the two devices cannot disagree. Any other stored icon stays as it is. */
   const ICONS = Object.fromEntries(SEED.map(([, em, name]) => [keyOf(name), em]));
-  const iconFor = (name) => ICONS[keyOf(name)] || "🛒";
+  const GROUP_ICONS = { "Vegetables": "🥦", "Fruit": "🍎", "Herbs": "🌿", "Legumes and grains": "🫘", "Nuts and seeds": "🥜", "Spices": "🧂",
+    "Oils, vinegars and sweet": "🫒", "Drinks and ferments": "🥛", "Other": "🧺" };
+  const WORD_ICONS = [
+    [/\bpeanuts?\b/i, "🥜"], [/\bsweet potato(es)?\b/i, "🍠"], [/\b(eggplants?|aubergines?)\b/i, "🍆"], [/\bcoconuts?\b/i, "🥥"],
+    [/\bvinegars?\b/i, "🍶"], [/\b(oils?|olives?)\b/i, "🫒"], [/\bhoney\b/i, "🍯"], [/\b(chocolate|cocoa)\b/i, "🍫"],
+    [/\b(milk|kefir)\b/i, "🥛"], [/\bjuices?\b/i, "🧃"], [/\b(coffee|espresso)\b/i, "☕"], [/\btea\b/i, "🍵"], [/\bwater\b/i, "💧"],
+    [/\bwine\b/i, "🍷"], [/\bbeers?\b/i, "🍺"],
+    [/\b(pasta|spaghetti|penne|fusilli|macaroni|linguine)\b/i, "🍝"], [/\b(noodles?|ramen|udon|soba)\b/i, "🍜"], [/\brice\b/i, "🍚"],
+    [/\b(bread|loaf|baguette|bagels?)\b/i, "🍞"], [/\b(tortillas?|wraps?)\b/i, "🌯"], [/\b(oats|quinoa|flour|barley|millet|buckwheat|couscous)\b/i, "🌾"],
+    [/\b(beans?|lentils?|chickpeas?|hummus|garbanzos?|edamame)\b/i, "🫘"], [/\bpeas\b/i, "🫛"], [/\b(tofu|tempeh)\b/i, "🧊"],
+    [/\beggs?\b/i, "🥚"], [/\bcheese\b/i, "🧀"], [/\bbutter\b/i, "🧈"], [/\b(chicken|turkey)\b/i, "🍗"], [/\b(fish|salmon|tuna|sardines?|cod)\b/i, "🐟"],
+    [/\b(shrimps?|prawns?)\b/i, "🦐"],
+    [/\bbananas?\b/i, "🍌"], [/\b(tomato(es)?|passata)\b/i, "🍅"], [/\bapples?\b/i, "🍎"], [/\bpears?\b/i, "🍐"], [/\b(oranges?|clementines?|mandarins?)\b/i, "🍊"],
+    [/\blemons?\b/i, "🍋"], [/\bgrapes?\b/i, "🍇"], [/\bstrawberr(y|ies)\b/i, "🍓"], [/\bcherr(y|ies)\b/i, "🍒"], [/\b(berry|berries|blueberries|raspberries)\b/i, "🫐"],
+    [/\b(peach(es)?|apricots?|nectarines?)\b/i, "🍑"], [/\bmangoe?s?\b/i, "🥭"], [/\bpineapples?\b/i, "🍍"], [/\bkiwis?\b/i, "🥝"], [/\bwatermelons?\b/i, "🍉"],
+    [/\bmelons?\b/i, "🍈"], [/\bavocados?\b/i, "🥑"],
+    [/\bpotato(es)?\b/i, "🥔"], [/\bonions?\b/i, "🧅"], [/\bgarlic\b/i, "🧄"], [/\bcarrots?\b/i, "🥕"], [/\bcorn\b/i, "🌽"], [/\b(cucumbers?|courgettes?|zucchinis?)\b/i, "🥒"],
+    [/\b(lettuce|spinach|kale|cabbage|chard|greens)\b/i, "🥬"], [/\bbroccoli\b/i, "🥦"], [/\bmushrooms?\b/i, "🍄"], [/\b(chill?i(es)?|jalapenos?)\b/i, "🌶️"],
+    [/\bpeppers?\b/i, "🫑"], [/\bginger\b/i, "🫚"], [/\b(salt|electrolytes?)\b/i, "🧂"], [/\b(nuts?|almonds?|walnuts?|cashews?|hazelnuts?|pecans?|pistachios?)\b/i, "🌰"],
+    [/\b(seeds?|chia|flax|hemp)\b/i, "🌱"], [/\b(cans?|tins?|soup)\b/i, "🥫"], [/\bpopcorn\b/i, "🍿"],
+  ];
+  const groupIcon = (group) => GROUP_ICONS[okGroup(group) || "Other"];
+  // the icon an item gets when it has none of its own: the catalogue's, a word in its name, else its group's
+  function iconFor(name, group) {
+    const n = String(name || ""), w = WORD_ICONS.find((x) => x[0].test(n));
+    return ICONS[keyOf(n)] || (w && w[1]) || groupIcon(group || guessGroup(n));
+  }
+  const ownIcon = (em) => typeof em === "string" && !!em && em !== "🛒";
+
+  /* Amounts (Junyan, 2026-10-20, d39: "39 yes"): "400g navy beans" became a tile cut off as "400g nav…". An amount at the
+     start or end of a name is split off when he adds or renames: "400g navy beans", "500 g pasta", "pasta 500g",
+     "2 x 400g chickpeas", "1L oat milk", "6 eggs". The name keeps the food with a capital first letter ("Navy beans"); the
+     amount ("400 g") is stored on its own (item.amt) and shows on the tile's second line ("Plenty · 400 g"). Display only:
+     nothing counts grams. A count with no unit ("6 eggs") only splits at the start, and an amount at the end needs a unit,
+     so "Omega 3" stays whole. An item that never had the split (amt not stored) is split on every read, so his older items
+     read right on both devices without a write. */
+  const NUM = "\\d+(?:[.,]\\d+)?", UNIT = "kg|g|mg|ml|cl|dl|l|lbs?|oz";
+  const LEAD = new RegExp(`^(?:(${NUM})\\s*[x×]\\s*)?(${NUM})(?:\\s*(${UNIT})(?![a-z])|(?=\\s))\\s*(?:of\\s+)?(.*)$`, "i");
+  const TRAIL = new RegExp(`^(.*?)\\s+(?:(${NUM})\\s*[x×]\\s*)?(${NUM})\\s*(${UNIT})$`, "i");
+  const AMT_ONLY = new RegExp(`^(?:(${NUM})\\s*[x×]\\s*)?(${NUM})\\s*(${UNIT})?$`, "i");
+  const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+  function fmtUnit(mult, num, unit) {
+    const u = !unit ? "" : /^l$/i.test(unit) ? "L" : /^lbs$/i.test(unit) ? "lb" : unit.toLowerCase();
+    return `${mult ? `${mult.replace(",", ".")} × ` : ""}${num.replace(",", ".")}${u ? ` ${u}` : ""}`;
+  }
+  // "400g navy beans" -> { name: "Navy beans", amt: "400 g" }; no amount -> { name (first letter capital), amt: "" }
+  function splitName(raw) {
+    const s = String(raw || "").replace(/\s+/g, " ").trim();
+    let m = LEAD.exec(s);
+    if (m && /[a-z]/i.test(m[4])) return { name: cap(m[4].trim()).slice(0, 40), amt: fmtUnit(m[1], m[2], m[3]) };
+    m = TRAIL.exec(s);
+    if (m && /[a-z]/i.test(m[1])) return { name: cap(m[1].trim()).slice(0, 40), amt: fmtUnit(m[2], m[3], m[4]) };
+    return { name: cap(s).slice(0, 40), amt: "" };
+  }
+  // what he types in Edit's Amount field: "400g" -> "400 g"; anything else is kept as typed (short)
+  function amtOf(s) {
+    const v = String(s == null ? "" : s).replace(/\s+/g, " ").trim(), m = AMT_ONLY.exec(v);
+    return m ? fmtUnit(m[1], m[2], m[3]) : v.slice(0, 20);
+  }
   const shelfOf = (k, id) => (KITCHENS[k] ? KITCHENS[k].shelves.find((s) => s.id === id) : null) || null;
 
   // a level read from saved (synced) state: 0 to 3, else not checked
   const okLv = (v) => (v === 0 || v === 1 || v === 2 || v === 3 ? v : null);
   // its group: the one it stores, else the first guess from its name (stored with the item at its next change)
-  const clean = (it) => ({ ...it, lv: okLv(it.lv), group: okGroup(it.group) || guessGroup(it.name) });
+  /* and (d38, d39) its amount split off a name that never had the split, and its icon: its own, else the one iconFor gives */
+  function clean(it) {
+    const sp = typeof it.amt === "string" || typeof it.name !== "string" ? null : splitName(it.name);
+    const name = sp && sp.amt ? sp.name : it.name, group = okGroup(it.group) || guessGroup(name);
+    return { ...it, name, amt: sp ? sp.amt : it.amt, lv: okLv(it.lv), group, em: ownIcon(it.em) ? it.em : iconFor(name, group) };
+  }
   // every item of the kitchen, the catalogue under what he changed, deleted ones left out, in shelf then catalogue order
   function items(K, k) {
     const st = obj(obj(K).items), out = [], seen = new Set();
@@ -137,6 +205,8 @@
     const out = clone(K);
     out.items = obj(out.items);
     const { seed, ...rest } = it;
+    // an icon that is only what iconFor gives (or the old 🛒) is not stored, so a group change can change it (d38)
+    if (!ownIcon(rest.em) || (typeof rest.name === "string" && rest.em === iconFor(rest.name, rest.group))) delete rest.em;
     out.items[it.id] = { ...rest, at: iso(at) };
     return out;
   }
@@ -176,20 +246,32 @@
   /* Add something new (Plenty: he just put it there), in the group he picked (else the guess from its name). The same name
      already in that kitchen is set to Plenty instead of making a second tile; a deleted one comes back on the chosen shelf. */
   function add(K, k, shelf, name, at, group) {
-    const nm = String(name || "").trim().slice(0, 40);
+    const sp = splitName(name), nm = sp.name;   // "400g navy beans": Navy beans, 400 g (d39)
     if (!nm || !shelfOf(k, shelf)) return { K, id: null };
     const key = keyOf(nm);
     const live = items(K, k).find((x) => keyOf(x.name) === key);
-    if (live) return { K: setLevel(K, live.id, 3, at, "add"), id: live.id };
-    const dead = Object.entries(obj(obj(K).items)).find(([, x]) => x && x.del && x.k === k && keyOf(x.name || (item(K, x.id) || {}).name) === key);
+    if (live) { const out = setLevel(K, live.id, 3, at, "add");
+      return { K: sp.amt ? put(out, { ...item(out, live.id), amt: sp.amt }, at) : out, id: live.id }; }
+    const dead = Object.entries(obj(obj(K).items)).find(([, x]) => x && x.del && x.k === k && keyOf(splitName(x.name || (item(K, x.id) || {}).name).name) === key);
     const sd = k === "home" ? SEED_ITEMS.find((x) => keyOf(x.name) === key) : null;
     const id = dead ? dead[0] : sd ? sd.id : "u" + ms(at).toString(36) + Math.random().toString(36).slice(2, 6);
-    const base = { ...(item(K, id) || {}), id, k, shelf, name: nm, group: okGroup(group) || okGroup((obj(obj(K).items)[id] || {}).group) || guessGroup(nm), em: (item(K, id) || {}).em || iconFor(nm), lv: null, hist: [], added: iso(at) };
+    const g = okGroup(group) || okGroup((obj(obj(K).items)[id] || {}).group) || guessGroup(nm);
+    const old = obj(obj(K).items)[id] || {}, sem = sd ? sd.em : null;
+    const base = { ...(item(K, id) || {}), id, k, shelf, name: nm, amt: sp.amt, group: g, em: ownIcon(old.em) ? old.em : sem || iconFor(nm, g), lv: null, hist: [], added: iso(at) };
     delete base.del;
     return { K: setLevel(put(K, base, at), id, 3, at, "add"), id };
   }
-  const rename = (K, id, name, at) => { const it = item(K, id), nm = String(name || "").trim().slice(0, 40);
-    return it && nm ? put(K, { ...it, name: nm, em: it.em && it.em !== "🛒" ? it.em : iconFor(nm) }, at) : K; };
+  /* Rename, and (d39) the amount: one typed in the name is split off and wins; else amt (Edit's Amount field) when given,
+     else the amount it had. An icon that came from its old name or group follows the new name (put leaves it out). */
+  function rename(K, id, name, at, amt) {
+    const it = item(K, id), sp = splitName(name);
+    if (!it || !sp.name) return K;
+    const a = sp.amt || (amt === undefined ? it.amt || "" : amtOf(amt));
+    const auto = it.em === iconFor(it.name, it.group), raw = obj(obj(K).items)[id] || {};
+    const em = auto && !ownIcon(raw.em) ? iconFor(sp.name, it.group) : it.em;
+    if (sp.name === it.name && a === (it.amt || "") && typeof raw.amt === "string") return K;
+    return put(K, { ...it, name: sp.name, amt: a, em }, at);
+  }
   const move = (K, id, shelf, at) => { const it = item(K, id); return it && shelfOf(it.k, shelf) ? put(K, { ...it, shelf }, at) : K; };
   /* Put an item in a group and on a shelf (d34: Edit's pickers, or a drag onto another group or shelf). Either may be left
      out (null) to keep it. Nothing changes (K comes back as is) when both are already so, or a value is not a real one. */
@@ -197,7 +279,10 @@
     const it = item(K, id); if (!it) return K;
     const sh = shelf == null ? it.shelf : shelf, g = group == null ? it.group : group;
     if (!shelfOf(it.k, sh) || !okGroup(g) || (sh === it.shelf && g === it.group)) return K;
-    return put(K, { ...it, shelf: sh, group: g }, at);
+    // an icon from its group (none of its own) follows the new group: put leaves it out and iconFor gives the new one (d38)
+    const raw = obj(obj(K).items)[id] || {}, seedEm = (SEED_ITEMS.find((x) => x.id === id) || {}).em;
+    const em = ownIcon(raw.em) || seedEm ? it.em : iconFor(it.name, g);
+    return put(K, { ...it, shelf: sh, group: g, em }, at);
   }
   // a delete is kept as a mark (del), so the other device's copy cannot bring the item back
   const remove = (K, id, at) => { const it = item(K, id); return it ? put(K, { id, k: it.k, shelf: it.shelf, name: it.name, group: it.group, del: true }, at) : K; };
@@ -364,13 +449,13 @@
   function preTick(rows, names, k) {
     const on = [], extra = [], byKey = new Map(arr(rows).map((r) => [keyOf(r.name), r]));
     for (const n of arr(names)) {
-      const nm = String(n || "").trim().slice(0, 40), key = keyOf(nm);
+      const nm = String(n || "").trim().slice(0, 40), key = keyOf(splitName(nm).name);
       if (!key) continue;
       const r = byKey.get(key);
       if (r) { if (!on.includes(r.id)) on.push(r.id); continue; }
       if (extra.some((x) => keyOf(x.name) === key)) continue;
-      const group = guessGroup(nm);
-      extra.push({ id: "p:" + key, name: nm, em: iconFor(nm), group, shelf: guessShelf(k || "home", group), item: null, lv: null, src: "new", top: false });
+      const group = guessGroup(splitName(nm).name);
+      extra.push({ id: "p:" + key, name: nm, em: iconFor(splitName(nm).name, group), group, shelf: guessShelf(k || "home", group), item: null, lv: null, src: "new", top: false });
     }
     return { on, extra };
   }
@@ -384,7 +469,7 @@
     let out = clone(K);
     const ids = [], prev = {}, ticks = {}, keys = new Set();
     for (const p of arr(picks)) {
-      const nm = String((p && p.name) || "").trim().slice(0, 40), key = keyOf(nm);
+      const sp = splitName(p && p.name), nm = sp.name, key = keyOf(nm);   // "500g pasta" fills Pasta (d39)
       if (!key || keys.has(key)) continue;
       keys.add(key);
       const have = (p.item && item(out, p.item) && item(out, p.item).k === k && !item(out, p.item).del ? item(out, p.item) : null)
@@ -393,7 +478,7 @@
         prev[have.id] = clone(have);
         ticks[have.id] = obj(out.shop)[have.id] ? clone(out.shop[have.id]) : null;
         out = setLevel(out, have.id, 3, t, s);
-        out = put(out, { ...item(out, have.id), fresh: t }, t);
+        out = put(out, { ...item(out, have.id), fresh: t, ...(sp.amt ? { amt: sp.amt } : {}) }, t);
         if (ticks[have.id] && ticks[have.id].on) out.shop = { ...obj(out.shop), [have.id]: { on: false, at: t } };
         ids.push(have.id);
         continue;
@@ -401,7 +486,7 @@
       const sd = k === "home" ? SEED_ITEMS.find((x) => keyOf(x.name) === key) : null;
       const group = okGroup(p.group) || (sd && clean(sd).group) || guessGroup(nm);
       const shelf = shelfOf(k, p.shelf) ? p.shelf : sd ? sd.shelf : guessShelf(k, group);
-      const r = add(out, k, shelf, nm, t, group);
+      const r = add(out, k, shelf, p.name, t, group);
       if (!r.id) continue;
       out = r.K;
       if (p.em && p.em !== "🛒") out = put(out, { ...item(out, r.id), em: p.em }, t);
@@ -566,7 +651,10 @@
       low: list.filter((x) => x.lv != null && x.lv <= 1).length, soon: list.filter((x) => lowSoon(x, now, shopAt)).length };
   }
 
-  root.QuestKitchen = { NEED, LEVELS, KITCHENS, SEED, FRESH, DEFAULT_SHOP, GROUP_NAMES, keyOf, iconFor, guessGroup, guessShelf,
+  // a tile's second line (d39): the status, then the amount when it has one ("Plenty · 400 g")
+  const tileLine = (it, now, shopAt, tz) => status(it, now, shopAt, tz) + (it && it.amt ? ` · ${it.amt}` : "");
+
+  root.QuestKitchen = { NEED, LEVELS, KITCHENS, SEED, FRESH, DEFAULT_SHOP, GROUP_NAMES, GROUP_ICONS, keyOf, iconFor, groupIcon, splitName, amtOf, tileLine, guessGroup, guessShelf,
     items, item, grouped, setLevel, nextLevel, tap, add, rename, move, place, remove, status, shows, pace, lowAt, lowSoon, turnAt, useFirst, nextShop, parseAmt, usesOf, amountFor,
     shopList, tick, buyTicked, TRAVEL_STARTER, pickList, preTick, fill, unfill, shopInfo, shopWhen, shopUpto, match, dinner, active, pick, noteActive, tripEnd, bringHome, dayWord, counts };
 })(typeof window !== "undefined" ? window : globalThis);

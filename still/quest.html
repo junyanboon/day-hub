@@ -521,6 +521,7 @@
   .check { display:flex; align-items:center; gap:10px; margin-top:14px; font-size:14px; color:var(--ink-soft); }
   .sheet .check input { width:20px; height:20px; margin:0; flex:none; accent-color:#fff; }
   .btn.danger { background:transparent; border:1px solid rgba(255,156,156,.5); color:var(--bad); font-weight:500; }
+  .btn.danger.armed { background:rgba(255,156,156,.22); border-color:var(--bad); font-weight:700; }
   .node.now .dot { background:#fff; border-color:#fff; box-shadow:0 0 0 6px rgba(255,255,255,.18), 0 0 22px rgba(255,255,255,.5);
     animation:pulse 2.4s ease-in-out infinite; }
   .node.now .t { font-weight:700; }
@@ -616,6 +617,14 @@
   .kt-lb.f { color:#7fd0ff; } .kt-lb.p { color:var(--gold); }
   .kt-lb small, .kt-lb b { letter-spacing:0; text-transform:none; font-weight:500; color:var(--ink-soft); font-size:11.5px; }
   .kt-lb b { margin-left:auto; font-variant-numeric:tabular-nums; }
+  /* Edit easier to find (Junyan, 2026-10-20, d40: "40 yes"): he never found the Edit chip by the search box, so each shelf
+     heading has a ✏️ on its right that turns Edit on, and while Edit is on a bar stays at the top of the sheet. */
+  .kt-pen { flex:none; font:inherit; font-size:14px; line-height:1; padding:5px 9px; border-radius:999px; border:1px solid var(--glass-border); background:transparent; color:var(--ink); }
+  .kt-pen[aria-pressed="true"] { background:rgba(255,255,255,.22); border-color:#fff; }
+  .kt-editbar { position:sticky; top:-20px; z-index:3; margin:10px -16px 0; padding:9px 16px; display:flex; align-items:center; gap:10px;
+    background:#5a4fa8; box-shadow:0 6px 14px rgba(0,0,0,.3); font-size:13px; font-weight:600; }
+  .kt-editbar span { flex:1; min-width:0; }
+  .kt-editbar button { flex:none; font:inherit; font-size:13px; font-weight:700; padding:6px 14px; border-radius:999px; background:#fff; color:#3d3872; }
   /* fixed tiles (2026-10-20, d34: "When I click on the ingredient the whole pill changes size with the text"): a grid, 2 across
      on a phone and 3 when wider, every tile the same size. A tap changes colours and the status line only; nothing resizes
      or moves. The 3-bar meter fills like a battery. Low: gold outline. Out: soft red. Not checked: dashed. */
@@ -905,7 +914,7 @@
 <script src="quest-levels.js?v=20261016b"></script>
 <script src="quest-gymlog.js?v=20261019a"></script>
 <script src="quest-meals.js?v=20261020s"></script>
-<script src="quest-kitchen.js?v=20261020k8"></script>
+<script src="quest-kitchen.js?v=20261020k9"></script>
 <script src="quest-trends.js?v=20261019end3"></script>
 <script src="nvc-words.js?v=20261010a"></script>
 <script src="quest-fx.js?v=20261019x"></script>
@@ -2734,9 +2743,9 @@
           ["new", "Not checked", all.filter(x => x.lv == null).length]].map(([f, n, c]) =>
           `<button type="button" class="kt-chip" data-kf="${f}" aria-pressed="${S.f === f}">${n} ${c}</button>`).join("")}</div>` +
         `<div class="kt-key"><span><i class="l3"></i>Plenty</span><span><i class="l2"></i>Half</span><span><i class="l1"></i>Low</span><span><i class="l0"></i>Out</span><span><i class="ln"></i>Not checked</span></div>` +
-        `<p class="kt-hint">${S.edit ? "Edit: tap an item to rename it, change its group or shelf, or delete it."
-          : S.f === "new" ? "Tap each one you have: one tap marks it Plenty, the next steps it down. Hold one to drag it to another group."
-          : "Tap an item to step it down. Out goes back to Plenty. Hold one to drag it to another group or shelf."}</p>` +
+        (S.edit ? `<div class="kt-editbar" role="status"><span>Editing: tap an item to change or delete it</span><button type="button" id="kEditDone">Done</button></div>`
+          : `<p class="kt-hint">${S.f === "new" ? "Tap each one you have: one tap marks it Plenty, the next steps it down. Hold one to drag it to another group."
+          : "Tap an item to step it down. Out goes back to Plenty. Hold one to drag it to another group or shelf."}</p>`) +
         `<div id="kShelves">${kitShelves(S, K, k, shop, t)}</div>` +
         `<div class="kt-add"><input class="kt-q" id="kNew" placeholder="Add something new" autocomplete="off" maxlength="40">` +
         `<button type="button" class="mq-mini go" id="kAdd">Add</button></div><div class="kt-pick" id="kPick" hidden></div>`;
@@ -2774,6 +2783,7 @@
       $("kQ").oninput = e => { S.q = e.target.value; S.keep.clear(); $("kShelves").innerHTML = kitShelves(S, G.kitchen, S.k, kitShop(S.k), now()); bindShelves(); };
       sh.querySelectorAll("[data-kf]").forEach(bn => bn.onclick = () => { S.f = bn.dataset.kf; S.keep.clear(); redraw(); });
       $("kEdit").onclick = () => { S.edit = !S.edit; redraw(); };
+      if ($("kEditDone")) $("kEditDone").onclick = () => { S.edit = false; redraw(); };
       if ($("kBring")) $("kBring").onclick = () => { kitFillOpen(S, "bring"); redraw(); sh.scrollTop = 0; };
       bindShelves();
       wireKitchenDrag();
@@ -2804,7 +2814,7 @@
         if (S.fill) { const key = QK().keyOf(nm), F = S.fill, rows = kitFillRows(S);
           const hit = rows.find(x => QK().keyOf(x.name) === key);
           if (hit) F.on.add(hit.id);
-          else { const id = "p:" + key; F.extra.push({ id, name:nm, em:QK().iconFor(nm), group:A.g, shelf:A.sh, item:null, lv:null, src:"new", top:false }); F.on.add(id); }
+          else { const id = "p:" + key; F.extra.push({ id, name:nm, em:QK().iconFor(QK().splitName(nm).name, A.g), group:A.g, shelf:A.sh, item:null, lv:null, src:"new", top:false }); F.on.add(id); }
           S.add = { g:null, sh:null, gT:false, shT:false }; F.q = ""; redraw(); if (refocus && $("kNew")) $("kNew").focus(); return; }
         const r = QK().add(G.kitchen, S.k, A.sh, nm, now(), A.g); kitSave(r.K);
         const it = r.id && QK().item(G.kitchen, r.id);
@@ -2815,6 +2825,8 @@
       $("kNew").onkeydown = e => { if (e.key === "Enter") addIt(true); };
     }
     function bindShelves(){
+      // the ✏️ on each shelf heading (d40): Edit on, or off again
+      sh.querySelectorAll("#kShelves [data-kedit]").forEach(bn => bn.onclick = () => { S.edit = !S.edit; redraw(); });
       sh.querySelectorAll("#kShelves [data-kit]").forEach(bn => bn.onclick = () => {
         // the click that ends a hold or a drag is not a tap (it can land on the tile the drop just redrew away)
         if (!bn.isConnected || Date.now() - kdEnded < 450) return;
@@ -2851,7 +2863,7 @@
     const rows = kitFillRows(S).filter(r => F.on.has(r.id) || !q || r.name.toLowerCase().includes(q));
     const shelfName = id => (shelves.find(x => x.id === id) || {}).name || "";
     const note = r => r.item ? (r.lv == null ? "Not checked" : KLV[r.lv]) : r.src === "home" ? (F.use === "bring" ? "From Home" : "Not here yet") : r.src === "starter" ? "Often packed" : "New";
-    const row = r => `<button type="button" class="kt-li kt-pk" data-kpk="${esc(r.id)}" aria-pressed="${F.on.has(r.id)}"><span class="bx"></span><span class="e">${esc(r.em || "🛒")}</span>` +
+    const row = r => `<button type="button" class="kt-li kt-pk" data-kpk="${esc(r.id)}" aria-pressed="${F.on.has(r.id)}"><span class="bx"></span><span class="e">${esc(r.em || QK().iconFor(r.name, r.group))}</span>` +
       `<span class="n">${esc(r.name)}<small>${esc(note(r))}</small></span><span class="q">${esc(shelfName(r.shelf))}</span></button>`;
     const top = rows.filter(r => r.top), rest = rows.filter(r => !r.top);
     const html = (top.length ? `<p class="kt-gh">On your shopping list</p><div class="kt-list">${top.map(row).join("")}</div>` : "") +
@@ -2904,7 +2916,8 @@
       if (!shown.length && (q || S.f !== "all")) return "";
       const buy = mine.filter(x => QK().shows(x, "buy", t, shop.at)).length, grey = mine.filter(x => x.lv == null).length;
       return `<div class="kt-shelf" data-ksh="${sh.id}"><div class="kt-sh" data-kdrop="${sh.id}|"><div class="kt-lb ${sh.cls}"><span>${esc(sh.name)}</span>` +
-        `<small>${mine.length} item${mine.length === 1 ? "" : "s"}${buy ? `, ${buy} to buy` : ""}${grey ? `, ${grey} not checked` : ""}</small></div></div>` +
+        `<small>${mine.length} item${mine.length === 1 ? "" : "s"}${buy ? `, ${buy} to buy` : ""}${grey ? `, ${grey} not checked` : ""}</small></div>` +
+        `<button type="button" class="kt-pen" data-kedit aria-pressed="${S.edit}" aria-label="${S.edit ? "Stop editing" : "Edit items"}">✏️</button></div>` +
         (shown.length ? QK().grouped(shown).map(g => `<div class="kt-grp" data-kdrop="${sh.id}|${esc(g.group)}"><p class="kt-gh">${esc(g.group)}</p>` +
           `<div class="kt-items">${g.list.map(x => kitTile(x, S, t, shop, tz)).join("")}</div></div>`).join("")
           : `<p class="kt-hint" data-kdrop="${sh.id}|">Nothing here yet.</p>`) + `</div>`;
@@ -2912,8 +2925,9 @@
     return html || `<p class="kt-hint">${q ? "Nothing matches." : S.f === "buy" ? "Nothing to buy." : "Everything has been checked."}</p>`;
   }
   // one tile (d34): icon, name on one line, the status line, and the 3-bar meter. The same size whatever it says.
+  // The status line carries the amount when it has one (d39: "Plenty · 400 g"), cut with an ellipsis like the name.
   function kitTile(x, S, t, shop, tz){
-    const st = QK().status(x, t, shop.at, tz), soon = x.lv != null && x.lv >= 2 && QK().lowSoon(x, t, shop.at);
+    const st = QK().tileLine(x, t, shop.at, tz), soon = x.lv != null && x.lv >= 2 && QK().lowSoon(x, t, shop.at);
     return `<button type="button" class="ki L${x.lv == null ? "n" : x.lv}${soon ? " soon" : ""}" data-kit="${esc(x.id)}" ` +
       `aria-label="${esc(x.name)}, ${esc(st)}. ${S.edit ? "Tap to edit." : "Tap to change, hold to move."}">` +
       `<span class="e">${esc(x.em)}</span><span class="tx"><span class="nm">${esc(x.name)}</span><span class="st">${esc(st)}</span></span>` +
@@ -3019,12 +3033,15 @@
     // the click that ends a hold or a drag is not a tap
     sh.addEventListener("click", e => { if (Date.now() - kdEnded < 450 && e.target.closest("#kShelves")) { e.stopPropagation(); e.preventDefault(); } }, true);
   }
-  // edit one item: rename, its group and shelf (the way that is not a drag, d34), take it off
+  /* edit one item: rename, its amount (d39), its group and shelf (the way that is not a drag, d34), take it off.
+     Delete asks for a second tap ("Tap again to delete", d40): there is no undo for a delete, and a confirm step keeps it
+     simple on both devices (an undo would have to bring the item back over a delete mark the other device may have). */
   function openKitchenItem(id){
     const it = QK().item(G.kitchen, id); if (!it) return openKitchen();
     const kn = QK().KITCHENS[it.k];
     openSheet(`<div class="win-hd"><span class="kt-ico">${esc(it.em)}</span><div><div class="tt">${esc(it.name)}</div><div class="sb">${kn.icon} ${esc(kn.name)}</div></div></div>
       <div class="win-lb">Name</div><input id="kiName" value="${esc(it.name)}" maxlength="40" autocomplete="off">
+      <div class="win-lb">Amount <small>(optional, e.g. 400 g)</small></div><input id="kiAmt" value="${esc(it.amt || "")}" maxlength="20" autocomplete="off" placeholder="Amount">
       <div class="win-lb">Group</div><div class="kt-tools">${QK().GROUP_NAMES.map(g => `<button type="button" class="kt-chip" data-kig="${esc(g)}" aria-pressed="${g === it.group}">${esc(g)}</button>`).join("")}</div>
       <div class="win-lb">Shelf</div><div class="kt-tools">${kn.shelves.map(s => `<button type="button" class="kt-chip" data-kish="${s.id}" aria-pressed="${s.id === it.shelf}">${esc(s.name)}</button>`).join("")}</div>
       <div class="actions"><button class="btn danger" id="kiDel">Delete this item</button></div>
@@ -3036,11 +3053,16 @@
       $("sheet").querySelectorAll("[data-kig]").forEach(x => x.setAttribute("aria-pressed", x.dataset.kig === group)); });
     $("kiBack").onclick = () => openKitchen();
     $("kiSave").onclick = () => { let K = G.kitchen; const nm = $("kiName").value.trim();
-      if (nm && nm !== it.name) K = QK().rename(K, id, nm, now());
+      const amt = $("kiAmt").value.trim();
+      if (nm && (nm !== it.name || QK().amtOf(amt) !== (it.amt || ""))) K = QK().rename(K, id, nm, now(), amt);
       K = QK().place(K, id, shelf, group, now());
       if (K !== G.kitchen) kitSave(K);
       openKitchen(); render(); };
-    $("kiDel").onclick = () => { kitSave(QK().remove(G.kitchen, id, now())); log(`Kitchen: ${it.name} deleted`); openKitchen(); render(); };
+    let armed = 0;
+    $("kiDel").onclick = () => {
+      if (Date.now() - armed > 4000) { armed = Date.now(); $("kiDel").textContent = "Tap again to delete"; $("kiDel").classList.add("armed");
+        setTimeout(() => { const b = $("kiDel"); if (b && Date.now() - armed >= 4000) { b.textContent = "Delete this item"; b.classList.remove("armed"); } }, 4100); return; }
+      kitSave(QK().remove(G.kitchen, id, now())); log(`Kitchen: ${it.name} deleted`); openKitchen(); render(); };
   }
   /* A dinner tick (d21, d28): each ingredient ticked in a dish steps the kitchen's matching item down one level, each one
      unticked steps it back. before and after: the dish's ticked ingredient names. */
