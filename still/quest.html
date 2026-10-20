@@ -2853,6 +2853,7 @@
     const at = (x, y) => { const el = document.elementFromPoint(x, y); return el && el.closest("#kShelves [data-kdrop], .kt-tray [data-kdrop]"); };
     const follow = () => {
       const d = KD; if (!d || !d.live) return;
+      if (!$("kShelves") || !d.el.isConnected) return end(true);   // the sheet closed or changed under the finger
       d.ghost.style.left = (d.x - d.dx) + "px"; d.ghost.style.top = (d.y - d.dy) + "px";
       const el = at(d.x, d.y), inShelf = el && el.closest("[data-ksh]");
       if (inShelf && inShelf.dataset.ksh !== d.shelf) { d.shelf = inShelf.dataset.ksh; d.tray.querySelector("b").textContent = shelfName(d.k, d.shelf); }
