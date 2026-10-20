@@ -745,7 +745,7 @@
 <script src="quest-trends.js?v=20261019end3"></script>
 <script src="nvc-words.js?v=20261010a"></script>
 <script src="quest-fx.js?v=20261019x"></script>
-<script src="quest-night.js?v=20261019end1"></script>
+<script src="quest-night.js?v=20261020end2"></script>
 <script src="quest-basics.js?v=20261019z"></script>
 <script src="quest-suggest.js?v=20261019a"></script>
 <script src="quest-water.js?v=20261019m"></script>
@@ -1538,10 +1538,9 @@
     const done = TR.topDone(all.filter(b => G.day.closes[gk(b)] === "done" || ["in", "late"].includes(G.day.checks[gk(b)])).filter(b => !isSleep(b))
       .map(b => ({ name:`✓ ${shortName(b)}`, rank:isSadhana(b) ? 0 : isMeal(b) || b.kind === "rest" ? 3 : isHealth(b) ? 1 : 2, mins:(b.e - b.s) / 60000,
         yoga:QuestBasics.blockBasic(b.t, b.kind) === "yoga", practiced:practiced(b) })));
-    // the two automatic ones left Right now (d35) and still show here by name, above the 3 blocks
-    const auto = [(G.day.earn || {}).early ? "✓ Last meal 3 hr before bed, paid tomorrow morning" : null,
-      habitN("bedtime") ? `✓ Asleep by 11 last night${BED ? ` (${BED.asleep})` : ""}` : BED ? `· Asleep after 11 last night (${BED.asleep})` : null].filter(Boolean);
-    done.unshift(...auto);
+    // the two automatic ones left Right now (d35) and sit beside what they relate to (d69): bedtime in Last night, last meal by Drains
+    const marks = { meal:(G.day.earn || {}).early ? "Last meal 3 hr before bed ✓" : null,
+      bed:habitN("bedtime") ? `Bedtime ${BED ? BED.asleep : "before 11"}, aim before 11 ✓` : BED ? `Bedtime ${BED.asleep}, aim before 11 ✗` : null };
     const next = new Date(Date.parse(gameYmd() + "T12:00:00Z") + 86400000).toISOString().slice(0, 10);
     let items = [], note = "", ahead = null;
     try {
@@ -1558,7 +1557,7 @@
     const night = (G.night || {})[G.day.date] || {};
     QuestNight.open({
       today: { stats: [[`${Math.round(prana())}%`, "prana"], [`${Math.round(body())}%`, "body"], [`${lit}/${health.length}`, "health blocks done"], [`${hDone}`, "habits ticked"], [STEPS != null ? STEPS.toLocaleString() : "·", "steps"]],
-        line: pranaLine(), done, trends: dayTrends() },
+        line: pranaLine(), done, trends: (tt => tt && { ...tt, marks })(dayTrends()) },
       tomorrow: { label: new Date(next + "T12:00:00Z").toLocaleDateString("en-US", { timeZone:"UTC", weekday:"long", month:"short", day:"numeric" }), items, note, ahead },
       prana: Math.round(body()), feel: night.feel || null,
       onFeel: n => { const o = (G.night = G.night || {})[G.day.date] || {}; G.night[G.day.date] = { ...o, feel:n, feelBody:Math.round(body()), feelPrana:Math.round(prana()), feelAt:now().toISOString() };

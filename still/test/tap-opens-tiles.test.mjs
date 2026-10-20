@@ -84,9 +84,13 @@ test("Right now keeps only what is for now: no How are you, really?, no auto til
   assert.match(html, /\["bedtime", "[^"]+", 5, 1, "🌙", "Asleep by 11", "auto", "Evening"\]/);
   assert.match(s, /How am I\?/, "his own check-in button stays");
   const night = fn("openNight");
-  assert.match(night, /\(G\.day\.earn \|\| \{\}\)\.early \? "✓ Last meal 3 hr before bed/, "tonight's last meal shows on the day's end screen");
-  assert.match(night, /habitN\("bedtime"\) \? `✓ Asleep by 11 last night/, "and last night's sleep time");
-  assert.match(night, /done\.unshift\(\.\.\.auto\)/);
+  // d69: each sits beside what it relates to, not above the top 3 blocks
+  assert.match(night, /\(G\.day\.earn \|\| \{\}\)\.early \? "Last meal 3 hr before bed ✓"/, "tonight's last meal shows on the day's end screen");
+  assert.match(night, /Bedtime \$\{BED\.asleep\}, aim before 11 ✗/, "and last night's bedtime, with a cross when late");
+  assert.ok(!/done\.unshift/.test(night), "the bottom list is just the top 3 blocks");
+  const nj = fs.readFileSync(here + "quest-night.js", "utf8");
+  assert.match(nj, /if \(m\.meal\) days\.splice\(/, "last meal goes in under Drains");
+  assert.match(nj, /if \(m\.bed\) nights\.unshift\(/, "bedtime goes first in Last night");
 });
 
 test("gym keeps How do you feel now? in its own list, and it still pays (d34)", () => {
