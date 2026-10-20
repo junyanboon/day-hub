@@ -444,6 +444,7 @@ main>.empty,.pair .summary,.note{color:#fff;text-shadow:0 1px 2px rgba(9,22,50,.
           </div>
           <div class="links"><button type="button" data-read="${esc(x.id)}">${S.bodies[x.id] ? "Hide the email" : "Show the email"}</button>
             <button type="button" data-skip="${esc(x.id)}">Skip for now</button>
+            ${x.task ? `<a href="${esc(x.task.url)}" target="_blank" rel="noopener">Open the task</a>` : `<button type="button" data-mktask="${esc(x.id)}"${S.mk && S.mk[x.id] ? " disabled" : ""}>${S.mk && S.mk[x.id] ? "Making the task…" : "Make a task"}</button>`}
             <button type="button" data-why="${esc(x.id)}">${S.why[x.id] ? "Hide details" : "Details"}</button></div>
           ${S.bodies[x.id] ? mailBlock(x) : ""}
           ${S.why[x.id] ? `<div class="whybox">${claudeLine(x)}${x.rule ? "" : jevLine(x)}${meter(x, S.picks[x.id] || x.suggest || "")}</div>` : ""}
@@ -464,6 +465,7 @@ main>.empty,.pair .summary,.note{color:#fff;text-shadow:0 1px 2px rgba(9,22,50,.
           ${mailBlock(x)}
           <div class="jevline quiet">Claude's "what's going on" and a draft reply come in the next build. Send will only go out when you tap it.</div>
           <div class="btns"><button class="btn" type="button" data-tosort="${esc(x.id)}">Sort it instead</button></div>
+          <div class="links">${x.task ? `<a href="${esc(x.task.url)}" target="_blank" rel="noopener">Open the task</a>` : `<button type="button" data-mktask="${esc(x.id)}"${S.mk && S.mk[x.id] ? " disabled" : ""}>${S.mk && S.mk[x.id] ? "Making the task…" : "Make a task"}</button>`}</div>
         </div>` : "";
       return `<div class="row ${S.open===x.id?"open":""}">${head(x, "people", `<span class="pill ask">From a person</span>`)}${body}</div>`;
     }).join("");
@@ -693,6 +695,11 @@ main>.empty,.pair .summary,.note{color:#fff;text-shadow:0 1px 2px rgba(9,22,50,.
     if (rd){ const id = rd.dataset.read; S.bodies[id] = "loading"; render();
       try { S.bodies[id] = await api("/inbox/item?id=" + encodeURIComponent(id)); } catch (err) { S.bodies[id] = { error: err.message }; }
       render(); return; }
+    const mk = e.target.closest("[data-mktask]");
+    if (mk){ const id = mk.dataset.mktask; (S.mk ||= {})[id] = true; render();
+      try { const r = await post("/inbox/task", { id }); toast(r.task.reused ? "That task already exists." : "Task made: " + r.task.title); }
+      catch (err) { toastErr(err.message); }
+      delete S.mk[id]; return load(); }
     const sk = e.target.closest("[data-skip]");
     if (sk){ try { await post("/inbox/decide", { id: sk.dataset.skip, action:"skip" }); nextOpen(); } catch (err) { toastErr(err.message); } return load(); }
     const ts = e.target.closest("[data-tosort]");
