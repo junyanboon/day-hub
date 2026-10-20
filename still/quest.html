@@ -189,15 +189,27 @@
   .sq-bar { display:block; height:6px; border-radius:4px; background:rgba(0,0,0,.25); margin-top:7px; overflow:hidden; }
   .sq-bar b { display:block; height:100%; width:0; background:linear-gradient(90deg, #7fd0ff, #8fe3b0); border-radius:4px; transition:width .8s cubic-bezier(.2,.8,.2,1); }
   /* the water card (2026-10-19, d23): like the steps side quest, with a "by 4 PM" marker on the bar */
-  .wq { flex-wrap:wrap; }
   .wq.done { border-color:rgba(127,208,255,.65); background:linear-gradient(135deg, rgba(127,208,255,.18), rgba(143,227,176,.08)); }
   .wq-bar { position:relative; height:10px; overflow:visible; margin-top:9px; }
   .wq-bar b { background:linear-gradient(90deg, #7fd0ff, #b8e6ff); }
   .wq-bar i { position:absolute; top:-3px; bottom:-3px; width:2px; background:#ffd479; border-radius:1px; }
   .wq-bar em { position:absolute; top:12px; transform:translateX(-50%); font-style:normal; font-size:10px; color:#ffd479; white-space:nowrap; }
-  .wq-btn { width:100%; margin-top:16px; padding:11px 12px; border-radius:12px; border:1px solid rgba(127,208,255,.55); background:rgba(127,208,255,.16);
-    color:var(--ink); font:inherit; font-weight:600; font-size:14px; cursor:pointer; position:relative; }
-  .wq-btn:active { transform:scale(.97); }
+  /* the drop is the button (Junyan, 2026-10-20: "make the water symbol into the thing I press"): one compact row */
+  .wq-drop { flex:none; width:48px; height:48px; border-radius:50%; display:grid; place-items:center; padding:0; position:relative;
+    border:1px solid rgba(127,208,255,.6); background:radial-gradient(circle at 35% 30%, rgba(184,230,255,.35), rgba(127,208,255,.14) 70%);
+    box-shadow:0 0 0 0 rgba(127,208,255,.45), 0 4px 14px rgba(127,208,255,.18); font-size:24px; line-height:1; cursor:pointer;
+    -webkit-tap-highlight-color:transparent; touch-action:manipulation; transition:transform .12s ease; }
+  .wq-drop:active { transform:scale(.9); }
+  .wq-drop:focus-visible { outline:2px solid #7fd0ff; outline-offset:3px; }
+  .wq-drop.hit { animation:wq-hit .55s cubic-bezier(.2,.8,.2,1); }
+  .wq-drop.hit::after { content:""; position:absolute; inset:-2px; border-radius:50%; border:2px solid #7fd0ff; animation:wq-ring .7s ease-out forwards; pointer-events:none; }
+  @keyframes wq-hit { 0% { transform:scale(.8); } 40% { transform:scale(1.18) rotate(-6deg); } 70% { transform:scale(.96) rotate(3deg); } 100% { transform:scale(1); } }
+  @keyframes wq-ring { from { transform:scale(1); opacity:.9; } to { transform:scale(1.9); opacity:0; } }
+  .wq-n { position:relative; }
+  .wq-plus { position:absolute; left:100%; top:-2px; margin-left:6px; font-style:normal; font-weight:700; font-size:13px; color:#7fd0ff; white-space:nowrap;
+    pointer-events:none; animation:wq-plus 1.1s ease-out forwards; }
+  @keyframes wq-plus { 0% { transform:translateY(4px) scale(.7); opacity:0; } 25% { transform:translateY(-6px) scale(1.15); opacity:1; } 100% { transform:translateY(-26px) scale(1); opacity:0; } }
+  @media (prefers-reduced-motion: reduce) { .wq-drop.hit { animation:none; } .wq-drop.hit::after, .wq-plus { display:none; } }
   .sugw { margin:14px 0 4px; padding:10px 12px; border-radius:14px; background:var(--glass); border:1px solid var(--glass-border); }
   .sugr { display:flex; align-items:center; gap:6px; padding:8px 0; border-top:1px solid var(--glass-border); }
   .sugr:first-of-type { border-top:0; }
@@ -754,7 +766,7 @@
 <script src="quest-night.js?v=20261020end2"></script>
 <script src="quest-basics.js?v=20261020a"></script>
 <script src="quest-suggest.js?v=20261019a"></script>
-<script src="quest-water.js?v=20261019m"></script>
+<script src="quest-water.js?v=20261020b"></script>
 <script src="quest-gym.js?v=20261019x"></script>
 <script src="quest-morning.js?v=20261019a"></script>
 <script src="quest-agenda.js?v=20261020c"></script>
@@ -1440,28 +1452,43 @@
   const hourNow = () => +tzParts(now(), { hour:"numeric", hourCycle:"h23" }).hour;
   function waterBlock(){ const b = currentOf(blocks(), now()); return b && b.kind !== "open" && b.kind !== "break" && !isSleep(b) ? b : null; }
   function waterPay(){ const h = HABITS.find(x => x[0] === "water"); return QW().pay(G.day.glasses, Math.max(1, Math.round(h[2] * gainMult())), h[3]); }
+  let waterBarFrom = null;   // the bar width before a tap, so the redrawn bar can fill from it
   function waterHTML(){
     if (!QW() || !G.day) return "";
     const W = QW(), s = W.summary(G.day.glasses), b = waterBlock(), pct = Math.min(100, Math.round(s.total / W.AIM * 100));
     const left = W.AIM - s.total, after = W.late(hourNow());
     const sub = s.total >= W.AIM ? `${s.total} glasses, ${(s.ml / 1000).toLocaleString()} L. The aim is met.`
       : `${s.ml.toLocaleString()} ml so far${!after && s.total < W.BY4 ? `, ${W.BY4 - s.total} more by 4 PM` : `, ${left} to the aim`}`;
-    return `<div class="sq wq${s.total >= W.AIM ? " done" : ""}"><span class="sq-i">💧</span><span class="sq-t">Water · ${s.total} / ${W.AIM} glasses` +
+    const from = waterBarFrom != null ? waterBarFrom : pct; waterBarFrom = null;   // the bar fills from the last count after a tap
+    return `<div class="sq wq${s.total >= W.AIM ? " done" : ""}">` +
+      `<button type="button" class="wq-drop" data-glass aria-label="Add one glass" title="${esc(W.button(b ? shortName(b) : "", hourNow()))}">💧</button>` +
+      `<span class="sq-t">Water · <span class="wq-n">${s.total} / ${W.AIM}</span> glasses` +
       `<small>${esc(sub)}</small>` +
-      `<i class="sq-bar wq-bar"><b style="width:${pct}%"></b><i style="left:${W.markerPct()}%"></i><em style="left:${W.markerPct()}%">by 4 PM</em></i></span>` +
-      `<button class="wq-btn" data-glass>${esc(W.button(b ? shortName(b) : "", hourNow()))}</button></div>`;
+      `<i class="sq-bar wq-bar"><b style="width:${from}%" data-to="${pct}"></b><i style="left:${W.markerPct()}%"></i><em style="left:${W.markerPct()}%">by 4 PM</em></i></span></div>`;
+  }
+  // after a tap redraws the card: the drop bounces with a splash ring, "+1" floats off the count, the bar fills
+  function waterCheer(focused){
+    const card = document.querySelector(".wq"); if (!card) return;
+    const drop = card.querySelector(".wq-drop"), n = card.querySelector(".wq-n"), bar = card.querySelector(".wq-bar b");
+    if (drop) { drop.classList.remove("hit"); void drop.offsetWidth; drop.classList.add("hit"); setTimeout(() => drop.classList.remove("hit"), 800); }
+    waterBarFrom = null;
+    if (drop && focused) drop.focus();
+    if (n) { const p = document.createElement("span"); p.className = "wq-plus"; p.setAttribute("aria-hidden", "true"); p.textContent = "+1"; n.appendChild(p); setTimeout(() => p.remove(), 1200); }
+    if (bar) requestAnimationFrame(() => requestAnimationFrame(() => { bar.style.width = bar.dataset.to + "%"; }));
   }
   function waterStamp(){ const s = QW() ? QW().summary(G.day.glasses) : null; return s && s.total ? { wt:s.total, w4:s.before4 } : {}; }
   function addGlass(el){
     if (!QW() || !G.day) return;
     const b = waterBlock(), id = "g" + (+now()) + Math.random().toString(36).slice(2, 6), d = waterPay();
     const fx = window.QuestFx, rect = el ? el.getBoundingClientRect() : null;
+    waterBarFrom = Math.min(100, Math.round(QW().summary(G.day.glasses).total / QW().AIM * 100));
     G.day.glasses = QW().add(G.day.glasses, { id, at:now().toISOString(), blk:b ? gk(b) : "none", name:b ? shortName(b) : "", hour:hourNow(), d });
     const where = b ? ` (${shortName(b)})` : "";
     addHabit("water", d, `Water, one 250 ml glass${where}`, "1 glass", !!fx);
     if (fx && rect) fx.tap(rect, { icon:"💧", gain:d, full:QW().summary(G.day.glasses).total >= QW().AIM, water:true, color:"#7fd0ff" });
+    const focused = !!el && document.activeElement === el;
     render();
-    if (fx) fx.pop(document.querySelector(".wq"));
+    waterCheer(focused);
     calToast(`1 glass of water logged${where}.`, 6000, () => undoGlass(id));
   }
   function undoGlass(id){
