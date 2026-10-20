@@ -747,7 +747,7 @@
 <script src="nvc-words.js?v=20261010a"></script>
 <script src="quest-fx.js?v=20261019x"></script>
 <script src="quest-night.js?v=20261020end2"></script>
-<script src="quest-basics.js?v=20261019z"></script>
+<script src="quest-basics.js?v=20261020a"></script>
 <script src="quest-suggest.js?v=20261019a"></script>
 <script src="quest-water.js?v=20261019m"></script>
 <script src="quest-gym.js?v=20261019x"></script>
@@ -1315,6 +1315,8 @@
     ["neem", "Neem and turmeric, every morning", 3, 1, "🌿", "Neem + turmeric", "blk", "Morning"],
     ["mouthAm", "Dr Ellie's mouthcare routine in the morning, the whole routine in one tap", 2, 1, "🦷", "Dr Ellie AM", "blk", "Morning"],
     ["shower", "Shower, face wash, moisturizer with SPF", 2, 1, "🚿", "Shower", "blk", "Morning"],
+    // tidying is part of mental health, so it fills body (Junyan, 2026-10-20)
+    ["tidy", "Tidy the room", 2, 1, "🛏️", "Tidy the room", "blk", "Morning"],
     ["copper", "Clean the copper pot and bless the water (at home)", 3, 1, "🏺", "Copper pot", "blk", "Morning"],
     ["shambhavi", "Shambhavi Mahamudra", 20, 1, "🧘", "Shambhavi", "blk", "Practice"],
     ["kriya", "Isha Kriya", 10, 1, "🌀", "Isha Kriya", "blk", "Practice"],
@@ -1587,6 +1589,7 @@
     protein:"Protein at breakfast keeps your energy and hunger steady until lunch.",
     supps:"They fill the gaps your food might miss.",
     neem:"Sadhguru recommends neem and turmeric each morning to cleanse the system and support immunity.",
+    tidy:"A tidy room clears the mind, and that is part of your health.",
     mouthAm:"Dr Ellie's routine protects your teeth and gums, and a healthy mouth supports a healthy body.",
     shambhavi:"Your core daily practice: it settles the mind and builds steady energy for the whole day.",
     kriya:"A short guided practice that calms you and restores your energy.",
@@ -3653,6 +3656,10 @@
     else if (t.r.on && tile && fx && t.r.why) fx.nope(btn);   // already paid today: the little shake
     else if (t.r.on && tile && fx && !st.h) fx.tap(rect, { icon:QB().stepIcon(st.t) });   // a step that pays nothing still bursts
     if (t.W.tick[i] && st.wind && !G.day.windDown) G.day.windDown = now().toISOString();
+    /* No Done button (Junyan, 2026-10-20: "Can we drop the 'done' button"): ticking the last step closes the block,
+       unticking one opens it again. Each tick is saved and paid on the tap itself. */
+    const B = basicOf(blk), skip = t.W.skip || {}, all = B && B.steps.length && B.steps.every((x, j) => skip[j] || t.W.tick[j]);
+    if (B && !!all !== (G.day.closes[gk(blk)] === "done")) basicDone(blk);
     saveG(); redraw();
     if (fx && (t.pay || t.back || (t.r.on && !st.h))) fx.pop(document.querySelector(`[data-bstep="${i}"][data-k="${CSS.escape(btn.dataset.k)}"]`));
   }
@@ -3682,8 +3689,6 @@
     root.querySelectorAll("[data-bskip]").forEach(b => b.onclick = e => { e.stopPropagation();   // "travelling, skip" on a home-only step
       const blk = blkOf(b.dataset.k); if (!blk) return; const W = G.day.work[gk(blk)];
       (W.skip = W.skip || {})[b.dataset.bskip] = true; log(`Skipped today (travelling): ${b.dataset.t || "a home step"}`); saveG(); redraw(); });
-    root.querySelectorAll("[data-bdone]").forEach(b => b.onclick = e => { e.stopPropagation();
-      const blk = blkOf(b.dataset.bdone); if (blk) basicDone(blk); redraw(); });
     root.querySelectorAll("[data-ask]").forEach(b => b.onclick = e => { e.stopPropagation();
       const blk = blkOf(b.dataset.ask); if (!blk) return; (G.research = G.research || []).push({ key:gk(blk), title:blk.t, s:blk.s.toISOString() }); saveG(); redraw(); });
   }
@@ -3791,19 +3796,16 @@
   }
   function basicHtml(b, ck, lb){
     const B = basicOf(b), k = gk(b); if (!B) return "";
-    const W = ((G.day.work = G.day.work || {})[k] = G.day.work[k] || { tick:{}, goal:"" }), done = G.day.closes[k] === "done";
+    const W = ((G.day.work = G.day.work || {})[k] = G.day.work[k] || { tick:{}, goal:"" });
     W.tick = W.tick || {};
     // a home-only step (the copper pot) shows a quiet skip while home or travelling is only the calendar's guess
     const hr = MO_CTX.hour(now()), id = basicId(b), skip = W.skip || {};
     const steps = B.steps.map((x, i) => [x, i]).filter(([x, i]) => !skip[i]);
-    const pd = blockPaid(b), paidTxt = [pd.p ? `prana +${pd.p}` : "", pd.b ? `body +${pd.b}` : ""].filter(Boolean).join(", ");
     return `${B.steps.length ? `<div class="${lb}">${id === "yoga" ? "What did you do?" : "Steps"} ${steps.filter(([, i]) => W.tick[i]).length}/${steps.length}</div>` : ""}
-      ${steps.some(([x]) => x.h) ? `<div class="hkey" style="margin:0 0 6px"><b class="mp">gold</b> fills prana · <b class="mb">teal</b> fills body · each one pays once</div>` : ""}
       ${steps.length ? `<div class="hgrid btiles">${steps.map(([x, i]) => stepTile(b, W, x, i, hr, id)).join("")}</div>` : ""}
       ${steps.filter(([x, i]) => x.skip && !(G.day.plan || {}).mode && !W.tick[i] && !(W.paid || {})[i]).map(([x, i]) =>
         `<button class="mo-det-btn" style="opacity:.7;font-size:12px;margin:4px 0 6px" data-bskip="${i}" data-k="${esc(b.key)}" data-t="${esc(x.t)}">Travelling today, skip the ${esc(x.t.toLowerCase().replace(/^clean the /, ""))}</button>`).join("")}
-      ${id !== "caney" ? `<div class="hint" style="margin:8px 2px" data-paid>${paidTxt ? `Paid so far: ${paidTxt}.` : "Nothing paid yet. Tick what you did."}</div>` : ""}
-      <button class="mo-det-btn" data-bdone="${esc(b.key)}">${done ? "✓ Done · tap to undo" : "Done"}</button>`;
+`;
   }
   function openBasic(b){
     openSheet(`${winHead(b)}${basicHtml(b, "wck", "win-lb")}

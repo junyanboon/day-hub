@@ -24,7 +24,7 @@
 
   // wd: 0 Sunday to 6 Saturday, the game day's weekday
   function domestics(mode, wd){
-    if (mode === "travel") return { min:25, steps:[DR_AM, WASH, { t:"Tidy the room" }] };
+    if (mode === "travel") return { min:25, steps:[DR_AM, WASH, { t:"Tidy the room", h:"tidy" }] };
     const steps = [{ t:"Wash the dishes" }, { t:"Sweep" }, DR_AM, WASH, COPPER];
     if (PLUS[wd]) return { min:60, steps: steps.concat([{ t:`Plus One: ${PLUS[wd]}` }]) };
     return { min:30, steps };
