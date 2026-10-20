@@ -69,6 +69,11 @@
     return ev;
   }
 
+  /* A booking (a car rental, a stay: anything over 12 hours, or a whole-day event) is not a block of his
+     time, so the day column leaves it out and real blocks keep their full width (Junyan, 2026-10-20, d71). */
+  const isLong = x => +x.e - +x.s > 12 * MIN * 60;
+  function timelineLanes(items){ return lanes(items.filter(x => !isLong(x.st || x))); }
+
   /* A change waiting for the calendar to agree: shown at its new place until the plan read back has
      it there, or for 3 minutes (the plan is cached for one), whichever comes first. */
   function applyPending(list, pend, t){
@@ -207,7 +212,7 @@
     return x && y && x[1] === y[1] ? `${a.replace(m, "")} to ${b}` : `${a} to ${b}`;
   }
 
-  root.QuestAgenda = { addDays, agendaDays, mergeAgenda, snap, dragResult, dragKind, lanes, applyPending,
+  root.QuestAgenda = { addDays, agendaDays, mergeAgenda, snap, dragResult, dragKind, lanes, isLong, timelineLanes, applyPending,
     pickSpan, addKey, samePick, placePick, undoPick, carveFree, rangeText, overlaps, freeSlot, clampEdge,
     JOINT, JUNYAN, ADD_CALS, onJoint, inRoom };
 })(typeof window !== "undefined" ? window : globalThis);
