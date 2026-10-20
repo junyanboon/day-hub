@@ -44,7 +44,9 @@
      ends it, cuts it or drops it. Only Joint Plans events and blocks added in Quest can clash (d40: "the other
      calendars don't conflict with this one"). */
   const QA = () => root.QuestAgenda;
-  const isBooking = (i) => (QA() ? QA().isBooking(i) : !!i.allDay || +i.e - +i.s > 12 * HR);
+  // a flight is never a booking, however long: its airport check must still run. The fallback covers a cached older
+  // quest-agenda.js without isBooking.
+  const isBooking = (i) => !i.flight && (QA() && QA().isBooking ? QA().isBooking(i) : !!i.allDay || +i.e - +i.s > 12 * HR);
   const canClash = (i) => (QA() ? QA().inRoom(i) : !isBooking(i));
   const upcoming = (D) => D.items.filter((i) => i.e > D.now && !i.brk && !isBooking(i));
   const fixedOf = (D) => upcoming(D).filter((i) => !i.open);
