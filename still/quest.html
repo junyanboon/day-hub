@@ -644,7 +644,8 @@
   .ki.Ln { background:transparent; border:1.5px dashed var(--glass-border); } .ki.Ln .nm { color:var(--ink-soft); } .ki.Ln .e { opacity:.6; }
   /* hold and drag a tile onto another group or shelf (d34): the tile lifts, the group under the finger lights up */
   .ki.held { opacity:.35; }
-  .ki-ghost { position:fixed; z-index:90; pointer-events:none; background:#57509a; box-shadow:0 12px 28px rgba(0,0,0,.45); transition:transform .14s ease-out; }
+  .ki-ghost { position:fixed; z-index:90; pointer-events:none; box-shadow:0 12px 28px rgba(0,0,0,.45); transition:transform .14s ease-out; }
+  .ki.ki-ghost.ki-ghost { background:#57509a; border-style:solid; }   /* solid whatever its level, so it reads above the tiles */
   .ki-ghost.up { transform:scale(1.06) rotate(-1.5deg); }
   .kt-tray { position:fixed; left:50%; bottom:0; transform:translateX(-50%); width:min(480px, 100%); z-index:85; padding:10px 12px calc(env(safe-area-inset-bottom) + 12px);
     background:#2c2860; border-radius:18px 18px 0 0; box-shadow:0 -8px 24px rgba(0,0,0,.4); }
@@ -2782,6 +2783,8 @@
       $("kNew").onkeydown = e => { if (e.key === "Enter") addIt(true); };
       function bindShelves(){
         sh.querySelectorAll("#kShelves [data-kit]").forEach(bn => bn.onclick = () => {
+          // the click that ends a hold or a drag is not a tap (it can land on the tile the drop just redrew away)
+          if (!bn.isConnected || Date.now() - kdEnded < 450) return;
           if (S.edit) return openKitchenItem(bn.dataset.kit);
           if (S.f !== "all") S.keep.add(bn.dataset.kit);   // it stays in view until the filter changes
           kitSave(QK().tap(G.kitchen, bn.dataset.kit, now())); redraw();
@@ -2872,8 +2875,10 @@
       d.el.classList.add("held");
       try { d.el.setPointerCapture(d.id); } catch {}
       if (d.touch && navigator.vibrate) try { navigator.vibrate(15); } catch {}
-      // near the top of the sheet or just above the tray, the sheet scrolls by itself
+      // near the top of the sheet or just above the tray, the sheet scrolls by itself (once the finger has moved, so a
+      // tile lifted near an edge does not set it scrolling)
       const loop = () => { if (KD !== d || !d.live) return;
+        if (Math.hypot(d.x - d.x0, d.y - d.y0) < 12) return requestAnimationFrame(loop);
         const top = sh.getBoundingClientRect().top, bottom = tray.getBoundingClientRect().top, edge = 48;
         const v = d.y < top + edge ? -Math.ceil((top + edge - d.y) / 5) : d.y > bottom - edge && d.y < bottom ? Math.ceil((d.y - bottom + edge) / 5) : 0;
         if (v) { sh.scrollTop += v; follow(); }
