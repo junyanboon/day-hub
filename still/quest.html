@@ -914,7 +914,7 @@
 <script src="quest-levels.js?v=20261016b"></script>
 <script src="quest-gymlog.js?v=20261019a"></script>
 <script src="quest-meals.js?v=20261020s"></script>
-<script src="quest-kitchen.js?v=20261020k9"></script>
+<script src="quest-kitchen.js?v=20261020ka"></script>
 <script src="quest-trends.js?v=20261019end3"></script>
 <script src="nvc-words.js?v=20261010a"></script>
 <script src="quest-fx.js?v=20261019x"></script>
@@ -2811,7 +2811,7 @@
       const addIt = (refocus) => { const nm = $("kNew").value.trim(); if (!nm) return;
         fillPick();
         // in the picker (d35), something not in the list joins it ticked, on the group and shelf picked; Add N items adds it
-        if (S.fill) { const key = QK().keyOf(nm), F = S.fill, rows = kitFillRows(S);
+        if (S.fill) { const key = QK().keyOf(QK().splitName(nm).name), F = S.fill, rows = kitFillRows(S);   // "500g pasta" ticks Pasta (d39)
           const hit = rows.find(x => QK().keyOf(x.name) === key);
           if (hit) F.on.add(hit.id);
           else { const id = "p:" + key; F.extra.push({ id, name:nm, em:QK().iconFor(QK().splitName(nm).name, A.g), group:A.g, shelf:A.sh, item:null, lv:null, src:"new", top:false }); F.on.add(id); }
@@ -3058,10 +3058,14 @@
       K = QK().place(K, id, shelf, group, now());
       if (K !== G.kitchen) kitSave(K);
       openKitchen(); render(); };
+    // the second tap counts from 0.3 s to 4 s after the first (a double tap is not a yes); the timer resets this button only
     let armed = 0;
-    $("kiDel").onclick = () => {
-      if (Date.now() - armed > 4000) { armed = Date.now(); $("kiDel").textContent = "Tap again to delete"; $("kiDel").classList.add("armed");
-        setTimeout(() => { const b = $("kiDel"); if (b && Date.now() - armed >= 4000) { b.textContent = "Delete this item"; b.classList.remove("armed"); } }, 4100); return; }
+    const del = $("kiDel");
+    del.onclick = () => {
+      const gap = Date.now() - armed;
+      if (gap < 300) return;
+      if (gap > 4000) { armed = Date.now(); del.textContent = "Tap again to delete"; del.classList.add("armed");
+        setTimeout(() => { if (Date.now() - armed >= 4000) { del.textContent = "Delete this item"; del.classList.remove("armed"); } }, 4100); return; }
       kitSave(QK().remove(G.kitchen, id, now())); log(`Kitchen: ${it.name} deleted`); openKitchen(); render(); };
   }
   /* A dinner tick (d21, d28): each ingredient ticked in a dish steps the kitchen's matching item down one level, each one

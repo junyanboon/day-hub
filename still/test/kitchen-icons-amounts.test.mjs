@@ -159,3 +159,12 @@ test("d38 to d40: the page shows the amount on the tile, an Amount field, a shel
   assert.match(html, /\.kt-editbar\s*\{[^}]*position:\s*sticky/);
   assert.doesNotMatch(html, /r\.em \|\| "🛒"/);
 });
+
+test("review fixes: no split for a name that only starts with a number, capitals kept, Black pepper, a catalogue icon kept on rename", () => {
+  for (const n of ["2 % milk", "5 spice", "3 bean salad", "7 Up", "iPhone cable"]) assert.equal(K.splitName(n).name, n, n);
+  assert.equal(K.splitName("500 grapes").amt, "500");
+  assert.equal(K.iconFor("Black pepper"), "🧂");
+  assert.equal(K.iconFor("Red pepper flakes"), "🫑");
+  const k = K.rename({}, "h:cumin", "Cumin seeds", at(1));
+  assert.equal(K.item(k, "h:cumin").em, "🟤");
+});

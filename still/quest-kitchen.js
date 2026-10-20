@@ -128,7 +128,7 @@
     [/\bmelons?\b/i, "🍈"], [/\bavocados?\b/i, "🥑"],
     [/\bpotato(es)?\b/i, "🥔"], [/\bonions?\b/i, "🧅"], [/\bgarlic\b/i, "🧄"], [/\bcarrots?\b/i, "🥕"], [/\bcorn\b/i, "🌽"], [/\b(cucumbers?|courgettes?|zucchinis?)\b/i, "🥒"],
     [/\b(lettuce|spinach|kale|cabbage|chard|greens)\b/i, "🥬"], [/\bbroccoli\b/i, "🥦"], [/\bmushrooms?\b/i, "🍄"], [/\b(chill?i(es)?|jalapenos?)\b/i, "🌶️"],
-    [/\bpeppers?\b/i, "🫑"], [/\bginger\b/i, "🫚"], [/\b(salt|electrolytes?)\b/i, "🧂"], [/\b(nuts?|almonds?|walnuts?|cashews?|hazelnuts?|pecans?|pistachios?)\b/i, "🌰"],
+    [/\b((black|white) pepper|peppercorns?)\b/i, "🧂"], [/\bpeppers?\b/i, "🫑"], [/\bginger\b/i, "🫚"], [/\b(salt|electrolytes?)\b/i, "🧂"], [/\b(nuts?|almonds?|walnuts?|cashews?|hazelnuts?|pecans?|pistachios?)\b/i, "🌰"],
     [/\b(seeds?|chia|flax|hemp)\b/i, "🌱"], [/\b(cans?|tins?|soup)\b/i, "🥫"], [/\bpopcorn\b/i, "🍿"],
   ];
   const groupIcon = (group) => GROUP_ICONS[okGroup(group) || "Other"];
@@ -150,7 +150,8 @@
   const LEAD = new RegExp(`^(?:(${NUM})\\s*[x×]\\s*)?(${NUM})(?:\\s*(${UNIT})(?![a-z])|(?=\\s))\\s*(?:of\\s+)?(.*)$`, "i");
   const TRAIL = new RegExp(`^(.*?)\\s+(?:(${NUM})\\s*[x×]\\s*)?(${NUM})\\s*(${UNIT})$`, "i");
   const AMT_ONLY = new RegExp(`^(?:(${NUM})\\s*[x×]\\s*)?(${NUM})\\s*(${UNIT})?$`, "i");
-  const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+  // a first word in lower case gets a capital ("navy beans" -> "Navy beans"); "iPhone" or "BBQ sauce" stay as typed
+  const cap = (s) => (/^[a-z]+(\s|$)/.test(s) ? s.charAt(0).toUpperCase() + s.slice(1) : s);
   function fmtUnit(mult, num, unit) {
     const u = !unit ? "" : /^l$/i.test(unit) ? "L" : /^lbs$/i.test(unit) ? "lb" : unit.toLowerCase();
     return `${mult ? `${mult.replace(",", ".")} × ` : ""}${num.replace(",", ".")}${u ? ` ${u}` : ""}`;
@@ -159,7 +160,9 @@
   function splitName(raw) {
     const s = String(raw || "").replace(/\s+/g, " ").trim();
     let m = LEAD.exec(s);
-    if (m && /[a-z]/i.test(m[4])) return { name: cap(m[4].trim()).slice(0, 40), amt: fmtUnit(m[1], m[2], m[3]) };
+    /* the food must start with a letter ("2 % milk" stays whole), and a bare count with no unit only splits off a plural
+       ("6 eggs", but not "5 spice", "3 bean salad" or "7 Up") */
+    if (m && /^[a-z]/i.test(m[4]) && (m[3] || /[a-z]s$/i.test(m[4]))) return { name: cap(m[4].trim()).slice(0, 40), amt: fmtUnit(m[1], m[2], m[3]) };
     m = TRAIL.exec(s);
     if (m && /[a-z]/i.test(m[1])) return { name: cap(m[1].trim()).slice(0, 40), amt: fmtUnit(m[2], m[3], m[4]) };
     return { name: cap(s).slice(0, 40), amt: "" };
@@ -267,8 +270,9 @@
     const it = item(K, id), sp = splitName(name);
     if (!it || !sp.name) return K;
     const a = sp.amt || (amt === undefined ? it.amt || "" : amtOf(amt));
-    const auto = it.em === iconFor(it.name, it.group), raw = obj(obj(K).items)[id] || {};
-    const em = auto && !ownIcon(raw.em) ? iconFor(sp.name, it.group) : it.em;
+    const raw = obj(obj(K).items)[id] || {}, seedEm = (SEED_ITEMS.find((x) => x.id === id) || {}).em;
+    // an icon of its own or the catalogue's stays; one worked out from the old name is worked out again from the new one
+    const em = ownIcon(raw.em) || seedEm ? it.em : iconFor(sp.name, it.group);
     if (sp.name === it.name && a === (it.amt || "") && typeof raw.amt === "string") return K;
     return put(K, { ...it, name: sp.name, amt: a, em }, at);
   }
@@ -449,13 +453,13 @@
   function preTick(rows, names, k) {
     const on = [], extra = [], byKey = new Map(arr(rows).map((r) => [keyOf(r.name), r]));
     for (const n of arr(names)) {
-      const nm = String(n || "").trim().slice(0, 40), key = keyOf(splitName(nm).name);
+      const nm = String(n || "").trim().slice(0, 40), food = splitName(nm).name, key = keyOf(food);
       if (!key) continue;
       const r = byKey.get(key);
       if (r) { if (!on.includes(r.id)) on.push(r.id); continue; }
       if (extra.some((x) => keyOf(x.name) === key)) continue;
-      const group = guessGroup(splitName(nm).name);
-      extra.push({ id: "p:" + key, name: nm, em: iconFor(splitName(nm).name, group), group, shelf: guessShelf(k || "home", group), item: null, lv: null, src: "new", top: false });
+      const group = guessGroup(food);
+      extra.push({ id: "p:" + key, name: nm, em: iconFor(food, group), group, shelf: guessShelf(k || "home", group), item: null, lv: null, src: "new", top: false });
     }
     return { on, extra };
   }
