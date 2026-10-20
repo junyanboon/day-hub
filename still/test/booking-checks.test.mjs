@@ -115,5 +115,26 @@ test("d40: only Joint Plans blocks (and Quest adds) clash; his other calendars n
 test("the page hands the planner each block's calendar, its calendar times and all-day flag", () => {
   const page = fs.readFileSync(here + "quest.html", "utf8");
   assert.match(page, /items: all\.map\(b => \(\{[^]*?calId:b\.calId[^]*?cs:b\.cs, ce:b\.ce[^]*?allDay:!!b\.allDay/);
-  assert.match(page, /const isBooking = b => globalThis\.QuestAgenda \? globalThis\.QuestAgenda\.isBooking\(b\)/);
+  assert.match(page, /const isBooking = b => globalThis\.QuestAgenda && globalThis\.QuestAgenda\.isBooking \? globalThis\.QuestAgenda\.isBooking\(b\)/);
+});
+
+test("a long-haul flight is not a booking: its leave-by check still runs", () => {
+  const fl = { t: "Flight AC837 to Toronto", s: "2026-10-20T13:00:00+02:00", e: "2026-10-21T02:30:00+02:00", ...J };
+  const C = ctx([fl], "2026-10-20T08:00:00+02:00");
+  C.data().items[0].flight = true; C.data().items[0].kind = "travel";
+  M.count(C);
+  assert.equal(M._t.checks(C.data()).some((c) => c.id.startsWith("fly:")), true);
+});
+
+test("the day's suggestions treat a booking as free time, by the shared rule", () => {
+  require("../quest-suggest.js");
+  const S = globalThis.QuestSuggest, page = fs.readFileSync(here + "quest.html", "utf8");
+  assert.match(page, /const sugBlocks = [^\n]*booking:isBooking\(b\)/);
+  const day = "2026-10-20", tz = "Europe/Madrid", now = Date.parse("2026-10-20T07:00:00+02:00");
+  // shown as 2 PM to 5 PM, but the page says it is a booking: it must not fill the afternoon
+  const rental = { t: "Europcar", s: Date.parse("2026-10-20T07:00:00+02:00"), e: Date.parse("2026-10-20T19:00:00+02:00"), free: false, meal: false, basic: null };
+  const asBlock = S.suggest({ day, tz, now, blocks: [{ ...rental, booking: false }] });
+  const asBooking = S.suggest({ day, tz, now, blocks: [{ ...rental, booking: true }] });
+  assert.equal(asBooking.length >= asBlock.length, true);
+  assert.deepEqual(S.suggest({ day, tz, now, blocks: [{ ...rental, booking: true }] }), S.suggest({ day, tz, now, blocks: [] }));
 });

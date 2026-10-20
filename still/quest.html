@@ -768,10 +768,10 @@
 <script src="quest-fx.js?v=20261019x"></script>
 <script src="quest-night.js?v=20261020end2"></script>
 <script src="quest-basics.js?v=20261020a"></script>
-<script src="quest-suggest.js?v=20261019a"></script>
+<script src="quest-suggest.js?v=20261020a"></script>
 <script src="quest-water.js?v=20261020b"></script>
 <script src="quest-gym.js?v=20261019x"></script>
-<script src="quest-morning.js?v=20261020a"></script>
+<script src="quest-morning.js?v=20261020b"></script>
 <script src="quest-agenda.js?v=20261020d"></script>
 <script src="quest-offline.js?v=20261017a"></script>
 <script src="quest-nearby.js?v=20261016k"></script>
@@ -1267,7 +1267,7 @@
   // an event over 12 hours (a car rental, a stay) is a booking, not a block of his time (d70, 2026-10-20): it stays on
   // the calendar view but never holds back Day's end, takes Right now or Next, or fills the day for the sadhana slot
   // the rule lives in quest-agenda.js so every check (and the morning planner's step 2) uses the same one (2026-10-20)
-  const isBooking = b => globalThis.QuestAgenda ? globalThis.QuestAgenda.isBooking(b) : (!!b.allDay || +b.e - +b.s > 12 * 3600000);
+  const isBooking = b => globalThis.QuestAgenda && globalThis.QuestAgenda.isBooking ? globalThis.QuestAgenda.isBooking(b) : (!!b.allDay || +b.e - +b.s > 12 * 3600000);
   const isMeal = b => b.kind === "fuel";
   // what a block is worth in prana: [on time, late, "not today", missed]
   /* Prana is an energy reading (d102, NVC: no rewards, no punishment). Sadhana,
@@ -1690,7 +1690,7 @@
     try { const day = nextYmd(), plan = await getPlan(day); SUG_NEXT = { day, at:Date.now(), plan }; render(); }
     catch {} finally { SUG_PULL = false; }
   }
-  const sugBlocks = list => list.map(b => ({ t:b.t, s:+b.s, e:+b.e, free:b.kind === "open" || b.kind === "break", meal:isMeal(b), basic:basicId(b) }));
+  const sugBlocks = list => list.map(b => ({ t:b.t, s:+b.s, e:+b.e, free:b.kind === "open" || b.kind === "break", meal:isMeal(b), basic:basicId(b), booking:isBooking(b) }));
   function sugList(){
     if (!QS() || !PLAN || !QB()) return [];
     const skip = G.sugSkip || {}, today = gameYmd(), out = [];
