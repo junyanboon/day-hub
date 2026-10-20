@@ -39,9 +39,34 @@ test("a block's checklist: every step is a tile, none is a plain checkbox row; p
   const st = fn("function stepTile(");
   assert.match(st, /stepIcon\(/, "a plain step's tile has its own icon");
   // a plain step pays nothing (no habit), so its tile shows no amount
-  const W = { tick:{}, paid:{} }, steps = B.domestics("travel", 1).steps, i = steps.findIndex(x => /Tidy/.test(x.t));
+  const W = { tick:{}, paid:{} }, steps = B.domestics("home", 1).steps, i = steps.findIndex(x => /Sweep/.test(x.t));
   const r = B.tickStep(W, { W }, "domestics", i, steps[i], 11, () => 2);
   assert.equal(r.on, true); assert.equal(r.pay, null);
+});
+
+test("2026-10-20: Tidy the room pays body +2 once a day, and an untick takes it back", () => {
+  assert.match(html, /\["tidy", "Tidy the room", 2, 1, "🛏️", "Tidy the room", "blk", "Morning"\]/, "a Morning habit, so meterOf gives body");
+  const steps = B.domestics("travel", 1).steps, i = steps.findIndex(x => /Tidy/.test(x.t));
+  assert.equal(steps[i].h, "tidy");
+  const W = { tick:{}, paid:{} }, all = { W };
+  const r = B.tickStep(W, all, "domestics", i, steps[i], 11, () => 2);
+  assert.equal(r.pay.h, "tidy"); assert.equal(r.pay.d, 2);
+  B.applyTick(W, i, r); assert.ok(W.paid[i]);
+  const off = B.tickStep(W, all, "domestics", i, steps[i], 11, () => 2);
+  assert.equal(off.on, false); assert.equal(off.back.d, 2);
+  // a second Domestics the same day finds the daily limit used (gain 0): no second payment
+  const W2 = { tick:{}, paid:{} }, again = B.tickStep(W2, { W, W2 }, "domestics", i, steps[i], 11, () => 0);
+  assert.equal(again.pay, null);
+});
+
+test("2026-10-20: a block's tile sheet has no Done button, no paid line and no legend; the last tick closes it", () => {
+  const bh = fn("function basicHtml(");
+  assert.ok(!/data-bdone|Nothing paid yet|Paid so far|fills prana|each one pays once/.test(bh));
+  assert.match(bh, /"Steps"\} \$\{steps\.filter/, "the STEPS n/m header stays");
+  assert.ok(!/data-bdone/.test(html), "no handler left for the old button");
+  const ts = fn("function tapStep(");
+  assert.match(ts, /B\.steps\.every\(\(x, j\) => skip\[j\] \|\| t\.W\.tick\[j\]\)/);
+  assert.match(ts, /basicDone\(blk\)/);
 });
 
 test("prep lists (the insight agent's) are tiles in the window and in the planner, with the same tick rule", () => {

@@ -228,5 +228,5 @@ test("quest.html: the tile tap runs tapDay, counts read habitCount, owed take-ba
   const mq = html.indexOf("function openMeal"), m = html.slice(mq, mq + 5200);
   assert.match(m, /fx\.back\(/, "meal tiles use the same take-back animation");
   assert.match(html, /\[data-tick\][^]{0,300}\(W\.t = W\.t \|\| \{\}\)\[i\] = now\(\)\.toISOString\(\)/, "prep lists stamp their steps too");
-  for (const f of ["quest-merge", "quest-fx", "quest-basics"]) assert.match(html, new RegExp(`${f}\\.js\\?v=20261019[x-z]`), f);
+  for (const f of ["quest-merge", "quest-fx", "quest-basics"]) assert.match(html, new RegExp(`${f}\\.js\\?v=2026(1019[x-z]|1020a)`), f);
 });
