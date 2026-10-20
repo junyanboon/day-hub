@@ -2613,7 +2613,7 @@
   function nvPastBind(S, sh){
     nvPastOwner = S;
     const d = sh.querySelector(".nvc-past"); if (!d) return;
-    const fill = () => { const el = $("nvPast"); if (el && nvPastOwner === S && S.past) el.innerHTML = nvJournalHTML(S.pastData); };
+    const fill = () => { const el = $("nvPast"); if (el && nvPastOwner === S && S.pastData) el.innerHTML = nvJournalHTML(S.pastData); };
     const load = () => {
       if (S.pastData || S.pastLoading) return;
       S.pastLoading = nvJournalLoad().then(r => { S.pastData = r; S.pastLoading = null; fill(); });
@@ -2621,7 +2621,7 @@
     d.ontoggle = () => {
       S.past = d.open;
       if (!d.open) return;
-      if (!S.pastData) { $("nvPast").innerHTML = `<p class="nvc-tip">Loading…</p>`; load(); }
+      if (S.pastData) fill(); else { $("nvPast").innerHTML = `<p class="nvc-tip">Loading…</p>`; load(); }   // closed mid-load, opened again: show what came
     };
     if (S.past && !S.pastData) load();
   }
