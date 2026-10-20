@@ -1,7 +1,8 @@
 /* Day Quest water (Junyan, 2026-10-19, d23 and d24): water is its own card, like the steps side quest, and lives
    nowhere else (no free tile, never in a block checklist).
    - The aim: 8 glasses of 250 ml (2 L, Bryan Johnson's rough amount), with a marker at 6 glasses "by 4 PM".
-   - "+1 glass" names the block he is in right now; each glass is saved against that block's key, or "none" in
+   - The 💧 drop is the button (2026-10-20: "make the water symbol into the thing I press"); its tooltip
+     (button()) names the block he is in right now, and so does the logged line; each glass is saved against that block's key, or "none" in
      open time. After 4 PM it reads "+1 glass (thirsty)" and still works: Sadhguru's rule is to drink when thirsty,
      so this is a gentle reminder, never a block.
    - A glass pays what one cup of water paid before, into the same meter, up to the same daily limit.

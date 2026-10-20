@@ -68,3 +68,16 @@ test("no water tile, no water in block checklists, and the card is on the page",
   assert.match(html, /function waterHTML\(\)/);
   assert.doesNotMatch(html, /giveItem\("water"/);
 });
+
+test("the drop is the button: one compact row, no big +1 glass button, undo kept on the toast", () => {
+  const fn = html.slice(html.indexOf("function waterHTML()"), html.indexOf("function waterStamp()"));
+  assert.match(fn, /<button type="button" class="wq-drop" data-glass aria-label="Add one glass"/);
+  assert.doesNotMatch(html, /wq-btn/);
+  assert.match(html, /\.wq-drop \{[^}]*width:48px; height:48px; border-radius:50%/);
+  const add = html.slice(html.indexOf("function addGlass("), html.indexOf("function undoGlass("));
+  assert.match(add, /addHabit\("water", d, `Water, one 250 ml glass\$\{where\}`/);   // same pay, names the block
+  assert.match(add, /blk:b \? gk\(b\) : "none"/);
+  assert.match(add, /calToast\(`1 glass of water logged\$\{where\}\.`, 6000, \(\) => undoGlass\(id\)\)/);
+  assert.match(add, /waterCheer\(\)/);
+  assert.match(html, /querySelectorAll\("\[data-glass\]"\)\.forEach\(bn => bn\.onclick = \(\) => addGlass\(bn\)\)/);
+});
