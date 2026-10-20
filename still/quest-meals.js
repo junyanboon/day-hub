@@ -167,10 +167,40 @@
   const dishOf = (id, list) => (list || ALL_DISHES).find((d) => d.id === id) || null;
   const gotOf = (rec, d) => { const g = rec && rec.dish && Array.isArray(rec.dish[d.id]) ? rec.dish[d.id] : [];
     return d.items.map((x) => x[0]).filter((n) => g.includes(n)); };
-  // the most a dish pays: the Blueprint meal's value at today's level
-  const dishMax = (opt) => Math.round(((opt && opt.dish) || DISH_VALUE) * ((opt && opt.mult) ?? 1));   // opt.dish: the page's HABITS value
-  // what n of the dish's ingredients are worth: its share of the full value
-  const dishPay = (d, n, opt) => (d.items.length ? Math.round(dishMax(opt) * Math.min(n, d.items.length) / d.items.length) : 0);
+  /* A daily cap (Junyan, 2026-10-20, d17: "17 yes"). Blueprint dishes share the Blueprint meal's old limit across all
+     meals of the day: two a day, the first worth its full value (+9 at level 1), the second the habit's next step on the
+     DIM curve (+6), nothing after. Tonight's ideas get their own cap of the same shape, so a recipe never uses up a
+     Blueprint slot and recipes cannot pay without end either. A dish takes a slot when its first ingredient is ticked and
+     keeps the most it may pay (its max) on its paid record, so later ticks and unticks always use the same max and an
+     untick takes back exactly what it paid; Clear frees the slot. opt: { mult, dish (the habit's value), dim (DIM),
+     dishLimit (its daily limit), used (slots other dishes of its group hold today) }. */
+  const groupOf = (d) => (DISHES.some((x) => x.id === d.id) ? "bp" : "idea");
+  // the slots dishes of d's group hold today across G.day.mealq, leaving out d itself on meal k. A Blueprint tile ticked
+  // before 2026-10-20 still holds a Blueprint slot.
+  function slotsUsed(mealq, k, d) {
+    let n = 0;
+    const g = groupOf(d);
+    for (const [mk, q] of Object.entries(mealq || {})) {
+      if (!q || q.kind || typeof q !== "object") continue;
+      if (g === "bp" && Array.isArray(q.sel) && q.sel.includes("blueprint")) n++;
+      for (const [key, v] of Object.entries(q.v || {})) {
+        if (!key.startsWith("dish:") || (mk === k && key === "dish:" + d.id)) continue;
+        const o = dishOf(key.slice(5));
+        if (o && groupOf(o) === g && Array.isArray(v) && +v[2] > 0) n++;
+      }
+    }
+    return n;
+  }
+  // the most a dish pays: its group's next slot on the Blueprint meal's curve at today's level (0 once the cap is reached)
+  function dishMax(opt, used) {
+    const o = opt || {}, u = used ?? o.used ?? 0, dim = o.dim || [1, 0.7], lim = o.dishLimit ?? 2;
+    if (u >= lim) return 0;
+    return Math.round((o.dish || DISH_VALUE) * (dim[u] ?? 0.2) * (o.mult ?? 1));
+  }
+  // the max this dish keeps on the record once started, else what a start now would get
+  const capOf = (rec, d, opt) => { const v = rec && rec.v && rec.v["dish:" + d.id]; return v && +v[2] > 0 ? +v[2] : dishMax(opt); };
+  // what n of the dish's ingredients are worth: its share of max
+  const dishPay = (d, n, opt, max) => (d.items.length ? Math.round((max ?? dishMax(opt)) * Math.min(n, d.items.length) / d.items.length) : 0);
   // "3 of 10 ingredients", what is missing, and whether it is all in
   function dishStatus(rec, d) {
     const got = gotOf(rec, d), m = d.items.length, n = got.length;
@@ -189,15 +219,19 @@
     if (how === "all") got = d.items.map((x) => x[0]);
     else if (how === "none") got = [];
     else if (d.items.some((x) => x[0] === how)) got = got.includes(how) ? got.filter((x) => x !== how) : got.concat(how);
-    const key = "dish:" + d.id, was = r.v[key] ? +r.v[key][1] || 0 : 0, now = dishPay(d, got.length, opt), dd = now - was;
+    const key = "dish:" + d.id, old = r.v[key], was = old ? +old[1] || 0 : 0, wasDone = old && old[3] ? 1 : 0;
+    const max = capOf(r, d, opt), now = got.length ? dishPay(d, got.length, opt, max) : 0, dd = now - was;
+    // d18 ("18 yes"): a Blueprint dish with every ingredient ticked counts as the Blueprint meal done today
+    const isDone = groupOf(d) === "bp" && got.length === d.items.length && max > 0 ? 1 : 0;
     if (got.length) r.dish[d.id] = d.items.map((x) => x[0]).filter((x) => got.includes(x)); else delete r.dish[d.id];
-    if (now) r.v[key] = ["b", now]; else delete r.v[key];
+    // [meter, paid, max, counted as done]; kept while ticked and the dish has a slot, so the slot and the max hold
+    if (got.length && max > 0) r.v[key] = ["b", now, max, isDone]; else delete r.v[key];
     r.b += dd;
-    return { rec: r, ops: dd ? [{ id: key, on: dd > 0, m: "b", d: dd }] : [] };
+    return { rec: r, ops: dd ? [{ id: key, on: dd > 0, m: "b", d: dd }] : [], done: (r.v[key] ? isDone : 0) - wasDone };
   }
   // what one dish has paid on this record (shown on its card)
   const dishPaid = (rec, d) => (rec && rec.v && rec.v["dish:" + d.id] ? +rec.v["dish:" + d.id][1] || 0 : 0);
 
   root.QuestMeals = { PRANA_FOODS, PRANA_WAYS, TIPS, DRAINS, BODY, LEGACY_BODY, JUNK, ONEOF, FOOD_IDS, DRAIN_IDS, AUTO_NOTE,
-    DISH_VALUE, DISHES, IDEAS, SHORT, tileLabel, value, score, toggle, tally, tap, meterOf, dishOf, dishMax, dishPay, dishStatus, tick, dishPaid };
+    DISH_VALUE, DISHES, IDEAS, SHORT, tileLabel, value, score, toggle, tally, tap, meterOf, dishOf, groupOf, slotsUsed, dishMax, capOf, dishPay, dishStatus, tick, dishPaid };
 })(typeof window !== "undefined" ? window : globalThis);
