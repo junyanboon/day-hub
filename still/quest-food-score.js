@@ -8,8 +8,11 @@
      page keeps the limits). A food with no amount counts toward no gram tile.
    - Ultra-processed or fried (a minus) only when an obviously processed food is logged.
    - Onion or garlic (d84, a drain): ticked when an onion or garlic family food is logged.
-   Amounts are read as logged: what the meal took off the kitchen, or the recipe amount of a tick, so a pot cooked for two
-   counts whole. Pure, so it can be tested (node --test still/test). */
+   Amounts are read as logged: what the meal took off the kitchen, or the recipe amount of a tick.
+   2026-10-21, d87 (Junyan: meals are cooked for him and Caney, "it's divided by our weight differential. Caney weighs 100
+   lbs and me 145 so we divide the food accordingly"): the amount tiles count HIS share of what was logged (opt.share,
+   shareOf: 145 / 245, about 59%, unless the meal is marked Just me). The kitchen still loses the whole amount.
+   Pure, so it can be tested (node --test still/test). */
 (function (root) {
   "use strict";
   const has = (re, s) => re.test(s);
@@ -114,15 +117,33 @@
   // what a food took: none when he set it to 0
   const eaten = (f) => !(typeof f.q === "number" && f.q === 0);
 
-  /* What a meal's foods earn. foods: [{ n, q, u } or { n, amt }]; opt.morning: a morning meal (the protein tile).
+  /* His share of a meal (d87). weights: { me, other } in lb (the setting, G.kitchen.share), else 145 and 100. A meal
+     marked Just me (rec.solo) is all his; a meal keeps the share it was first scored with (rec.sh), so changing the
+     weights never moves what a past meal paid. */
+  const WEIGHTS = { me: 145, other: 100 };
+  const okLb = (x) => typeof x === "number" && isFinite(x) && x >= 20 && x <= 500;
+  function weightsOf(w) {
+    const me = w ? +w.me : NaN, other = w ? +w.other : NaN;
+    return okLb(me) && okLb(other) ? { me, other } : { ...WEIGHTS };
+  }
+  const shareNow = (w) => { const x = weightsOf(w); return Math.round((x.me / (x.me + x.other)) * 10000) / 10000; };
+  function shareOf(rec, w) {
+    if (rec && rec.solo) return 1;
+    if (rec && typeof rec.sh === "number" && rec.sh > 0 && rec.sh <= 1) return rec.sh;
+    return shareNow(w);
+  }
+
+  /* What a meal's foods earn. foods: [{ n, q, u } or { n, amt }]; opt.morning: a morning meal (the protein tile);
+     opt.share: his share of the amounts (d87, 0 to 1, the whole when not given). Presence tiles count while it is above 0.
      Returns { ids: [tile ids, in TILE_ORDER], got: { veg, greens, legumes, nuts, berries, evoo, seeds, protein } (the
      amounts added up, rounded) }. */
   const TILE_ORDER = ["fruit", "fveg", "sprouts", "pnuts", "honey", "protein", "legumes", "veg", "greens", "evoo", "nuts", "berries", "seeds", "junk", "neg"];
   const NEED = { protein: 30, legumes: 150, veg: 250, greens: 50, evoo: 15, nuts: 30, berries: 100, seeds: 10 };
   function earn(foods, opt) {
-    const o = opt || {}, on = new Set(), got = { protein: 0, legumes: 0, veg: 0, greens: 0, evoo: 0, nuts: 0, berries: 0, seeds: 0 };
+    const o = opt || {}, share = typeof o.share === "number" && isFinite(o.share) ? Math.max(0, Math.min(1, o.share)) : 1;
+    const on = new Set(), got = { protein: 0, legumes: 0, veg: 0, greens: 0, evoo: 0, nuts: 0, berries: 0, seeds: 0 };
     for (const f of Array.isArray(foods) ? foods : []) {
-      if (!f || !f.n || !eaten(f)) continue;
+      if (!f || !f.n || !eaten(f) || share <= 0) continue;
       const k = kindsOf(f.n);
       if (k.fruit) on.add("fruit");
       if (k.veg) on.add("fveg");
@@ -133,6 +154,7 @@
       if (k.allium) on.add("neg");
       let g = gramsOf(f);
       if (g == null) continue;
+      g *= share;   // his share of the pot (d87)
       if (k.legume && DRY.test(f.n)) g *= 2.5;   // dry lentils or beans weigh about 2.5 times as much cooked
       if (k.legume) got.legumes += g;
       if (k.veg) got.veg += g;
@@ -156,5 +178,5 @@
     seeds: "flax or chia", junk: "processed", neg: "onion or garlic", fresh: "freshly made", light: "stopped before full", attn: "ate with attention",
     blueprint: "Blueprint meal", ferment: "fermented food", xylitol: "xylitol", supps: "supplements" };
 
-  root.QuestFoodScore = { kindsOf, gramsOf, readAmt, earn, TILE_ORDER, NEED, WORD };
+  root.QuestFoodScore = { kindsOf, gramsOf, readAmt, earn, TILE_ORDER, NEED, WORD, WEIGHTS, weightsOf, shareNow, shareOf };
 })(typeof window !== "undefined" ? window : globalThis);
