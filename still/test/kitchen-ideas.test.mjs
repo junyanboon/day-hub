@@ -55,10 +55,10 @@ test("d41: the kitchen decides: shiitake, broccoli and quinoa at home make the s
   const st = QI.status(k, "home", r.list[0]);
   assert.equal(st.text, "All in your kitchen");
   assert.deepEqual(J(st.buy), []);
-  // what it shows is what is there, never a made-up number: amounts for amount items, the level word for the rest
+  // what it shows is what is there, never a made-up number: amounts for amount items, "how many?" for the rest
   const row = (n) => st.rows.find((x) => x.name === n);
   assert.equal(row("Broccoli").word, "have 500 g");
-  assert.equal(row("Fresh ginger, grated").word, "plenty");
+  assert.equal(row("Fresh ginger, grated").word, "how many?");
   assert.equal(row("Lime").word, "have 4");
 });
 
@@ -91,7 +91,7 @@ test("d41: short or missing food is said: only what is there, and a To buy list;
   const row = (n) => st.rows.find((x) => x.name === n);
   assert.equal(row("Broccoli").st, "short"); assert.equal(row("Broccoli").word, "only 100 g");
   assert.equal(row("Shiitake mushrooms").st, "out");
-  assert.equal(row("Red peppers").st, "unchecked"); assert.equal(row("Red peppers").word, "not checked");
+  assert.equal(row("Red peppers").st, "unchecked"); assert.equal(row("Red peppers").word, "how many?");
   assert.ok(st.buy.includes("Broccoli") && st.buy.includes("Shiitake mushrooms"));
   assert.ok(st.check.includes("Red peppers"));
   assert.ok(!st.buy.includes("Tahini") && !st.check.includes("Tahini"), "a staple not checked is not nagged");

@@ -45,26 +45,27 @@ test("recipe change: Super Veggie broccoli and cauliflower are 175 g each (350 g
   assert.equal(sv.items.find((x) => x[0] === "Cauliflower")[1], "175 g");
 });
 
-test("d42: the tile shows the amount; items with no number keep their level (d46)", () => {
+test("d42: the tile shows the amount; an item with no number asks how many (levels retired, 2026-10-21)", () => {
   let r = K.add({}, "home", "fridge", "Bananas 4", at(0));
   assert.equal(it(r.K, r.id).name, "Bananas");
   assert.equal(K.tileLine(it(r.K, r.id), T0, T0 + 7 * D), "4");
   assert.equal(it(r.K, r.id).lv, 3);
-  // no number given: Plenty, no made-up number
+  // no number given: "how many?", no made-up number and no level word
   r = K.add({}, "home", "pantry", "Dates", at(0));
   assert.equal(it(r.K, r.id).q, undefined);
-  assert.equal(K.tileLine(it(r.K, r.id), T0, T0 + 7 * D), "Plenty");
+  assert.equal(K.tileLine(it(r.K, r.id), T0, T0 + 7 * D), "how many?");
   // the old d39 amount is the first amount, read the same on every device with no write
   const old = { items: { u1: { id: "u1", k: "home", shelf: "pantry", name: "Navy beans", amt: "400 g", group: "Legumes and grains", lv: 2, at: at(-5) } } };
   assert.equal(it(old, "u1").q, 400); assert.equal(it(old, "u1").u, "g"); assert.equal(K.tileLine(it(old, "u1"), T0, T0 + 7 * D), "400 g");
   assert.deepEqual(J(K.items(old, "home")), J(K.items(old, "home")));
 });
 
-test("d43: a tap on an amount item changes nothing (the page opens its Edit page); a level item still steps", () => {
+test("d43: a tap on an amount item changes nothing; since the levels were retired every tile tap opens the item's page", () => {
   const k = withBroc();
   assert.equal(K.tap(k, "h:broccoli", at(1)), k);
-  assert.equal(K.item(K.tap({}, "h:spinach", at(1)), "h:spinach").lv, 3);
-  assert.match(html, /typeof kit\.q === "number"\) return openKitchenItem\(/);
+  const bind = html.slice(html.indexOf("function bindShelves()"), html.indexOf("function bindShelves()") + 900);
+  assert.match(bind, /return openKitchenItem\(bn\.dataset\.kit\);/);
+  assert.ok(!/QK\(\)\.tap\(/.test(html), "no tap steps a level on the page");
 });
 
 test("d44: a ticked ingredient takes its recipe amount off; a redraw or a second tick takes nothing more; the untick puts it back", () => {
@@ -94,7 +95,7 @@ test("d44: never below 0; an amount that cannot be turned is 0 for him to fill i
   k = K.eat(k, "home", "a", { name: "Broccoli" }, true, at(1), "175 g").K;
   assert.equal(it(k, "h:broccoli").left, 0);
   assert.equal(it(k, "h:broccoli").lv, 0);
-  assert.equal(K.tileLine(it(k, "h:broccoli"), T0, T0 + 7 * D), "Out · buy");
+  assert.equal(K.tileLine(it(k, "h:broccoli"), T0, T0 + 7 * D), "none left · buy");
   k = K.eat(k, "home", "b", { name: "Broccoli" }, true, at(2), "175 g").K;
   assert.equal(it(k, "h:broccoli").left, 0);
   k = K.eat(k, "home", "a", { name: "Broccoli" }, false, at(3)).K;

@@ -31,13 +31,20 @@
      and an untick is the same record marked off. A tick from before amounts (no q) takes nothing off.
    - Low (d45): under 2 meals' worth by the Blueprint dishes that use it, else under a quarter of what he last bought;
      0 is Out. "Low by" and the shopping amounts use his real use over the last 14 days, else one dish a day.
+   2026-10-21 (Junyan, "Nothing should say plenty", replacing d46): the levels are retired from everything he sees. No
+   Plenty, Half, Low or Out, no level key and no tap that steps a level. An item with no number reads "how many?" (ASK)
+   and a tap opens its page (- and + for a piece food, the amount box for grams or ml). The stored levels stay as they
+   are (nothing rewritten, both devices read the same): they are only read for the shopping list, where an item with no
+   number counts as not known (no run-low guess), except one he had at Out or Low, which stays on the list until he gives
+   it a number or buys it. The pips fill only for an item with a number (what is left of what he last bought).
    The state is G.kitchen, kept across days and synced like the rest of the game; QuestMerge.mergeKitchen (quest-merge.js, also
    run by still-api) merges two devices item by item, the later change winning. Pure, so it can be tested (node --test still/test). */
 (function (root) {
   "use strict";
   const DAY = 86400000;
   const NEED = "Knowing what's here, so dinner is easy and nothing goes to waste.";
-  const LEVELS = ["Out", "Low", "Half", "Plenty"];
+  const LEVELS = ["Out", "Low", "Half", "Plenty"];   // stored levels (internal only since the levels were retired)
+  const ASK = "how many?";   // what an item with no number shows, everywhere
   // slow: pantry-like shelves, whose things last weeks (the run-low default and the shelf an item brought home lands on)
   const KITCHENS = {
     home: { id: "home", icon: "🏠", name: "Home", shelves: [
@@ -133,7 +140,7 @@
     [/\b(pasta|spaghetti|penne|fusilli|macaroni|linguine)\b/i, "🍝"], [/\b(noodles?|ramen|udon|soba)\b/i, "🍜"], [/\brice\b/i, "🍚"],
     [/\b(bread|loaf|baguette|bagels?)\b/i, "🍞"], [/\b(tortillas?|wraps?)\b/i, "🌯"], [/\b(oats|quinoa|flour|barley|millet|buckwheat|couscous)\b/i, "🌾"],
     [/\b(beans?|lentils?|chickpeas?|hummus|garbanzos?|edamame)\b/i, "🫘"], [/\bpeas\b/i, "🫛"], [/\b(tofu|tempeh)\b/i, "🧊"],
-    [/\beggs?\b/i, "🥚"], [/\bcheese\b/i, "🧀"], [/\bbutter\b/i, "🧈"], [/\b(chicken|turkey)\b/i, "🍗"], [/\b(fish|salmon|tuna|sardines?|cod)\b/i, "🐟"],
+    [/\beggs?\b/i, "🥚"], [/\b(cheese|mozzarella|burrata|fior di latte)\b/i, "🧀"], [/\bbutter\b/i, "🧈"], [/\b(chicken|turkey)\b/i, "🍗"], [/\b(fish|salmon|tuna|sardines?|cod)\b/i, "🐟"],
     [/\b(shrimps?|prawns?)\b/i, "🦐"],
     [/\bbananas?\b/i, "🍌"], [/\b(tomato(es)?|passata)\b/i, "🍅"], [/\bapples?\b/i, "🍎"], [/\bpears?\b/i, "🍐"], [/\b(oranges?|clementines?|mandarins?)\b/i, "🍊"],
     [/\blemons?\b/i, "🍋"], [/\bgrapes?\b/i, "🍇"], [/\bstrawberr(y|ies)\b/i, "🍓"], [/\bcherr(y|ies)\b/i, "🍒"], [/\b(berry|berries|blueberries|raspberries)\b/i, "🫐"],
@@ -184,16 +191,23 @@
        "Vitamin B 12" or "Room 7" stay whole */
     m = TRAIL_N.exec(s);
     if (m && (/[a-z]s$/i.test(m[1]) || unitFor(m[1]) === "")) return { name: cap(m[1].trim()).slice(0, 40), amt: fmtUnit(null, m[2], "") };
+    /* d76 (2026-10-21): a count with a word for what he counts at the end ("Bread 1 piece", "Chickpeas 2 cans", "Fior di
+       latte 2 balls"): the word goes and the count stays, so the tile reads Bread · 1. The number must come right before
+       the word, so a name that only ends in such a word ("Mozzarella balls", "Energy balls") stays whole. The amount is
+       given as "N pieces", which qtyFor reads as a count of the item whatever the food. */
+    m = TRAIL_C.exec(s);
+    if (m && /[a-z]/i.test(m[1])) return { name: cap(m[1].trim()).slice(0, 40), amt: `${m[2].replace(",", ".")} ${+m[2].replace(",", ".") === 1 ? "piece" : "pieces"}` };
     return { name: cap(s).slice(0, 40), amt: "" };
   }
   const TRAIL_N = /^(.*?[a-z])\s+(\d{1,3}(?:[.,]5)?)$/i;
+  const TRAIL_C = /^(.*?[a-z])\s+(\d{1,3}(?:[.,]5)?)\s*(?:pieces?|pcs?|slices?|loaf|loaves|cans?|tins?|jars?|packs?|packets?|balls?)\.?$/i;
   const PIECE_G = 10;
   /* The unit a bare number means for a food (d42): a count for what is bought by the piece, ml for drinks and oils,
      else grams. "Black pepper", "Coconut yogurt" or "Lemon juice" are not counted by the piece. d64 (2026-10-21): capsicum
      ("1" had become 1 g), beetroot, figs, chillies, tortillas and other foods bought one at a time are counted too. */
-  const COUNT_FOODS = /\b(bananas?|avocados?|limes?|lemons?|apples?|pears?|eggs?|oranges?|clementines?|mandarins?|kiwis?|peach(es)?|nectarines?|plums?|mangoe?s?|grapefruits?|pomegranates?|coconuts?|melons?|pineapples?|courgettes?|zucchinis?|cucumbers?|peppers?|aubergines?|eggplants?|onions?|tomato(es)?|carrots?|potato(es)?|leeks?|lettuces?|capsicums?|beetroots?|beets?|parsnips?|turnips?|artichokes?|figs?|apricots?|persimmons?|papayas?|guavas?|chill?i(es)?|jalapenos?|tortillas?|wraps?|pitas?|bagels?|buns?|croissants?|muffins?)\b/i;
+  const COUNT_FOODS = /\b(bananas?|avocados?|limes?|lemons?|apples?|pears?|eggs?|oranges?|clementines?|mandarins?|kiwis?|peach(es)?|nectarines?|plums?|mangoe?s?|grapefruits?|pomegranates?|coconuts?|melons?|pineapples?|courgettes?|zucchinis?|cucumbers?|peppers?|aubergines?|eggplants?|onions?|tomato(es)?|carrots?|potato(es)?|leeks?|lettuces?|capsicums?|beetroots?|beets?|parsnips?|turnips?|artichokes?|figs?|apricots?|persimmons?|papayas?|guavas?|chill?i(es)?|jalapenos?|tortillas?|wraps?|pitas?|bagels?|buns?|croissants?|muffins?|fior di latte|mozzarellas?|burratas?)\b/i;
   const LIQUID = /\b(milk|juices?|oils?|vinegars?|kefir|kombucha|water|wine|beers?|syrup|sauce|drinks?|shots?)\b/i;
-  const NOT_PIECE = /\b(yogh?urts?|flakes|powder|paste|seeds?|flour|butter|dried|(black|white) pepper|peppercorns?|leaves|puree|passata|cherry tomato(es)?)\b/i;
+  const NOT_PIECE = /\b(yogh?urts?|flakes|powder|paste|seeds?|flour|butter|dried|shredded|grated|(black|white) pepper|peppercorns?|leaves|puree|passata|cherry tomato(es)?)\b/i;
   function unitFor(name) {
     const n = String(name || "");
     return LIQUID.test(n) ? "ml" : !NOT_PIECE.test(n) && COUNT_FOODS.test(n) ? "" : "g";
@@ -288,7 +302,7 @@
        way on both devices with no write, from the item's last change (so only meals ticked after that count). */
     if (!(typeof out.q === "number" && isFinite(out.q) && out.q >= 0)) {
       delete out.q; delete out.u; delete out.qt; delete out.buy;
-      const p = out.amt ? qtyOf(out.amt, name) : null;
+      const p = out.amt ? qtyFor(out.amt, name) : null;   // d76: "1 piece" split off "Bread 1 piece" is a count
       if (p) Object.assign(out, { q: p.q, u: p.u, qt: it.at || it.added || null, buy: p.q });
     } else {
       out.u = out.u === "g" || out.u === "ml" ? out.u : "";
@@ -556,7 +570,11 @@
     return est;
   }
   // will it run low before the next shop (only items at Half or Plenty)
-  const lowSoon = (it, now, shopAt) => { if (!it || it.lv == null || it.lv < 2) return false; const a = lowAt(it, now); return a != null && a <= ms(shopAt); };
+  // an item with no number is not known: no run-low guess for it (levels retired, 2026-10-21)
+  const lowSoon = (it, now, shopAt) => { if (!hasQ(it) || it.lv == null || it.lv < 2) return false; const a = lowAt(it, now); return a != null && a <= ms(shopAt); };
+  /* on the shopping list by itself: an amount item at its low line or out; an item with no number only when it was left
+     at Out or Low before the levels were retired (until he gives it a number or buys it) */
+  const needsBuy = (it) => !!it && it.lv != null && it.lv <= 1;
   // when fresh food is expected to turn (ms), or null for food that keeps
   function turnAt(it) {
     const life = FRESH[keyOf(it.name)];
@@ -619,7 +637,7 @@
   }
 
   /* The shopping list for kitchen k (d28): Low and Out first, then what will run low before the next shop, by shelf.
-     Items not checked yet are never on it. Each row: { it, why ("out" | "low" | "soon"), at (run-low ms), on (ticked),
+     Items not checked yet are never on it, nor one with no number unless it was at Out or Low (needsBuy). Each row: { it, why ("out" | "low" | "soon"), at (run-low ms), on (ticked),
      uses, amt, dinners }. dinners: the days from now to the next shop, 1 to 7. */
   function shopList(K, k, now, shopAt, dishes) {
     const t = ms(now), dinners = Math.max(1, Math.min(7, Math.ceil((ms(shopAt) - t) / DAY)));
@@ -627,7 +645,7 @@
     const rows = [];
     for (const it of items(K, k)) {
       if (it.lv == null) continue;
-      const why = it.lv === 0 ? "out" : it.lv === 1 ? "low" : lowSoon(it, t, shopAt) ? "soon" : null;
+      const why = it.lv === 0 ? "out" : needsBuy(it) ? "low" : lowSoon(it, t, shopAt) ? "soon" : null;
       if (!why) continue;
       const row = { it, why, at: lowAt(it, t) ?? t, on: !!(ticks[it.id] && ticks[it.id].on), ...amountFor(it.name, dishes, dinners) };
       if (hasQ(it)) row.amt = fmtQ(toBuy(it, t, shopAt), it.u);   // d45: from what is left and his real use
@@ -993,9 +1011,9 @@
     return isPiece(it) ? 1 : PORTION[okGroup(it.group) || guessGroup(it.name)] || 100;
   }
   /* "From your kitchen" (d47; 2026-10-21, d70 brief: "a banana on Plenty can still be ticked"): what kitchen k has, with or
-     without an amount: an amount item with some left, a level item that is not Out (or not checked yet), and anything
-     this meal already ticked (mine: item ids). */
-  const mealList = (K, k, mine) => items(K, k).filter((x) => (mine && mine.has(x.id)) || (hasQ(x) ? x.left > 0 : x.lv !== 0));
+     without an amount: an amount item with some left, every item with no number (its old level is not shown any more, so
+     it is not used to hide one), and anything this meal already ticked (mine: item ids). */
+  const mealList = (K, k, mine) => items(K, k).filter((x) => (mine && mine.has(x.id)) || (hasQ(x) ? x.left > 0 : true));
   /* d70: what he types for an extra, read like the kitchen reads a name and an amount: "Creatine 5 g", "6 almonds",
      "200 ml coconut yogurt", "1 banana", "Collagen". it: the item of kitchen k it names (then the item's own name is
      used), else null. q, u: what it took, in the item's unit when it has an amount ("" a count, "g", "ml"); q null
@@ -1115,37 +1133,34 @@
     return s.block ? `before ${s.soon ? "the shop after this one" : "your next shop"} (${sw(s.block)})`
       : `in the next ${DEFAULT_SHOP[k] || 7} days (next shop not on the calendar yet)`;
   }
-  /* The status line under a tile's name (d34): Plenty, Half, "Low · buy", "Out · buy", "Low by Thu" (a Half or Plenty that
-     runs low before the next shop), or "Not checked". */
+  /* The status line under a tile's name (d34, d42): what is left ("350 g", "4"), "120 g · buy" at its low line,
+     "none left · buy", "4 · low by Thu" (runs low before the next shop). No number: "how many?" (levels retired,
+     2026-10-21), with "· buy" when it is still on the shopping list from an old Out or Low. */
   function status(it, now, shopAt, tz) {
-    if (!it || it.lv == null) return "Not checked";
-    // d42: an amount item shows what is left instead of a level word ("350 g", "120 g · buy", "4 · low by Thu")
-    if (hasQ(it) && typeof it.left === "number") {
-      if (it.lv === 0) return "Out · buy";
+    if (it && hasQ(it) && typeof it.left === "number") {
+      if (it.lv === 0) return "none left · buy";
       const a = fmtQ(it.left, it.u);
       if (it.lv === 1) return `${a} · buy`;
       return lowSoon(it, now, shopAt) ? `${a} · low by ${dayWord(lowAt(it, now), now, tz)}` : a;
     }
-    if (it.lv === 0) return "Out · buy";
-    if (it.lv === 1) return "Low · buy";
-    if (lowSoon(it, now, shopAt)) return `Low by ${dayWord(lowAt(it, now), now, tz)}`;
-    return LEVELS[it.lv];
+    return needsBuy(it) ? `${ASK} · buy` : ASK;
   }
-  // the sheet's filters (d34): "all", "buy" (what the shopping list holds: low, out, or low before the next shop), "new" (not checked)
-  const shows = (it, f, now, shopAt) => f === "buy" ? !!it && it.lv != null && (it.lv <= 1 || lowSoon(it, now, shopAt))
-    : f === "new" ? !!it && it.lv == null : !!it;
-  // counts for the kitchen card: { low (low or out), soon, unchecked, total }
+  /* the sheet's filters (d34): "all", "buy" (what the shopping list holds: low, out, or low before the next shop), "new"
+     (no number yet: the way through setting up, since the levels were retired) */
+  const shows = (it, f, now, shopAt) => f === "buy" ? !!it && (needsBuy(it) || lowSoon(it, now, shopAt))
+    : f === "new" ? !!it && !hasQ(it) : !!it;
+  // counts for the kitchen card: { low (on the list: low or out), soon, unchecked (no number yet), total }
   function counts(K, k, now, shopAt) {
     const list = items(K, k);
-    return { total: list.length, unchecked: list.filter((x) => x.lv == null).length,
-      low: list.filter((x) => x.lv != null && x.lv <= 1).length, soon: list.filter((x) => lowSoon(x, now, shopAt)).length };
+    return { total: list.length, unchecked: list.filter((x) => !hasQ(x)).length,
+      low: list.filter(needsBuy).length, soon: list.filter((x) => lowSoon(x, now, shopAt)).length };
   }
 
-  // a tile's second line (d39): the status, then the amount when it has one ("Plenty · 400 g")
+  // a tile's second line (d39): the status, then words he typed for an amount with no number ("how many? · a jar")
   // (d42) an amount item's status already is its amount
   const tileLine = (it, now, shopAt, tz) => status(it, now, shopAt, tz) + (it && it.amt && !hasQ(it) ? ` · ${it.amt}` : "");
 
-  root.QuestKitchen = { NEED, LEVELS, KITCHENS, SEED, FRESH, DEFAULT_SHOP, GROUP_NAMES, GROUP_ICONS, keyOf, iconFor, groupIcon, splitName, amtOf, tileLine, guessGroup, guessShelf, firstTake, mealList, extraParse, search, unitOf,
+  root.QuestKitchen = { NEED, LEVELS, ASK, needsBuy, KITCHENS, SEED, FRESH, DEFAULT_SHOP, GROUP_NAMES, GROUP_ICONS, keyOf, iconFor, groupIcon, splitName, amtOf, tileLine, guessGroup, guessShelf, firstTake, mealList, extraParse, search, unitOf,
     items, item, grouped, setLevel, nextLevel, tap, add, rename, move, place, remove, status, shows, pace, lowAt, lowSoon, turnAt, useFirst, nextShop, parseAmt, usesOf, amountFor,
     shopList, missing, MAX_RECIPE_ROWS, stepList, tick, buyTicked, hasQ, isPiece, pieceCount, stepCount, unitFor, qtyOf, fmtQ, recipeIn, perMeal, setAmount, restock, rateOf, toBuy, eat, setTake, taken, portion, serving, ownDishes, ownDish, saveDish, delDish, dishAmt, dishIcon, kitchenFoods, TRAVEL_STARTER, pickList, preTick, fill, unfill, shopInfo, shopWhen, shopUpto, match, dinner, active, pick, noteActive, tripEnd, bringHome, dayWord, counts };
 })(typeof window !== "undefined" ? window : globalThis);

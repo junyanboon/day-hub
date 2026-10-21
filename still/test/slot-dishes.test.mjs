@@ -34,12 +34,16 @@ test("d51: each part shows the real thing if the kitchen has it, else the closes
   // the pattern: any vinegar stands in for the cider vinegar
   assert.deepEqual(J(show(part(rows, "acid"))), [["Lime", "have", false], ["Sherry vinegar", "have", true]]);
   assert.deepEqual(J(show(part(rows, "seeds"))), [["Pumpkin seeds", "have", true]]);
-  // shiitake is Out and no other mushroom: the real name, marked none in the kitchen
+  /* shiitake was left at an old Out with no number, and no other mushroom: since the levels were retired (2026-10-21)
+     that is not known, so it asks how many (never "out" or a made-up "have") */
   const m = part(rows, "mushroom").rows[0];
-  assert.deepEqual(J([m.name, m.st, m.word, m.entry]), ["Shiitake mushrooms", "none", "none in the kitchen", "mushroom:Shiitake mushrooms"]);
-  // ginger was never checked: shown as itself, not checked (never a made-up "have")
+  assert.deepEqual(J([m.name, m.st, m.word, m.entry]), ["Shiitake mushrooms", "unchecked", "how many?", "mushroom:Shiitake mushrooms"]);
+  // ginger was never checked: shown as itself, asking how many (never a made-up "have")
   assert.deepEqual(J(show(part(rows, "ginger"))), [["Fresh ginger, grated", "unchecked", false]]);
-  assert.equal(part(rows, "ginger").rows[0].word, "not checked");
+  assert.equal(part(rows, "ginger").rows[0].word, "how many?");
+  // a food that is not in the kitchen at all, or an amount at 0, is none in the kitchen
+  const k0 = stock([["h:shiitake", "0 g"]]), m0 = part(QI.slotRows(k0, "home", sv, []), "mushroom").rows[0];
+  assert.deepEqual(J([m0.st, m0.word]), ["none", "none in the kitchen"]);
   assert.equal(QI.slotsHave(k, "home", sv, []), 4);   // greens, legume, acid, seeds
 });
 
@@ -52,7 +56,7 @@ test("d51: one food is never in two parts, and a real ingredient is never taken 
   assert.deepEqual(J(show(part(rows, "brazil"))), [["Brazil nuts", "have", false]]);
   // only frozen berries: one berry row takes them, the other has none
   const b = QI.slotRows(stock([["h:blueberries", 0], ["h:cherries", 0], ["h:frozen-berries", "500 g"]]), "home", np, []);
-  assert.deepEqual(J(show(part(b, "berries"))), [["Frozen berries", "have", true], ["Cherries", "none", false]]);
+  assert.deepEqual(J(show(part(b, "berries"))), [["Frozen berries", "have", true], ["Cherries", "unchecked", false]]);
 });
 
 test("d51: a tick stays where it is when it takes the last of a food, and a pick from Use something else fills its part", () => {
@@ -163,8 +167,8 @@ test("d51 to d53 on the page: parts with swaps and Use something else, How to ma
   const ed = html.slice(html.indexOf("function openDishEdit("), html.indexOf("A walk, hike or other outdoor block"));
   assert.ok(ed.includes('id="deSteps"') && ed.includes("steps:S.steps"));
   assert.match(html, /r\.why === "none" \? "not in the kitchen"/);
-  for (const [f, v] of [["quest-meals", "d70"], ["quest-kitchen", "d70d"], ["quest-ideas", "d69b"]]) assert.match(html, new RegExp(`${f}\\.js\\?v=20261021${v}"`), f);
-  assert.match(body, /p\.rows\.filter\(r => r\.on \|\| r\.st !== "none"\)\.map\(r => r\.entry\)/, "Got everything skips foods marked none in the kitchen");
+  for (const [f, v] of [["quest-meals", "d70"], ["quest-kitchen", "d76"], ["quest-ideas", "d76"]]) assert.match(html, new RegExp(`${f}\\.js\\?v=20261021${v}"`), f);
+  assert.ok(!/>Got everything<|>Clear<|data-dall|data-dnone/.test(body), "2026-10-21: no Got everything and no Clear on any dish card");
   assert.ok(!/For 2 people\. Each part/.test(body), "d72: the intro is gone");
 });
 
