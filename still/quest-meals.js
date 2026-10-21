@@ -78,8 +78,9 @@
       ["Chia seeds", "2 tbsp"], ["Ground flaxseed", "2 tbsp"], ["Sunflower lecithin", "2 tsp"], ["Cocoa powder", "2 tbsp"],
       ["Cinnamon", "½ tsp"], ["Pomegranate juice", "120 ml"], ["Blueberries", "100 g"], ["Cherries", "100 g"]] },
   ];
-  /* Tonight's ideas, for 2 people. ONE list on purpose: a later job will write three a day from what is in his fridge,
-     and only this list (or what the page passes in its place) needs to change. Ids must stay unique per day. */
+  /* Tonight's ideas, for 2 people. Since 2026-10-21 (d41) the page shows three a day picked from what is in the kitchen
+     (quest-ideas.js, whose pool starts with these three, same ids); this list is what shows when that module is not
+     loaded. Ids must stay unique across the pool. */
   const IDEAS = [
     { id: "r1", icon: "🫘", name: "Lentil bowl with roasted peppers", time: "35 min", items: [
       ["Green or brown lentils, dry", "140 g"], ["Red peppers", "2"], ["Courgette", "1 medium"], ["Baby spinach", "100 g"],
@@ -167,7 +168,10 @@
      exactly as the tiles do (G.day.mealq, one record per meal). Ingredients are kept by name, so a later change to a list
      never ticks the wrong row. */
   const ALL_DISHES = DISHES.concat(IDEAS);
-  const dishOf = (id, list) => (list || ALL_DISHES).find((d) => d.id === id) || null;
+  /* a dish by id: the Blueprint dishes and the ideas, and (2026-10-21, d41) any idea of the kitchen-ideas pool
+     (quest-ideas.js), so a meal ticked on an idea from another day still reads and holds its slot */
+  const dishOf = (id, list) => (list || ALL_DISHES).find((d) => d.id === id)
+    || (!list && root.QuestIdeas ? root.QuestIdeas.byId(id) : null) || null;
   const gotOf = (rec, d) => { const g = rec && rec.dish && Array.isArray(rec.dish[d.id]) ? rec.dish[d.id] : [];
     return d.items.map((x) => x[0]).filter((n) => g.includes(n)); };
   /* A daily cap (Junyan, 2026-10-20, d17: "17 yes"). Blueprint dishes share the Blueprint meal's old limit across all
