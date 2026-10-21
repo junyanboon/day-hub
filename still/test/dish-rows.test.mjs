@@ -39,12 +39,12 @@ test("d71: every row (part dishes, plain dishes, his own, extras, From your kitc
   assert.match(x, /<div class="mq-row tk"><button type="button" class="mq-ing" data-xoff=/);
   assert.match(x, /\$\{tookLabel\(`data-xq=/);
   assert.match(sheet, /<span class="mq-ra"> · \$\{esc\(r\.amt\)\}<\/span>/, "a ticked part keeps the recipe amount in its hint");
-  assert.match(sheet, /<small class="mq-hv mq-ra">\$\{esc\(amt\)\}<\/small>/, "a ticked ingredient too");
+  assert.match(sheet, /<small class="mq-hv mq-ra">\$\{esc\(QR\(\) \? QR\(\)\.amtText\(amt\) : amt\)\}<\/small>/, "a ticked ingredient too");
   assert.ok(!/mq-ingw/.test(html), "the old two line wrapper is gone");
   // every list of tick rows sits in a one column mq-rows, not the two column grid
   assert.ok(!/<div class="mq-ings">\$\{xs\.map/.test(sheet) && /<div class="mq-rows">\$\{xs\.map/.test(sheet));
   assert.match(sheet, /<div class="mq-rows">\$\{d\.items\.map/);
-  assert.match(html, /<div class="mq-rows">\$\{g\.list\.map\(row\)/);
+  assert.match(html, /<div class="mq-rows">\$\{oldEat\.map\(old\)\.join\(""\)\}\$\{xs\.map\(x => xRow\(MEAL, x, ""\)\)/, "d78: What did you eat? rows");
   // the "left" words stay the label's only small, which the took handlers update in place
   assert.equal((html.match(/inp\.closest\("\.mq-take"\)\.querySelector\("small"\)/g) || []).length, 2);
 });

@@ -177,6 +177,7 @@ test("d41: the page loads quest-ideas.js and the meal sheet shows today's three 
   assert.match(html, /IT\.note \? `<p class="mq-serves mq-inote">/, "a short kitchen is said in words");
   assert.match(html, /<b>To buy:<\/b>/);
   // the shopping list's amounts follow today's ideas, and a dish by id finds any idea of the pool
-  assert.match(html, /const kitDishes = kc => QM \? \(kc && QM\.dishesFor \? QM\.dishesFor\(kc\) : bpToday\(\)\)\.concat\(ideasToday\(\)\.list\.filter\(d => !d\.own\)\) : \[\]/);
+  // d79: only while the recipe book has not loaded (the ideas are the fallback then)
+  assert.match(html, /const kitDishes = kc => QM \? \(kc && QM\.dishesFor \? QM\.dishesFor\(kc\) : bpToday\(\)\)\.concat\(recipesOn\(\) \? \[\] : ideasToday\(\)\.list\.filter\(d => !d\.own\)\) : \[\]/);
   assert.match(html, /\|\| ideaById\(id\)\n/);
 });

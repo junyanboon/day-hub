@@ -247,8 +247,9 @@ test("d47: From your kitchen: a banana takes 1 off, a gram item a dish's portion
 });
 
 test("the page: take fields in the dishes, a From your kitchen card, amounts in the picker, the amount on Edit", () => {
-  assert.match(html, /function kitMealCard\(/);
-  assert.match(html, /\$\{kitMealCard\(k\)\}/);
+  // d78: the From your kitchen card became the What did you eat? box at the top of the meal sheet
+  assert.match(html, /const eatBox = \(\) =>/);
+  assert.match(html, /\$\{eatBox\(\)\}/);
   assert.match(html, /data-take="/);
   assert.match(html, /QK\(\)\.setTake\(/);
   assert.match(html, /QK\(\)\.firstTake\(/);   // d70: portion() for an amount item, a first take for a level one
@@ -256,7 +257,7 @@ test("the page: take fields in the dishes, a From your kitchen card, amounts in 
   assert.match(html, /amt:kitFillAmt\(S, r\)/);
   assert.match(html, /Amount now/);
   assert.match(html, /Mark ticked items as bought/);
-  assert.match(html, /From your kitchen/);
+  assert.match(html, /What did you eat\?/);
 });
 
 test("review fixes: an untick after a shop still puts back; a shop after eating past 0 gives what he bought", () => {

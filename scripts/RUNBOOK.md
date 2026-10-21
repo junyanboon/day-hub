@@ -311,3 +311,23 @@ The Worker keeps the routes (`POST /spent`, `GET /spent/today`,
 `GET /spent/accounts`) and the `YNAB_TOKEN` secret is set, so this can be
 revived from the app side alone. `/health` reports `ynabConfigured`. Budgets
 are found by name — 🇨🇦Junyan CAD / 🇺🇸Junyan USD, archived copies excluded.
+
+# Day Quest recipe cards (recipe wiki, added 2026-10-21, d79)
+
+The meal sheet's recipe cards come from Junyan's recipe wiki (`personal/recipe-wiki`, kept by its own agent; never edit it
+from here). Day Quest holds a copy in `still/quest-recipe-data.js` (a `?v=` script, so the service worker saves it with the
+page and the cards open offline). `still/quest-recipes.js` reads it.
+
+To refresh after the wiki changes:
+
+```
+cd "/Users/jboon/Agent Workspace/personal/day-hub"
+node scripts/pull-recipes.mjs "/Users/jboon/Agent Workspace/personal/recipe-wiki"
+node --test still/test/*.test.mjs
+```
+
+The script runs the wiki's `tools/export.mjs` into a temp file (the wiki folder is not written), rewrites
+`still/quest-recipe-data.js`, and gives its `?v=` stamp in `still/quest.html` a new value. Commit both files and open a PR.
+Travel-friendly on a trip: recipes the wiki tags `travel`; if no recipe has that tag, a guess (no oven, 8 ingredients or
+fewer, 30 min or less). The two Blueprint recipes (tag `blueprint`) are left out: they are the Blueprint dish cards.
+If the data file fails to load, the meal sheet falls back to the old "Tonight's ideas" picker (`quest-ideas.js`).

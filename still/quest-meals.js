@@ -276,7 +276,8 @@
   /* a dish by id: the Blueprint dishes and the ideas, and (2026-10-21, d41) any idea of the kitchen-ideas pool
      (quest-ideas.js), so a meal ticked on an idea from another day still reads and holds its slot */
   const dishOf = (id, list) => (list || ALL_DISHES).find((d) => d.id === id)
-    || (!list && root.QuestIdeas ? root.QuestIdeas.byId(id) : null) || null;
+    || (!list && root.QuestIdeas ? root.QuestIdeas.byId(id) : null)
+    || (!list && root.QuestRecipes ? root.QuestRecipes.byId(id) : null) || null;   // a recipe card (d79) holds an idea slot
   const gotOf = (rec, d) => { const g = rec && rec.dish && Array.isArray(rec.dish[d.id]) ? rec.dish[d.id] : [];
     return d.items.map((x) => x[0]).filter((n) => g.includes(n)); };
   /* Parts (d51). A tick on a part dish is stored as "<part id>:<what he used>" ("greens:Kale"). A meal ticked before parts
@@ -377,6 +378,7 @@
     let got = gotOf(r, d);
     if (how === "all") got = d.items.map((x) => x[0]);
     else if (how === "none") got = [];
+    else if (Array.isArray(how)) got = d.items.map((x) => x[0]).filter((n) => how.includes(n));   // "Cook this" (d79): these ticks
     else if (d.items.some((x) => x[0] === how)) got = got.includes(how) ? got.filter((x) => x !== how) : got.concat(how);
     const key = "dish:" + d.id, old = r.v[key], was = old ? +old[1] || 0 : 0, wasDone = old && old[3] ? 1 : 0;
     /* his own dishes (d48) pay nothing and hold no slot: the food tiles pay for what was in it, and a dish of his can
