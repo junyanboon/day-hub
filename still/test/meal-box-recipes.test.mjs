@@ -88,7 +88,7 @@ test("d79: a meal logged against an old idea still reads and keeps its points", 
   assert.ok(r1 && r1.items.length);
   const rec = QM.tick(null, r1, "all", opt).rec;
   assert.equal(QM.dishPaid(rec, r1), 9);
-  assert.match(sheet, /\.map\(ideaById\)\.filter\(Boolean\)\);/, "an old idea with ticks joins the list under the recipes");
+  assert.match(sheet, /\.map\(id => ideaById\(id\) \|\| recipeStub\(id\)\)\.filter\(Boolean\)\);/, "an old idea with ticks joins the list under the recipes");
   assert.match(sheet, /\$\{RL\.map\(recipeCard\)\.join\(""\)\}\$\{ideas\.map\(d => dishCard\(d\)\)\.join\(""\)\}/);
 });
 
@@ -131,7 +131,7 @@ test("d78: his own dish card: no 'N of M ingredients · K added', added foods in
   assert.match(rows, /xs\.map\(x => xRow\(d, x, "added this time"\)\)\.join\(""\) \+ `<\/div>`/, "inside the same mq-rows");
   assert.match(rows, /d\.own && !d\.del && xs\.length/);
   assert.match(rows, /data-xkeep="\$\{esc\(d\.id\)\}" data-xn="\$\{esc\(x\.n\)\}">Keep \$\{esc\(x\.n\)\} in the dish</);
-  assert.ok(!/Also went in/.test(rows), "no separate heading on a plain dish");
+  assert.ok(!/>Also went in</.test(rows), "no separate heading on a plain dish");
   // Keep: the food joins the dish, the extra is put back and the ingredient tick takes the same amount off
   const keep = sheet.slice(sheet.indexOf('querySelectorAll("[data-xkeep]")'), sheet.indexOf('querySelectorAll("[data-rcook]")'));
   assert.ok(keep.indexOf("QK().saveDish(") < keep.indexOf("dropExtraFrom(d, x.n)") && keep.indexOf("dropExtraFrom(d, x.n)") < keep.indexOf("dishTap(bn, d.id, ing[0]"));
@@ -140,6 +140,17 @@ test("d78: his own dish card: no 'N of M ingredients · K added', added foods in
   const k2 = K.saveDish(k.K, { id: d.id, name: d.name, icon: d.icon, items: d.items.concat([["Chickpeas", "200 g"]]), steps: d.steps }, "2026-10-21T21:00:00Z");
   assert.equal(k2.id, d.id);
   assert.deepEqual(J(K.ownDish(k2.K, d.id).items), [["Red peppers", "2"], ["Chickpeas", "200 g"]]);
+});
+
+test("review: a cooked recipe the book no longer has still reads from its ticks and can be unticked", () => {
+  assert.match(html, /function recipeStub\(id\)\{/);
+  assert.match(html, /\.map\(id => ideaById\(id\) \|\| recipeStub\(id\)\)\.filter\(Boolean\)\);/);
+  assert.match(html, /\|\| \(QR\(\) \? QR\(\)\.byId\(id\) : null\) \|\| recipeStub\(id\)/);
+  // only his own dishes and recipes fold added foods into the list
+  assert.match(html, /const xs = d\.own \|\| d\.recipe \? QM\.extrasOf\(rec, d\.id\) : \[\];/);
+  // Keep saves the kitchen before anything can return
+  const keep = html.slice(html.indexOf('querySelectorAll("[data-xkeep]")'), html.indexOf('querySelectorAll("[data-rcook]")'));
+  assert.ok(keep.indexOf("kitSave(r.K)") > 0 && keep.indexOf("kitSave(r.K)") < keep.indexOf("if (!ing) return;"));
 });
 
 test("d80: a deleted dish keeps tonight's meal readable, also when only added foods are on it", () => {
@@ -159,7 +170,7 @@ test("d79: the recipe card: shut shows time and tags; open shows ingredients, st
   assert.match(rc, /const tv = trip && QR\(\)\.isTravel\(d, rule\), sub = \[d\.time, QR\(\)\.tagLine\(d\)\]/);
   assert.match(rc, /<p class="kt-gh">Steps<\/p><ol>/);
   assert.match(rc, /data-rcook="\$\{esc\(d\.id\)\}">Cook this</);
-  assert.match(rc, /h\.st === "have" \|\| h\.st === "short"/, "only what the kitchen has, softly");
+  assert.match(rc, /got = h && h\.st === "have", short = h && h\.st === "short"/, "only what the kitchen has, softly; short is not green");
   assert.ok(!/you have|buy \$|To buy/.test(rc), "no scoring of what he has");
   assert.match(sheet, /dishTap\(bn, d\.id, QR\(\)\.cookTicks\(d\)\)/);
   // the old ideas only when the book did not load; the trip line says how travel-friendly is decided

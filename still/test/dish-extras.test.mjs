@@ -186,7 +186,7 @@ test("From your kitchen lists items with no amount too (levels retired: an old O
 test("d70, d74, d75 on the page: every dish card ends with the search box itself, free text, ticked extras with took; no button, no helper text", () => {
   const body = html.slice(html.indexOf("const slotCard = d =>"), html.indexOf("function kitMealBind"));
   assert.equal((body.match(/\$\{extrasBlock\(d\)\}<\/div>`/g) || []).length, 1, "the part dishes end with it");
-  assert.equal((body.match(/\$\{xSearch\(d\)\}<\/div>`/g) || []).length, 1, "the plain dishes (his own, old ideas) end with the box alone (d78)");
+  assert.ok(body.includes("${d.own || d.recipe ? xSearch(d) : extrasBlock(d)}</div>`"), "his own dishes and recipes end with the box alone (d78); other plain dishes keep Also went in");
   assert.ok(!/>\+ Add something you put in<|data-xadd/.test(html), "d74: no + Add something you put in button");
   const xb = html.slice(html.indexOf("const xSearch = (d, aria, ph) =>"), html.indexOf("const slotCard = d =>"));
   assert.ok(xb.includes('ph || "Search the kitchen, or type a food and amount"') && !/open \?/.test(xb), "the box is always there");

@@ -2593,7 +2593,7 @@
     const trip = !!QK() && kitToday() === "travel";
     const RL = recipesOn() ? QR().order(QR().list(), { trip, meal:QR().mealOf(name) }) : null, rule = RL ? QR().travelRule() : null;
     const IT = RL ? { list:[], note:"" } : ideasToday(), ideas = IT.list.concat(Object.keys((rec && rec.dish) || {})
-      .filter(id => !IT.list.some(d => d.id === id) && !(RL && RL.some(d => d.id === id))).map(ideaById).filter(Boolean));
+      .filter(id => !IT.list.some(d => d.id === id) && !(RL && RL.some(d => d.id === id))).map(id => ideaById(id) || recipeStub(id)).filter(Boolean));
     const kn = QK() ? QK().KITCHENS[kitToday()] : null;
     /* Super Veggie and Nutty Pudding (d58): the travel versions when the travel fridge is in use, else the full recipes, then any
        Blueprint dish of the other kitchen this meal already has ticks on, so a tick can always be taken back */
@@ -2738,14 +2738,14 @@
           (fit && (fit.buy.length || fit.check.length) ? `<p class="mq-how mq-buy">${fit.buy.length ? `<b>To buy:</b> ${esc(fit.buy.join(", "))}` : ""}${fit.buy.length && fit.check.length ? "<br>" : ""}${fit.check.length ? `<b>How many do you have?</b> ${esc(fit.check.join(", "))}` : ""}</p>` : "") +
           links(howTo(d)) +
           (d.own && !d.del ? `<div class="mq-drow"><button type="button" class="mq-mini" data-dedit="${esc(d.id)}">Edit</button></div>` : "") +
-          `${xSearch(d)}</div>` : "") +
+          `${d.own || d.recipe ? xSearch(d) : extrasBlock(d)}</div>` : "") +
         `</div>`;
     };
     /* a plain dish's tick rows: its ingredients, then (his own, d48) a food taken out of it since this meal ticked it, then
        what was added this time (d78: in the same list, marked "added this time", not under its own heading). On his own
        dish each added food has "Keep X in the dish", which puts it in the dish and makes it an ingredient tick. */
     const plainRows = (d, on, fit) => {
-      const xs = QM.extrasOf(rec, d.id);
+      const xs = d.own || d.recipe ? QM.extrasOf(rec, d.id) : [];   // other plain dishes keep "Also went in" (extrasBlock)
       return `<div class="mq-rows">${d.items.map(([n, amt], i) => kitTakeWrap(on.has(n) ? kitEatKey(k, d.id, n) : null,
           `<button type="button" class="mq-ing" data-ding="${esc(d.id)}" data-i="${i}" aria-pressed="${on.has(n)}">` +
           `<span class="bx"></span><span class="n">${esc(n)}${fit && !on.has(n) && fit.rows[i] ? `<small class="mq-hv ${fit.rows[i].st}">${esc(fit.rows[i].word)}</small>` : ""}` +
@@ -2772,8 +2772,8 @@
         `<span class="mq-dn"><b>${esc(d.name)}</b><small>${esc(sub)}</small></span>` +
         `<span class="mq-dp">${pd ? sign(pd) : cooked ? "<small>cooked</small>" : tv ? "<small>travel</small>" : ""}</span></button>` +
         (open ? `<div class="mq-dlist">` + (cooked ? plainRows(d, on) + steps + xSearch(d)
-          : `<ul class="mq-rcl">${d.items.map(([n, amt], i) => { const h = have[i], got = h && (h.st === "have" || h.st === "short");
-              return `<li><span class="n">${esc(n)}${QR().optional(amt) ? ` <small>optional</small>` : ""}${got ? ` <small class="have">${esc(h.word)}</small>` : ""}</span><span class="qty">${esc(QR().amtText(amt))}</span></li>`; }).join("")}</ul>` +
+          : `<ul class="mq-rcl">${d.items.map(([n, amt], i) => { const h = have[i], got = h && h.st === "have", short = h && h.st === "short";
+              return `<li><span class="n">${esc(n)}${QR().optional(amt) ? ` <small>optional</small>` : ""}${got ? ` <small class="have">${esc(h.word)}</small>` : short ? ` <small>${esc(h.word)}</small>` : ""}</span><span class="qty">${esc(QR().amtText(amt))}</span></li>`; }).join("")}</ul>` +
             steps +
             (swaps.length ? `<p class="mq-how"><b>Swaps:</b> ${esc(swaps.map(([n, l]) => `${n}: ${l.join(", ")}`).join("; "))}</p>` : "") +
             `<div class="mq-drow"><button type="button" class="mq-mini go mq-cook" data-rcook="${esc(d.id)}">Cook this</button><span class="mq-dst">Untick what you did not have.</span></div>`) +
@@ -2952,9 +2952,10 @@
       const d = dishById(bn.dataset.xkeep); if (!d || !d.own || d.del) return;
       const x = QM.extrasOf(mealRec(), d.id).find(y => QM.xKey(y.n) === QM.xKey(bn.dataset.xn)); if (!x) return;
       const amt = x.q == null ? "" : QK().fmtQ(x.q, x.u);
-      const r = QK().saveDish(G.kitchen, { id:d.id, name:d.name, icon:d.icon, items:d.items.concat([[x.n, amt]]), steps:d.steps || [] }, now());
+      const has = d.items.some(i => QM.xKey(i[0]) === QM.xKey(x.n));   // already in the dish: only the tick moves
+      const r = QK().saveDish(G.kitchen, { id:d.id, name:d.name, icon:d.icon, items:has ? d.items : d.items.concat([[x.n, amt]]), steps:d.steps || [] }, now());
       if (!r.id) return;
-      G.kitchen = r.K;
+      kitSave(r.K);   // saved before any return below (review)
       const nd = QK().ownDish(G.kitchen, d.id), ing = nd && nd.items.find(i => QM.xKey(i[0]) === QM.xKey(x.n)); if (!ing) return;
       log(`Dish changed: ${ing[0]} kept in ${d.name}`);
       dropExtraFrom(d, x.n);   // puts back what the extra took ...
@@ -3034,7 +3035,7 @@
   /* a dish by id: the Blueprint dishes, tonight's ideas and his own, a deleted one of his too (a meal logged with it), and
      any idea of the pool (d41: an idea from another day that a meal has ticks on) */
   const dishById = id => allDishes().find(d => d.id === id) || (QK() ? QK().ownDish(G.kitchen, id) : null) || ideaById(id)
-    || (QR() ? QR().byId(id) : null)   // a recipe card (d79)
+    || (QR() ? QR().byId(id) : null) || recipeStub(id)   // a recipe card (d79), or one no longer in the book
     || (QM ? QM.dishOf(id, QM.BLUEPRINT || QM.DISHES) : null);   // a Blueprint dish of the other kitchen (d58)
   // his dishes for this meal: the live ones, then any deleted one this meal has ticks on
   function mealOwn(rec){
@@ -3183,6 +3184,15 @@
   // his recipe book (d79, quest-recipes.js): on when it loaded with any recipe; else tonight's ideas stay as the fallback
   const QR = () => window.QuestRecipes;
   const recipesOn = () => !!(QR() && QR().list().length);
+  /* a recipe a meal was cooked from that the book no longer has (taken out of the wiki, or the data did not load): its
+     ticks today, as a plain list, so the meal still reads and each tick can still be taken back (review) */
+  function recipeStub(id){
+    if (!/^rc-[a-z0-9-]{1,37}$/.test(id) || (QR() && QR().byId(id)) || !G.day) return null;
+    const ticks = [...new Set(Object.values(G.day.mealq || {}).flatMap(q => q && q.dish && Array.isArray(q.dish[id]) ? q.dish[id] : []))];
+    if (!ticks.length) return null;
+    const w = id.slice(3).replace(/-/g, " ");
+    return { id, recipe:true, icon:"🍽️", name:w.charAt(0).toUpperCase() + w.slice(1), time:"", tags:[], steps:[], swaps:{}, items:ticks.map(n => [n, ""]) };
+  }
   const ideaSince = () => window.QuestSuggest ? QuestSuggest.at(gameYmd(), 4, 0, TZ()) : 0;
   const ideasToday = () => QI() && QK() && G.day ? QI().pick(G.kitchen, kitToday(), { day:gameYmd(), since:ideaSince(), now:+now() })
     : { list:QM ? QM.IDEAS : [], note:"", ready:3 };
