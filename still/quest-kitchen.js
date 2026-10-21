@@ -110,7 +110,7 @@
     ["Nuts and seeds", /\b(nuts?|peanuts?|walnuts?|almonds?|macadamias?|cashews?|pistachios?|hazelnuts?|pecans?|seeds?|flax|flaxseed|chia|hemp|sesame)\b/i],
     ["Herbs", /\b(parsley|coriander|cilantro|basil|mint|dill|rosemary|thyme|chives|sage)\b/i],
     ["Fruit", /\b(lemons?|limes?|berry|berries|blueberries|raspberries|strawberries|apples?|pears?|cherry|cherries|bananas?|oranges?|figs?|dates|grapes?|kiwis?|mangoe?s?|pomegranates?|melons?|peach(es)?|plums?)\b/i],
-    ["Vegetables", /\b(broccoli|cauliflower|shiitake|mushrooms?|spinach|tomato(es)?|peppers?|courgettes?|zucchinis?|rocket|arugula|carrots?|kale|avocados?|peas|sprouts|ginger|garlic|olives?|onions?|leeks?|cucumbers?|beetroots?|beets?|lettuce|celery|cabbage|chard|squash|pumpkin|potato(es)?|sweet potato(es)?|aubergines?|eggplants?|asparagus|fennel)\b/i],
+    ["Vegetables", /\b(broccoli|cauliflower|shiitake|mushrooms?|spinach|tomato(es)?|peppers?|capsicums?|courgettes?|zucchinis?|rocket|arugula|carrots?|kale|avocados?|peas|sprouts|ginger|garlic|olives?|onions?|leeks?|cucumbers?|beetroots?|beets?|lettuce|celery|cabbage|chard|squash|pumpkin|potato(es)?|sweet potato(es)?|aubergines?|eggplants?|asparagus|fennel)\b/i],
   ];
   const guessGroup = (name) => (GROUPS.find((g) => g[1].test(String(name || ""))) || ["Other"])[0];
   const okGroup = (g) => (GROUP_NAMES.includes(g) ? g : null);
@@ -141,7 +141,7 @@
     [/\bmelons?\b/i, "🍈"], [/\bavocados?\b/i, "🥑"],
     [/\bpotato(es)?\b/i, "🥔"], [/\bonions?\b/i, "🧅"], [/\bgarlic\b/i, "🧄"], [/\bcarrots?\b/i, "🥕"], [/\bcorn\b/i, "🌽"], [/\b(cucumbers?|courgettes?|zucchinis?)\b/i, "🥒"],
     [/\b(lettuce|spinach|kale|cabbage|chard|greens)\b/i, "🥬"], [/\bbroccoli\b/i, "🥦"], [/\bmushrooms?\b/i, "🍄"], [/\b(chill?i(es)?|jalapenos?)\b/i, "🌶️"],
-    [/\b((black|white) pepper|peppercorns?)\b/i, "🧂"], [/\bpeppers?\b/i, "🫑"], [/\bginger\b/i, "🫚"], [/\b(salt|electrolytes?)\b/i, "🧂"], [/\b(nuts?|almonds?|walnuts?|cashews?|hazelnuts?|pecans?|pistachios?)\b/i, "🌰"],
+    [/\b((black|white) pepper|peppercorns?)\b/i, "🧂"], [/\b(peppers?|capsicums?)\b/i, "🫑"], [/\bginger\b/i, "🫚"], [/\b(salt|electrolytes?)\b/i, "🧂"], [/\b(nuts?|almonds?|walnuts?|cashews?|hazelnuts?|pecans?|pistachios?)\b/i, "🌰"],
     [/\b(seeds?|chia|flax|hemp)\b/i, "🌱"], [/\b(cans?|tins?|soup)\b/i, "🥫"], [/\bpopcorn\b/i, "🍿"],
   ];
   const groupIcon = (group) => GROUP_ICONS[okGroup(group) || "Other"];
@@ -187,9 +187,11 @@
     return { name: cap(s).slice(0, 40), amt: "" };
   }
   const TRAIL_N = /^(.*?[a-z])\s+(\d{1,3}(?:[.,]5)?)$/i;
+  const PIECE_G = 10;
   /* The unit a bare number means for a food (d42): a count for what is bought by the piece, ml for drinks and oils,
-     else grams. "Black pepper", "Coconut yogurt" or "Lemon juice" are not counted by the piece. */
-  const COUNT_FOODS = /\b(bananas?|avocados?|limes?|lemons?|apples?|pears?|eggs?|oranges?|clementines?|mandarins?|kiwis?|peach(es)?|nectarines?|plums?|mangoe?s?|grapefruits?|pomegranates?|coconuts?|melons?|pineapples?|courgettes?|zucchinis?|cucumbers?|peppers?|aubergines?|eggplants?|onions?|tomato(es)?|carrots?|potato(es)?|leeks?|lettuces?)\b/i;
+     else grams. "Black pepper", "Coconut yogurt" or "Lemon juice" are not counted by the piece. d64 (2026-10-21): capsicum
+     ("1" had become 1 g), beetroot, figs, chillies, tortillas and other foods bought one at a time are counted too. */
+  const COUNT_FOODS = /\b(bananas?|avocados?|limes?|lemons?|apples?|pears?|eggs?|oranges?|clementines?|mandarins?|kiwis?|peach(es)?|nectarines?|plums?|mangoe?s?|grapefruits?|pomegranates?|coconuts?|melons?|pineapples?|courgettes?|zucchinis?|cucumbers?|peppers?|aubergines?|eggplants?|onions?|tomato(es)?|carrots?|potato(es)?|leeks?|lettuces?|capsicums?|beetroots?|beets?|parsnips?|turnips?|artichokes?|figs?|apricots?|persimmons?|papayas?|guavas?|chill?i(es)?|jalapenos?|tortillas?|wraps?|pitas?|bagels?|buns?|croissants?|muffins?)\b/i;
   const LIQUID = /\b(milk|juices?|oils?|vinegars?|kefir|kombucha|water|wine|beers?|syrup|sauce|drinks?|shots?)\b/i;
   const NOT_PIECE = /\b(yogh?urts?|flakes|powder|paste|seeds?|flour|butter|dried|(black|white) pepper|peppercorns?|leaves|puree|passata|cherry tomato(es)?)\b/i;
   function unitFor(name) {
@@ -239,6 +241,36 @@
     const v = thou(String(s == null ? "" : s).replace(/\s+/g, " ").trim()), m = AMT_ONLY.exec(v);
     return m ? fmtUnit(m[1], m[2], m[3]) : v.slice(0, 20);
   }
+  /* d64: "4 tomatoes", "4 lemons", "Tomatoes 4" or "4 pieces" typed for the item is the count 4, whatever unit the food
+     would take. Words that name something else ("2 cans", "3 bags") are not a count of the item: null. */
+  const PIECE_WORD = /^(pieces?|pcs?|whole|items?|each|units?)$/i;
+  const CONTAINER = /^(cans?|tins?|jars?|bags?|packs?|packets?|boxe?s?|bottles?|cartons?|bunch(es)?|heads?|blocks?|tubs?|punnets?|handfuls?|cups?|tbsp|tsp|slices?)\b/i;
+  function pieceCount(text, name) {
+    const s = String(text == null ? "" : text).replace(/\s+/g, " ").trim();
+    let m = /^(\d+(?:[.,]\d+)?)\s*(?:[x×]\s+)?([a-z][a-z ]*)$/i.exec(s), n, w;
+    if (m) { n = m[1]; w = m[2]; }
+    else { m = /^([a-z][a-z ]*?)\s*[x×]?\s*(\d+(?:[.,]\d+)?)$/i.exec(s); if (!m) return null; n = m[2]; w = m[1]; }
+    w = w.trim();
+    if (!w || CONTAINER.test(w)) return null;
+    const kw = keyOf(w), kn = keyOf(name);
+    if (!PIECE_WORD.test(w) && !(kw && kn && (kw === kn || kn.endsWith(" " + kw) || kw.endsWith(" " + kn)))) return null;
+    const q = +n.replace(",", ".");
+    return isFinite(q) && q >= 0 ? q : null;
+  }
+  // an amount he typed as a number: a count of the item first (d64), else as qtyOf reads it
+  function qtyFor(text, name, uHint) {
+    const n = pieceCount(text, name);
+    return n != null ? { q: n, u: "" } : qtyOf(amtOf(text), name, uHint);
+  }
+  /* d64: Edit's - and + for a piece food: one more or one less of what the field says, from 1 when it has no number yet,
+     never below 0. Words with no number ("a bag") stay on -, and become 1 on +. */
+  function stepCount(text, name, dir) {
+    const s = String(text == null ? "" : text).trim();
+    let n = pieceCount(s, name);
+    if (n == null && /^\d+(?:[.,]\d+)?$/.test(s)) n = +s.replace(",", ".");
+    if (n == null) return dir > 0 ? "1" : s;
+    return fmtQ(Math.max(0, n + (dir > 0 ? 1 : -1)), "");
+  }
   const shelfOf = (k, id) => (KITCHENS[k] ? KITCHENS[k].shelves.find((s) => s.id === id) : null) || null;
 
   // a level read from saved (synced) state: 0 to 3, else not checked
@@ -246,7 +278,10 @@
   // its group: the one it stores, else the first guess from its name (stored with the item at its next change)
   /* and (d38, d39) its amount split off a name that never had the split, and its icon: its own, else the one iconFor gives */
   function clean(it) {
-    const sp = typeof it.amt === "string" || typeof it.name !== "string" ? null : splitName(it.name);
+    /* d64: an empty amount stored with a count still in the name ("Bananas 4", added before d42 split a trailing count)
+       is split on read too, so the tile reads Bananas, 4. Only when no number is stored. */
+    const storedQ = typeof it.q === "number" && isFinite(it.q) && it.q >= 0;
+    const sp = typeof it.name !== "string" || (typeof it.amt === "string" && (it.amt || storedQ)) ? null : splitName(it.name);
     const name = sp && sp.amt ? sp.name : it.name, group = okGroup(it.group) || guessGroup(name);
     const out = { ...it, name, amt: sp ? sp.amt : it.amt, lv: okLv(it.lv), group, em: ownIcon(it.em) ? it.em : iconFor(name, group) };
     /* d42: the amount as a number. One stored (q) stands; else the d39 amount ("400 g") is its first amount, read the same
@@ -258,10 +293,15 @@
     } else {
       out.u = out.u === "g" || out.u === "ml" ? out.u : "";
       out.buy = +out.buy > 0 ? +out.buy : out.q;
+      /* d64: a food bought by the piece stored as a few grams ("Capsicum 1 g": a bare "1" read as grams before capsicum
+         was on the list) is a count. Under PIECE_G grams nobody means weight for a whole capsicum or banana. */
+      if (out.u === "g" && unitFor(name) === "" && out.q < PIECE_G && out.buy < PIECE_G) out.u = "";
     }
     return out;
   }
   const hasQ = (it) => !!it && typeof it.q === "number";
+  // d64: an item counted by the piece (its - and + buttons): one with a count, or a level item of a food bought by the piece
+  const isPiece = (it) => !!it && typeof it.name === "string" && (hasQ(it) ? it.u === "" : unitFor(it.name) === "");
   /* The meals' take-offs by item (K.used records with an amount, not taken back), worked out once per used object. */
   const eatCache = new WeakMap();
   function eatsById(K) {
@@ -382,7 +422,7 @@
       const { q, u, qt, buy, ...rest } = it;
       return put(K, { ...rest, amt: "", lv: it.lv ?? null }, at);
     }
-    const p = qtyOf(s, it.name, hasQ(it) ? it.u : undefined);
+    const p = qtyFor(text, it.name, hasQ(it) ? it.u : undefined);
     if (!p) { if (s === (it.amt || "") && !hasQ(it)) return K; const { q, u, qt, buy, ...rest } = it; return put(K, { ...rest, amt: s }, at); }
     if (hasQ(it) && p.u === it.u && Math.abs(p.q - it.left) < 0.05) return K;
     // what he last bought (the pips' full mark) stays, unless this is his first number, a new unit, or more than that
@@ -396,7 +436,7 @@
     const it0 = item(K, id); if (!it0) return K;
     let out = setLevel(K, id, 3, at, src || "buy");
     const it = item(out, id);
-    const p = amount && typeof amount === "object" ? amount : amount ? qtyOf(amtOf(amount), it.name, hasQ(it0) ? it0.u : undefined) : null;
+    const p = amount && typeof amount === "object" ? amount : amount ? qtyFor(amount, it.name, hasQ(it0) ? it0.u : undefined) : null;
     if (hasQ(it0)) {
       const same = p && p.u === it0.u, got = same ? p.q : p ? null : it0.buy;
       if (got == null) out = put(out, { ...it, q: p.q, u: p.u, qt: iso(at), rt: iso(at), buy: p.q }, at);   // a new unit: what he typed is the amount
@@ -428,7 +468,7 @@
     const old = obj(obj(K).items)[id] || {}, sem = sd ? sd.em : null;
     const base = { ...(item(K, id) || {}), id, k, shelf, name: nm, amt: "", group: g, em: ownIcon(old.em) ? old.em : sem || iconFor(nm, g), lv: null, hist: [], added: iso(at) };
     delete base.del; delete base.q; delete base.u; delete base.qt; delete base.buy;
-    const p = given ? qtyOf(given, nm) : null;
+    const p = given ? qtyFor(given, nm) : null;
     if (p) Object.assign(base, { q: p.q, u: p.u, qt: iso(at), buy: p.q });
     else if (given) base.amt = given;
     return { K: setLevel(put(K, base, at), id, 3, at, "add"), id };
@@ -780,8 +820,12 @@
      down one level; unticking puts it back. key: one per meal, dish and ingredient. The record (K.used[key]) says what it
      changed, so an untick undoes exactly that, and only while the item still shows that level (a level he set by hand since
      stands). An item not checked yet is left alone (no made-up levels). Returns { K, id } (id: the item it moved, or null). */
+  /* d64: a capsicum is the recipes' red pepper, for taking a meal off (not for adding: "Capsicum" stays its own tile) */
+  const SAME_AS = { capsicum: "red pepper", "red capsicum": "red pepper", "bell pepper": "red pepper", "red bell pepper": "red pepper" };
   function match(K, k, name) {
-    const key = keyOf(name), list = items(K, k).filter((x) => keyOf(x.name) === key);
+    const key = keyOf(name), all = items(K, k);
+    let list = all.filter((x) => keyOf(x.name) === key);
+    if (!list.length) list = all.filter((x) => SAME_AS[keyOf(x.name)] === key);
     return list.find((x) => x.lv != null && x.lv > 0) || list[0] || null;
   }
   function dinner(K, k, key, name, on, at) {
@@ -1053,5 +1097,5 @@
 
   root.QuestKitchen = { NEED, LEVELS, KITCHENS, SEED, FRESH, DEFAULT_SHOP, GROUP_NAMES, GROUP_ICONS, keyOf, iconFor, groupIcon, splitName, amtOf, tileLine, guessGroup, guessShelf,
     items, item, grouped, setLevel, nextLevel, tap, add, rename, move, place, remove, status, shows, pace, lowAt, lowSoon, turnAt, useFirst, nextShop, parseAmt, usesOf, amountFor,
-    shopList, missing, MAX_RECIPE_ROWS, stepList, tick, buyTicked, hasQ, unitFor, qtyOf, fmtQ, recipeIn, perMeal, setAmount, restock, rateOf, toBuy, eat, setTake, taken, portion, serving, ownDishes, ownDish, saveDish, delDish, dishAmt, dishIcon, kitchenFoods, TRAVEL_STARTER, pickList, preTick, fill, unfill, shopInfo, shopWhen, shopUpto, match, dinner, active, pick, noteActive, tripEnd, bringHome, dayWord, counts };
+    shopList, missing, MAX_RECIPE_ROWS, stepList, tick, buyTicked, hasQ, isPiece, pieceCount, stepCount, unitFor, qtyOf, fmtQ, recipeIn, perMeal, setAmount, restock, rateOf, toBuy, eat, setTake, taken, portion, serving, ownDishes, ownDish, saveDish, delDish, dishAmt, dishIcon, kitchenFoods, TRAVEL_STARTER, pickList, preTick, fill, unfill, shopInfo, shopWhen, shopUpto, match, dinner, active, pick, noteActive, tripEnd, bringHome, dayWord, counts };
 })(typeof window !== "undefined" ? window : globalThis);
