@@ -55,7 +55,17 @@ test("the calendar sends a tap on another day's block through openAgendaItem; dr
 
 test("the kitchen asks What did you buy? for a Groceries block that is over, today or an earlier day, once per block", () => {
   const k = fn("openKitchen");
-  assert.match(k, /if \(fresh && ob && \(SI\.today \|\| ob\.e <= \+t\) && !kitFilled\.has\(kitBlockKey\(ob\)\)\) kitFillOpen\(S, "buy"\);/);
+  const line = /\n\s*(if \(fresh && ob [^\n]*kitFillOpen\(S, "buy"\);)/.exec(k)[1];
+  const asks = (ob, today, filled = []) => { let asked = false;
+    new Function("fresh", "ob", "SI", "t", "kitFilled", "kitBlockKey", "kitFillOpen", "S", line)(
+      true, ob, { today }, new Date("2026-10-21T14:00:00Z"), new Set(filled), b => `${b.t}|${+b.s}`, () => { asked = true; }, {});
+    return asked; };
+  const past = { t:"Groceries", s:Date.parse("2026-10-20T18:30:00Z"), e:Date.parse("2026-10-20T19:30:00Z") };
+  const future = { t:"Groceries", s:Date.parse("2026-10-22T18:30:00Z"), e:Date.parse("2026-10-22T19:30:00Z") };
+  assert.equal(asks(past, null), true, "yesterday's shop: What did you buy? opens");
+  assert.equal(asks(past, null, [`Groceries|${past.s}`]), false, "once per block");
+  assert.equal(asks(future, null), false, "a shop still to come: just the list");
+  assert.equal(asks({ t:"Groceries", s:Date.parse("2026-10-21T13:30:00Z"), e:Date.parse("2026-10-21T15:00:00Z") }, {}), true, "today's, on now: as before");
 });
 
 test("the kt-blk line names the day for a block from another day and stays bare for today's", () => {

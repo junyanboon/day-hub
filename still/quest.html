@@ -2714,7 +2714,7 @@
     const when = QK().shopWhen(kitBlocks(), t, k, TZ(), ob, ft), SI = QK().shopInfo(kitBlocks(), t, k, TZ(), ob);
     /* the fill-in picker (d35): "What did you buy?" opens by itself on a Groceries block's sheet during or after the block,
        "What did you bring?" when the travel fridge is in use and empty (until he goes back from it) */
-    // a Groceries block on another day (from the agenda) that is over asks too: he shopped yesterday (2026-10-21)
+    // a Groceries block on another day (from the agenda) that is over asks too: he shopped yesterday (2026-10-21, d28)
     if (fresh && ob && (SI.today || ob.e <= +t) && !kitFilled.has(kitBlockKey(ob))) kitFillOpen(S, "buy");
     if (!S.fill && k === "travel" && today === "travel" && !all.length && !S.noBring) kitFillOpen(S, "bring");
     const tabs = `<div class="kt-seg" role="tablist"><button type="button" role="tab" data-kv="have" aria-selected="${S.view === "have"}">What we have<small>${all.length} items</small></button>` +
@@ -2845,9 +2845,9 @@
      puts every ticked one in the kitchen at Plenty (QuestKitchen.fill), with one Undo toast for the batch.
      The seam for a later receipt photo (d29): kitFillOpen(S, "buy", names) pre-ticks the same picker from the names it read
      (QuestKitchen.preTick); names that match nothing come in as new rows, ticked. S.fill: { use, on (ticked row ids), q, extra }. */
-  // the Groceries blocks whose "What did you buy?" he already answered or closed (this page load), so it opens once per block
   // the kt-blk line's day for a block from another day of the agenda ("Yesterday · ", "Thu, Oct 22 · "); today's has none
-  const kitBlkDay = (b, t) => { const d = tzYmd(new Date(b.s)), td = tzYmd(t); return d === td ? "" : esc(dayLabel(d, td).split(" · ")[0]) + " · "; };
+  const kitBlkDay = (b, at) => { const d = tzYmd(new Date(b.s)), td = tzYmd(at); return d === td ? "" : esc(dayLabel(d, td).split(" · ")[0]) + " · "; };
+  // the Groceries blocks whose "What did you buy?" he already answered or closed (this page load), so it opens once per block
   const kitFilled = new Set(), kitBlockKey = b => `${b.t}|${+b.s}`;
   function kitFillRows(S){
     const F = S.fill, shop = kitShop(S.k);
