@@ -591,6 +591,8 @@
   .mq-part { margin:8px 2px 4px; } .mq-part.ok { color:#8fe3b0; }
   .mq-ing.none .n { opacity:.7; } .mq-else { align-self:flex-start; font-size:11px; padding:3px 9px; margin-top:-2px; }
   .mq-other { margin-top:4px; padding:6px; border-radius:10px; background:rgba(0,0,0,.15); }
+  .mq-xadd { margin-top:8px; border-style:dashed; } .sheet input.mq-xs { width:100%; margin:0 0 6px; }
+  .mq-xfree { margin:4px 0 2px; }
   .mq-full { font-size:11px; opacity:.85; }
   .mq-steps ol { margin:6px 0 0; padding-left:20px; font-size:13px; line-height:1.5; } .mq-steps li { margin:3px 0; }
   .mq-howbtn { font-size:12px; padding:5px 10px; }
@@ -947,9 +949,9 @@
 <script src="quest-oura.js?v=20261019a"></script>
 <script src="quest-levels.js?v=20261016b"></script>
 <script src="quest-gymlog.js?v=20261019a"></script>
-<script src="quest-meals.js?v=20261021d57b"></script>
-<script src="quest-kitchen.js?v=20261021d64"></script>
-<script src="quest-ideas.js?v=20261021d61"></script>
+<script src="quest-meals.js?v=20261021d70"></script>
+<script src="quest-kitchen.js?v=20261021d70d"></script>
+<script src="quest-ideas.js?v=20261021d69b"></script>
 <script src="quest-trends.js?v=20261019end3"></script>
 <script src="nvc-words.js?v=20261010a"></script>
 <script src="quest-fx.js?v=20261019x"></script>
@@ -2603,6 +2605,40 @@
       return `<div class="mq-steps${open ? " open" : ""}"><button type="button" class="mq-mini mq-howbtn" data-dhow="${esc(d.id)}" aria-expanded="${open}">How to make it <span aria-hidden="true">${open ? "▴" : "▾"}</span></button>` +
         (open ? (steps.length ? `<ol>${steps.map(x => `<li>${esc(x)}</li>`).join("")}</ol>` : `<p class="mq-how">No steps yet. Add them with Edit.</p>`) : "") + `</div>`;
     };
+    /* Extras (Junyan, 2026-10-21, d70: "There's no option to add bananas. I used collagen so I want to put that there and
+       creatine as well"): "+ Add something you put in" at the bottom of every dish card's parts or ingredients. It opens a
+       search over everything in the kitchen in use, with or without an amount (QuestKitchen.search), and takes free text
+       for a food that is not in it ("Creatine 5 g", "6 almonds"). An extra is a ticked row with what it took, changeable
+       (a count for piece foods, g or ml otherwise). A kitchen item with an amount has it taken off through the same tick
+       records as a dish tick; a level item or a food not in the kitchen takes nothing off but is on the meal
+       (QuestMeals.addExtra). Extras earn no points: the parts and the food tiles do. A tap on the row takes it off and
+       puts back what it took. */
+    const xKeyOf = (d, n) => kitEatKey(k, d.id + "+", QM.xKey(n));
+    const xWord = (d, x) => { const tk = QK() && QK().taken(G.kitchen, xKeyOf(d, x.n)), it = tk && QK().item(G.kitchen, tk.id);
+      return !it || it.del ? "not in the kitchen, nothing taken off" : kitLeftWord(it, tk); };
+    const xRow = (d, x) => `<div class="mq-ingw"><button type="button" class="mq-ing" data-xoff="${esc(d.id)}" data-xn="${esc(x.n)}" aria-pressed="true">` +
+      `<span class="bx"></span><span class="n">${esc(x.n)}<small class="mq-hv">added</small></span><span class="qty"></span></button>` +
+      `<label class="mq-take"><span>took</span><input class="mq-tq" type="number" inputmode="decimal" min="0" step="any" data-xq="${esc(d.id)}" data-xn="${esc(x.n)}" value="${x.q == null ? "" : x.q}" placeholder="?" aria-label="How much ${esc(x.n)} went in">` +
+      `<span>${kitUnit(x.u)}</span><small>${esc(xWord(d, x))}</small></label></div>`;
+    // the search results: kitchen items (not ones already added to this dish), then the free text as typed
+    const xResults = (d, text) => {
+      if (!QK()) return "";
+      const have = new Set(QM.extrasOf(rec, d.id).map(x => QM.xKey(x.n))), t = String(text || "").trim();
+      const list = QK().search(G.kitchen, kitToday(), t).filter(x => !have.has(QM.xKey(x.name))).slice(0, t ? 12 : Infinity);
+      const btn = x => `<button type="button" class="mq-ing" data-xit="${esc(x.id)}" data-xd="${esc(d.id)}" aria-pressed="false"><span class="bx"></span>` +
+        `<span class="n">${esc(x.em)} ${esc(x.name)}</span><span class="qty">${esc(kitHaveWord(x))}</span></button>`;
+      return (t ? `<button type="button" class="mq-mini go mq-xfree" data-xfree data-xd="${esc(d.id)}">Add "${esc(t.slice(0, 40))}"</button>` : "") +
+        (list.length ? (t ? `<div class="mq-ings">${list.map(btn).join("")}</div>` : QK().grouped(list).map(g => `<p class="kt-gh">${esc(g.group)}</p><div class="mq-ings">${g.list.map(btn).join("")}</div>`).join(""))
+          : t ? `<p class="mq-how">Not in the ${esc(kn ? kn.name.toLowerCase() : "kitchen")}. Add it as you typed it; nothing comes off.</p>` : `<p class="mq-how">Nothing in the kitchen yet. Type a food and how much.</p>`);
+    };
+    const extrasBlock = d => {
+      const xs = QM.extrasOf(rec, d.id), open = mqOpen.has(k + "|" + d.id + "|xtra");
+      return (xs.length ? `<p class="kt-gh mq-part ok">Also went in</p><div class="mq-ings">${xs.map(x => xRow(d, x)).join("")}</div>` : "") +
+        `<button type="button" class="mq-mini mq-xadd" data-xadd="${esc(d.id)}" aria-expanded="${open}">+ Add something you put in</button>` +
+        (open ? `<div class="mq-other"><input type="search" class="mq-xs" data-xs="${esc(d.id)}" placeholder="Search the kitchen, or type a food and amount" autocomplete="off" enterkeyhint="done">` +
+          `<p class="mq-how">Extras earn no points; the parts and the food tiles below do. Something in the kitchen with an amount comes off what you have.</p>` +
+          `<div data-xres="${esc(d.id)}">${xResults(d, "")}</div></div>` : "");
+    };
     /* A "best you can" dish (d51, d52): its parts, each showing the real ingredient if the kitchen in use has it, else the
        closest swap, else "none in the kitchen" (QuestIdeas.slotRows). Any part can take something else from the kitchen
        ("Use something else"). Points go by parts filled. The full recipe stays visible, small, so he sees the aim. */
@@ -2632,10 +2668,10 @@
       const hint = slot ? `you have ${QI().slotsHave(G.kitchen, kitToday(), d, [...on])} of ${st.m} parts · tap to open` : fit ? `${esc(fit.text)} · tap to open` : `${st.m} ${unit} · tap to open`;
       return `<div class="mq-dish${open ? " open" : ""}${st.all ? " done" : ""}">` +
         `<button type="button" class="mq-dbtn" data-dopen="${esc(d.id)}" aria-expanded="${open}"><span class="mq-de">${esc(d.icon)}</span>` +
-        `<span class="mq-dn"><b>${esc(d.name)}</b><small>${st.n ? `${st.n} of ${st.m} ${unit}` : slot ? hint.charAt(0).toUpperCase() + hint.slice(1) : hint}${d.time ? ` · ${esc(d.time)}` : ""}</small></span>` +
+        `<span class="mq-dn"><b>${esc(d.name)}</b><small>${st.n ? `${st.n} of ${st.m} ${unit}` : slot ? hint.charAt(0).toUpperCase() + hint.slice(1) : hint}${QM.extrasOf(rec, d.id).length ? ` · ${QM.extrasOf(rec, d.id).length} added` : ""}${d.time ? ` · ${esc(d.time)}` : ""}</small></span>` +
         `<span class="mq-dp">${d.own ? `<small>${d.del ? "deleted" : "your dish"}</small>` : pd ? sign(pd) : max ? `<small>up to</small> +${max}` : `<small>full for today</small>`}</span></button>` +
         `<i class="mq-dbar"><b style="width:${st.pct}%"></b></i>` +
-        (open && slot ? `<div class="mq-dlist">${slotCard(d)}${howTo(d, slotUse(d))}` +
+        (open && slot ? `<div class="mq-dlist">${slotCard(d)}${extrasBlock(d)}${howTo(d, slotUse(d))}` +
           `<div class="mq-drow"><button type="button" class="mq-mini go" data-dall="${esc(d.id)}">Got everything</button><button type="button" class="mq-mini" data-dnone="${esc(d.id)}">Clear</button>` +
           `<span class="mq-dst${st.all ? " ok" : ""}">${esc(st.text)}</span></div></div>` : "") +
         (open && !slot ? `<div class="mq-dlist"><p class="mq-serves">${d.own ? "Your usual amounts. Tick what went in; it comes off the kitchen, and you can change how much. Your dishes earn no points of their own: tap the food tiles below for those."
@@ -2646,7 +2682,7 @@
           // d48: a food taken out of his dish since this meal ticked it still shows here, so he can untick it
           (d.own ? [...on].filter(n => !d.items.some(x => x[0] === n)).map(n => kitTakeWrap(kitEatKey(k, d.id, n),
             `<button type="button" class="mq-ing" data-dname="${esc(n)}" data-did="${esc(d.id)}" aria-pressed="true">` +
-            `<span class="bx"></span><span class="n">${esc(n)}</span><span class="qty">not in the dish now</span></button>`)).join("") : "") + `</div>` +
+            `<span class="bx"></span><span class="n">${esc(n)}</span><span class="qty">not in the dish now</span></button>`)).join("") : "") + `</div>${extrasBlock(d)}` +
           (fit && (fit.buy.length || fit.check.length) ? `<p class="mq-how mq-buy">${fit.buy.length ? `<b>To buy:</b> ${esc(fit.buy.join(", "))}` : ""}${fit.buy.length && fit.check.length ? "<br>" : ""}${fit.check.length ? `<b>Not checked in the kitchen:</b> ${esc(fit.check.join(", "))}` : ""}</p>` : "") +
           howTo(d) +
           `<div class="mq-drow"><button type="button" class="mq-mini go" data-dall="${esc(d.id)}">Got everything</button><button type="button" class="mq-mini" data-dnone="${esc(d.id)}">Clear</button>` +
@@ -2768,9 +2804,73 @@
       redraw(true);
     });
     sh.querySelectorAll("[data-dname]").forEach(bn => bn.onclick = () => dishTap(bn, bn.dataset.did, bn.dataset.dname));
+    // extras (d70): open the search, add from the kitchen or as typed, change what one took, take one off
+    const mealRec = () => { const cur = (G.day.mealq || {})[k]; return cur && !cur.kind ? cur : null; };
+    const putRec = r => { (G.day.mealq = G.day.mealq || {})[k] = { ...r, at:now().toISOString() }; stampDay(); saveG(); };
+    function addExtraTo(d, x){
+      const cur = mealRec();
+      if (!x.name || QM.extrasOf(cur, d.id).some(y => QM.xKey(y.n) === QM.xKey(x.name))) return;   // already on this dish
+      let q = x.q, u = x.u || "";
+      if (x.lost) calToast(`${x.name} is kept in ${kitUnit(x.it.u) || "pieces"} in the kitchen, so "${x.lost}" could not come off as typed. Change how much it took.`, 5000);
+      if (x.it) {
+        /* nothing typed: an amount item's portion, one of a piece food; a level item kept by weight (collagen) is left
+           blank for him to fill in, never a made-up 100 g */
+        const guess = q ?? (typeof x.it.q === "number" || QK().unitOf(x.it) === "" ? QK().firstTake(x.it) : null);
+        const r0 = QK().eat(G.kitchen, kitToday(), xKeyOf(d, x.name), { id:x.it.id, note:true, ...(x.q != null ? { u } : {}) }, true, now(), guess ?? 0);
+        const tk = QK().taken(r0.K, xKeyOf(d, x.name));
+        if (tk) { q = guess == null ? null : tk.q; u = tk.u; }
+        if (r0.K !== G.kitchen) { G.kitchen = r0.K; if (r0.id) kitEatToast(r0.K, [r0.id]); }
+      }
+      putRec(QM.addExtra(cur, d.id, { n:x.name, q, u })); redraw();
+    }
+    function dropExtraFrom(d, n){
+      const r0 = QK() ? QK().eat(G.kitchen, kitToday(), xKeyOf(d, n), {}, false, now()) : { K:G.kitchen };
+      if (r0.K !== G.kitchen) { G.kitchen = r0.K; if (r0.id) kitEatToast(r0.K, [r0.id]); }
+      putRec(QM.dropExtra(mealRec(), d.id, n));
+    }
+    // Clear takes the extras off too, and puts back what they took
+    function dropAllExtras(id){ const d = dishById(id); if (d) for (const x of QM.extrasOf(mealRec(), d.id)) dropExtraFrom(d, x.n); }
+    sh.querySelectorAll("[data-xadd]").forEach(bn => bn.onclick = () => {
+      const key = k + "|" + bn.dataset.xadd + "|xtra";
+      if (mqOpen.has(key)) mqOpen.delete(key); else mqOpen.add(key);
+      redraw(true);
+      const inp = sh.querySelector(`[data-xs="${bn.dataset.xadd}"]`); if (inp && mqOpen.has(key)) inp.focus({ preventScroll:true });
+    });
+    sh.querySelectorAll("[data-xs]").forEach(inp => {
+      const d = dishById(inp.dataset.xs), box = d && sh.querySelector(`[data-xres="${d.id}"]`); if (!box) return;
+      // the results change in place as he types (a redraw would drop the keyboard)
+      inp.oninput = () => { box.innerHTML = xResults(d, inp.value); };
+      inp.onkeydown = e => { if (e.key === "Enter" && inp.value.trim()) { e.preventDefault(); addExtraTo(d, QK().extraParse(G.kitchen, kitToday(), inp.value)); } };
+      box.onclick = e => {
+        const it = e.target.closest("[data-xit]"), fr = e.target.closest("[data-xfree]");
+        if (it) {
+          const item = QK().item(G.kitchen, it.dataset.xit); if (!item) return;
+          // "6 almonds" typed, then Almonds tapped: the 6 goes with it
+          const p = QK().extraParse(G.kitchen, kitToday(), inp.value), same = p.it && p.it.id === item.id;
+          addExtraTo(d, { name:item.name, it:item, q:same ? p.q : null, u:same ? p.u : "", lost:same ? p.lost : null });
+        } else if (fr && inp.value.trim()) addExtraTo(d, QK().extraParse(G.kitchen, kitToday(), inp.value));
+      };
+    });
+    sh.querySelectorAll("[data-xoff]").forEach(bn => bn.onclick = () => {
+      const d = dishById(bn.dataset.xoff); if (!d) return;
+      const fx = window.QuestFx; if (fx) fx.back(bn.getBoundingClientRect(), { gain:0 });
+      dropExtraFrom(d, bn.dataset.xn); redraw();
+    });
+    sh.querySelectorAll("[data-xq]").forEach(inp => inp.onchange = () => {
+      const d = dishById(inp.dataset.xq); if (!d) return;
+      const raw = String(inp.value).trim(), v = parseFloat(raw.replace(",", ".")), q = raw === "" || isNaN(v) ? null : Math.max(0, v);
+      const key = xKeyOf(d, inp.dataset.xn);
+      if (q != null && QK() && QK().taken(G.kitchen, key)) { const K2 = QK().setTake(G.kitchen, key, q, now()); if (K2 !== G.kitchen) { G.kitchen = K2; const tk = QK().taken(K2, key); if (tk) kitEatToast(K2, [tk.id]); } }
+      putRec(QM.setExtraQ(mealRec(), d.id, inp.dataset.xn, q));
+      // no redraw (the next tap would be swallowed): only the words beside it change
+      const sm = inp.closest(".mq-take") && inp.closest(".mq-take").querySelector("small");
+      const x = QM.extrasOf(mealRec(), d.id).find(y => QM.xKey(y.n) === QM.xKey(inp.dataset.xn));
+      if (sm && x) sm.textContent = xWord(d, x);
+      render();
+    });
     // the kitchen (d44, d47): how much a tick took, and "From your kitchen" ticks
     kitMealBind(sh, k, redraw, b);
-    sh.querySelectorAll("[data-dnone]").forEach(bn => bn.onclick = () => dishTap(bn, bn.dataset.dnone, "none"));
+    sh.querySelectorAll("[data-dnone]").forEach(bn => bn.onclick = () => { dropAllExtras(bn.dataset.dnone); dishTap(bn, bn.dataset.dnone, "none"); });
     // his own dishes (d48): New dish and Edit open the dish editor, which comes back here
     sh.querySelectorAll("[data-dnew]").forEach(bn => bn.onclick = () => openDishEdit(b, dishNew()));
     sh.querySelectorAll("[data-dedit]").forEach(bn => bn.onclick = () => { const d = QK().ownDish(G.kitchen, bn.dataset.dedit); if (d && !d.del) openDishEdit(b, dishNew(d)); });
@@ -2787,25 +2887,30 @@
     const tk = key && QK() && QK().taken(G.kitchen, key), it = tk && QK().item(G.kitchen, tk.id);
     if (!tk || !it || it.del) return btn;
     return `<div class="mq-ingw">${btn}<label class="mq-take"><span>took</span><input class="mq-tq" type="number" inputmode="decimal" min="0" step="any" data-take="${esc(key)}" value="${tk.q}" aria-label="How much ${esc(it.name)} this meal took">` +
-      `<span>${kitUnit(it.u)}</span><small>${it.lv === 0 ? "none left" : `${esc(it.amt)} left`}</small></label></div>`;
+      `<span>${kitUnit(tk.u)}</span><small>${esc(kitLeftWord(it, tk))}</small></label></div>`;
   }
+  // beside a "took": what is left of an amount item, or (d70) a level item's level, which a tick does not change
+  // what the kitchen has of an item, in a list: "have 300 g", its level, or "not checked"
+  const kitHaveWord = x => typeof x.q === "number" ? `have ${x.amt}` : x.lv == null ? "not checked" : (KLV[x.lv] || "").toLowerCase();
+  const kitLeftWord = (it, tk) => tk && tk.nq ? `${it.lv == null ? "not checked" : (KLV[it.lv] || "").toLowerCase()} · nothing taken off` : it.lv === 0 ? "none left" : `${it.amt} left`;
   function kitMealCard(mk){
     if (!QK() || !G.day) return "";
     const kk = kitToday(), kn = QK().KITCHENS[kk], pre = kitEatKey(mk, "kitchen", ""), open = mqOpen.has(mk + "|kitchen");
     const used = (G.kitchen && G.kitchen.used) || {};
     const mine = new Set(Object.keys(used).filter(x => x.startsWith(pre) && QK().taken(G.kitchen, x)).map(x => x.slice(pre.length)));
-    const list = QK().items(G.kitchen, kk).filter(x => typeof x.q === "number" && (x.left > 0 || mine.has(x.id)));
+    // with or without an amount (d70 brief: a banana on Plenty can be ticked; a level item takes nothing off)
+    const list = QK().mealList(G.kitchen, kk, mine);
     const row = x => kitTakeWrap(mine.has(x.id) ? pre + x.id : null,
       `<button type="button" class="mq-ing" data-kown="${esc(x.id)}" aria-pressed="${mine.has(x.id)}"><span class="bx"></span>` +
-      `<span class="n">${esc(x.em)} ${esc(x.name)}</span><span class="qty">${mine.has(x.id) ? "" : `have ${esc(x.amt)}`}</span></button>`);
+      `<span class="n">${esc(x.em)} ${esc(x.name)}</span><span class="qty">${mine.has(x.id) ? "" : esc(kitHaveWord(x))}</span></button>`);
     return `<div class="mq-sub mq-subl"><span>From your kitchen · ${kn.icon} ${esc(kn.name)}</span></div><div class="mq-dishes"><div class="mq-dish${open ? " open" : ""}">` +
       `<button type="button" class="mq-dbtn" data-dopen="kitchen" aria-expanded="${open}"><span class="mq-de">🧺</span>` +
-      `<span class="mq-dn"><b>Anything else from the kitchen</b><small>${mine.size ? `${mine.size} ticked` : list.length ? `${list.length} with an amount · tap to open` : "nothing with an amount yet"}</small></span></button>` +
+      `<span class="mq-dn"><b>Anything else from the kitchen</b><small>${mine.size ? `${mine.size} ticked` : list.length ? `${list.length} in the ${esc(kn.name.toLowerCase())} · tap to open` : "nothing in it yet"}</small></span></button>` +
       (open ? `<div class="mq-dlist">` + (list.length
-        ? `<p class="mq-serves">Tick what else went in, like a swap or a banana. It comes off what you have; change how much if you need to.</p>` +
+        ? `<p class="mq-serves">Tick what else went in, like a swap or a banana. Something with an amount comes off what you have; change how much if you need to. Something on a level takes nothing off.</p>` +
           QK().grouped(list).map(g => `<p class="kt-gh">${esc(g.group)}</p><div class="mq-ings">${g.list.map(row).join("")}</div>`).join("") +
           (mine.size ? `<div class="mq-drow"><button type="button" class="mq-mini go" data-ksave>Save as a dish</button><span class="mq-dst">Your ticks and amounts become a dish of your own.</span></div>` : "")
-        : `<p class="mq-serves">Nothing in the ${esc(kn.name.toLowerCase())} has an amount yet. Give an item an amount on its Edit page in the Kitchen, or when you add or buy it, and it shows here.</p>`) +
+        : `<p class="mq-serves">Nothing in the ${esc(kn.name.toLowerCase())} yet. Add what you have in the Kitchen and it shows here.</p>`) +
         `</div>` : "") + `</div></div>`;
   }
   function kitMealBind(sh, mk, redraw, b){
@@ -2824,13 +2929,13 @@
       /* no redraw: the change fires on the blur of the tap that comes next, and a redraw would swallow that tap. Only the
          "left" words change here (the next redraw draws the rest). */
       const sm = inp.closest(".mq-take") && inp.closest(".mq-take").querySelector("small");
-      if (sm && it) sm.textContent = it.lv === 0 ? "none left" : `${it.amt} left`;
+      if (sm && it) sm.textContent = kitLeftWord(it, tk);
       render();
     });
     sh.querySelectorAll("[data-kown]").forEach(bn => bn.onclick = () => {
       const id = bn.dataset.kown, key = kitEatKey(mk, "kitchen", id), on = !QK().taken(G.kitchen, key), it = QK().item(G.kitchen, id);
       if (!it) return;
-      const r = QK().eat(G.kitchen, kitToday(), key, { id }, on, now(), on ? QK().portion(it) : null);
+      const r = QK().eat(G.kitchen, kitToday(), key, { id, note:true }, on, now(), on ? QK().firstTake(it) : null);
       if (r.K === G.kitchen) return;
       kitSave(r.K); if (r.id) kitEatToast(r.K, [r.id]); redraw();
     });

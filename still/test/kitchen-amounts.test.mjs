@@ -250,7 +250,7 @@ test("the page: take fields in the dishes, a From your kitchen card, amounts in 
   assert.match(html, /\$\{kitMealCard\(k\)\}/);
   assert.match(html, /data-take="/);
   assert.match(html, /QK\(\)\.setTake\(/);
-  assert.match(html, /QK\(\)\.portion\(/);
+  assert.match(html, /QK\(\)\.firstTake\(/);   // d70: portion() for an amount item, a first take for a level one
   assert.match(html, /data-kpq="/);
   assert.match(html, /amt:kitFillAmt\(S, r\)/);
   assert.match(html, /Amount now/);
