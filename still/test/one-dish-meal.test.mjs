@@ -23,7 +23,7 @@ test("the choices: Blueprint, his dishes, recipes (or ideas), then Something els
   assert.ok(b > 0 && o > b && r > o, "Blueprint, his dishes, then recipes or ideas");
   assert.ok(sheet.includes("${pickCard(MEAL, cur === MEAL.id)}"), "Something else last");
   // no meal yet: only the choices; a meal: its card open, Change meal folds the choices
-  assert.ok(sheet.includes('${mainId ? `${lb("This meal", "mb", 0)}'));
+  assert.ok(sheet.includes('${mainId ? `<div class="mq-mhd">${lb("This meal", "mb", 0)}<button type="button" class="mq-mini mq-howbtn" data-mchange'), "Change meal sits on the heading");
   assert.ok(sheet.includes("data-mchange") && sheet.includes('${chg ? `<div class="mq-pick">${picker(mainId)}</div>` : ""}'));
 });
 

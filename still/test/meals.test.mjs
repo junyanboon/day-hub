@@ -64,7 +64,7 @@ test("a meal block opens one screen that is the meal: no plate list, no Rate thi
 
 test("the meal screen (d83 to d85): What's this meal?, the Counted line, then the drains; no food tile grids, no note on the automatic drains", () => {
   const i = html.indexOf("function openMeal(b)"), body = html.slice(i, html.indexOf("The meal sheet's kitchen parts"));
-  const a = body.indexOf("What's this meal?"), b = body.indexOf("${counted()}"), c = body.indexOf("Drains · lower prana");
+  const a = body.indexOf("What's this meal?"), b = body.lastIndexOf("${counted()}"), c = body.indexOf("Drains · lower prana");
   assert.ok(a > 0 && b > a && c > b, "out of order or missing");
   assert.ok(!/Prana foods · Sadhguru|Body foods · Bryan Johnson/.test(body), "d83: the tile grids are gone");
   assert.ok(/<script src="quest-meals\.js\?v=\w+"><\/script>\s*<script src="quest-food-score\.js\?v=\w+"><\/script>/.test(html));

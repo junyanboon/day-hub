@@ -632,7 +632,7 @@
   .mq-pk .mq-de { font-size:19px; } .mq-pk .mq-dn b { font-size:13px; line-height:1.2; } .mq-pk .mq-dn small { font-size:10.5px; }
   .mq-pk.on { border-color:rgba(95,211,196,.8); background:rgba(95,211,196,.14); }
   div.mq-dbtn { cursor:default; padding-top:9px; }
-  .mq-chg { margin:2px 0 4px; }
+  .mq-mhd { display:flex; align-items:center; gap:8px; } .mq-mhd > .mq-lb { flex:1; min-width:0; } .mq-mhd > .mq-mini { flex:none; min-height:36px; }
   .mq-kbs { display:flex; flex-direction:column; gap:2px; }
   .mq-kg[hidden], .mq-kb[hidden] { display:none; }
   .mq-kg .kt-gh { margin:4px 2px 3px; }
@@ -2724,7 +2724,7 @@
       const have = new Set(QM.extrasOf(rec, d.id).map(x => QM.xKey(x.n)).concat(d === MEAL ? oldEat.map(x => QM.xKey(x.it.name)) : []));
       const list = QK().mealList(G.kitchen, kitToday()).filter(x => !have.has(QM.xKey(x.name)));
       const btn = x => `<button type="button" class="mq-kb" data-xit="${esc(x.id)}" data-xd="${esc(d.id)}">${esc(x.em)} ${esc(x.name)} <small>${esc(QK().hasQ(x) ? x.amt : QK().ASK)}</small></button>`;
-      return `<div class="mq-xbox"><input type="search" class="mq-xs" data-xs="${esc(d.id)}" placeholder="Search your kitchen, or type a food and amount" aria-label="Add a food to this meal" autocomplete="off" enterkeyhint="done">` +
+      return `<div class="mq-xbox"><input type="search" class="mq-xs" data-xs="${esc(d.id)}" placeholder="Search, or type a food and amount" aria-label="Add a food to this meal" autocomplete="off" enterkeyhint="done">` +
         `<div data-xfw="${esc(d.id)}"></div><div class="mq-kbs" data-xres="${esc(d.id)}">` +
         QK().grouped(list).map(g => `<div class="mq-kg"><p class="kt-gh">${esc(g.group)}</p><div class="mq-kbw">${g.list.map(btn).join("")}</div></div>`).join("") + `</div></div>`;
     };
@@ -2874,12 +2874,12 @@
     openSheet(`${winHead(b)}
       ${warn ? `<div class="warnline">${esc(warn)}</div>` : ""}
       ${lastFood ? `<p>Last food ended ${fmtT(lastFood)} (${fmtHM(Math.round((b.s - lastFood) / 60000))} before this).</p>` : ""}
-      ${mainId ? `${lb("This meal", "mb", 0)}
-      <div class="mq-dishes">${onIds.map(id => mealCard(id, id === mainId ? kitPanel(id === MEAL.id ? MEAL : dishById(id) || MEAL) : "")).join("")}</div>
-      <div class="mq-drow mq-chg"><button type="button" class="mq-mini mq-howbtn" data-mchange aria-expanded="${chg}">Change meal <span aria-hidden="true">${chg ? "▴" : "▾"}</span></button></div>
-      ${chg ? `<div class="mq-pick">${picker(mainId)}</div>` : ""}`
-      : `${lb("What's this meal?", "mb", 0)}<div class="mq-pick">${picker(null)}</div>`}
+      ${mainId ? `<div class="mq-mhd">${lb("This meal", "mb", 0)}<button type="button" class="mq-mini mq-howbtn" data-mchange aria-expanded="${chg}">Change meal <span aria-hidden="true">${chg ? "▴" : "▾"}</span></button></div>
+      ${chg ? `<div class="mq-pick">${picker(mainId)}</div>` : ""}
       ${counted()}
+      <div class="mq-dishes">${onIds.map(id => mealCard(id, id === mainId ? kitPanel(id === MEAL.id ? MEAL : dishById(id) || MEAL) : "")).join("")}</div>`
+      : `${lb("What's this meal?", "mb", 0)}<div class="mq-pick">${picker(null)}</div>
+      ${counted()}`}
       ${lb("Drains · lower prana", "mp", got(QM.DRAIN_IDS))}
       <div class="mq-drs">${QM.DRAINS.map(drain).join("")}</div>
       <div class="mq-tips"><div class="mq-tl">How to eat</div>${QM.TIPS.map(([i, t]) => `<p><span>${i}</span>${esc(t)}</p>`).join("")}</div>
