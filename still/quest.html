@@ -589,7 +589,7 @@
   .mq-row:has(> .mq-ing[aria-pressed="true"]) { box-shadow:inset 0 0 0 1px rgba(95,211,196,.8); background:rgba(95,211,196,.18); }
   .mq-row > .mq-ing { flex:1; min-width:0; min-height:44px; border:0; border-radius:10px; background:transparent; }
   .mq-row > .mq-ing[aria-pressed="true"] { background:transparent; }
-  .mq-row.tk > .mq-ing .qty { display:none; }
+  .mq-row.tk > .mq-ing .qty { display:none; } .mq-ra { display:none; } .mq-row.tk .mq-ra { display:inline; } .mq-row.tk small.mq-ra { display:block; }
   .mq-take { display:flex; font-size:11.5px; color:var(--ink-soft); }
   .mq-row .mq-take { flex:none; flex-direction:column; align-items:flex-end; justify-content:center; gap:1px; min-height:44px; padding:2px 7px 2px 0; cursor:text; }
   .mq-tqw { display:flex; align-items:center; gap:4px; white-space:nowrap; }
@@ -2642,8 +2642,7 @@
       return !it || it.del ? "not in the kitchen, nothing taken off" : kitLeftWord(it, tk); };
     const xRow = (d, x) => `<div class="mq-row tk"><button type="button" class="mq-ing" data-xoff="${esc(d.id)}" data-xn="${esc(x.n)}" aria-pressed="true">` +
       `<span class="bx"></span><span class="n">${esc(x.n)}<small class="mq-hv">added</small></span></button>` +
-      `<label class="mq-take"><span class="mq-tqw"><span>took</span><input class="mq-tq" type="number" inputmode="decimal" min="0" step="any" data-xq="${esc(d.id)}" data-xn="${esc(x.n)}" value="${x.q == null ? "" : x.q}" placeholder="?" aria-label="How much ${esc(x.n)} went in">` +
-      `<span>${kitUnit(x.u)}</span></span><small>${esc(xWord(d, x))}</small></label></div>`;
+      `${tookLabel(`data-xq="${esc(d.id)}" data-xn="${esc(x.n)}"`, x.q, x.u, xWord(d, x), `How much ${x.n} went in`)}</div>`;
     // the search results: kitchen items (not ones already added to this dish), then the free text as typed
     const xResults = (d, text) => {
       if (!QK()) return "";
@@ -2681,8 +2680,8 @@
       return parts.map((p, si) => `<div class="mq-rows mq-prt${p.filled ? " ok" : ""}">` +
           p.rows.map((r, ri) => kitTakeWrap(r.on ? kitEatKey(k, d.id, r.entry) : null,
             `<button type="button" class="mq-ing${r.st === "none" && !r.on ? " none" : ""}" data-dsl="${esc(d.id)}" data-si="${si}" data-ri="${ri}" aria-pressed="${r.on}">` +
-            `<span class="bx"></span><span class="n">${esc(r.name)}<small class="mq-hv${r.on ? "" : ` ${r.st}`}"><b class="mq-pl">${esc(p.role)}</b>` +
-            `${r.swap ? ` · for ${esc(r.for.split(",")[0])}` : ""}${r.on ? "" : ` · ${esc(r.word)}`}</small></span><span class="qty">${esc(r.amt)}</span></button>`,
+            `<span class="bx"></span><span class="n">${esc(r.name)}<small class="mq-hv${r.on ? "" : ` ${r.st}`}"><b class="mq-pl">${esc(p.role)}${p.filled ? " ✓" : ""}</b>` +
+            `${r.swap ? ` · for ${esc(r.for.split(",")[0])}` : ""}${r.on ? `<span class="mq-ra"> · ${esc(r.amt)}</span>` : ` · ${esc(r.word)}`}</small></span><span class="qty">${esc(r.amt)}</span></button>`,
             ri ? `<span class="mq-sw" aria-hidden="true"></span>` : sw(p, si))).join("") +
           `</div>` + pick(p, si)).join("");
     };
@@ -2702,7 +2701,8 @@
         (open && !slot ? `<div class="mq-dlist">` +
           `<div class="mq-rows">${d.items.map(([n, amt], i) => kitTakeWrap(on.has(n) ? kitEatKey(k, d.id, n) : null,
             `<button type="button" class="mq-ing" data-ding="${esc(d.id)}" data-i="${i}" aria-pressed="${on.has(n)}">` +
-            `<span class="bx"></span><span class="n">${esc(n)}${fit && !on.has(n) && fit.rows[i] ? `<small class="mq-hv ${fit.rows[i].st}">${esc(fit.rows[i].word)}</small>` : ""}</span><span class="qty">${esc(amt)}</span></button>`)).join("")}` +
+            `<span class="bx"></span><span class="n">${esc(n)}${fit && !on.has(n) && fit.rows[i] ? `<small class="mq-hv ${fit.rows[i].st}">${esc(fit.rows[i].word)}</small>` : ""}` +
+            `${on.has(n) ? `<small class="mq-hv mq-ra">${esc(amt)}</small>` : ""}</span><span class="qty">${esc(amt)}</span></button>`)).join("")}` +
           // d48: a food taken out of his dish since this meal ticked it still shows here, so he can untick it
           (d.own ? [...on].filter(n => !d.items.some(x => x[0] === n)).map(n => kitTakeWrap(kitEatKey(k, d.id, n),
             `<button type="button" class="mq-ing" data-dname="${esc(n)}" data-did="${esc(d.id)}" aria-pressed="true">` +
@@ -2911,9 +2911,13 @@
   function kitTakeWrap(key, btn, side){
     const tk = key && QK() && QK().taken(G.kitchen, key), it = tk && QK().item(G.kitchen, tk.id);
     if (!tk || !it || it.del) return `<div class="mq-row">${btn}${side || ""}</div>`;
-    return `<div class="mq-row tk">${btn}<label class="mq-take"><span class="mq-tqw"><span>took</span><input class="mq-tq" type="number" inputmode="decimal" min="0" step="any" data-take="${esc(key)}" value="${tk.q}" aria-label="How much ${esc(it.name)} this meal took">` +
-      `<span>${kitUnit(tk.u)}</span></span><small>${esc(kitLeftWord(it, tk))}</small></label>${side || ""}</div>`;
+    return `<div class="mq-row tk">${btn}${tookLabel(`data-take="${esc(key)}"`, tk.q, tk.u, kitLeftWord(it, tk), `How much ${it.name} this meal took`)}${side || ""}</div>`;
   }
+  /* the "took [30] g" field over its words (what is left), for a dish tick and an extra; attrs: the data-* the handler reads
+     (already escaped). The words are the label's only small: the change handlers update them in place. */
+  const tookLabel = (attrs, q, u, word, aria) => `<label class="mq-take"><span class="mq-tqw"><span>took</span>` +
+    `<input class="mq-tq" type="number" inputmode="decimal" min="0" step="any" ${attrs} value="${q == null ? "" : esc(String(q))}" placeholder="?" aria-label="${esc(aria)}">` +
+    `<span>${kitUnit(u)}</span></span><small>${esc(word)}</small></label>`;
   // beside a "took": what is left of an amount item, or (d70) a level item's level, which a tick does not change
   // what the kitchen has of an item, in a list: "have 300 g", its level, or "not checked"
   const kitHaveWord = x => typeof x.q === "number" ? `have ${x.amt}` : x.lv == null ? "not checked" : (KLV[x.lv] || "").toLowerCase();
