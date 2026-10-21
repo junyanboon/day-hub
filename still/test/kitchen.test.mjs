@@ -24,7 +24,8 @@ test("Home starts from the catalogue, every item grey (not checked); the travel 
   assert.equal(K.items({}, "travel").length, 0);
   const c = K.counts({}, "home", T0, T0 + 7 * D);
   assert.deepEqual(J(c), { total: K.SEED.length, unchecked: K.SEED.length, low: 0, soon: 0 });
-  assert.equal(K.shopList({}, "home", T0, T0 + 7 * D, DISHES).count, 0);   // grey is never on the list
+  // grey is never on the list; only a Blueprint recipe food the kitchen has no item for at all is (d53)
+  assert.deepEqual(J(K.shopList({}, "home", T0, T0 + 7 * D, DISHES).groups.flatMap((g) => g.list.map((r) => [r.it.name, r.why]))), [["Sunflower lecithin", "none"]]);
 });
 
 test("one tap steps down: grey to Plenty, then Half, Low, Out, and back to Plenty", () => {
@@ -225,7 +226,7 @@ test("the shopping list: low and out, plus what runs low before the next Groceri
   const shop = K.nextShop([{ t: "Groceries", s: at(4 * 24) }, { t: "Dinner", s: at(5) }], T0, "home");
   assert.equal(shop.at, T0 + 4 * D);
   const L = K.shopList(k, "home", T0, shop.at, DISHES);
-  assert.deepEqual(J(L.groups.map((g) => [g.shelf.id, g.list.map((r) => [r.it.name, r.why])])),
+  assert.deepEqual(J(L.groups.map((g) => [g.shelf.id, g.list.filter((r) => r.why !== "none").map((r) => [r.it.name, r.why])])),
     [["fridge", [["Broccoli", "out"], ["Spinach", "soon"]]], ["pantry", [["Chickpeas", "low"]]]]);
   assert.equal(L.dinners, 4);
   const br = L.groups[0].list[0];

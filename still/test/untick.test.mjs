@@ -225,7 +225,7 @@ test("quest.html: the tile tap runs tapDay, counts read habitCount, owed take-ba
   assert.match(q, /id="oEdit">Change time or name</, "and the block can still be changed from there");
   const so = html.slice(html.indexOf("function blockList("), html.indexOf("function blockList(") + 900);
   assert.match(so, /QB\(\)\.outdoorBlock\(b\.t\)\) return "outdoor"/, "a walk or hike opens its barefoot tile");
-  const mq = html.indexOf("function openMeal"), m = html.slice(mq, mq + 12000);   // longer since the dish checklists (2026-10-20)
+  const mq = html.indexOf("function openMeal"), m = html.slice(mq, html.indexOf("The meal sheet's kitchen parts"));   // the whole meal sheet (2026-10-21, d51)
   assert.match(m, /fx\.back\(/, "meal tiles use the same take-back animation");
   assert.match(html, /\[data-tick\][^]{0,300}\(W\.t = W\.t \|\| \{\}\)\[i\] = now\(\)\.toISOString\(\)/, "prep lists stamp their steps too");
   for (const f of ["quest-merge", "quest-fx", "quest-basics"]) assert.match(html, new RegExp(`${f}\\.js\\?v=2026(1019[x-z]|1020a|1020k\\d|1021d48)`), f);

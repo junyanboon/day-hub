@@ -78,6 +78,63 @@
       ["Chia seeds", "2 tbsp"], ["Ground flaxseed", "2 tbsp"], ["Sunflower lecithin", "2 tsp"], ["Cocoa powder", "2 tbsp"],
       ["Cinnamon", "½ tsp"], ["Pomegranate juice", "120 ml"], ["Blueberries", "100 g"], ["Cherries", "100 g"]] },
   ];
+  /* "Best you can" dishes (Junyan, 2026-10-21, d51: "I should try my best to make a super-veggie like dish based on what's
+     available. Same thing with nutty pudding"; "the goal is to try to help me get to the full recipe as close as I can").
+     Each Blueprint dish is made of parts (slots), one per role. A part lists the real ingredients with their amounts (the
+     full recipe above, same names and amounts) and, for each, the swaps that can stand in: [name, amount, [swap names],
+     any (a pattern: any kitchen item whose name matches, "any mushroom")]. The meal sheet shows each real ingredient if
+     the kitchen in use has it, else the closest swap it has, else "none in the kitchen" (QuestIdeas.slotRows). A swap
+     takes the real ingredient's amount. d52: the dish pays by parts filled (5 of 8 parts, 5/8 of its value).
+     Steps (d53): "How to make it", numbered. A {part} in a step is filled with what he is using today; {a|b} joins the
+     names of both parts; a step whose parts are all empty is left out. Cooked soft and with little oil (his gut plan,
+     2026-10-21): steamed or simmered, never fried. Plain strings, so a recipe library can feed the same shape later. */
+  const SLOTS = {
+    sv: [
+      { id: "greens", role: "Greens", want: [["Broccoli", "175 g", ["Frozen broccoli", "Kale", "Cabbage", "Brussels sprouts", "Romanesco"]],
+        ["Cauliflower", "175 g", ["Frozen broccoli", "Kale", "Cabbage", "Brussels sprouts", "Romanesco"]]] },
+      { id: "legume", role: "Lentils or beans", want: [["Black lentils, dry", "90 g", ["Green lentils", "Red lentils", "Brown lentils", "Navy beans", "White beans", "Chickpeas"]]] },
+      { id: "mushroom", role: "Mushroom", want: [["Shiitake mushrooms", "100 g", [], "mushroom|portobello|chanterelle|enoki|oyster|cremini|porcini"]] },
+      { id: "ginger", role: "Ginger", want: [["Fresh ginger, grated", "2 tbsp", []]] },
+      { id: "acid", role: "Lime and vinegar", want: [["Lime", "1", ["Lemons"]], ["Apple cider vinegar", "2 tbsp", [], "vinegar"]] },
+      { id: "spice", role: "Spice", want: [["Ground cumin", "2 tsp", ["Ground coriander", "Turmeric", "Smoked paprika", "Curry powder"]]] },
+      { id: "seeds", role: "Seeds", want: [["Hemp seeds", "4 tbsp", ["Pumpkin seeds", "Sunflower seeds", "Ground flax"]]] },
+      { id: "oil", role: "Oil", want: [["Extra virgin olive oil", "30 ml", [], "\\boil\\b"]] },
+    ],
+    np: [
+      { id: "milk", role: "Nut milk", want: [["Macadamia milk", "240 ml", ["Almond milk", "Cashew milk", "Oat milk", "Soy milk"], "(nut|seed|hemp|coconut) milk"]] },
+      { id: "nuts", role: "Ground nuts", want: [["Macadamia nuts, ground", "4 tbsp", ["Almonds", "Cashews", "Hazelnuts", "Pecans"], "\\bnuts?\\b"]] },
+      { id: "walnuts", role: "Walnuts", want: [["Walnuts", "2 tbsp", ["Pecans"]]] },
+      { id: "brazil", role: "Brazil nuts", want: [["Brazil nuts", "2", []]] },
+      { id: "chia", role: "Chia", want: [["Chia seeds", "2 tbsp", []]] },
+      { id: "flax", role: "Flax", want: [["Ground flaxseed", "2 tbsp", []]] },
+      { id: "lecithin", role: "Lecithin", want: [["Sunflower lecithin", "2 tsp", ["Soy lecithin"]]] },
+      { id: "cocoa", role: "Cocoa", want: [["Cocoa powder", "2 tbsp", ["Cacao powder", "Cacao"]]] },
+      { id: "cinnamon", role: "Cinnamon", want: [["Cinnamon", "½ tsp", []]] },
+      { id: "juice", role: "Juice", want: [["Pomegranate juice", "120 ml", ["Tart cherry juice"], "juice"]] },
+      { id: "berries", role: "Berries", want: [["Blueberries", "100 g", ["Frozen berries", "Raspberries", "Blackberries", "Strawberries"], "berr(y|ies)|cherr(y|ies)"],
+        ["Cherries", "100 g", ["Frozen berries", "Raspberries", "Blackberries", "Strawberries"], "berr(y|ies)|cherr(y|ies)"]] },
+    ],
+  };
+  const STEPS = {
+    sv: [
+      "Rinse the {legume}. Dry lentils: simmer in plenty of water until very soft, 25 to 30 min, then drain. Cooked beans or chickpeas: warm them in a little water for 5 min.",
+      "Cut the {greens} small and steam until soft, 8 to 10 min. Softer is easier on the gut.",
+      "Slice the {mushroom} and simmer in a splash of water until soft, about 5 min.",
+      "Stir in the {ginger|spice} for the last minute.",
+      "Put everything in a bowl and dress it with the {acid}.",
+      "Drizzle over the {oil}.",
+      "Top with the {seeds} and eat it warm.",
+    ],
+    np: [
+      "Pour the {milk} into a blender.",
+      "Add the {nuts|walnuts|brazil} and blend until smooth, about 1 min.",
+      "Add the {chia|flax|lecithin|cocoa|cinnamon} and blend a few seconds more.",
+      "Stir in the {juice}.",
+      "Let it sit at least 10 min so it thickens and the seeds soften (longer is gentler on the gut).",
+      "Top with the {berries}.",
+    ],
+  };
+  for (const d of DISHES) { d.slots = SLOTS[d.id]; d.steps = STEPS[d.id]; }
   /* Tonight's ideas, for 2 people. Since 2026-10-21 (d41) the page shows three a day picked from what is in the kitchen
      (quest-ideas.js, whose pool starts with these three, same ids); this list is what shows when that module is not
      loaded. Ids must stay unique across the pool. */
@@ -174,6 +231,46 @@
     || (!list && root.QuestIdeas ? root.QuestIdeas.byId(id) : null) || null;
   const gotOf = (rec, d) => { const g = rec && rec.dish && Array.isArray(rec.dish[d.id]) ? rec.dish[d.id] : [];
     return d.items.map((x) => x[0]).filter((n) => g.includes(n)); };
+  /* Parts (d51). A tick on a part dish is stored as "<part id>:<what he used>" ("greens:Kale"). A meal ticked before parts
+     holds the recipe's own names ("Broccoli"), which read as their part, so it still counts and can be unticked. */
+  const isSlotDish = (d) => !!d && Array.isArray(d.slots) && d.slots.length > 0;
+  function slotOf(d, entry) {
+    if (!isSlotDish(d) || typeof entry !== "string") return null;
+    const m = /^([a-z]+):(.+)$/.exec(entry);
+    if (m && d.slots.some((s) => s.id === m[1])) return { slot: m[1], name: m[2] };
+    const s = d.slots.find((x) => x.want.some((w) => w[0] === entry));
+    return s ? { slot: s.id, name: entry } : null;
+  }
+  // what a tick names: the food of a part tick, else the ingredient itself
+  const entryName = (d, entry) => { const p = slotOf(d, entry); return p ? p.name : entry; };
+  // the part dish's ticks that read (in order), and the parts they fill
+  const entriesOf = (rec, d) => (rec && rec.dish && Array.isArray(rec.dish[d.id]) ? rec.dish[d.id] : []).filter((e) => slotOf(d, e));
+  const filledOf = (rec, d) => new Set(entriesOf(rec, d).map((e) => slotOf(d, e).slot));
+  // how many parts a dish has: its parts, else its ingredients
+  const partsOf = (d) => (isSlotDish(d) ? d.slots.length : d.items.length);
+  /* "How to make it" (d53): numbered steps. use: { part id: [names used today] } for a part dish (else the recipe's own
+     names). His own dishes and a recipe library give steps as a list; tonight's ideas keep one paragraph (how), split
+     into its sentences. */
+  const lowName = (n) => String(n).split(",")[0].trim().toLowerCase().replace(/\bbrazil\b/g, "Brazil");
+  const joinNames = (l) => (l.length < 2 ? l.join("") : l.slice(0, -1).join(", ") + " and " + l[l.length - 1]);
+  function stepsOf(d, use) {
+    if (!d) return [];
+    if (isSlotDish(d)) {
+      const u = use || Object.fromEntries(d.slots.map((s) => [s.id, s.want.map((w) => w[0])]));
+      return (d.steps || []).map((t) => {
+        let empty = false;
+        const out = t.replace(/\{([a-z|]+)\}/g, (m0, ids) => {
+          const names = [...new Set(ids.split("|").flatMap((id) => (u[id] || []).map(lowName)))];
+          if (!names.length) empty = true;
+          return joinNames(names);
+        });
+        return empty ? null : out;
+      }).filter(Boolean);
+    }
+    if (Array.isArray(d.steps)) return d.steps.filter((x) => typeof x === "string" && x.trim()).map((x) => x.trim());
+    if (typeof d.how === "string" && d.how.trim()) return d.how.trim().split(/(?<=\.)\s+(?=[A-Z0-9])/);
+    return [];
+  }
   /* A daily cap (Junyan, 2026-10-20, d17: "17 yes"). Blueprint dishes share the Blueprint meal's old limit across all
      meals of the day: two a day, the first worth its full value (+9 at level 1), the second the habit's next step on the
      DIM curve (+6), nothing after. Tonight's ideas get their own cap of the same shape, so a recipe never uses up a
@@ -207,9 +304,15 @@
   // the max this dish keeps on the record once started, else what a start now would get
   const capOf = (rec, d, opt) => { const v = rec && rec.v && rec.v["dish:" + d.id]; return v && +v[2] > 0 ? +v[2] : dishMax(opt); };
   // what n of the dish's ingredients are worth: its share of max
-  const dishPay = (d, n, opt, max) => (d.items.length ? Math.round((max ?? dishMax(opt)) * Math.min(n, d.items.length) / d.items.length) : 0);
+  const dishPay = (d, n, opt, max) => { const m = partsOf(d); return m ? Math.round((max ?? dishMax(opt)) * Math.min(n, m) / m) : 0; };
   // "3 of 10 ingredients", what is missing, and whether it is all in
   function dishStatus(rec, d) {
+    if (isSlotDish(d)) {   // d52: parts filled, and the parts still empty by their role
+      const f = filledOf(rec, d), m = d.slots.length, n = f.size, missing = d.slots.filter((s) => !f.has(s.id)).map((s) => s.role);
+      const all = n === m;
+      const text = all ? "All in. Full points." : n ? `Missing: ${missing.slice(0, 2).join(", ")}${missing.length > 2 ? ` and ${missing.length - 2} more` : ""}` : "";
+      return { n, m, all, missing, pct: Math.round((n / m) * 100), text };
+    }
     const got = gotOf(rec, d), m = d.items.length, n = got.length;
     const missing = d.items.map((x) => x[0]).filter((x) => !got.includes(x));
     const all = n === m && m > 0;
@@ -222,6 +325,7 @@
   function tick(rec, d, how, opt) {
     const r = { ...(rec || {}), sel: [...((rec && Array.isArray(rec.sel)) ? rec.sel : [])], v: { ...((rec && rec.v) || {}) },
       p: +((rec && rec.p) || 0), b: +((rec && rec.b) || 0), dish: { ...((rec && rec.dish) || {}) } };
+    if (isSlotDish(d)) return tickSlots(r, d, how, opt);
     let got = gotOf(r, d);
     if (how === "all") got = d.items.map((x) => x[0]);
     else if (how === "none") got = [];
@@ -244,9 +348,27 @@
     r.b += dd;
     return { rec: r, ops: dd ? [{ id: key, on: dd > 0, m: "b", d: dd }] : [], done: (r.v[key] ? isDone : 0) - wasDone };
   }
+  /* A part dish (d51, d52): how is one tick ("greens:Kale", or an old recipe name) to tick or untick, a list (the ticks it
+     should have now: the page's "Got everything", what each part shows), "all" (the full recipe) or "none" (Clear). It pays its share of the
+     dish's value by parts filled. A tick that no longer reads is dropped. */
+  function tickSlots(r, d, how, opt) {
+    let got = entriesOf(r, d);
+    if (how === "none") got = [];
+    else if (how === "all") got = d.slots.flatMap((sl) => sl.want.map((w) => w[0]));   // the full recipe, by its own names
+    else if (Array.isArray(how)) got = [...new Set(how.filter((e) => slotOf(d, e)))];
+    else if (slotOf(d, how)) got = got.includes(how) ? got.filter((x) => x !== how) : got.concat(how);
+    const key = "dish:" + d.id, old = r.v[key], was = old ? +old[1] || 0 : 0, wasDone = old && old[3] ? 1 : 0;
+    const n = new Set(got.map((e) => slotOf(d, e).slot)).size;
+    const max = capOf(r, d, opt), now = n ? dishPay(d, n, opt, max) : 0, dd = now - was;
+    const isDone = n === d.slots.length && max > 0 ? 1 : 0;
+    if (got.length) r.dish[d.id] = got; else delete r.dish[d.id];
+    if (n && max > 0) r.v[key] = ["b", now, max, isDone]; else delete r.v[key];
+    r.b += dd;
+    return { rec: r, ops: dd ? [{ id: key, on: dd > 0, m: "b", d: dd }] : [], done: (r.v[key] ? isDone : 0) - wasDone };
+  }
   // what one dish has paid on this record (shown on its card)
   const dishPaid = (rec, d) => (rec && rec.v && rec.v["dish:" + d.id] ? +rec.v["dish:" + d.id][1] || 0 : 0);
 
   root.QuestMeals = { PRANA_FOODS, PRANA_WAYS, TIPS, DRAINS, BODY, LEGACY_BODY, JUNK, ONEOF, FOOD_IDS, DRAIN_IDS, AUTO_NOTE,
-    DISH_VALUE, DISHES, IDEAS, SHORT, tileLabel, value, score, toggle, tally, tap, meterOf, dishOf, groupOf, slotsUsed, dishMax, capOf, dishPay, dishStatus, tick, dishPaid };
+    DISH_VALUE, DISHES, IDEAS, SLOTS, STEPS, isSlotDish, slotOf, entryName, entriesOf, filledOf, partsOf, stepsOf, SHORT, tileLabel, value, score, toggle, tally, tap, meterOf, dishOf, groupOf, slotsUsed, dishMax, capOf, dishPay, dishStatus, tick, dishPaid };
 })(typeof window !== "undefined" ? window : globalThis);

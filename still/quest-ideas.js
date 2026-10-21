@@ -196,5 +196,51 @@
     return res;
   }
 
-  root.QuestIdeas = { get POOL() { return POOL(); }, MORE, banned, byId, staple, read, status, pick, jitter, atStart };
+  /* "Best you can" parts (Junyan, 2026-10-21, d51). For a part dish (QuestMeals SLOTS: Super Veggie, Nutty Pudding) and
+     the meal's ticks on it, what each part shows in kitchen k:
+     - a tick stays where it is (the food he used, matched to the real ingredient it stands for), so a row never moves
+       under his finger when the tick takes the last of it;
+     - every other real ingredient shows itself when the kitchen has it, else the closest swap it has (its listed swaps
+       in order, then any item matching the part's pattern), else itself when not checked yet, else itself marked
+       "none in the kitchen". One food is never shown in two places in the dish, and real ingredients are placed first,
+       so a swap never takes a food another part needs.
+     Returns [{ id, role, filled, rows: [{ entry (what a tick stores), name, amt, on, swap, for (the real ingredient),
+     st ("have" | "unchecked" | "none"), word, it }] }]. */
+  function slotRows(K, k, d, entries) {
+    const M = QM(), kit = byKey(K, k), all = QK().items(K, k), key = QK().keyOf;
+    const look = (name) => { const it = kit.get(key(name)) || null;
+      const st = !it || it.lv === 0 ? "none" : it.lv == null ? "unchecked" : "have";
+      return { it: st === "none" ? null : it, st }; };
+    const ents = (entries || []).map((e) => ({ e, p: M.slotOf(d, e) })).filter((x) => x.p);
+    const used = new Set(ents.map((x) => key(x.p.name)));
+    const parts = d.slots.map((s) => {
+      const rows = s.want.map((w) => ({ w, for: w[0], amt: w[1], entry: null }));
+      const mine = ents.filter((x) => x.p.slot === s.id), rest = [];
+      for (const x of mine) { const r = rows.find((y) => !y.entry && key(y.for) === key(x.p.name)); if (r) Object.assign(r, { entry: x.e, name: x.p.name, swap: false }); else rest.push(x); }
+      for (const x of rest) { const r = rows.find((y) => !y.entry);
+        if (r) Object.assign(r, { entry: x.e, name: x.p.name, swap: true });
+        else rows.push({ w: s.want[0], for: s.want[0][0], amt: s.want[0][1], entry: x.e, name: x.p.name, swap: true }); }
+      return { s, rows };
+    });
+    const open = () => parts.flatMap((p) => p.rows.filter((r) => !r.entry && !r.name).map((r) => ({ p, r })));
+    const take = (r, name, swap) => { r.name = name; r.swap = swap; used.add(key(name)); };
+    const cands = (w) => { const out = (w[2] || []).slice();
+      if (w[3]) { const re = new RegExp(w[3], "i"); for (const it of all) if (re.test(it.name)) out.push(it.name); }
+      return out; };
+    // the real ingredients the kitchen has, then swaps it has, then real ones not checked yet, then swaps not checked yet
+    for (const { r } of open()) if (!used.has(key(r.for)) && look(r.for).st === "have") take(r, r.for, false);
+    for (const { r } of open()) { const n = cands(r.w).find((c) => !used.has(key(c)) && look(c).st === "have"); if (n) take(r, (kit.get(key(n)) || {}).name || n, true); }
+    for (const { r } of open()) if (!used.has(key(r.for)) && look(r.for).st === "unchecked") take(r, r.for, false);
+    for (const { r } of open()) { const n = (r.w[2] || []).find((c) => !used.has(key(c)) && look(c).st === "unchecked"); if (n) take(r, (kit.get(key(n)) || {}).name || n, true); }
+    for (const { r } of open()) { r.name = r.for; r.swap = false; r.none = true; }
+    return parts.map(({ s, rows }) => ({ id: s.id, role: s.role, filled: rows.some((r) => r.entry),
+      rows: rows.map((r) => { const l = r.none ? { it: null, st: "none" } : look(r.name);
+        const word = l.st === "none" ? "none in the kitchen" : l.st === "unchecked" ? "not checked"
+          : typeof l.it.q === "number" ? `have ${l.it.amt}` : (QK().LEVELS[l.it.lv] || "").toLowerCase();
+        return { entry: r.entry || `${s.id}:${r.name}`, name: r.name, amt: r.amt, on: !!r.entry, swap: !!r.swap, for: r.for, st: l.st, word, it: l.it }; }) }));
+  }
+  // the parts a part dish could fill from kitchen k now (ticked, or a food it has): "you have 6 of 8 parts"
+  const slotsHave = (K, k, d, entries) => slotRows(K, k, d, entries).filter((p) => p.filled || p.rows.some((r) => r.st === "have")).length;
+
+  root.QuestIdeas = { get POOL() { return POOL(); }, MORE, banned, byId, staple, read, status, pick, jitter, atStart, slotRows, slotsHave };
 })(typeof window !== "undefined" ? window : globalThis);
