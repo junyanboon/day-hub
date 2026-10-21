@@ -177,7 +177,7 @@
      keeps the most it may pay (its max) on its paid record, so later ticks and unticks always use the same max and an
      untick takes back exactly what it paid; Clear frees the slot. opt: { mult, dish (the habit's value), dim (DIM),
      dishLimit (its daily limit), used (slots other dishes of its group hold today) }. */
-  const groupOf = (d) => (DISHES.some((x) => x.id === d.id) ? "bp" : "idea");
+  const groupOf = (d) => (d && d.own ? "own" : DISHES.some((x) => x.id === d.id) ? "bp" : "idea");
   // the slots dishes of d's group hold today across G.day.mealq, leaving out d itself on meal k. A Blueprint tile ticked
   // before 2026-10-20 still holds a Blueprint slot.
   function slotsUsed(mealq, k, d) {
@@ -209,7 +209,7 @@
     const got = gotOf(rec, d), m = d.items.length, n = got.length;
     const missing = d.items.map((x) => x[0]).filter((x) => !got.includes(x));
     const all = n === m && m > 0;
-    const text = all ? "All in. Full points." : n ? `Missing: ${missing.slice(0, 2).join(", ")}${missing.length > 2 ? ` and ${missing.length - 2} more` : ""}` : "";
+    const text = all ? (d.own ? "All in." : "All in. Full points.") : n ? `Missing: ${missing.slice(0, 2).join(", ")}${missing.length > 2 ? ` and ${missing.length - 2} more` : ""}` : "";
     return { n, m, all, missing, pct: m ? Math.round((n / m) * 100) : 0, text };
   }
   /* Tick or untick one ingredient (how = its name), or "all" (Got everything) or "none" (Clear). Pays the difference
@@ -223,10 +223,15 @@
     else if (how === "none") got = [];
     else if (d.items.some((x) => x[0] === how)) got = got.includes(how) ? got.filter((x) => x !== how) : got.concat(how);
     const key = "dish:" + d.id, old = r.v[key], was = old ? +old[1] || 0 : 0, wasDone = old && old[3] ? 1 : 0;
-    const max = capOf(r, d, opt), now = got.length ? dishPay(d, got.length, opt, max) : 0, dd = now - was;
+    /* his own dishes (d48) pay nothing and hold no slot: the food tiles pay for what was in it, and a dish of his can
+       never pay the Blueprint dish value. A food he has since taken out of the dish stays ticked on a meal logged before,
+       so the page's before and after agree and nothing is put back on the kitchen. */
+    const names = d.items.map((x) => x[0]), stale = d.own && rec && rec.dish && Array.isArray(rec.dish[d.id]) ? rec.dish[d.id].filter((x) => !names.includes(x)) : [];
+    const max = d.own ? 0 : capOf(r, d, opt), now = got.length ? dishPay(d, got.length, opt, max) : 0, dd = now - was;
     // d18 ("18 yes"): a Blueprint dish with every ingredient ticked counts as the Blueprint meal done today
     const isDone = groupOf(d) === "bp" && got.length === d.items.length && max > 0 ? 1 : 0;
-    if (got.length) r.dish[d.id] = d.items.map((x) => x[0]).filter((x) => got.includes(x)); else delete r.dish[d.id];
+    const keep = names.filter((x) => got.includes(x)).concat(stale);
+    if (keep.length) r.dish[d.id] = keep; else delete r.dish[d.id];
     // [meter, paid, max, counted as done]; kept while ticked and the dish has a slot, so the slot and the max hold
     if (got.length && max > 0) r.v[key] = ["b", now, max, isDone]; else delete r.v[key];
     r.b += dd;

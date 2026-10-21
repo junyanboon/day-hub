@@ -194,7 +194,8 @@
      Item by item, the later change (at) wins, and a delete is a mark (del) that wins the same way, so two devices that
      change different items both keep theirs and a deleted item never comes back. Each item's level history (hist, which
      teaches his pace) is kept from both. Shelf checks: the later time. Shopping ticks, dinner records (used) and the
-     kitchen picked for a day: per key, the later change. The trip marks: the later day. */
+     kitchen picked for a day: per key, the later change. His own dishes (d48): per dish, the later change, a
+     delete being a mark (del) that wins the same way. The trip marks: the later day. */
   function mergeKitchen(o, n) {
     if (!o || typeof o !== "object") return n;
     if (!n || typeof n !== "object") return o;
@@ -215,7 +216,7 @@
     for (const [k, v] of Object.entries(obj(n.shelves))) if (!shelves[k] || ms(v) > ms(shelves[k])) shelves[k] = v;
     const trip = { ...obj(o.trip) };
     for (const [k, v] of Object.entries(obj(n.trip))) if (!trip[k] || String(v) > String(trip[k])) trip[k] = v;
-    return { ...o, ...n, items, shelves, shop: perKey(o.shop, n.shop), used: perKey(o.used, n.used), pick: later(o.pick, n.pick) || null, trip };
+    return { ...o, ...n, items, shelves, shop: perKey(o.shop, n.shop), used: perKey(o.used, n.used), dishes: perKey(o.dishes, n.dishes), pick: later(o.pick, n.pick) || null, trip };
   }
 
   function mergeQuest(a, b) {
