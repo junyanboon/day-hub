@@ -74,3 +74,12 @@ test("d81: the page shows no 'up to +N' on a recipe or idea card and no points l
   assert.match(card, /QM\.pays\(d\)/, "the dish card asks whether the dish pays before showing up to +N");
   assert.ok(!/It pays like tonight's ideas did/.test(sheet), "the recipe card comment no longer says it pays");
 });
+
+test("d81: an idea that paid before and was since cleared keeps its card on the meal, so its points show", () => {
+  const d = QM.dishOf("r1");
+  const old = { v: { "dish:r1": ["b", 9, 9, 0], fruit: ["p", 2] }, b: 9, dish: { r1: ["Lemon"], sv: ["greens:Kale"] } };
+  const cleared = QM.tick(old, d, "none", opt).rec;
+  assert.equal(cleared.dish.r1, undefined);
+  assert.deepEqual(J(QM.heldIds(cleared)).sort(), ["r1", "sv"], "the paid record keeps r1, tiles are not dishes");
+  assert.match(sheet, /ideas = IT\.list\.concat\(QM\.heldIds\(rec\)/, "the meal sheet lists held dishes, not only ticked ones");
+});
