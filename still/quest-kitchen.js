@@ -805,16 +805,17 @@
      winning, and a delete is a mark (del) that keeps the name and foods, so an older copy cannot bring it back and a meal
      logged with it can still show it. Nothing here touches K.used: deleting or editing a dish never puts back or takes off
      what a meal already took. */
-  const okDish = (x) => !!x && typeof x === "object" && typeof x.name === "string" && !!x.name;
+  // a synced record is only used when it looks like one (its id goes into the page's attributes and selectors)
+  const okDish = (x, id) => !!x && typeof x === "object" && typeof x.name === "string" && !!x.name && /^[\w-]{1,40}$/.test(id);
   const shape = (id, x) => ({ id, icon: ownIcon(x.icon) ? x.icon : "🍽️", name: x.name, own: true, items: arr(x.items).filter((r) => Array.isArray(r) && typeof r[0] === "string" && r[0])
     .map((r) => [r[0], typeof r[1] === "string" ? r[1] : ""]), added: x.added || null, ...(x.del ? { del: true } : {}) });
   // his dishes, deleted ones left out, oldest first (a new one goes at the end, so nothing jumps)
   function ownDishes(K) {
-    return Object.entries(obj(obj(K).dishes)).filter(([, x]) => okDish(x) && !x.del).map(([id, x]) => shape(id, x))
+    return Object.entries(obj(obj(K).dishes)).filter(([id, x]) => okDish(x, id) && !x.del).map(([id, x]) => shape(id, x))
       .sort((a, b) => ms(a.added) - ms(b.added) || (a.id < b.id ? -1 : 1));
   }
   // one dish, a deleted one too (del:true), else null
-  const ownDish = (K, id) => { const x = obj(obj(K).dishes)[id]; return okDish(x) ? shape(id, x) : null; };
+  const ownDish = (K, id) => { const x = obj(obj(K).dishes)[id]; return okDish(x, id) ? shape(id, x) : null; };
   // the kitchen item a food names, in either kitchen (the unit a bare number means)
   const anyItem = (K, name) => match(K, "home", name) || match(K, "travel", name);
   /* A usual amount as he types it, read the way the kitchen reads amounts: "300" -> "300 g" (a bare number takes the unit
@@ -855,7 +856,7 @@
   // delete one of his dishes: a mark that keeps what it was
   function delDish(K, id, at) {
     const x = obj(obj(K).dishes)[id];
-    if (!okDish(x) || x.del) return K;
+    if (!okDish(x, id) || x.del) return K;
     const out = clone(K);
     out.dishes = { ...obj(out.dishes), [id]: { ...x, del: true, at: iso(at) } };
     return out;
@@ -870,9 +871,10 @@
   /* A first portion for a "From your kitchen" tick (d47): 1 of a counted item; else a Blueprint dish's meal amount; else
      a small plate by food group. Never more than is left. */
   const PORTION = { "Spices": 3, "Herbs": 10, "Nuts and seeds": 30, "Oils, vinegars and sweet": 15, "Legumes and grains": 80, "Drinks and ferments": 250 };
+  // a plate's worth whatever is left (d48: a dish's usual amount must not shrink with today's stock)
+  const serving = (it) => (!hasQ(it) ? 0 : it.u === "" ? 1 : it.per || PORTION[it.group] || 100);
   function portion(it) {
-    if (!hasQ(it)) return 0;
-    const p = it.u === "" ? 1 : it.per || PORTION[it.group] || 100;
+    const p = serving(it);
     return Math.max(0, Math.min(p, typeof it.left === "number" ? it.left : p));
   }
 
@@ -997,5 +999,5 @@
 
   root.QuestKitchen = { NEED, LEVELS, KITCHENS, SEED, FRESH, DEFAULT_SHOP, GROUP_NAMES, GROUP_ICONS, keyOf, iconFor, groupIcon, splitName, amtOf, tileLine, guessGroup, guessShelf,
     items, item, grouped, setLevel, nextLevel, tap, add, rename, move, place, remove, status, shows, pace, lowAt, lowSoon, turnAt, useFirst, nextShop, parseAmt, usesOf, amountFor,
-    shopList, tick, buyTicked, hasQ, unitFor, qtyOf, fmtQ, recipeIn, perMeal, setAmount, restock, rateOf, toBuy, eat, setTake, taken, portion, ownDishes, ownDish, saveDish, delDish, dishAmt, dishIcon, kitchenFoods, TRAVEL_STARTER, pickList, preTick, fill, unfill, shopInfo, shopWhen, shopUpto, match, dinner, active, pick, noteActive, tripEnd, bringHome, dayWord, counts };
+    shopList, tick, buyTicked, hasQ, unitFor, qtyOf, fmtQ, recipeIn, perMeal, setAmount, restock, rateOf, toBuy, eat, setTake, taken, portion, serving, ownDishes, ownDish, saveDish, delDish, dishAmt, dishIcon, kitchenFoods, TRAVEL_STARTER, pickList, preTick, fill, unfill, shopInfo, shopWhen, shopUpto, match, dinner, active, pick, noteActive, tripEnd, bringHome, dayWord, counts };
 })(typeof window !== "undefined" ? window : globalThis);

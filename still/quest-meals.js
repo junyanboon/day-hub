@@ -226,7 +226,10 @@
     /* his own dishes (d48) pay nothing and hold no slot: the food tiles pay for what was in it, and a dish of his can
        never pay the Blueprint dish value. A food he has since taken out of the dish stays ticked on a meal logged before,
        so the page's before and after agree and nothing is put back on the kitchen. */
-    const names = d.items.map((x) => x[0]), stale = d.own && rec && rec.dish && Array.isArray(rec.dish[d.id]) ? rec.dish[d.id].filter((x) => !names.includes(x)) : [];
+    const names = d.items.map((x) => x[0]);
+    let stale = d.own && rec && rec.dish && Array.isArray(rec.dish[d.id]) ? rec.dish[d.id].filter((x) => !names.includes(x)) : [];
+    // the page shows such a food as its own row, so a tap on it (or Clear) unticks it and the kitchen gets it back
+    if (how === "none" || stale.includes(how)) stale = how === "none" ? [] : stale.filter((x) => x !== how);
     const max = d.own ? 0 : capOf(r, d, opt), now = got.length ? dishPay(d, got.length, opt, max) : 0, dd = now - was;
     // d18 ("18 yes"): a Blueprint dish with every ingredient ticked counts as the Blueprint meal done today
     const isDone = groupOf(d) === "bp" && got.length === d.items.length && max > 0 ? 1 : 0;

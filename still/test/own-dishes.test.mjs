@@ -88,8 +88,23 @@ test("d48: edit renames and changes foods; a food taken out keeps its tick on a 
   const r2 = QM.tick(before, d, "Navy beans", {});
   assert.deepEqual(J(r2.rec.dish[id]).sort(), ["Broccoli", "Navy beans", "Pasta"]);
   assert.equal(QM.dishStatus(r2.rec, d).n, 2);
-  const r3 = QM.tick(r2.rec, d, "none", {});
-  assert.deepEqual(J(r3.rec.dish[id]), ["Pasta"], "Clear clears what the dish lists now");
+  // the sheet shows Pasta as its own row: a tap on it unticks it (so the kitchen gets it back), and Clear clears it too
+  const r3 = QM.tick(r2.rec, d, "Pasta", {});
+  assert.deepEqual(J(r3.rec.dish[id]).sort(), ["Broccoli", "Navy beans"]);
+  assert.equal(QM.tick(r2.rec, d, "none", {}).rec.dish[id], undefined, "Clear clears the old food too");
+});
+
+test("d48 review: a dish's usual amount is a plate's worth, not capped by what is left today", () => {
+  let k = K.add({}, "home", "pantry", "Pasta", at(0), null, "20 g").K;
+  const p = K.match(k, "home", "Pasta");
+  assert.equal(K.portion(p), 20, "a meal tick never takes more than is left");
+  assert.equal(K.serving(p), 80, "the dish keeps a full plate");
+});
+
+test("d48 review: a synced dish record with an odd id is ignored", () => {
+  const k = { dishes: { 'x"><img src=x>': { name: "Bad", items: [] }, ok1: { name: "Good", items: [["Oats", "60 g"]], added: at(0), at: at(0) } } };
+  assert.deepEqual(J(K.ownDishes(k).map((d) => d.id)), ["ok1"]);
+  assert.equal(K.ownDish(k, 'x"><img src=x>'), null);
 });
 
 test("d48: delete hides the dish but leaves meals and the kitchen as they were", () => {
