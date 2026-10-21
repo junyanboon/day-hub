@@ -708,6 +708,10 @@
   .kt-pkw { display:flex; flex-direction:column; gap:2px; }
   .kt-pkq { display:flex; align-items:center; gap:8px; padding:0 10px 4px 44px; font-size:12px; color:var(--ink-soft); }
   .sheet .kt-pkq input.mq-tq { width:110px; text-align:left; }
+  /* d64: a piece food's amount on its Edit page, with - and + either side */
+  .ki-step { display:flex; align-items:center; gap:10px; margin-top:12px; }
+  .sheet .ki-step input { margin:0; flex:1; min-width:0; text-align:center; font-size:18px; font-variant-numeric:tabular-nums; }
+  .ki-step .mq-mini { font-size:22px; line-height:1; width:52px; height:48px; padding:0; flex:none; border-radius:14px; }
   .kt-li.kt-pk { padding:5px 10px; } .kt-pk .e { font-size:17px; } .kt-pk .n { font-size:13.5px; }
   .kt-fill b { font-size:15px; }
   .btn.kt-fillgo { display:block; width:100%; margin-top:10px; text-align:center; }
@@ -944,7 +948,7 @@
 <script src="quest-levels.js?v=20261016b"></script>
 <script src="quest-gymlog.js?v=20261019a"></script>
 <script src="quest-meals.js?v=20261021d57b"></script>
-<script src="quest-kitchen.js?v=20261021d59b"></script>
+<script src="quest-kitchen.js?v=20261021d64"></script>
 <script src="quest-ideas.js?v=20261021d61"></script>
 <script src="quest-trends.js?v=20261019end3"></script>
 <script src="nvc-words.js?v=20261010a"></script>
@@ -3187,7 +3191,10 @@
     const note = r => { const it = r.item && QK().item(G.kitchen, r.item);
       return it && typeof it.q === "number" ? `${it.amt} left` : r.item ? (r.lv == null ? "Not checked" : KLV[r.lv]) : r.src === "home" ? (F.use === "bring" ? "From Home" : "Not here yet") : r.src === "starter" ? "Often packed" : "New"; };
     // d42: a ticked row asks how much (filled with what he bought last time for an item with an amount)
-    const amtField = r => F.on.has(r.id) ? `<label class="kt-pkq"><span>How much?</span><input class="mq-tq" data-kpq="${esc(r.id)}" value="${esc(kitFillAmt(S, r))}" placeholder="e.g. 4 or 500 g" maxlength="20" autocomplete="off" aria-label="How much ${esc(r.name)}"></label>` : "";
+    // d64: a food bought by the piece asks how many
+    const pieceRow = r => { const it = r.item && QK().item(G.kitchen, r.item); return QK().isPiece(it || { name:QK().splitName(r.name).name }); };
+    const amtField = r => { if (!F.on.has(r.id)) return ""; const pc = pieceRow(r), ask = pc ? "How many" : "How much";
+      return `<label class="kt-pkq"><span>${ask}?</span><input class="mq-tq" data-kpq="${esc(r.id)}" value="${esc(kitFillAmt(S, r))}" placeholder="${pc ? "e.g. 4" : "e.g. 4 or 500 g"}" maxlength="20" autocomplete="off" aria-label="${ask} ${esc(r.name)}"></label>`; };
     const row = r => `<div class="kt-pkw"><button type="button" class="kt-li kt-pk" data-kpk="${esc(r.id)}" aria-pressed="${F.on.has(r.id)}"><span class="bx"></span><span class="e">${esc(r.em || QK().iconFor(r.name, r.group))}</span>` +
       `<span class="n">${esc(r.name)}<small>${esc(note(r))}</small></span><span class="q">${esc(shelfName(r.shelf))}</span></button>${amtField(r)}</div>`;
     const top = rows.filter(r => r.top), rest = rows.filter(r => !r.top);
@@ -3378,10 +3385,15 @@
   function openKitchenItem(id){
     const it = QK().item(G.kitchen, id); if (!it) return openKitchen();
     const kn = QK().KITCHENS[it.k];
+    // d64: a food bought by the piece gets - and + beside its count (they change the field; Save saves it)
+    const piece = QK().isPiece(it);
     openSheet(`<div class="win-hd"><span class="kt-ico">${esc(it.em)}</span><div><div class="tt">${esc(it.name)}</div><div class="sb">${kn.icon} ${esc(kn.name)}</div></div></div>
       <div class="win-lb">Name</div><input id="kiName" value="${esc(it.name)}" maxlength="40" autocomplete="off">
-      ${typeof it.q === "number" ? `<div class="win-lb">Amount now <small>(meals take it down by themselves; fix it here)</small></div>`
-        : `<div class="win-lb">Amount <small>(optional, e.g. 400 g or 4; with a number, meals take it down)</small></div>`}<input id="kiAmt" value="${esc(it.amt || "")}" maxlength="20" autocomplete="off" placeholder="Amount">
+      ${piece ? `<div class="win-lb">How many${typeof it.q === "number" ? " now" : ""} <small>(${typeof it.q === "number" ? "meals take it down by themselves; fix it here" : "optional; with a number, meals take it down"})</small></div>`
+        : typeof it.q === "number" ? `<div class="win-lb">Amount now <small>(meals take it down by themselves; fix it here)</small></div>`
+        : `<div class="win-lb">Amount <small>(optional, e.g. 400 g or 4; with a number, meals take it down)</small></div>`}${piece
+        ? `<div class="ki-step"><button type="button" class="mq-mini" id="kiMinus" aria-label="One less">−</button><input id="kiAmt" value="${esc(it.amt || "")}" maxlength="20" autocomplete="off" placeholder="How many?" aria-label="How many ${esc(it.name)}"><button type="button" class="mq-mini" id="kiPlus" aria-label="One more">+</button></div>`
+        : `<input id="kiAmt" value="${esc(it.amt || "")}" maxlength="20" autocomplete="off" placeholder="Amount">`}
       <div class="win-lb">Group</div><div class="kt-tools">${QK().GROUP_NAMES.map(g => `<button type="button" class="kt-chip" data-kig="${esc(g)}" aria-pressed="${g === it.group}">${esc(g)}</button>`).join("")}</div>
       <div class="win-lb">Shelf</div><div class="kt-tools">${kn.shelves.map(s => `<button type="button" class="kt-chip" data-kish="${s.id}" aria-pressed="${s.id === it.shelf}">${esc(s.name)}</button>`).join("")}</div>
       <div class="actions"><button class="btn danger" id="kiDel">Delete this item</button></div>
@@ -3391,6 +3403,8 @@
       $("sheet").querySelectorAll("[data-kish]").forEach(x => x.setAttribute("aria-pressed", x.dataset.kish === shelf)); });
     $("sheet").querySelectorAll("[data-kig]").forEach(bn => bn.onclick = () => { group = bn.dataset.kig;
       $("sheet").querySelectorAll("[data-kig]").forEach(x => x.setAttribute("aria-pressed", x.dataset.kig === group)); });
+    if (piece) for (const [bid, dir] of [["kiMinus", -1], ["kiPlus", 1]])
+      $(bid).onclick = () => { const f = $("kiAmt"); f.value = QK().stepCount(f.value, it.name, dir); };
     $("kiBack").onclick = () => openKitchen();
     $("kiSave").onclick = () => { let K = G.kitchen; const nm = $("kiName").value.trim();
       const amt = $("kiAmt").value.trim();
