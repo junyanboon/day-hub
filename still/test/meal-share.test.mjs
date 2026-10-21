@@ -84,8 +84,8 @@ test("the weights merge across devices: the later change wins, both ways", () =>
 test("the page: syncFoods scores with his share and stamps the meal's share once; the kitchen still takes the full amount", () => {
   const sf = sheet.slice(sheet.indexOf("function syncFoods(){"), sheet.indexOf("// the drains (d84)"));
   assert.ok(sf.length > 100, "found syncFoods");
-  assert.ok(sf.includes("FSC().earn(foods, { morning, share:FSC().shareOf(cur, mealWeights()) })"), "scored with his share");
-  assert.ok(sf.includes('typeof cur.sh !== "number"'), "a meal's share is stamped the first time it is scored");
+  assert.ok(sf.includes("FSC().earn(foods, { morning, share:FSC().shareOf(base, mealWeights()) })"), "scored with his share");
+  assert.ok(sf.includes("FSC().stampShare(cur, foods.length, mealWeights())") && sf.includes("FSC().shareOf(base, mealWeights())"), "a meal's share is stamped the first time it is scored");
   // the kitchen take is untouched: kitDinner and the extras still get the logged amounts
   assert.ok(sheet.includes("kitDinner(k, d, (cur && cur.dish && cur.dish[d.id]) || [], (r.rec.dish && r.rec.dish[d.id]) || [], amts);"));
 });
@@ -103,4 +103,26 @@ test("the page: a Just me toggle by This meal, the Counted line names his share,
   const w = sheet.slice(sheet.indexOf('querySelectorAll("[data-mwt]")'), sheet.indexOf('querySelectorAll("[data-mwt]")') + 900);
   assert.ok(w.includes("kitSave(") && w.includes("at:now().toISOString()"), "saved with the game, stamped for the merge");
   assert.ok(!w.includes("redraw(") && !w.includes("syncFoods("), "no redraw (it swallows the next tap) and no re-scoring of this meal");
+});
+
+test("a meal keeps the share it was first scored with: stamped once foods are on it; a meal paid before d87 keeps the whole", () => {
+  const w = { me: 150, other: 150 };
+  assert.equal(FS.stampShare({ m: "sv" }, 0, w).sh, undefined, "no foods yet: nothing stamped (a weight change before the first food still counts)");
+  assert.equal(FS.stampShare({ m: "sv" }, 2, w).sh, 0.5);
+  const old = { m: "sv", auto: ["veg", "fveg"] };
+  assert.equal(FS.stampShare(old, 2, w).sh, 1, "its tiles were paid on the whole amount, so none is taken back");
+  const kept = { m: "sv", sh: 0.5918 };
+  assert.equal(FS.stampShare(kept, 3, { me: 100, other: 100 }), kept, "already stamped: unchanged (same object)");
+  assert.equal(FS.shareOf({ ...kept, solo: true }), 1, "Just me still wins");
+});
+
+test("a weight he types: decimals with a point or comma, a thousands comma is too much, nonsense is null", () => {
+  assert.equal(FS.readLb("145"), 145);
+  assert.equal(FS.readLb(" 145.5 "), 145.5);
+  assert.equal(FS.readLb("145,5"), 145.5);
+  assert.equal(FS.readLb("100 lb"), 100);
+  assert.equal(FS.readLb("1,000"), null);
+  for (const x of ["", "abc", "0", "-100", "12", "600", null, "1/2"]) assert.equal(FS.readLb(x), null, String(x));
+  const h = sheet.slice(sheet.indexOf('querySelectorAll("[data-mwt]")'), sheet.indexOf('querySelectorAll("[data-mwt]")') + 600);
+  assert.ok(h.includes("FSC().readLb(inp.value)"));
 });

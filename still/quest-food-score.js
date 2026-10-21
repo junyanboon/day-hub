@@ -127,6 +127,21 @@
     return okLb(me) && okLb(other) ? { me, other } : { ...WEIGHTS };
   }
   const shareNow = (w) => { const x = weightsOf(w); return Math.round((x.me / (x.me + x.other)) * 10000) / 10000; };
+  /* The share a meal keeps (rec.sh), set the first time it is scored with foods on it. A meal whose foods already paid
+     tiles before d87 (rec.auto, no sh) was scored with the whole amount, so it keeps 1. Returns the record (a copy when
+     it changed). */
+  function stampShare(rec, nFoods, w) {
+    if (!rec || (typeof rec.sh === "number" && rec.sh > 0 && rec.sh <= 1)) return rec;
+    if (Array.isArray(rec.auto) && rec.auto.length) return { ...rec, sh: 1 };
+    return nFoods > 0 ? { ...rec, sh: shareNow(w) } : rec;
+  }
+  // a weight he typed: "145", "145.5", "145,5" (a decimal comma); "1,000" is a thousands comma. null when not 20 to 500 lb
+  function readLb(text) {
+    const t = String(text == null ? "" : text).trim().replace(/\s*(lbs?|pounds?)$/i, "");
+    const v = /^\d{1,3}(,\d{3})+$/.test(t) ? +t.replace(/,/g, "") : /^\d+([.,]\d+)?$/.test(t) ? +t.replace(",", ".") : NaN;
+    const r = Math.round(v * 10) / 10;
+    return okLb(r) ? r : null;
+  }
   function shareOf(rec, w) {
     if (rec && rec.solo) return 1;
     if (rec && typeof rec.sh === "number" && rec.sh > 0 && rec.sh <= 1) return rec.sh;
@@ -178,5 +193,5 @@
     seeds: "flax or chia", junk: "processed", neg: "onion or garlic", fresh: "freshly made", light: "stopped before full", attn: "ate with attention",
     blueprint: "Blueprint meal", ferment: "fermented food", xylitol: "xylitol", supps: "supplements" };
 
-  root.QuestFoodScore = { kindsOf, gramsOf, readAmt, earn, TILE_ORDER, NEED, WORD, WEIGHTS, weightsOf, shareNow, shareOf };
+  root.QuestFoodScore = { kindsOf, gramsOf, readAmt, earn, TILE_ORDER, NEED, WORD, WEIGHTS, weightsOf, shareNow, shareOf, stampShare, readLb };
 })(typeof window !== "undefined" ? window : globalThis);

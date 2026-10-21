@@ -996,7 +996,7 @@
 <script src="quest-levels.js?v=20261016b"></script>
 <script src="quest-gymlog.js?v=20261019a"></script>
 <script src="quest-meals.js?v=20261021d87"></script>
-<script src="quest-food-score.js?v=20261021d87s"></script>
+<script src="quest-food-score.js?v=20261021d87t"></script>
 <script src="quest-kitchen.js?v=20261021h81b"></script>
 <script src="quest-ideas.js?v=20261021d76"></script>
 <script src="quest-recipe-data.js?v=202610211914"></script>
@@ -2926,10 +2926,9 @@
     function syncFoods(){
       const cur = mealRec(); if (!cur || !FSC()) return;
       const foods = mealFoods(k, cur);
-      const r = QM.autoSync(cur, FSC().earn(foods, { morning, share:FSC().shareOf(cur, mealWeights()) }).ids, mqOpt(), id => !mqCounted(id) || habitGain(id) > 0);
-      // d87: the share this meal is first scored with stays with it, so new weights never move what it paid
-      const stamp = typeof cur.sh !== "number" && foods.length > 0;
-      if (stamp) r.rec.sh = FSC().shareNow(mealWeights());
+      // d87: the share this meal is first scored with stays with it (rec.sh), so new weights never move what it paid
+      const base = FSC().stampShare(cur, foods.length, mealWeights()), stamp = base !== cur;
+      const r = QM.autoSync(base, FSC().earn(foods, { morning, share:FSC().shareOf(base, mealWeights()) }).ids, mqOpt(), id => !mqCounted(id) || habitGain(id) > 0);
       if (!stamp && !r.ops.length && JSON.stringify(r.rec.auto || null) === JSON.stringify(cur.auto || null)) return;
       applyOps(r.ops, window.QuestFx);
       putRec(r.rec);
@@ -3060,15 +3059,15 @@
       const cur = mealRec(); if (!cur || !FSC()) return;
       const r = { ...cur };
       if (r.solo) delete r.solo; else r.solo = true;
-      if (typeof r.sh !== "number") r.sh = FSC().shareNow(mealWeights());
       putRec(r);
       syncFoods();
       redraw();
     };
     // the shared-meal weights (d87): saved with the game; new scoring only (a scored meal keeps its rec.sh)
     sh.querySelectorAll("[data-mwt]").forEach(inp => inp.onchange = () => {
-      const w = FSC().weightsOf(mealWeights()), key = inp.dataset.mwt, v = Math.round(+String(inp.value).trim().replace(",", ".") * 10) / 10;
-      if (!(v >= 20 && v <= 500) || !(key in w)) { inp.value = w[key]; return; }
+      const w = FSC().weightsOf(mealWeights()), key = inp.dataset.mwt, v = FSC().readLb(inp.value);
+      if (!["me", "other"].includes(key)) return;
+      if (v == null) { inp.value = w[key]; return; }
       kitSave({ ...(G.kitchen || {}), share:{ ...w, [key]:v, at:now().toISOString() } });
       inp.value = v;
       recount();   // no redraw: it would swallow the next tap (the other weight)
