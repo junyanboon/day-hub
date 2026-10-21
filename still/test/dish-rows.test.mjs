@@ -48,9 +48,9 @@ test("d71: every row (part dishes, plain dishes, his own, extras, From your kitc
 
 test("d71: tap targets at least 44 px tall, and the took field fits a 375 px phone", () => {
   assert.match(rule(".mq-row"), /min-height:44px/);
-  assert.match(rule(".mq-sw"), /width:44px/);
-  assert.match(rule(".mq-row .mq-take"), /min-height:42px/);
-  assert.match(rule(".mq-row > .mq-ing"), /min-height:42px/);
+  assert.match(rule(".mq-sw"), /width:44px; min-height:44px/);
+  assert.match(rule(".mq-row .mq-take"), /min-height:44px/);
+  assert.match(rule(".mq-row > .mq-ing"), /min-height:44px/);
   assert.match(rule(".mq-row > .mq-ing"), /min-width:0/);
   assert.match(rule(".sheet .mq-row input.mq-tq"), /width:52px/);
 });
