@@ -132,5 +132,6 @@ test("d51 to d53 on the page: parts with swaps and Use something else, How to ma
   assert.ok(ed.includes('id="deSteps"') && ed.includes("steps:S.steps"));
   assert.match(html, /r\.why === "none" \? "not in the kitchen"/);
   for (const f of ["quest-meals", "quest-kitchen", "quest-ideas"]) assert.match(html, new RegExp(`${f}\\.js\\?v=20261021d51`), f);
+  assert.match(body, /p\.rows\.filter\(r => r\.on \|\| r\.st !== "none"\)\.map\(r => r\.entry\)/, "Got everything skips foods marked none in the kitchen");
   assert.ok(!/[—–]/.test(body.match(/For 2 people\. Each part[^<]*/)[0]));
 });

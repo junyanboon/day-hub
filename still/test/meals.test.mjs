@@ -139,7 +139,7 @@ test("a dish pays its share of the Blueprint meal's +9 as its parts are filled (
   assert.equal(M.dishMax({ mult:1.5, dish:6 }), 9); assert.equal(M.dishMax({ mult:1, dish:8 }), 8);   // the page passes the HABITS value
   let r = M.tick(null, sv(), "greens:Broccoli", at15);
   assert.deepEqual(J(r.ops), [{ id:"dish:sv", on:true, m:"b", d:1 }]);   // 1 of 8 parts: round(1.125)
-  // Cauliflower fills the same part (greens), so it pays nothing more; a swap (Kale for nothing else) counts like the real thing
+  // Cauliflower fills the same part (greens), so it pays nothing more; a swap (Lemons, Pumpkin seeds) counts like the real thing
   const c = M.tick(r.rec, sv(), "greens:Cauliflower", at15);
   assert.deepEqual(J(c.ops), []);
   r = c;

@@ -587,7 +587,7 @@
       if (hasQ(it)) row.amt = fmtQ(toBuy(it, t, shopAt), it.u);   // d45: from what is left and his real use
       rows.push(row);
     }
-    for (const it of missing(K, k)) rows.push({ it, why: "none", at: t, on: !!(ticks[it.id] && ticks[it.id].on), ...amountFor(it.name, dishes, dinners) });
+    for (const it of missing(K, k, dishes)) rows.push({ it, why: "none", at: t, on: !!(ticks[it.id] && ticks[it.id].on), ...amountFor(it.name, dishes, dinners) });
     const groups = [];
     for (const sh of KITCHENS[k].shelves) {
       const list = rows.filter((r) => r.it.shelf === sh.id).sort((a, b) => rank[a.why] - rank[b.why] || a.at - b.at);
@@ -602,10 +602,12 @@
      none:true, on the shelf it would go on. Ticking it and "Mark ticked items as bought", or "What did you buy?", adds it
      to the kitchen. Home only: the travel fridge holds a few things for a trip, not the full recipes. */
   const shortName = (name) => cap(String(name).split(",")[0].trim().replace(/^(fresh|extra virgin) /i, ""));
-  function missing(K, k) {
+  // dishes: the list shopList was given (its part dishes are the Blueprint ones), else QuestMeals.DISHES
+  function missing(K, k, dishes) {
     if (k !== "home") return [];
     const have = new Set(items(K, k).map((x) => keyOf(x.name))), out = [];
-    for (const d of arr(root.QuestMeals && root.QuestMeals.DISHES)) for (const [ing] of arr(d.items)) {
+    const bp = arr(dishes || (root.QuestMeals && root.QuestMeals.DISHES)).filter((d) => d && Array.isArray(d.slots));
+    for (const d of bp) for (const [ing] of arr(d.items)) {
       const key = keyOf(ing);
       if (!key || have.has(key)) continue;
       have.add(key);

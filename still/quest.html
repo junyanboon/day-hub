@@ -944,7 +944,7 @@
 <script src="quest-levels.js?v=20261016b"></script>
 <script src="quest-gymlog.js?v=20261019a"></script>
 <script src="quest-meals.js?v=20261021d51"></script>
-<script src="quest-kitchen.js?v=20261021d51"></script>
+<script src="quest-kitchen.js?v=20261021d51b"></script>
 <script src="quest-ideas.js?v=20261021d51"></script>
 <script src="quest-trends.js?v=20261019end3"></script>
 <script src="nvc-words.js?v=20261010a"></script>
@@ -2729,11 +2729,12 @@
       const d = dishById(bn.dataset.ding), it = d && d.items[+bn.dataset.i]; if (!it) return;
       dishTap(bn, d.id, it[0], `[data-ding="${d.id}"][data-i="${bn.dataset.i}"]`);
     });
-    // a part dish (d51): Got everything ticks every row shown; a row ticks what it shows; Use something else ticks a pick
+    // a part dish (d51): Got everything ticks every row with a food; a row ticks what it shows; Use something else ticks a pick
     const amtsOf = d => Object.fromEntries(slotParts(d).flatMap(p => p.rows.map(r => [r.entry, r.amt])));
     sh.querySelectorAll("[data-dall]").forEach(bn => bn.onclick = () => {
       const d = dishById(bn.dataset.dall); if (!d) return;
-      if (QM.isSlotDish(d) && QI()) dishTap(bn, d.id, slotParts(d).flatMap(p => p.rows.map(r => r.entry)), null, amtsOf(d));
+      // every row it shows, except a food marked none in the kitchen (he can still tick that row on its own)
+      if (QM.isSlotDish(d) && QI()) dishTap(bn, d.id, slotParts(d).flatMap(p => p.rows.filter(r => r.on || r.st !== "none").map(r => r.entry)), null, amtsOf(d));
       else dishTap(bn, d.id, "all");
     });
     sh.querySelectorAll("[data-dsl]").forEach(bn => bn.onclick = () => {
