@@ -37,7 +37,7 @@ test("d48: a new dish keeps its name, a guessed icon and the usual amounts, read
   assert.deepEqual(J(d[0].items), [["Navy beans", "300 g"], ["Shiitake", "60 g"], ["Pasta", "30 g"], ["Broccoli", "150 g"]]);
   // counts and ml, and words with no number kept as typed
   const r2 = K.saveDish({}, { name: "Smoothie", items: [["Bananas", "2"], ["Oat milk", "1/4 L"], ["Oat milk", "200"], ["Cinnamon", "a pinch"], ["", "5 g"]] }, at(0));
-  assert.deepEqual(J(K.ownDish(r2.K, r2.id).items), [["Bananas", "2"], ["Oat milk", "1/4 L"], ["Cinnamon", "a pinch"]], "one row per food, empty rows dropped");
+  assert.deepEqual(J(K.ownDish(r2.K, r2.id).items), [["Bananas", "2"], ["Oat milk", "250 ml"], ["Cinnamon", "a pinch"]], "one row per food, empty rows dropped (a fraction reads as a number since 2026-10-21)");
   // a name is needed
   assert.equal(K.saveDish({}, { name: "  ", items: FOODS }, at(0)).id, null);
   // his own icon stays

@@ -208,16 +208,52 @@
   const COUNT_FOODS = /\b(bananas?|avocados?|limes?|lemons?|apples?|pears?|eggs?|oranges?|clementines?|mandarins?|kiwis?|peach(es)?|nectarines?|plums?|mangoe?s?|grapefruits?|pomegranates?|coconuts?|melons?|pineapples?|courgettes?|zucchinis?|cucumbers?|peppers?|aubergines?|eggplants?|onions?|tomato(es)?|carrots?|potato(es)?|leeks?|lettuces?|capsicums?|beetroots?|beets?|parsnips?|turnips?|artichokes?|figs?|apricots?|persimmons?|papayas?|guavas?|chill?i(es)?|jalapenos?|tortillas?|wraps?|pitas?|bagels?|buns?|croissants?|muffins?|fior di latte|mozzarellas?|burratas?)\b/i;
   const LIQUID = /\b(milk|juices?|oils?|vinegars?|kefir|kombucha|water|wine|beers?|syrup|sauce|drinks?|shots?)\b/i;
   const NOT_PIECE = /\b(yogh?urts?|flakes|powder|paste|seeds?|flour|butter|dried|shredded|grated|(black|white) pepper|peppercorns?|leaves|puree|passata|cherry tomato(es)?)\b/i;
-  function unitFor(name) {
+  // the unit by the food alone (a few grams of such a food read as a count, d64)
+  function foodUnit(name) {
     const n = String(name || "");
     return LIQUID.test(n) ? "ml" : !NOT_PIECE.test(n) && COUNT_FOODS.test(n) ? "" : "g";
   }
+  // "Mini Honey Jars", "Tea bags": counted in what the name says (2026-10-21), else by the food
+  const unitFor = (name) => (nameCw(name) ? "" : foodUnit(name));
+  /* Half counts and container counts (Junyan, 2026-10-21: half a lemon typed ".5" was kept as words, and "1 jar" of Mini
+     Honey Jars was not tracked). numText writes a typed half the one way the parsers read: ".5" and "½" as "0.5", "1½",
+     "1 ½" and "1 1/2" as "1.5", "1/2" as "0.5". */
+  function numText(text) {
+    return String(text == null ? "" : text)
+      .replace(/(\d+)?\s*([½¼¾⅓⅔])/g, (_, w, c) => ` ${+((w ? +w : 0) + FRAC[c]).toFixed(2)}`)
+      .replace(/(^|[^\d.,/])(\d{1,3}) (\d)\/(\d{1,2})(?![\d./])/g, (a, b, w, x, y) => (+y > +x ? b + String(+(+w + x / y).toFixed(2)) : a))
+      .replace(/(^|[^\d.,/])(\d)\/(\d{1,2})(?![\d./])/g, (a, b, x, y) => (+y > +x ? b + String(+(x / y).toFixed(2)) : a))
+      .replace(/(^|[^\d])[.,](\d)/g, "$10.$2").replace(/\s+/g, " ").trim();
+  }
+  // a number he typed in a "took" field: ".5", "½", "1/2", "0,5", "30 g" (the number); NaN when there is none
+  const numOf = (text) => { const m = /^\d+(?:[.,]\d+)?/.exec(numText(text)); return m ? +m[0].replace(",", ".") : NaN; };
+  /* What a count can be a count of (the brief's list): "1 jar", "2 cans". Pieces are a plain count of the item (d76). */
+  const CONT_FORMS = { jar: "jars", can: "cans", tin: "tins", pack: "packs", packet: "packets", bottle: "bottles", pot: "pots", box: "boxes", bag: "bags", slice: "slices" };
+  const contWord = (w) => { const x = String(w || "").toLowerCase(); return Object.prototype.hasOwnProperty.call(CONT_FORMS, x) ? x : Object.keys(CONT_FORMS).find((k) => CONT_FORMS[k] === x) || null; };
+  const okCw = (x) => (typeof x === "string" && Object.prototype.hasOwnProperty.call(CONT_FORMS, x) ? x : null);
+  // the container a name ends in ("Mini Honey Jars" jar, "Tea bags" bag); slices only when typed, so "Bread slices" stays bread
+  const nameCw = (name) => { const m = /(?:^|\s)([a-z]+)$/i.exec(String(name || "").trim()); const w = m && contWord(m[1]); return w && w !== "slice" ? w : null; };
+  // "1 jar", "2 Jars", "0.5 jar" -> { q, cw }; anything else null
+  function contCount(text) {
+    const m = /^(\d+(?:[.,]\d+)?)\s*([a-z]+)\.?$/i.exec(numText(text));
+    const cw = m && contWord(m[2]);
+    return cw ? { q: +m[1].replace(",", "."), cw } : null;
+  }
+  // a count with its container: "1 jar", "2 jars", "0.5 jar"; no container: the number ("4", "0.5")
+  function fmtCount(q, cw) {
+    const s = fmtQ(q, ""), c = okCw(cw);
+    return c ? `${s} ${+s <= 1 ? c : CONT_FORMS[c]}` : s;
+  }
+  // the container an item is counted in: its own (typed), else its name's; none for grams or ml
+  const cwOf = (it) => (!it || it.u !== "" ? null : okCw(it.cw) || nameCw(it.name));
+  // an amount of an item in its own unit, for the tile and the fields: "350 g", "4", "2 jars"
+  const fmtItem = (it, q) => (it && it.u === "" ? fmtCount(q, cwOf(it)) : fmtQ(q, it ? it.u : "g"));
   /* An amount as a number (d42): "400 g", "1.5 kg", "2 × 400 g", "1 L", "4" -> { q, u } in g, ml or a count (""). A bare
      number takes the unit the item already has (uHint), else the food's own (unitFor). null when there is no number. */
   const AMT_N = /^(?:(\d+(?:\.\d+)?)\s*[x×]\s*)?(\d+(?:\.\d+)?)\s*(kg|g|mg|ml|cl|dl|l|lbs?|oz)?$/i;
   const TO_BASE = { kg: [1000, "g"], g: [1, "g"], mg: [0.001, "g"], lb: [454, "g"], lbs: [454, "g"], oz: [28, "g"], l: [1000, "ml"], ml: [1, "ml"], cl: [10, "ml"], dl: [100, "ml"] };
   function qtyOf(text, name, uHint) {
-    const m = AMT_N.exec(thou(String(text == null ? "" : text)).replace(/,/g, ".").replace(/\s+/g, " ").trim());
+    const m = AMT_N.exec(thou(numText(text)).replace(/,/g, ".").replace(/\s+/g, " ").trim());
     if (!m) return null;
     const n = +m[2] * (m[1] ? +m[1] : 1);
     if (!isFinite(n) || n < 0) return null;
@@ -252,7 +288,7 @@
   }
   // what he types in Edit's Amount field: "400g" -> "400 g"; anything else is kept as typed (short)
   function amtOf(s) {
-    const v = thou(String(s == null ? "" : s).replace(/\s+/g, " ").trim()), m = AMT_ONLY.exec(v);
+    const v = thou(numText(s)), m = AMT_ONLY.exec(v);
     return m ? fmtUnit(m[1], m[2], m[3]) : v.slice(0, 20);
   }
   /* d64: "4 tomatoes", "4 lemons", "Tomatoes 4" or "4 pieces" typed for the item is the count 4, whatever unit the food
@@ -260,7 +296,7 @@
   const PIECE_WORD = /^(pieces?|pcs?|whole|items?|each|units?)$/i;
   const CONTAINER = /^(cans?|tins?|jars?|bags?|packs?|packets?|boxe?s?|bottles?|cartons?|bunch(es)?|heads?|blocks?|tubs?|punnets?|handfuls?|cups?|tbsp|tsp|slices?)\b/i;
   function pieceCount(text, name) {
-    const s = String(text == null ? "" : text).replace(/\s+/g, " ").trim();
+    const s = numText(text);
     let m = /^(\d+(?:[.,]\d+)?)\s*(?:[x×]\s+)?([a-z][a-z ]*)$/i.exec(s), n, w;
     if (m) { n = m[1]; w = m[2]; }
     else { m = /^([a-z][a-z ]*?)\s*[x×]?\s*(\d+(?:[.,]\d+)?)$/i.exec(s); if (!m) return null; n = m[2]; w = m[1]; }
@@ -274,17 +310,22 @@
   // an amount he typed as a number: a count of the item first (d64), else as qtyOf reads it
   function qtyFor(text, name, uHint) {
     const n = pieceCount(text, name);
-    return n != null ? { q: n, u: "" } : qtyOf(amtOf(text), name, uHint);
+    if (n != null) return { q: n, u: "" };
+    const c = contCount(text);   // 2026-10-21: "1 jar" is a count of jars
+    return c ? { q: c.q, u: "", cw: c.cw } : qtyOf(amtOf(text), name, uHint);
   }
   /* d64: Edit's - and + for a piece food: one more or one less of what the field says, from 1 when it has no number yet,
      never below 0. Words with no number ("a bag") stay on -, and become 1 on +. */
   function stepCount(text, name, dir) {
-    const s = String(text == null ? "" : text).trim();
-    let n = pieceCount(s, name);
-    if (n == null && /^\d+(?:[.,]\d+)?$/.test(s)) n = +s.replace(",", ".");
-    if (n == null) return dir > 0 ? "1" : s;
-    return fmtQ(Math.max(0, n + (dir > 0 ? 1 : -1)), "");
+    const s = numText(text), c = contCount(s);
+    let n = pieceCount(s, name), cw = null;
+    if (n == null && c) { n = c.q; cw = c.cw; }
+    if (n == null && /^\d+(?:\.\d+)?$/.test(s)) { n = +s; cw = nameCw(name); }   // a bare "2" on Mini Honey Jars: 3 jars
+    if (n == null) return dir > 0 ? "1" : String(text == null ? "" : text).trim();
+    return fmtCount(Math.max(0, n + (dir > 0 ? 1 : -1)), cw);
   }
+  // the field reads as a count (the item page shows - and + for it): "4", "1 jar", "0.5"; uHint as qtyFor takes it
+  const isCountText = (text, name, uHint) => { const p = String(text || "").trim() ? qtyFor(text, name, uHint) : null; return !!p && p.u === ""; };
   const shelfOf = (k, id) => (KITCHENS[k] ? KITCHENS[k].shelves.find((s) => s.id === id) : null) || null;
 
   // a level read from saved (synced) state: 0 to 3, else not checked
@@ -303,14 +344,16 @@
     if (!(typeof out.q === "number" && isFinite(out.q) && out.q >= 0)) {
       delete out.q; delete out.u; delete out.qt; delete out.buy;
       const p = out.amt ? qtyFor(out.amt, name) : null;   // d76: "1 piece" split off "Bread 1 piece" is a count
-      if (p) Object.assign(out, { q: p.q, u: p.u, qt: it.at || it.added || null, buy: p.q });
+      if (p) Object.assign(out, { q: p.q, u: p.u, qt: it.at || it.added || null, buy: p.q }, p.cw ? { cw: p.cw } : {});   // "1 jar" (2026-10-21)
+      if (!p || !p.cw) delete out.cw;
     } else {
       out.u = out.u === "g" || out.u === "ml" ? out.u : "";
       out.buy = +out.buy > 0 ? +out.buy : out.q;
       /* d64: a food bought by the piece stored as a few grams ("Capsicum 1 g": a bare "1" read as grams before capsicum
          was on the list) is a count. Under PIECE_G grams nobody means weight for a whole capsicum or banana. Grams he
          types from this build on ("5 g" of lemon) are kept: put marks them wg, and a marked item stays in grams. */
-      if (out.u === "g" && !it.wg && unitFor(name) === "" && out.q < PIECE_G && out.buy < PIECE_G) out.u = "";
+      if (out.u === "g" && !it.wg && foodUnit(name) === "" && out.q < PIECE_G && out.buy < PIECE_G) out.u = "";
+      if (out.u !== "" || !okCw(out.cw)) delete out.cw;
     }
     return out;
   }
@@ -357,7 +400,7 @@
     const left = Math.max(0, Math.round((it.q - eaten) * 10) / 10), buy = it.buy, per = perMeal(it);
     const low = per ? 2 * per : buy / 4;
     const lv = left <= 0 ? 0 : left < low ? 1 : left >= (buy * 2) / 3 ? 3 : 2;
-    return { ...it, left, eaten, low, per, eats, lv, amt: fmtQ(left, it.u) };
+    return { ...it, left, eaten, low, per, eats, lv, amt: fmtItem(it, left) };
   }
   // every item of the kitchen, the catalogue under what he changed, deleted ones left out, in shelf then catalogue order
   function items(K, k) {
@@ -389,9 +432,11 @@
     // an icon that is only what iconFor gives (or the old 🛒) is not stored, so a group change can change it (d38)
     if (!ownIcon(rest.em) || (typeof rest.name === "string" && rest.em === iconFor(rest.name, rest.group))) delete rest.em;
     // an amount item stores its base amount (q at qt), and amt as its text, so a page from before still shows a number
-    if (hasQ(rest)) rest.amt = fmtQ(rest.q, rest.u);
+    // a count keeps the container he typed (cw, 2026-10-21); grams, ml and level items have none
+    if (hasQ(rest) && rest.u === "" && okCw(rest.cw)) rest.cw = okCw(rest.cw); else delete rest.cw;
+    if (hasQ(rest)) rest.amt = fmtItem(rest, rest.q);
     // d64: a few grams of a piece food that he typed as grams stays grams (clean reads an unmarked one as a count)
-    if (hasQ(rest) && rest.u === "g" && typeof rest.name === "string" && unitFor(rest.name) === "" && rest.q < PIECE_G) rest.wg = true;
+    if (hasQ(rest) && rest.u === "g" && typeof rest.name === "string" && foodUnit(rest.name) === "" && rest.q < PIECE_G) rest.wg = true;
     else delete rest.wg;
     out.items[it.id] = { ...rest, at: iso(at) };
     return out;
@@ -444,10 +489,13 @@
     }
     const p = qtyFor(text, it.name, hasQ(it) ? it.u : undefined);
     if (!p) { if (s === (it.amt || "") && !hasQ(it)) return K; const { q, u, qt, buy, ...rest } = it; return put(K, { ...rest, amt: s }, at); }
-    if (hasQ(it) && p.u === it.u && Math.abs(p.q - it.left) < 0.05) return K;
+    // the container: the one he typed ("2 jars"); a bare number keeps the one the item has
+    const cw = p.u !== "" ? null : p.cw || (/^\d+(?:\.\d+)?$/.test(numText(text)) && hasQ(it) && it.u === "" ? okCw(it.cw) : null);
+    if (hasQ(it) && p.u === it.u && (cw || null) === (okCw(it.cw) || null) && Math.abs(p.q - it.left) < 0.05) return K;
     // what he last bought (the pips' full mark) stays, unless this is his first number, a new unit, or more than that
     const buy = !hasQ(it) || p.u !== it.u ? p.q : Math.max(it.buy, p.q);
-    return put(K, { ...it, q: p.q, u: p.u, qt: iso(at), buy: buy || p.q, lv: it.lv == null ? 3 : it.lv }, at);
+    const { cw: _cw, ...base } = it;
+    return put(K, { ...base, q: p.q, u: p.u, ...(cw ? { cw } : {}), qt: iso(at), buy: buy || p.q, lv: it.lv == null ? 3 : it.lv }, at);
   }
   /* Restock (Add, What did you buy?, What did you bring?, Mark ticked items as bought, brought home): what he got is added
      to what is left. amount: text ("500 g", "4") or { q, u }; none given: an amount item adds what he last bought, a level
@@ -648,7 +696,7 @@
       const why = it.lv === 0 ? "out" : needsBuy(it) ? "low" : lowSoon(it, t, shopAt) ? "soon" : null;
       if (!why) continue;
       const row = { it, why, at: lowAt(it, t) ?? t, on: !!(ticks[it.id] && ticks[it.id].on), ...amountFor(it.name, dishes, dinners) };
-      if (hasQ(it)) row.amt = fmtQ(toBuy(it, t, shopAt), it.u);   // d45: from what is left and his real use
+      if (hasQ(it)) row.amt = fmtItem(it, toBuy(it, t, shopAt));   // d45: from what is left and his real use
       rows.push(row);
     }
     for (const it of missing(K, k, dishes)) rows.push({ it, why: "none", at: t, on: !!(ticks[it.id] && ticks[it.id].on), ...amountFor(it.name, dishes, dinners) });
@@ -901,7 +949,9 @@
     const it = r.id ? item(K, r.id) : match(K, k, r.name);
     if (!it || it.del || it.k !== k || !(hasQ(it) || r.note)) return { K, id: null };
     const u = !hasQ(it) && ["", "g", "ml"].includes(r.u) ? r.u : unitOf(it);   // a level item: the unit he typed ("6 almonds")
-    const q = typeof amount === "number" ? amount : recipeIn(amount, u);
+    let q = typeof amount === "number" ? amount : recipeIn(amount, u);
+    // 2026-10-21: a jar or a can a recipe gives in spoons comes off as 1 (he can change the took number)
+    if (q == null && hasQ(it) && cwOf(it)) q = 1;
     const out = clone(K);
     out.used = { ...obj(out.used), [key]: { id: it.id, q: Math.max(0, Math.round((+q || 0) * 10) / 10), u, ...(hasQ(it) ? {} : { nq: true }), t: iso(at), at: iso(at) } };
     return { K: out, id: it.id };
@@ -1019,7 +1069,7 @@
      used), else null. q, u: what it took, in the item's unit when it has an amount ("" a count, "g", "ml"); q null
      when he gave none, or when a count was typed for an item kept in grams. */
   function extraParse(K, k, text) {
-    const raw = String(text == null ? "" : text).replace(/\s+/g, " ").trim();
+    const raw = numText(text);   // "½ lemon", ".5 lemon": half a lemon (2026-10-21)
     if (!raw) return { name: null, q: null, u: "", it: null };
     let { name, amt } = splitName(raw);
     if (!amt) { const m = /^(\d+(?:[.,]\d+)?)\s+([a-z].*)$/i.exec(raw); if (m) { name = cap(m[2]).slice(0, 40); amt = m[1]; } }
@@ -1139,7 +1189,7 @@
   function status(it, now, shopAt, tz) {
     if (it && hasQ(it) && typeof it.left === "number") {
       if (it.lv === 0) return "none left · buy";
-      const a = fmtQ(it.left, it.u);
+      const a = fmtItem(it, it.left);
       if (it.lv === 1) return `${a} · buy`;
       return lowSoon(it, now, shopAt) ? `${a} · low by ${dayWord(lowAt(it, now), now, tz)}` : a;
     }
@@ -1162,5 +1212,5 @@
 
   root.QuestKitchen = { NEED, LEVELS, ASK, needsBuy, KITCHENS, SEED, FRESH, DEFAULT_SHOP, GROUP_NAMES, GROUP_ICONS, keyOf, iconFor, groupIcon, splitName, amtOf, tileLine, guessGroup, guessShelf, firstTake, mealList, extraParse, search, unitOf,
     items, item, grouped, setLevel, nextLevel, tap, add, rename, move, place, remove, status, shows, pace, lowAt, lowSoon, turnAt, useFirst, nextShop, parseAmt, usesOf, amountFor,
-    shopList, missing, MAX_RECIPE_ROWS, stepList, tick, buyTicked, hasQ, isPiece, pieceCount, stepCount, unitFor, qtyOf, fmtQ, recipeIn, perMeal, setAmount, restock, rateOf, toBuy, eat, setTake, taken, portion, serving, ownDishes, ownDish, saveDish, delDish, dishAmt, dishIcon, kitchenFoods, TRAVEL_STARTER, pickList, preTick, fill, unfill, shopInfo, shopWhen, shopUpto, match, dinner, active, pick, noteActive, tripEnd, bringHome, dayWord, counts };
+    shopList, missing, MAX_RECIPE_ROWS, stepList, tick, buyTicked, hasQ, isPiece, pieceCount, stepCount, isCountText, numOf, numText, fmtItem, cwOf, unitFor, qtyOf, fmtQ, recipeIn, perMeal, setAmount, restock, rateOf, toBuy, eat, setTake, taken, portion, serving, ownDishes, ownDish, saveDish, delDish, dishAmt, dishIcon, kitchenFoods, TRAVEL_STARTER, pickList, preTick, fill, unfill, shopInfo, shopWhen, shopUpto, match, dinner, active, pick, noteActive, tripEnd, bringHome, dayWord, counts };
 })(typeof window !== "undefined" ? window : globalThis);
