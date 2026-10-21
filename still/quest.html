@@ -3193,8 +3193,8 @@
     // d42: a ticked row asks how much (filled with what he bought last time for an item with an amount)
     // d64: a food bought by the piece asks how many
     const pieceRow = r => { const it = r.item && QK().item(G.kitchen, r.item); return QK().isPiece(it || { name:QK().splitName(r.name).name }); };
-    const amtField = r => { if (!F.on.has(r.id)) return ""; const pc = pieceRow(r), ask = pc ? "How many?" : "How much?";
-      return `<label class="kt-pkq"><span>${ask}</span><input class="mq-tq" data-kpq="${esc(r.id)}" value="${esc(kitFillAmt(S, r))}" placeholder="${pc ? "e.g. 4" : "e.g. 4 or 500 g"}" maxlength="20" autocomplete="off" aria-label="${ask.slice(0, -1)} ${esc(r.name)}"></label>`; };
+    const amtField = r => { if (!F.on.has(r.id)) return ""; const pc = pieceRow(r), ask = pc ? "How many" : "How much";
+      return `<label class="kt-pkq"><span>${ask}?</span><input class="mq-tq" data-kpq="${esc(r.id)}" value="${esc(kitFillAmt(S, r))}" placeholder="${pc ? "e.g. 4" : "e.g. 4 or 500 g"}" maxlength="20" autocomplete="off" aria-label="${ask} ${esc(r.name)}"></label>`; };
     const row = r => `<div class="kt-pkw"><button type="button" class="kt-li kt-pk" data-kpk="${esc(r.id)}" aria-pressed="${F.on.has(r.id)}"><span class="bx"></span><span class="e">${esc(r.em || QK().iconFor(r.name, r.group))}</span>` +
       `<span class="n">${esc(r.name)}<small>${esc(note(r))}</small></span><span class="q">${esc(shelfName(r.shelf))}</span></button>${amtField(r)}</div>`;
     const top = rows.filter(r => r.top), rest = rows.filter(r => !r.top);

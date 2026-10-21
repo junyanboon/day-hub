@@ -294,8 +294,9 @@
       out.u = out.u === "g" || out.u === "ml" ? out.u : "";
       out.buy = +out.buy > 0 ? +out.buy : out.q;
       /* d64: a food bought by the piece stored as a few grams ("Capsicum 1 g": a bare "1" read as grams before capsicum
-         was on the list) is a count. Under PIECE_G grams nobody means weight for a whole capsicum or banana. */
-      if (out.u === "g" && unitFor(name) === "" && out.q < PIECE_G && out.buy < PIECE_G) out.u = "";
+         was on the list) is a count. Under PIECE_G grams nobody means weight for a whole capsicum or banana. Grams he
+         types from this build on ("5 g" of lemon) are kept: put marks them wg, and a marked item stays in grams. */
+      if (out.u === "g" && !it.wg && unitFor(name) === "" && out.q < PIECE_G && out.buy < PIECE_G) out.u = "";
     }
     return out;
   }
@@ -373,6 +374,9 @@
     if (!ownIcon(rest.em) || (typeof rest.name === "string" && rest.em === iconFor(rest.name, rest.group))) delete rest.em;
     // an amount item stores its base amount (q at qt), and amt as its text, so a page from before still shows a number
     if (hasQ(rest)) rest.amt = fmtQ(rest.q, rest.u);
+    // d64: a few grams of a piece food that he typed as grams stays grams (clean reads an unmarked one as a count)
+    if (hasQ(rest) && rest.u === "g" && typeof rest.name === "string" && unitFor(rest.name) === "" && rest.q < PIECE_G) rest.wg = true;
+    else delete rest.wg;
     out.items[it.id] = { ...rest, at: iso(at) };
     return out;
   }
@@ -816,12 +820,12 @@
     return out;
   }
 
+  /* d64: a capsicum is the recipes' red pepper, for taking a meal off (not for adding: "Capsicum" stays its own tile) */
+  const SAME_AS = Object.assign(Object.create(null), { capsicum: "red pepper", "red capsicum": "red pepper", "bell pepper": "red pepper", "red bell pepper": "red pepper" });
   /* Dinner ticks (d21, d28): ticking an ingredient in a dish on the meal sheet steps the matching item of the active kitchen
      down one level; unticking puts it back. key: one per meal, dish and ingredient. The record (K.used[key]) says what it
      changed, so an untick undoes exactly that, and only while the item still shows that level (a level he set by hand since
      stands). An item not checked yet is left alone (no made-up levels). Returns { K, id } (id: the item it moved, or null). */
-  /* d64: a capsicum is the recipes' red pepper, for taking a meal off (not for adding: "Capsicum" stays its own tile) */
-  const SAME_AS = { capsicum: "red pepper", "red capsicum": "red pepper", "bell pepper": "red pepper", "red bell pepper": "red pepper" };
   function match(K, k, name) {
     const key = keyOf(name), all = items(K, k);
     let list = all.filter((x) => keyOf(x.name) === key);
