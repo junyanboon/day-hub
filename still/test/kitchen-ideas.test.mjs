@@ -38,7 +38,8 @@ test("d41: the pool keeps his food rules: for 2, no garlic or onion, plants only
   // the three from before are in it with the same ids and the same ingredients (a meal ticked on them still reads)
   for (const d of QM.IDEAS) assert.deepEqual(J(QI.byId(d.id).items), J(d.items));
   for (const n of ["Garlic", "Red onion", "Leeks", "Chicken thighs", "Greek yogurt", "Eggs"]) assert.ok(QI.banned(n), n);
-  for (const n of ["Coconut yogurt", "Macadamia milk", "Shiitake mushrooms", "Spring greens"]) assert.ok(!QI.banned(n), n);
+  for (const n of ["Coconut yogurt", "Macadamia milk", "Shiitake mushrooms", "Spring greens", "Peanut butter", "Oat milk", "Cream of tartar"]) assert.ok(!QI.banned(n), n);
+  for (const n of ["Milk", "Whole milk", "Butter", "Kefir"]) assert.ok(QI.banned(n), n);
 });
 
 test("d41: every main ingredient is a food the kitchen catalogue knows, so what an idea uses is what a tick takes off", () => {
@@ -108,6 +109,13 @@ test("d41: too little in the kitchen: the note says so and the closest ideas sti
   assert.equal(thin.ready, 0);
   const travel = QI.pick({}, "travel", opt());
   assert.match(travel.note, /travel fridge/);
+  // ready means every main ingredient had in full: the shiitake bowl only, so the note names the other two
+  const one = QI.pick(stock(SHIITAKE_NIGHT), "home", opt());
+  assert.equal(one.ready, 1);
+  assert.match(one.note, /Only one of these can be made from what you have/);
+  // broccoli short for every idea that uses it: none is all in, and the note does not say "can be made"
+  const short = QI.pick(stock(SHIITAKE_NIGHT.map(([id, v]) => [id, id === "h:broccoli" ? "50 g" : v])), "home", opt());
+  if (short.ready === 0) assert.match(short.note, /None of these is all in the kitchen|Not much/);
   // a full kitchen has no note
   assert.equal(QI.pick(stock(SHIITAKE_NIGHT), "home", opt()).note.includes("Not much"), false);
 });
@@ -163,10 +171,10 @@ test("d41: the page loads quest-ideas.js and the meal sheet shows today's three 
   assert.match(html, /<script src="quest-kitchen\.js\?v=\w+"><\/script>\s*<script src="quest-ideas\.js\?v=\w+"><\/script>/);
   assert.match(html, /QI\(\)\.pick\(G\.kitchen, kitToday\(\)/);
   assert.match(html, /QI\(\)\.status\(G\.kitchen, kitToday\(\)/);
-  assert.ok(html.includes("Tonight's ideas · for 2 people${QK() ? ` · from ${QK().KITCHENS[kitToday()].icon}"), "the heading names the kitchen");
+  assert.ok(html.includes("Tonight's ideas · for 2 people${kn ? ` · from ${esc(kn.icon)} ${esc(kn.name)}`"), "the heading names the kitchen");
   assert.match(html, /IT\.note \? `<p class="mq-serves mq-inote">/, "a short kitchen is said in words");
   assert.match(html, /<b>To buy:<\/b>/);
   // the shopping list's amounts follow today's ideas, and a dish by id finds any idea of the pool
   assert.match(html, /const kitDishes = \(\) => QM \? QM\.DISHES\.concat\(ideasToday\(\)\.list\.filter\(d => !d\.own\)\) : \[\]/);
-  assert.match(html, /QI\(\) && QI\(\)\.byId\(id\)/);
+  assert.match(html, /\|\| ideaById\(id\);/);
 });

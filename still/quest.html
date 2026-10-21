@@ -938,7 +938,7 @@
 <script src="quest-gymlog.js?v=20261019a"></script>
 <script src="quest-meals.js?v=20261021d41"></script>
 <script src="quest-kitchen.js?v=20261021d48b"></script>
-<script src="quest-ideas.js?v=20261021d41"></script>
+<script src="quest-ideas.js?v=20261021d41b"></script>
 <script src="quest-trends.js?v=20261019end3"></script>
 <script src="nvc-words.js?v=20261010a"></script>
 <script src="quest-fx.js?v=20261019x"></script>
@@ -2557,7 +2557,8 @@
     /* tonight's ideas (d41): today's three from the kitchen, then any idea this meal already has ticks on (from another
        day's three, or before the kitchen changed), so a tick can always be taken back */
     const IT = ideasToday(), ideas = IT.list.concat(Object.keys((rec && rec.dish) || {})
-      .filter(id => !IT.list.some(d => d.id === id)).map(id => QI() ? QI().byId(id) : (QM.IDEAS.find(d => d.id === id) || null)).filter(Boolean));
+      .filter(id => !IT.list.some(d => d.id === id)).map(ideaById).filter(Boolean));
+    const kn = QK() ? QK().KITCHENS[kitToday()] : null;
     const sel = new Set(rec && Array.isArray(rec.sel) ? rec.sel : []), paid = (rec && rec.v) || {};
     const warn = mealWarn(b, all), lastFood = lastMealBefore(b.s, all), o = mqOpt();
     const sign = v => v > 0 ? `+${v}` : `${v}`;
@@ -2603,7 +2604,7 @@
       <div class="mq-dishes">${QM.DISHES.map(d => dishCard(d)).join("")}</div>
       ${QK() ? `<div class="mq-sub mq-subl"><span>Your dishes</span></div>
       <div class="mq-dishes">${own.filter(d => !ideas.some(x => x.id === d.id)).map(d => dishCard(d)).join("")}<button type="button" class="mq-mini mq-new" data-dnew>+ New dish</button></div>` : ""}
-      <div class="mq-sub mq-subl"><span>Tonight's ideas · for 2 people${QK() ? ` · from ${QK().KITCHENS[kitToday()].icon} ${esc(QK().KITCHENS[kitToday()].name)}` : ""}</span>${dishGot(ideas) ? `<b>${sign(dishGot(ideas))}</b>` : ""}</div>
+      <div class="mq-sub mq-subl"><span>Tonight's ideas · for 2 people${kn ? ` · from ${esc(kn.icon)} ${esc(kn.name)}` : ""}</span>${dishGot(ideas) ? `<b>${sign(dishGot(ideas))}</b>` : ""}</div>
       ${IT.note ? `<p class="mq-serves mq-inote">${esc(IT.note)}</p>` : ""}
       <div class="mq-dishes">${ideas.map(d => dishCard(d, QI() && QK() ? QI().status(G.kitchen, kitToday(), d) : null)).join("")}</div>
       ${kitMealCard(k)}
@@ -2759,7 +2760,7 @@
   const allDishes = () => kitDishes().concat(QK() ? QK().ownDishes(G.kitchen) : []);
   /* a dish by id: the Blueprint dishes, tonight's ideas and his own, a deleted one of his too (a meal logged with it), and
      any idea of the pool (d41: an idea from another day that a meal has ticks on) */
-  const dishById = id => allDishes().find(d => d.id === id) || (QK() ? QK().ownDish(G.kitchen, id) : null) || (QI() && QI().byId(id)) || null;
+  const dishById = id => allDishes().find(d => d.id === id) || (QK() ? QK().ownDish(G.kitchen, id) : null) || ideaById(id);
   // his dishes for this meal: the live ones, then any deleted one this meal has ticks on
   function mealOwn(rec){
     if (!QK()) return [];
@@ -2901,6 +2902,8 @@
   const ideaSince = () => window.QuestSuggest ? QuestSuggest.at(gameYmd(), 4, 0, TZ()) : 0;
   const ideasToday = () => QI() && QK() && G.day ? QI().pick(G.kitchen, kitToday(), { day:gameYmd(), since:ideaSince(), now:+now() })
     : { list:QM ? QM.IDEAS : [], note:"", ready:3 };
+  // an idea by id: any of the pool (d41), else the three fixed ones
+  const ideaById = id => (QI() ? QI().byId(id) : QM && QM.IDEAS.find(d => d.id === id)) || null;
   const kitDishes = () => QM ? QM.DISHES.concat(ideasToday().list.filter(d => !d.own)) : [];
   function kitSave(K){ G.kitchen = K; saveG(); }
   // the trip-end question, only once the whole calendar is in (a half-loaded agenda could read a travel day as home)

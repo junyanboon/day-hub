@@ -23,9 +23,10 @@
   const QK = () => root.QuestKitchen, QM = () => root.QuestMeals;
 
   // garlic, onion and their family (the Drain "onion or garlic"), and anything not Blueprint (animal food)
-  const BANNED = /\b(garlic|onions?|leeks?|shallots?|chives?|scallions?|spring onions?|asafoetida|hing|meat|beef|pork|lamb|chicken|turkey|fish|salmon|tuna|cod|shrimps?|prawns?|eggs?|cheese|butter|cream|ghee|milk chocolate|yogh?urts?)\b/i;
-  // a plant yogurt or milk is fine ("Coconut yogurt", "Macadamia milk")
-  const banned = (name) => { const n = String(name || ""); return BANNED.test(n.replace(/\b(coconut|soy|oat|almond|macadamia|cashew) (yogh?urt|milk|cream|butter)\b/gi, "")); };
+  const BANNED = /\b(garlic|onions?|leeks?|shallots?|chives?|scallions?|spring onions?|asafoetida|hing|meat|beef|pork|lamb|chicken|turkey|fish|salmon|tuna|cod|shrimps?|prawns?|eggs?|cheese|butter|cream|ghee|milk|kefir|yogh?urts?)\b/i;
+  // a plant yogurt, milk or butter is fine ("Coconut yogurt", "Macadamia milk", "Peanut butter"), and cream of tartar
+  const PLANT = /\b(coconut|soy|oat|almond|macadamia|cashew|peanut|nut|seed|hemp|rice|cocoa|sunflower) (yogh?urts?|milk|cream|butter|kefir)\b|\bcream of tartar\b/gi;
+  const banned = (name) => BANNED.test(String(name || "").replace(PLANT, ""));
 
   /* The pool. { id, icon, name, time, base, items:[[ingredient, amount for 2]], how }. Ingredient names match the
      kitchen catalogue's names the way a dish tick does (QuestKitchen.keyOf), so what an idea says it uses is exactly what
@@ -148,7 +149,7 @@
   // the kitchen as it was at the start of the day: today's meal ticks put back (their records left out)
   function atStart(K, since) {
     const used = (K && K.used) || {}, keep = {};
-    for (const [key, r] of Object.entries(used)) if (r && Date.parse(r.t) < since) keep[key] = r;
+    for (const [key, r] of Object.entries(used)) if (r && !(Date.parse(r.t) >= since)) keep[key] = r;   // a record with no time is kept
     return { ...K, used: keep };
   }
   // how well an idea fits the kitchen: { fit (the share of main ingredients had), score }
@@ -173,7 +174,8 @@
     const opt = o || {}, day = opt.day || "", since = +opt.since || 0;
     if (memo.K === K && memo.k === k && memo.day === day && memo.since === since && memo.out) return memo.out;
     const K0 = since ? atStart(K, since) : K, kit = byKey(K0, k);
-    const first = new Set(QK().useFirst(K0, k, opt.now || since || Date.now()).map((x) => x.it.id));
+    // use first as it read when the day began, so a pick holds all day (now only when no start is given)
+    const first = new Set(QK().useFirst(K0, k, since || opt.now || Date.now()).map((x) => x.it.id));
     const own = QK().ownDishes(K).filter((d) => d.items.length >= 3 && !d.items.some((x) => banned(x[0])) &&
       read(d, kit).every((r) => r.st === "have"));
     const cands = POOL().concat(own).map((d) => ({ d, ...rate(d, kit, first, day) }))
@@ -182,10 +184,12 @@
     for (const c of cands) { if (out.length === 3) break; if ((c.d.base && bases.has(c.d.base)) || (c.d.own && mine())) continue; out.push(c); if (c.d.base) bases.add(c.d.base); }
     for (const c of cands) { if (out.length === 3) break; if (!out.includes(c) && !(c.d.own && mine())) out.push(c); }
     const known = [...kit.values()].some((it) => it.lv != null);
-    const ready = out.filter((c) => c.fit >= 0.7).length;
+    // ready: every main ingredient had in full (short counts as missing here, so the note never says too much)
+    const ready = out.filter((c) => read(c.d, kit).every((r) => r.staple || r.st === "have")).length;
     const where = k === "travel" ? "travel fridge" : "kitchen";
     const note = !known ? `Nothing in the ${where} is checked yet, so these ideas show what to buy. Check the ${where} and they follow what you have.`
-      : ready === 0 ? `Not much in the ${where} for dinner. These are the closest; each one says what to buy.`
+      : ready === 0 && out[0].fit < 0.5 ? `Not much in the ${where} for dinner. These are the closest; each one says what to buy.`
+      : ready === 0 ? `None of these is all in the ${where}; each one says what to buy.`
       : ready < 3 ? `Only ${ready === 1 ? "one of these" : "two of these"} can be made from what you have; the ${3 - ready === 1 ? "other says" : "others say"} what to buy.` : "";
     const res = { list: out.map((c) => c.d), note, ready };
     Object.assign(memo, { K, k, day, since, out: res });
