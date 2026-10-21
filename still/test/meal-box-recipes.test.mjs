@@ -65,29 +65,27 @@ test("d79: the card's tag line and Cook this: every ingredient but the optional 
   assert.equal(K.recipeIn("½ tsp", "g"), 1.5);
 });
 
-test("d79: Cook this logs a recipe like a dish: one tick list, paid on the ideas' cap, an untick takes its share back", () => {
+test("d79, d81: Cook this logs a recipe like a dish: one tick list, no points, an untick takes the tick off", () => {
   const d = QM.dishOf(QR.list()[0].id);
   assert.ok(d && d.recipe, "a recipe id resolves, so a meal ticked on it reads on any day");
   assert.equal(QM.groupOf(d), "idea", "it holds an idea slot, never a Blueprint one");
   const ticks = QR.cookTicks(d);
   const r1 = QM.tick(null, d, ticks, opt);
   assert.deepEqual(J(r1.rec.dish[d.id]), J(ticks));
-  const full = Math.round(9 * Math.min(ticks.length, d.items.length) / d.items.length);
-  assert.equal(r1.rec.b, full);
+  assert.equal(r1.rec.b, 0, "a recipe is a suggestion, no points (d81)");
   const r2 = QM.tick(r1.rec, d, ticks[0], opt);
-  assert.ok(!r2.rec.dish[d.id].includes(ticks[0]) && r2.rec.b < r1.rec.b, "unticked what he did not have");
+  assert.ok(!r2.rec.dish[d.id].includes(ticks[0]) && r2.rec.b === 0, "unticked what he did not have");
   const r3 = QM.tick(r2.rec, d, "none", opt);
   assert.equal(r3.rec.b, 0); assert.ok(!r3.rec.dish || !r3.rec.dish[d.id]);
-  // the same slot rule as the ideas: a recipe on another meal holds one
-  const mealq = { a: r1.rec };
-  assert.equal(QM.slotsUsed(mealq, "b", QM.dishOf(QR.list()[1].id)), 1);
+  // it holds no slot either
+  assert.equal(QM.slotsUsed({ a: r1.rec }, "b", QM.dishOf(QR.list()[1].id)), 0);
 });
 
 test("d79: a meal logged against an old idea still reads and keeps its points", () => {
   const r1 = QM.dishOf("r1");
   assert.ok(r1 && r1.items.length);
-  const rec = QM.tick(null, r1, "all", opt).rec;
-  assert.equal(QM.dishPaid(rec, r1), 9);
+  const rec = { v: { "dish:r1": ["b", 9, 9, 0] }, b: 9, dish: { r1: r1.items.map((x) => x[0]) } };   // paid before d81
+  assert.equal(QM.dishPaid(QM.tick(rec, r1, r1.items[0][0], opt).rec, r1), 9, "an untick after d81 takes nothing back");
   assert.match(sheet, /\.map\(id => ideaById\(id\) \|\| recipeStub\(id\)\)\.filter\(Boolean\)\);/, "an old idea with ticks joins the list under the recipes");
   assert.match(sheet, /\$\{RL\.map\(recipeCard\)\.join\(""\)\}\$\{ideas\.map\(d => dishCard\(d\)\)\.join\(""\)\}/);
 });

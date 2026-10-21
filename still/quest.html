@@ -967,7 +967,7 @@
 <script src="quest-oura.js?v=20261019a"></script>
 <script src="quest-levels.js?v=20261016b"></script>
 <script src="quest-gymlog.js?v=20261019a"></script>
-<script src="quest-meals.js?v=20261021d79"></script>
+<script src="quest-meals.js?v=20261021d81b"></script>
 <script src="quest-kitchen.js?v=20261021h81b"></script>
 <script src="quest-ideas.js?v=20261021d76"></script>
 <script src="quest-recipe-data.js?v=202610211914"></script>
@@ -2572,7 +2572,9 @@
        Blueprint meal's value (+9 at level 1), each dish on its own; an untick or Clear takes its share back
        (QuestMeals.tick). The ticks live on the meal's record in G.day.mealq, so they save and sync like the tiles.
      - Supplements, fermented food and xylitol moved to the water card (d16). The tiles are smaller, about four to a row
-       on a phone, and each heading stays on one line with this meal's points for it on the right. */
+       on a phone, and each heading stays on one line with this meal's points for it on the right.
+     2026-10-21 (d81 NO, "they are just recommendations for me to make meals"): only the Blueprint dishes pay. Recipe cards
+     and tonight's old ideas pay nothing of their own (QuestMeals.pays); their ticks still take amounts off the kitchen. */
   const QM = window.QuestMeals;
   const mqSum = q => [q.p ? `prana ${q.p > 0 ? "+" : ""}${q.p}` : "", q.b ? `body ${q.b > 0 ? "+" : ""}${q.b}` : ""].filter(Boolean).join(", ") || "no change";
   // dish: the Blueprint meal habit's value, the most a dish pays before the level multiplier (d13)
@@ -2589,10 +2591,11 @@
     const own = mealOwn(rec);
     /* recipe cards (d79): his recipe book, travel-friendly first on a trip, this meal's recipes next. Tonight's ideas
        (d41) only when the book did not load; with the book, only an old idea this meal already has ticks on, so it still
-       reads, keeps its points and can be unticked */
+       reads, keeps its points and can be unticked. d81: an idea that paid before d81 and was since cleared keeps its points
+       (QuestMeals.tick leaves them), so its card stays too (QM.heldIds: ticks or a paid record) and the total adds up */
     const trip = !!QK() && kitToday() === "travel";
     const RL = recipesOn() ? QR().order(QR().list(), { trip, meal:QR().mealOf(name) }) : null, rule = RL ? QR().travelRule() : null;
-    const IT = RL ? { list:[], note:"" } : ideasToday(), ideas = IT.list.concat(Object.keys((rec && rec.dish) || {})
+    const IT = RL ? { list:[], note:"" } : ideasToday(), ideas = IT.list.concat(QM.heldIds(rec)
       .filter(id => !IT.list.some(d => d.id === id) && !(RL && RL.some(d => d.id === id))).map(id => ideaById(id) || recipeStub(id)).filter(Boolean));
     const kn = QK() ? QK().KITCHENS[kitToday()] : null;
     /* Super Veggie and Nutty Pudding (d58): the travel versions when the travel fridge is in use, else the full recipes, then any
@@ -2719,7 +2722,8 @@
     };
     const dishCard = (d, fit) => {
       const st = QM.dishStatus(rec, d), open = mqOpen.has(k + "|" + d.id), pd = QM.dishPaid(rec, d), on = new Set(rec && rec.dish && Array.isArray(rec.dish[d.id]) ? rec.dish[d.id] : []);
-      const max = QM.capOf(rec, d, dishOpt(k, d));   // its kept max once started, else what a start now gets (0: the day's cap is reached)
+      // its kept max once started, else what a start now gets (0: the day's cap is reached); a recipe or idea pays nothing (d81)
+      const pay = QM.pays(d), max = pay && QM.capOf(rec, d, dishOpt(k, d));
       const slot = QM.isSlotDish(d) && QI() && QK(), unit = slot ? "parts" : "ingredients";
       const hint = slot ? `you have ${QI().slotsHave(G.kitchen, kitToday(), d, [...on])} of ${st.m} parts · tap to open` : fit ? `${esc(fit.text)} · tap to open` : `${st.m} ${unit} · tap to open`;
       const nx = QM.extrasOf(rec, d.id).length;
@@ -2730,7 +2734,7 @@
       return `<div class="mq-dish${open ? " open" : ""}${st.all ? " done" : ""}">` +
         `<button type="button" class="mq-dbtn" data-dopen="${esc(d.id)}" aria-expanded="${open}"><span class="mq-de">${esc(d.icon)}</span>` +
         `<span class="mq-dn"><b>${esc(d.name)}</b><small>${sub}</small></span>` +
-        `<span class="mq-dp">${d.own ? `<small>${d.del ? "deleted" : "your dish"}</small>` : pd ? sign(pd) : max ? `<small>up to</small> +${max}` : `<small>full for today</small>`}</span></button>` +
+        `<span class="mq-dp">${d.own ? `<small>${d.del ? "deleted" : "your dish"}</small>` : pd ? sign(pd) : !pay ? "" : max ? `<small>up to</small> +${max}` : `<small>full for today</small>`}</span></button>` +
         (d.own ? "" : `<i class="mq-dbar"><b style="width:${st.pct}%"></b></i>`) +   // d78: no count bar on his own dish
         // no Got everything or Clear (2026-10-21: ticking part by part does the job); the search box ends the card (d74)
         (open && slot ? `<div class="mq-dlist">${slotCard(d)}${links(howTo(d, slotUse(d)), fullTo(d))}${extrasBlock(d)}</div>` : "") +
@@ -2760,7 +2764,8 @@
        kitchen in use has of each (softly, only what it has), the numbered steps, the swaps, and Cook this. Cook this logs
        it on the meal like a dish: every ingredient but the optional ones is ticked and its amount comes off the kitchen;
        he unticks what he did not have. Once cooked it is a dish card's tick list (with the search box) above the steps.
-       Unticking everything takes it back to the shut recipe. It pays like tonight's ideas did (their cap). */
+       Unticking everything takes it back to the shut recipe. No points of its own (d81, "they are just recommendations for
+       me to make meals"): the food tiles score the meal; a meal that paid on a recipe before d81 keeps it and shows it. */
     const recipeCard = d => {
       const on = new Set(dishOn(d)), xs = QM.extrasOf(rec, d.id), cooked = on.size > 0 || xs.length > 0, open = mqOpen.has(k + "|" + d.id), pd = QM.dishPaid(rec, d);
       const tv = trip && QR().isTravel(d, rule), sub = [d.time, QR().tagLine(d)].filter(Boolean).join(" · ");

@@ -200,10 +200,10 @@ test("Got everything pays the full value, Clear takes all of it back, and each d
   assert.deepEqual(J(r.ops), [{ id:"dish:sv", on:true, m:"b", d:8 }]);
   assert.equal(M.dishStatus(r.rec, sv()).text, "All in. Full points.");
   r = M.tick(r.rec, M.dishOf("r2"), "all", at15);
-  assert.equal(r.rec.b, 18); assert.equal(M.dishPaid(r.rec, M.dishOf("r2")), 9);
+  assert.equal(r.rec.b, 9, "an idea pays nothing (d81)"); assert.equal(M.dishPaid(r.rec, M.dishOf("r2")), 0);
   r = M.tick(r.rec, sv(), "none", at15);
   assert.deepEqual(J(r.ops), [{ id:"dish:sv", on:false, m:"b", d:-9 }]);
-  assert.equal(r.rec.b, 9); assert.equal(r.rec.dish.sv, undefined); assert.equal(r.rec.v["dish:sv"], undefined);
+  assert.equal(r.rec.b, 0); assert.equal(r.rec.dish.sv, undefined); assert.equal(r.rec.v["dish:sv"], undefined);
   assert.deepEqual(J(M.tick(r.rec, sv(), "none", at15).ops), []);   // nothing to take back twice
   // a partly ticked dish first: half pays its share
   assert.equal(M.dishPay(M.dishOf("np"), 6, at15), 5);   // round(9 * 6 / 12) = round(4.5)
@@ -279,15 +279,16 @@ test("d17: the max is kept, so later ticks and unticks use it and an untick take
   assert.equal(M.tick(null, np(), "all", { ...PAGE, used:1 }).rec.b, 6);
 });
 
-test("d17: tonight's ideas have their own cap of the same shape and never use a Blueprint slot", () => {
+test("d17, d81: tonight's ideas pay nothing now and never use a Blueprint slot", () => {
   const bp = M.tick(null, sv(), "all", { ...PAGE, used:0 }).rec;
   const r1 = M.tick(null, M.dishOf("r1"), "all", { ...PAGE, used:M.slotsUsed(dayOf([bp]), "m1", M.dishOf("r1")) });
-  assert.equal(r1.rec.b, 9, "a recipe after a Blueprint dish still gets the first idea slot");
+  assert.equal(r1.rec.b, 0, "an idea is a suggestion (d81)"); assert.ok(r1.rec.dish.r1.length);
   const day = dayOf([bp, r1.rec]);
-  assert.equal(M.slotsUsed(day, "m2", np()), 1);
-  assert.equal(M.slotsUsed(day, "m2", M.dishOf("r2")), 1);
-  const r2 = M.tick(null, M.dishOf("r2"), "all", { ...PAGE, used:1 }), r3 = M.tick(null, M.dishOf("r3"), "all", { ...PAGE, used:2 });
-  assert.equal(r2.rec.b, 6); assert.equal(r3.rec.b, 0);
+  assert.equal(M.slotsUsed(day, "m2", np()), 1, "only the Blueprint dish holds a slot");
+  assert.equal(M.slotsUsed(day, "m2", M.dishOf("r2")), 0);
+  // an idea that paid before d81 still holds one of the ideas' slots (its record is left as it was)
+  const old = { v:{ "dish:r1":["b", 9, 9, 0] }, b:9, dish:{ r1:["Lemon"] } };
+  assert.equal(M.slotsUsed({ m1:old }, "m2", M.dishOf("r2")), 1);
 });
 
 test("d17: a Blueprint tile ticked before today's change still holds a slot", () => {

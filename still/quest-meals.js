@@ -17,6 +17,7 @@
      - Blueprint dishes (d13): Super Veggie and Nutty Pudding (DISHES) and tonight's three recipes for 2 people (IDEAS) are
        checklists. A dish pays body as its ingredients are ticked, its share of the Blueprint meal's value (6, times the
        level multiplier: +9 at level 1), each dish on its own. Super Veggie has no garlic (d12: garlic is a Drain).
+       Since d81 (2026-10-21) only the Blueprint dishes pay; the ideas and recipe cards are suggestions (pays()).
      - Supplements, fermented food and xylitol moved to the water card (d16, quest-water.js DAY3). blueprint, ferment,
        xylitol and supps left BODY; LEGACY_BODY keeps their meter for records from before.
    Pure, so it can be tested (node --test still/test). */
@@ -274,10 +275,10 @@
   const BLUEPRINT = DISHES.concat(TRAVEL);   // the Blueprint dishes of both kitchens
   const ALL_DISHES = BLUEPRINT.concat(IDEAS);
   /* a dish by id: the Blueprint dishes and the ideas, and (2026-10-21, d41) any idea of the kitchen-ideas pool
-     (quest-ideas.js), so a meal ticked on an idea from another day still reads and holds its slot */
+     (quest-ideas.js), so a meal ticked on an idea from another day still reads (and, if it paid before d81, holds its slot) */
   const dishOf = (id, list) => (list || ALL_DISHES).find((d) => d.id === id)
     || (!list && root.QuestIdeas ? root.QuestIdeas.byId(id) : null)
-    || (!list && root.QuestRecipes ? root.QuestRecipes.byId(id) : null) || null;   // a recipe card (d79) holds an idea slot
+    || (!list && root.QuestRecipes ? root.QuestRecipes.byId(id) : null) || null;   // a recipe card (d79)
   const gotOf = (rec, d) => { const g = rec && rec.dish && Array.isArray(rec.dish[d.id]) ? rec.dish[d.id] : [];
     return d.items.map((x) => x[0]).filter((n) => g.includes(n)); };
   /* Parts (d51). A tick on a part dish is stored as "<part id>:<what he used>" ("greens:Kale"). A meal ticked before parts
@@ -328,8 +329,14 @@
      untick takes back exactly what it paid; Clear frees the slot. opt: { mult, dish (the habit's value), dim (DIM),
      dishLimit (its daily limit), used (slots other dishes of its group hold today) }. */
   const groupOf = (d) => (d && d.own ? "own" : BLUEPRINT.some((x) => x.id === d.id) ? "bp" : "idea");   // a travel version is a Blueprint dish (d58)
+  /* Only the Blueprint dishes (Super Veggie, Nutty Pudding, their travel versions) pay points of their own (Junyan,
+     2026-10-21, d81 NO: "they are just recommendations for me to make meals"). Recipe cards, tonight's old ideas and the
+     kitchen-ideas pool pay nothing, like his own dishes (d48): their ticks only take amounts off the kitchen, and the food
+     tiles score the meal. A meal that paid on a recipe or an idea before d81 keeps what it paid (tick leaves it alone). */
+  const pays = (d) => !!d && groupOf(d) === "bp";
   // the slots dishes of d's group hold today across G.day.mealq, leaving out d itself on meal k. A Blueprint tile ticked
   // before 2026-10-20 still holds a Blueprint slot.
+  // (since d81 an idea only holds one through a record paid before d81)
   function slotsUsed(mealq, k, d) {
     let n = 0;
     const g = groupOf(d);
@@ -365,12 +372,13 @@
     const got = gotOf(rec, d), m = d.items.length, n = got.length;
     const missing = d.items.map((x) => x[0]).filter((x) => !got.includes(x));
     const all = n === m && m > 0;
-    const text = all ? (d.own ? "All in." : "All in. Full points.") : n ? `Missing: ${missing.slice(0, 2).join(", ")}${missing.length > 2 ? ` and ${missing.length - 2} more` : ""}` : "";
+    const text = all ? (pays(d) ? "All in. Full points." : "All in.") : n ? `Missing: ${missing.slice(0, 2).join(", ")}${missing.length > 2 ? ` and ${missing.length - 2} more` : ""}` : "";
     return { n, m, all, missing, pct: m ? Math.round((n / m) * 100) : 0, text };
   }
-  /* Tick or untick one ingredient (how = its name), or "all" (Got everything) or "none" (Clear). Pays the difference
-     between what the dish is worth now and what it had paid, so an untick takes back exactly its share and Clear takes
-     back all of it. Returns { rec, ops } like tap(). */
+  /* Tick or untick one ingredient (how = its name), or "all" (Got everything) or "none" (Clear). A Blueprint dish pays the
+     difference between what it is worth now and what it had paid, so an untick takes back exactly its share and Clear
+     takes back all of it. Any other dish (d81) only keeps its ticks: no ops, and a record paid before d81 stays as it was
+     (noPay). Returns { rec, ops, done } like tap(). */
   function tick(rec, d, how, opt) {
     const r = { ...(rec || {}), sel: [...((rec && Array.isArray(rec.sel)) ? rec.sel : [])], v: { ...((rec && rec.v) || {}) },
       p: +((rec && rec.p) || 0), b: +((rec && rec.b) || 0), dish: { ...((rec && rec.dish) || {}) } };
@@ -388,10 +396,11 @@
     let stale = d.own && rec && rec.dish && Array.isArray(rec.dish[d.id]) ? rec.dish[d.id].filter((x) => !names.includes(x)) : [];
     // the page shows such a food as its own row, so a tap on it (or Clear) unticks it and the kitchen gets it back
     if (how === "none" || stale.includes(how)) stale = how === "none" ? [] : stale.filter((x) => x !== how);
-    const max = d.own ? 0 : capOf(r, d, opt), now = got.length ? dishPay(d, got.length, opt, max) : 0, dd = now - was;
-    // d18 ("18 yes"): a Blueprint dish with every ingredient ticked counts as the Blueprint meal done today
-    const isDone = groupOf(d) === "bp" && got.length === d.items.length && max > 0 ? 1 : 0;
     const keep = names.filter((x) => got.includes(x)).concat(stale);
+    if (!pays(d)) return noPay(r, d, keep);
+    const max = capOf(r, d, opt), now = got.length ? dishPay(d, got.length, opt, max) : 0, dd = now - was;
+    // d18 ("18 yes"): a Blueprint dish with every ingredient ticked counts as the Blueprint meal done today
+    const isDone = got.length === d.items.length && max > 0 ? 1 : 0;
     if (keep.length) r.dish[d.id] = keep; else delete r.dish[d.id];
     // [meter, paid, max, counted as done]; kept while ticked and the dish has a slot, so the slot and the max hold
     if (got.length && max > 0) r.v[key] = ["b", now, max, isDone]; else delete r.v[key];
@@ -400,13 +409,15 @@
   }
   /* A part dish (d51, d52): how is one tick ("greens:Kale", or an old recipe name) to tick or untick, a list (the ticks it
      should have now: the page's "Got everything", what each part shows), "all" (the full recipe) or "none" (Clear). It pays its share of the
-     dish's value by parts filled. A tick that no longer reads is dropped. */
+     dish's value by parts filled (a part dish that does not pay, d81, only keeps its ticks). A tick that no longer reads
+     is dropped. */
   function tickSlots(r, d, how, opt) {
     let got = entriesOf(r, d);
     if (how === "none") got = [];
     else if (how === "all") got = d.slots.flatMap((sl) => sl.want.map((w) => w[0]));   // the full recipe, by its own names
     else if (Array.isArray(how)) got = [...new Set(how.filter((e) => slotOf(d, e)))];
     else if (slotOf(d, how)) got = got.includes(how) ? got.filter((x) => x !== how) : got.concat(how);
+    if (!pays(d)) return noPay(r, d, got);
     const key = "dish:" + d.id, old = r.v[key], was = old ? +old[1] || 0 : 0, wasDone = old && old[3] ? 1 : 0;
     const n = new Set(got.map((e) => slotOf(d, e).slot)).size;
     const max = capOf(r, d, opt), now = n ? dishPay(d, n, opt, max) : 0, dd = now - was;
@@ -416,6 +427,14 @@
     r.b += dd;
     return { rec: r, ops: dd ? [{ id: key, on: dd > 0, m: "b", d: dd }] : [], done: (r.v[key] ? isDone : 0) - wasDone };
   }
+  // d81: a dish that does not pay keeps only its ticks; its paid record from before d81 (r.v) and r.b stay as they were
+  function noPay(r, d, ticks) {
+    if (ticks.length) r.dish[d.id] = ticks; else delete r.dish[d.id];
+    return { rec: r, ops: [], done: 0 };
+  }
+  // the dishes a meal record holds: ticks on them, or (d81) a paid record left after its ticks were cleared
+  const heldIds = (rec) => [...new Set(Object.keys((rec && rec.dish) || {})
+    .concat(Object.keys((rec && rec.v) || {}).filter((x) => x.startsWith("dish:")).map((x) => x.slice(5))))];
   // what one dish has paid on this record (shown on its card)
   const dishPaid = (rec, d) => (rec && rec.v && rec.v["dish:" + d.id] ? +rec.v["dish:" + d.id][1] || 0 : 0);
 
@@ -450,5 +469,5 @@
     ? { ...y, q: typeof q === "number" && isFinite(q) && q >= 0 ? Math.round(q * 10) / 10 : null } : y)));
 
   root.QuestMeals = { PRANA_FOODS, PRANA_WAYS, TIPS, DRAINS, BODY, LEGACY_BODY, JUNK, ONEOF, FOOD_IDS, DRAIN_IDS, AUTO_NOTE,
-    DISH_VALUE, DISHES, TRAVEL, BLUEPRINT, CORE, dishesFor, IDEAS, SLOTS, STEPS, isSlotDish, slotOf, entryName, extrasOf, addExtra, dropExtra, setExtraQ, xKey, entriesOf, filledOf, partsOf, stepsOf, SHORT, tileLabel, value, score, toggle, tally, tap, meterOf, dishOf, groupOf, slotsUsed, dishMax, capOf, dishPay, dishStatus, tick, dishPaid };
+    DISH_VALUE, DISHES, TRAVEL, BLUEPRINT, CORE, dishesFor, IDEAS, SLOTS, STEPS, isSlotDish, slotOf, entryName, extrasOf, addExtra, dropExtra, setExtraQ, xKey, entriesOf, filledOf, partsOf, stepsOf, SHORT, tileLabel, value, score, toggle, tally, tap, meterOf, dishOf, groupOf, pays, slotsUsed, dishMax, capOf, dishPay, dishStatus, tick, dishPaid, heldIds };
 })(typeof window !== "undefined" ? window : globalThis);
