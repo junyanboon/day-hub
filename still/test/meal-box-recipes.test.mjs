@@ -96,7 +96,7 @@ test("d78: What did you eat? is the first thing on the meal sheet, the same sear
   const top = sheet.slice(sheet.indexOf("openSheet(`${winHead(b)}"));
   assert.ok(top.indexOf("${eatBox()}") > 0 && top.indexOf("${eatBox()}") < top.indexOf('<div class="mq-tips">'), "above the tips and every card");
   const box = sheet.slice(sheet.indexOf("const eatBox = () =>"), sheet.indexOf("const slotCard ="));
-  assert.ok(box.includes("What did you eat?") && box.includes('xSearch(MEAL, "What did you eat?")'));
+  assert.ok(box.includes("What did you eat?") && box.includes('xSearch(MEAL, "What did you eat?", "Type a food, like red pepper 1")'));
   assert.match(box, /xRow\(MEAL, x, ""\)/, "a ticked row with took, no 'added' word");
   assert.match(box, /data-msave>Save as a dish</);
   assert.ok(!/function kitMealCard\(|<b>Anything else from the kitchen<\/b>|data-ksave/.test(html), "the old card is gone");

@@ -2666,7 +2666,7 @@
         (list.length ? `<div class="mq-ings">${list.map(btn).join("")}</div>` : "");
     };
     // the search box: the last thing on every open dish card (d74), and the What did you eat? box (d78)
-    const xSearch = (d, aria) => `<div class="mq-xbox"><input type="search" class="mq-xs" data-xs="${esc(d.id)}" placeholder="Search the kitchen, or type a food and amount" aria-label="${esc(aria || `Add something else that went into ${d.name}`)}" autocomplete="off" enterkeyhint="done">` +
+    const xSearch = (d, aria, ph) => `<div class="mq-xbox"><input type="search" class="mq-xs" data-xs="${esc(d.id)}" placeholder="${esc(ph || "Search the kitchen, or type a food and amount")}" aria-label="${esc(aria || `Add something else that went into ${d.name}`)}" autocomplete="off" enterkeyhint="done">` +
       `<div data-xres="${esc(d.id)}"></div></div>`;
     // a part dish: what else went in under "Also went in" (its parts decide points), then the search box
     const extrasBlock = d => {
@@ -2688,9 +2688,9 @@
       const xs = QM.extrasOf(rec, MEAL.id), n = xs.length + oldEat.length;
       const old = x => kitTakeWrap(kPre + x.id, `<button type="button" class="mq-ing" data-kown="${esc(x.id)}" aria-pressed="true"><span class="bx"></span>` +
         `<span class="n">${esc(x.it.name)}</span></button>`);
-      return `<div class="mq-sub mq-subl"><span>What did you eat?</span></div><div class="mq-dishes"><div class="mq-dish open mq-eat"><div class="mq-dlist">` +
+      return `${lb("What did you eat?", "mb", 0)}<div class="mq-dishes"><div class="mq-dish open mq-eat"><div class="mq-dlist">` +
         (n ? `<div class="mq-rows">${oldEat.map(old).join("")}${xs.map(x => xRow(MEAL, x, "")).join("")}</div>` : "") +
-        xSearch(MEAL, "What did you eat?") +
+        xSearch(MEAL, "What did you eat?", "Type a food, like red pepper 1") +
         (n ? `<div class="mq-drow"><button type="button" class="mq-mini mq-msave" data-msave>Save as a dish</button></div>` : "") +
         `</div></div></div>`;
     };
@@ -2731,7 +2731,7 @@
         `<button type="button" class="mq-dbtn" data-dopen="${esc(d.id)}" aria-expanded="${open}"><span class="mq-de">${esc(d.icon)}</span>` +
         `<span class="mq-dn"><b>${esc(d.name)}</b><small>${sub}</small></span>` +
         `<span class="mq-dp">${d.own ? `<small>${d.del ? "deleted" : "your dish"}</small>` : pd ? sign(pd) : max ? `<small>up to</small> +${max}` : `<small>full for today</small>`}</span></button>` +
-        `<i class="mq-dbar"><b style="width:${st.pct}%"></b></i>` +
+        (d.own ? "" : `<i class="mq-dbar"><b style="width:${st.pct}%"></b></i>`) +   // d78: no count bar on his own dish
         // no Got everything or Clear (2026-10-21: ticking part by part does the job); the search box ends the card (d74)
         (open && slot ? `<div class="mq-dlist">${slotCard(d)}${links(howTo(d, slotUse(d)), fullTo(d))}${extrasBlock(d)}</div>` : "") +
         (open && !slot ? `<div class="mq-dlist">` + plainRows(d, on, fit) +
