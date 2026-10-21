@@ -57,8 +57,8 @@ test("d35 buy: the list items come first, then everything in the kitchen (grey a
   assert.ok(top.includes("Tahini") && top.includes("Spinach"), "what is on the shopping list comes first: " + top.join(", "));
   assert.ok(rows.findIndex((r) => !r.top) > rows.findLastIndex((r) => r.top), "list rows before the rest");
   assert.ok(rows.some((r) => r.name === "Broccoli" && !r.top), "grey items are offered");
-  assert.equal(rows.length, K.items(k, "home").length, "every home item once");
-  assert.ok(rows.every((r) => r.item), "home buy rows point at the item they will fill");
+  assert.equal(rows.length, K.items(k, "home").length + 1, "every home item once, and the recipe food it has no item for (d53)");
+  assert.ok(rows.every((r) => r.item || r.name === "Sunflower lecithin"), "home buy rows point at the item they will fill");
   // travel: its own items first, plus the Home catalogue for anything it does not have
   let t = K.fill({}, "travel", [{ name: "Hummus", group: "Legumes and grains", shelf: "cool" }], at(-50), "bring").K;
   const tr = K.pickList(t, "travel", "buy", T0, T0 + 2 * D, DISHES);

@@ -63,7 +63,7 @@ test("a meal block opens one screen that is the meal: no plate list, no Rate thi
 });
 
 test("the meal screen is grouped Prana foods, Body foods, Drains in the meters' colours, and loads quest-meals.js", () => {
-  const i = html.indexOf("function openMeal(b)"), body = html.slice(i, i + 9000);
+  const i = html.indexOf("function openMeal(b)"), body = html.slice(i, html.indexOf("The meal sheet's kitchen parts"));
   const a = body.indexOf("Prana foods"), b = body.indexOf("Body foods"), c = body.indexOf("Drains");
   assert.ok(a > 0 && b > a && c > b, "groups out of order or missing");
   assert.ok(/<script src="quest-meals\.js\?v=\w+"><\/script>/.test(html));
@@ -134,19 +134,64 @@ test("tonight's ideas: three recipes for 2 with a time and steps, in one list", 
   assert.equal(new Set(ids).size, ids.length, "dish ids are unique");
 });
 
-test("a dish pays its share of the Blueprint meal's +9 as ingredients are ticked, and an untick takes it back", () => {
+test("a dish pays its share of the Blueprint meal's +9 as its parts are filled (d52), and an untick takes it back", () => {
   assert.equal(M.dishMax(at15), 9);   // the blueprint habit's 6 times the level multiplier
   assert.equal(M.dishMax({ mult:1.5, dish:6 }), 9); assert.equal(M.dishMax({ mult:1, dish:8 }), 8);   // the page passes the HABITS value
-  let r = M.tick(null, sv(), "Broccoli", at15);
-  assert.deepEqual(J(r.ops), [{ id:"dish:sv", on:true, m:"b", d:1 }]);
-  for (const n of ["Cauliflower", "Lime", "Hemp seeds", "Ground cumin"]) r = M.tick(r.rec, sv(), n, at15);
-  assert.equal(r.rec.b, 5); assert.deepEqual(J(r.rec.v["dish:sv"]), ["b", 5, 9, 0]);   // [meter, paid, max, counted as done] (d17, d18)   // 5 of 10: round(4.5)
+  let r = M.tick(null, sv(), "greens:Broccoli", at15);
+  assert.deepEqual(J(r.ops), [{ id:"dish:sv", on:true, m:"b", d:1 }]);   // 1 of 8 parts: round(1.125)
+  // Cauliflower fills the same part (greens), so it pays nothing more; a swap (Lemons, Pumpkin seeds) counts like the real thing
+  const c = M.tick(r.rec, sv(), "greens:Cauliflower", at15);
+  assert.deepEqual(J(c.ops), []);
+  r = c;
+  for (const n of ["acid:Lemons", "seeds:Pumpkin seeds", "spice:Ground cumin"]) r = M.tick(r.rec, sv(), n, at15);
+  assert.equal(r.rec.b, 5); assert.deepEqual(J(r.rec.v["dish:sv"]), ["b", 5, 9, 0]);   // [meter, paid, max, counted as done] (d17, d18); 4 of 8: round(4.5)
   const st = M.dishStatus(r.rec, sv());
-  assert.equal(st.n, 5); assert.equal(st.m, 10); assert.equal(st.all, false); assert.equal(st.pct, 50);
-  assert.equal(st.text, "Missing: Black lentils, dry, Shiitake mushrooms and 3 more");
-  r = M.tick(r.rec, sv(), "Lime", at15);
-  assert.deepEqual(J(r.ops), [{ id:"dish:sv", on:false, m:"b", d:-1 }]);
-  assert.equal(r.rec.b, 4); assert.equal(M.dishStatus(r.rec, sv()).n, 4);
+  assert.equal(st.n, 4); assert.equal(st.m, 8); assert.equal(st.all, false); assert.equal(st.pct, 50);
+  assert.equal(st.text, "Missing: Lentils or beans, Mushroom and 2 more");
+  r = M.tick(r.rec, sv(), "acid:Lemons", at15);
+  assert.deepEqual(J(r.ops), [{ id:"dish:sv", on:false, m:"b", d:-2 }]);   // 3 of 8: round(3.375) = 3
+  assert.equal(r.rec.b, 3); assert.equal(M.dishStatus(r.rec, sv()).n, 3);
+});
+
+test("d51: parts read the ticks: a part tick is 'part:food', and a recipe name ticked before parts reads as its part", () => {
+  assert.equal(sv().slots.length, 8); assert.equal(M.dishOf("np").slots.length, 11);
+  assert.deepEqual(J(M.slotOf(sv(), "greens:Kale")), { slot:"greens", name:"Kale" });
+  assert.deepEqual(J(M.slotOf(sv(), "Black lentils, dry")), { slot:"legume", name:"Black lentils, dry" });
+  assert.equal(M.slotOf(sv(), "nope:Kale"), null); assert.equal(M.slotOf(sv(), "Bananas"), null);
+  assert.equal(M.entryName(sv(), "greens:Kale"), "Kale"); assert.equal(M.entryName(M.dishOf("r1"), "Lemon"), "Lemon");
+  // a meal ticked before parts (the recipe's own names) still counts by part and can be unticked
+  const old = { sel:[], v:{ "dish:sv":["b", 2, 9, 0] }, p:0, b:2, dish:{ sv:["Broccoli", "Cauliflower", "Lime"] } };
+  assert.equal(M.dishStatus(old, sv()).n, 2);
+  const r = M.tick(old, sv(), "Lime", at15);
+  assert.deepEqual(J(r.rec.dish.sv), ["Broccoli", "Cauliflower"]);
+  assert.equal(r.rec.b, 1);   // 1 of 8 now: round(1.125), and it takes back the difference from what it paid
+  // a list sets the ticks (the page's Got everything): one food per tick, ticks that do not read are dropped
+  const all = M.tick(null, sv(), ["greens:Kale", "greens:Kale", "legume:Chickpeas", "x:y"], at15);
+  assert.deepEqual(J(all.rec.dish.sv), ["greens:Kale", "legume:Chickpeas"]);
+  assert.equal(all.rec.b, 2);
+  // the whole recipe is still there, same names and amounts
+  const same = d => assert.deepEqual(J(d.slots.flatMap(s => s.want.map(w => w[0] + " " + w[1])).sort()), J(d.items.map(w => w[0] + " " + w[1]).sort()));
+  same(sv()); same(M.dishOf("np"));
+});
+
+test("d53: How to make it: numbered steps for every dish, and a part dish names what fills each part today", () => {
+  const base = M.stepsOf(sv());
+  assert.ok(base.length >= 6);
+  assert.ok(base.some(x => /^Cut the broccoli and cauliflower small and steam until soft/.test(x)), base.join(" / "));
+  const today = M.stepsOf(sv(), { greens:["Kale"], legume:["Chickpeas"], mushroom:[], ginger:["Fresh ginger, grated"], spice:[], acid:["Lemons"], seeds:["Pumpkin seeds"], oil:["Extra virgin olive oil"] });
+  assert.ok(today.some(x => /^Cut the kale small and steam until soft/.test(x)), today.join(" / "));
+  assert.ok(!today.some(x => /shiitake|mushroom/i.test(x)), "a step for an empty part is left out");
+  assert.ok(today.includes("Stir in the fresh ginger for the last minute."));
+  // gentle on the gut (2026-10-21): steamed or simmered, never fried or roasted
+  for (const d of M.DISHES) for (const x of M.stepsOf(d)) assert.ok(!/\b(fry|fried|roast)/i.test(x), x);
+  const np = M.stepsOf(M.dishOf("np"), { milk:["Oat milk"], nuts:["Almonds"], walnuts:["Walnuts"], brazil:["Brazil nuts"] });
+  assert.ok(np.includes("Add the almonds, walnuts and Brazil nuts and blend until smooth, about 1 min."), np.join(" / "));
+  // tonight's ideas: their paragraph in sentences; his own dish: his list; nothing: none
+  assert.deepEqual(J(M.stepsOf(M.dishOf("r1"))), ["Simmer the lentils 20 min.", "Roast the peppers and courgette at 220°C for 25 min.",
+    "Wilt the spinach into the hot lentils, then top with veg, lemon, oil, parsley and almonds."]);
+  assert.deepEqual(J(M.stepsOf({ own:true, items:[], steps:[" Boil water ", "", 3] })), ["Boil water"]);
+  assert.deepEqual(J(M.stepsOf({ own:true, items:[] })), []);
+  for (const d of M.DISHES) assert.ok(!/[—–]/.test(d.steps.join(" ")), "no dashes");
 });
 
 test("Got everything pays the full value, Clear takes all of it back, and each dish scores on its own", () => {
@@ -174,7 +219,7 @@ test("dish ticks live on the meal's record beside the tiles: a tile tap keeps th
 
 test("an old meal record with fresh, light and attention still loads, names them and keeps their points", () => {
   const old = { sel:["fresh", "light", "attn", "fruit"], v:{ fresh:["p", 5], light:["p", 3], attn:["p", 3], fruit:["p", 3] }, p:14, b:0, at:"2026-10-19T23:00:00Z" };
-  assert.deepEqual(J(M.dishStatus(old, sv())), { n:0, m:10, all:false, missing:J(sv().items.map(x => x[0])), pct:0, text:"" });
+  assert.deepEqual(J(M.dishStatus(old, sv())), { n:0, m:8, all:false, missing:J(sv().slots.map(x => x.role)), pct:0, text:"" });
   const r = M.tick(old, sv(), "Broccoli", at15);
   assert.deepEqual(J(r.rec.sel), ["fresh", "light", "attn", "fruit"]);
   assert.equal(r.rec.p, 14); assert.equal(r.rec.b, 1);
@@ -258,7 +303,7 @@ test("d18: a finished Super Veggie or Nutty Pudding counts as the Blueprint meal
   r = M.tick(r.rec, sv(), "all", PAGE);
   assert.equal(r.done, 1); assert.equal(r.rec.v["dish:sv"][3], 1);
   assert.equal(M.tick(r.rec, sv(), "all", PAGE).done, 0, "ticking all again counts nothing more");
-  const un = M.tick(r.rec, sv(), "Lime", PAGE);
+  const un = M.tick(r.rec, sv(), "Extra virgin olive oil", PAGE);   // the oil part is empty again (d51)
   assert.equal(un.done, -1); assert.equal(un.rec.v["dish:sv"][3], 0);
   assert.equal(M.tick(r.rec, sv(), "none", PAGE).done, -1);
   // a recipe is not the Blueprint meal; a capped Blueprint dish pays nothing and is not counted either

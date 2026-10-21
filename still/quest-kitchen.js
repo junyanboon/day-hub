@@ -577,7 +577,7 @@
      uses, amt, dinners }. dinners: the days from now to the next shop, 1 to 7. */
   function shopList(K, k, now, shopAt, dishes) {
     const t = ms(now), dinners = Math.max(1, Math.min(7, Math.ceil((ms(shopAt) - t) / DAY)));
-    const ticks = obj(obj(K).shop), rank = { out: 0, low: 1, soon: 2 };
+    const ticks = obj(obj(K).shop), rank = { out: 0, low: 1, soon: 2, none: 3 };
     const rows = [];
     for (const it of items(K, k)) {
       if (it.lv == null) continue;
@@ -587,12 +587,34 @@
       if (hasQ(it)) row.amt = fmtQ(toBuy(it, t, shopAt), it.u);   // d45: from what is left and his real use
       rows.push(row);
     }
+    for (const it of missing(K, k, dishes)) rows.push({ it, why: "none", at: t, on: !!(ticks[it.id] && ticks[it.id].on), ...amountFor(it.name, dishes, dinners) });
     const groups = [];
     for (const sh of KITCHENS[k].shelves) {
       const list = rows.filter((r) => r.it.shelf === sh.id).sort((a, b) => rank[a.why] - rank[b.why] || a.at - b.at);
       if (list.length) groups.push({ shelf: sh, list });
     }
     return { groups, count: rows.length, dinners };
+  }
+  /* The full Blueprint recipes on the list (Junyan, 2026-10-21, d53: "First I will need to be encouraged based on the
+     grocery list"; "it can just put it on my shopping list, no notes needed"). Every real ingredient of Super Veggie and
+     Nutty Pudding (QuestMeals.DISHES) that the home kitchen does not have at all (never added, or deleted) is a plain row
+     on its list, like any other. Low and Out ones are on it already. It is a row only, not an item: id "n:<name key>",
+     none:true, on the shelf it would go on. Ticking it and "Mark ticked items as bought", or "What did you buy?", adds it
+     to the kitchen. Home only: the travel fridge holds a few things for a trip, not the full recipes. */
+  const shortName = (name) => cap(String(name).split(",")[0].trim().replace(/^(fresh|extra virgin) /i, ""));
+  // dishes: the list shopList was given (its part dishes are the Blueprint ones), else QuestMeals.DISHES
+  function missing(K, k, dishes) {
+    if (k !== "home") return [];
+    const have = new Set(items(K, k).map((x) => keyOf(x.name))), out = [];
+    const bp = arr(dishes || (root.QuestMeals && root.QuestMeals.DISHES)).filter((d) => d && Array.isArray(d.slots));
+    for (const d of bp) for (const [ing] of arr(d.items)) {
+      const key = keyOf(ing);
+      if (!key || have.has(key)) continue;
+      have.add(key);
+      const sd = SEED_ITEMS.find((x) => keyOf(x.name) === key), name = sd ? sd.name : shortName(ing), group = sd ? clean(sd).group : guessGroup(name);
+      out.push({ id: "n:" + slug(key), k, name, group, shelf: sd ? sd.shelf : guessShelf(k, group), em: sd ? sd.em : iconFor(name, group), lv: null, none: true });
+    }
+    return out;
   }
   /* What to buy of an amount item (d45): enough for his use until the shop after this one plus the low line, less what
      is left; with no use known, what he bought last time. Rounded up (10 g or ml, 50 above 200; whole pieces). */
@@ -612,6 +634,14 @@
       const s = obj(obj(K).shop)[it.id];
       if (!s || !s.on) continue;
       out = restock(out, it.id, null, at, "buy"); n++;
+      out.shop = { ...obj(out.shop), [it.id]: { on: false, at: iso(at) } };
+    }
+    // a recipe row not in the kitchen (d53) becomes an item at Plenty
+    for (const it of missing(K, k)) {
+      const s = obj(obj(K).shop)[it.id];
+      if (!s || !s.on) continue;
+      const r = add(out, k, it.shelf, it.name, at, it.group);
+      if (r.id) { out = r.K; n++; }
       out.shop = { ...obj(out.shop), [it.id]: { on: false, at: iso(at) } };
     }
     return { K: out, n };
@@ -642,7 +672,8 @@
     const from = (name, em, group, shelf, src) => { const have = byKey.get(keyOf(name));
       return have ? row(have, src === "home" || src === "starter" ? "have" : src) : { name, em, group, shelf, item: null, lv: null, src, top: false }; };
     if (use === "buy") {
-      for (const g of shopList(K, k, now, shopAt, dishes).groups) for (const r of g.list) push(row(r.it, "list", true));
+      for (const g of shopList(K, k, now, shopAt, dishes).groups) for (const r of g.list)
+        push(r.it.none ? { name: r.it.name, em: r.it.em, group: r.it.group, shelf: r.it.shelf, item: null, lv: null, src: "list", top: true } : row(r.it, "list", true));
       for (const it of mine) push(row(it, "have"));
     }
     if (k === "travel") {
@@ -805,10 +836,14 @@
      winning, and a delete is a mark (del) that keeps the name and foods, so an older copy cannot bring it back and a meal
      logged with it can still show it. Nothing here touches K.used: deleting or editing a dish never puts back or takes off
      what a meal already took. */
+  /* his steps (d53): "How to make it", one string a step, at most 20 of 300 characters. Typed one step a line; a number
+     he typed at the start ("1." or "2)") is dropped, the page numbers them. */
+  const stepList = (x) => (Array.isArray(x) ? x : typeof x === "string" ? x.split(/\n+/) : []).filter((t) => typeof t === "string")
+    .map((t) => t.replace(/\s+/g, " ").trim().replace(/^\d{1,2}\s*[.)]\s*/, "").slice(0, 300)).filter(Boolean).slice(0, 20);
   // a synced record is only used when it looks like one (its id goes into the page's attributes and selectors)
   const okDish = (x, id) => !!x && typeof x === "object" && typeof x.name === "string" && !!x.name && /^[\w-]{1,40}$/.test(id);
   const shape = (id, x) => ({ id, icon: ownIcon(x.icon) ? x.icon : "🍽️", name: x.name, own: true, items: arr(x.items).filter((r) => Array.isArray(r) && typeof r[0] === "string" && r[0])
-    .map((r) => [r[0], typeof r[1] === "string" ? r[1] : ""]), added: x.added || null, ...(x.del ? { del: true } : {}) });
+    .map((r) => [r[0], typeof r[1] === "string" ? r[1] : ""]), steps: stepList(x.steps), added: x.added || null, ...(x.del ? { del: true } : {}) });
   // his dishes, deleted ones left out, oldest first (a new one goes at the end, so nothing jumps)
   function ownDishes(K) {
     return Object.entries(obj(obj(K).dishes)).filter(([id, x]) => okDish(x, id) && !x.del).map(([id, x]) => shape(id, x))
@@ -850,7 +885,8 @@
     const old = d.id ? obj(obj(K).dishes)[d.id] : null;
     const id = old ? d.id : "d" + ms(at).toString(36) + Math.random().toString(36).slice(2, 6);
     const out = clone(K);
-    out.dishes = { ...obj(out.dishes), [id]: { id, name, icon: ownIcon(d.icon) ? d.icon : dishIcon(name, items), items, added: (old && old.added) || iso(at), at: iso(at) } };
+    const steps = stepList(d.steps);
+    out.dishes = { ...obj(out.dishes), [id]: { id, name, icon: ownIcon(d.icon) ? d.icon : dishIcon(name, items), items, ...(steps.length ? { steps } : {}), added: (old && old.added) || iso(at), at: iso(at) } };
     return { K: out, id };
   }
   // delete one of his dishes: a mark that keeps what it was
@@ -999,5 +1035,5 @@
 
   root.QuestKitchen = { NEED, LEVELS, KITCHENS, SEED, FRESH, DEFAULT_SHOP, GROUP_NAMES, GROUP_ICONS, keyOf, iconFor, groupIcon, splitName, amtOf, tileLine, guessGroup, guessShelf,
     items, item, grouped, setLevel, nextLevel, tap, add, rename, move, place, remove, status, shows, pace, lowAt, lowSoon, turnAt, useFirst, nextShop, parseAmt, usesOf, amountFor,
-    shopList, tick, buyTicked, hasQ, unitFor, qtyOf, fmtQ, recipeIn, perMeal, setAmount, restock, rateOf, toBuy, eat, setTake, taken, portion, serving, ownDishes, ownDish, saveDish, delDish, dishAmt, dishIcon, kitchenFoods, TRAVEL_STARTER, pickList, preTick, fill, unfill, shopInfo, shopWhen, shopUpto, match, dinner, active, pick, noteActive, tripEnd, bringHome, dayWord, counts };
+    shopList, missing, stepList, tick, buyTicked, hasQ, unitFor, qtyOf, fmtQ, recipeIn, perMeal, setAmount, restock, rateOf, toBuy, eat, setTake, taken, portion, serving, ownDishes, ownDish, saveDish, delDish, dishAmt, dishIcon, kitchenFoods, TRAVEL_STARTER, pickList, preTick, fill, unfill, shopInfo, shopWhen, shopUpto, match, dinner, active, pick, noteActive, tripEnd, bringHome, dayWord, counts };
 })(typeof window !== "undefined" ? window : globalThis);
