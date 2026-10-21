@@ -50,6 +50,16 @@ test("d64: a piece food whose bare number was read as grams shows as a count", (
   // real grams stay grams: a big number, or a food not bought by the piece
   assert.equal(K.item(stored("u6", { name: "Bananas", q: 400, u: "g", qt: at(0), buy: 400, amt: "400 g" }), "u6").u, "g");
   assert.equal(K.item(stored("u7", { name: "Ginger", q: 5, u: "g", qt: at(0), buy: 5, amt: "5 g" }), "u7").u, "g");
+  // grams he types now stay grams, even a few of a piece food ("5 g" of lemon), and a later change keeps them
+  let G5 = K.setAmount(stored("u8", { name: "Lemons", amt: "" }), "u8", "5 g", at(1));
+  assert.equal(K.item(G5, "u8").u, "g"); assert.equal(K.item(G5, "u8").amt, "5 g");
+  G5 = K.place(G5, "u8", "dry", null, at(2));
+  assert.equal(K.item(G5, "u8").u, "g");
+  // and a count put back later drops the mark
+  G5 = K.setAmount(G5, "u8", "3", at(3));
+  assert.equal(K.item(G5, "u8").u, "g");
+  G5 = K.setAmount(G5, "u8", "3 lemons", at(4));
+  assert.equal(K.item(G5, "u8").u, ""); assert.equal(G5.items.u8.wg, undefined);
 });
 
 test("d64: typed '4', '4 tomatoes', '4 lemons' or 'Tomatoes 4' saves as the count 4; grams and ml still work", () => {
@@ -103,14 +113,12 @@ test("d64: counted items come off in meals (Tomatoes '3 medium', Capsicum for 'R
   let S = K.setAmount(stored("t", { name: "Tomatoes", amt: "" }), "t", "4", at(1));
   let r = K.eat(S, "travel", "d|dinner|x|Tomatoes", { name: "Tomatoes" }, true, at(2), "3 medium");
   assert.equal(r.id, "t"); assert.equal(K.item(r.K, "t").left, 1);
-  const C = K.item(stored("c", { name: "Capsicum", q: 1, u: "g", qt: at(0), buy: 1, amt: "1 g" }), "c");
   S = { items: { c: { ...stored("c", { name: "Capsicum", q: 2, u: "", qt: at(0), buy: 2 }).items.c } } };
   r = K.eat(S, "travel", "d|dinner|x|Red peppers", { name: "Red peppers" }, true, at(2), "1");
   assert.equal(r.id, "c"); assert.equal(K.item(r.K, "c").left, 1);
   // a capsicum stored in grams (the old read) comes off as a count too
   r = K.eat(stored("c", { name: "Capsicum", q: 1, u: "g", qt: at(0), buy: 1, amt: "1 g" }), "travel", "d|dinner|y|Red peppers", { name: "Red peppers" }, true, at(2), "1");
   assert.equal(r.id, "c"); assert.equal(K.item(r.K, "c").left, 0);
-  assert.equal(C.u, "");
 });
 
 test("d64: the Edit page has - and + for piece foods, and fill-in asks 'How many?' for them", () => {
