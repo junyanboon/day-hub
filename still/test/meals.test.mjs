@@ -70,7 +70,7 @@ test("the meal screen (d83 to d85): What's this meal?, the Counted line, then th
   assert.ok(/<script src="quest-meals\.js\?v=\w+"><\/script>\s*<script src="quest-food-score\.js\?v=\w+"><\/script>/.test(html));
   assert.ok(!/AUTO_NOTE|Eating within 3 hours of bed and staying up past 11 count by themselves/.test(html + fs.readFileSync(new URL("../quest-meals.js", import.meta.url), "utf8")), "d85: the note is gone");
   assert.ok(body.includes("QM.handTap("), "a drain pays as he taps");
-  assert.ok(body.includes("QM.autoSync(") && body.includes("FSC().earn(foods, { morning })"), "the food tiles follow what was logged");
+  assert.ok(body.includes("QM.autoSync(") && body.includes("FSC().earn(foods, { morning, share:"), "the food tiles follow what was logged");
 });
 
 test("tiles pay as he taps, and a second tap takes back exactly what was paid", () => {
