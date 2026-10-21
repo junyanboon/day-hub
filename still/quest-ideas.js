@@ -6,8 +6,8 @@
      shallot, chives, spring onion: they are the Drain "onion or garlic"), lots of fresh vegetables, sprouts and nuts
      (Sadhguru's pranic foods). The three ideas from before (QuestMeals.IDEAS, r1 to r3) are in it with the same ids, so a
      meal ticked on them still reads.
-   - His own dishes (QuestKitchen.ownDishes) are candidates too, but only when every food in them is in the kitchen (and
-     none is garlic or onion).
+   - His own dishes (QuestKitchen.ownDishes) are candidates too, but only a whole dinner (3 foods or more) when every
+     food in them is in the kitchen and none is garlic or onion, and at most one of the three, so the ideas stay ideas.
    - Ranking: the share of an idea's main ingredients the kitchen has (enough of an amount item, or any level but Out),
      plus a little for each one it uses that should be used first (QuestKitchen.useFirst), that is running Low, or that
      has an amount; then a little for its pranic foods, and a small tie-break from the date so near-equal ideas rotate.
@@ -163,7 +163,7 @@
     }
     const fit = main.length ? got / main.length : 0;
     const pr = rows.filter((r) => PRANIC.has(QK().guessGroup(r.name))).length;
-    return { fit, score: fit * 10 + extra + pr * 0.1 + (d.own ? 1 : 0) + jitter(day + "|" + d.id) * 0.8 };
+    return { fit, score: fit * 10 + extra + pr * 0.1 + jitter(day + "|" + d.id) * 0.8 };
   }
   const memo = { K: null, k: null, day: null, since: null, out: null };
   /* Today's three. o: { day ("YYYY-MM-DD", the tie-break), since (ms, the start of the day), now (ms, for Use first) }.
@@ -174,13 +174,13 @@
     if (memo.K === K && memo.k === k && memo.day === day && memo.since === since && memo.out) return memo.out;
     const K0 = since ? atStart(K, since) : K, kit = byKey(K0, k);
     const first = new Set(QK().useFirst(K0, k, opt.now || since || Date.now()).map((x) => x.it.id));
-    const own = QK().ownDishes(K).filter((d) => d.items.length && !d.items.some((x) => banned(x[0])) &&
+    const own = QK().ownDishes(K).filter((d) => d.items.length >= 3 && !d.items.some((x) => banned(x[0])) &&
       read(d, kit).every((r) => r.st === "have"));
     const cands = POOL().concat(own).map((d) => ({ d, ...rate(d, kit, first, day) }))
       .sort((a, b) => b.score - a.score || (a.d.id < b.d.id ? -1 : 1));
-    const out = [], bases = new Set();
-    for (const c of cands) { if (out.length === 3) break; if (c.d.base && bases.has(c.d.base)) continue; out.push(c); if (c.d.base) bases.add(c.d.base); }
-    for (const c of cands) { if (out.length === 3) break; if (!out.includes(c)) out.push(c); }
+    const out = [], bases = new Set(), mine = () => out.some((c) => c.d.own);
+    for (const c of cands) { if (out.length === 3) break; if ((c.d.base && bases.has(c.d.base)) || (c.d.own && mine())) continue; out.push(c); if (c.d.base) bases.add(c.d.base); }
+    for (const c of cands) { if (out.length === 3) break; if (!out.includes(c) && !(c.d.own && mine())) out.push(c); }
     const known = [...kit.values()].some((it) => it.lv != null);
     const ready = out.filter((c) => c.fit >= 0.7).length;
     const where = k === "travel" ? "travel fridge" : "kitchen";

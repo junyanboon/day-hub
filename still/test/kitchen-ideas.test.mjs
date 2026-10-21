@@ -126,10 +126,13 @@ test("d41: his own dish is an idea when every food in it is in the kitchen, neve
   const mk = (kk, name, items) => K.saveDish(kk, { name, items }, at(-1));
   let r = mk(k, "Bean and shiitake toss", [["White beans", "300"], ["Shiitake", "100"], ["Broccoli", "150"]]); k = r.K; const good = r.id;
   r = mk(k, "Garlic beans", [["White beans", "300"], ["Garlic", "2"]]); k = r.K; const bad = r.id;
-  r = mk(k, "Pasta night", [["Pasta", "200"], ["Broccoli", "150"]]); k = r.K; const missing = r.id;
+  r = mk(k, "Pasta night", [["Pasta", "200"], ["Broccoli", "150"], ["Shiitake", "50"]]); k = r.K; const missing = r.id;
+  r = mk(k, "Beans", [["White beans", "300"]]); k = r.K; const small = r.id;
+  r = mk(k, "Shiitake beans", [["White beans", "200"], ["Shiitake", "50"], ["Broccoli", "100"]]); k = r.K; const second = r.id;
   const all = QI.pick(k, "home", opt()).list;
-  assert.ok(all.some((d) => d.id === good && d.own), ids({ list: all }).join());
-  assert.ok(!all.some((d) => d.id === bad || d.id === missing));
+  assert.ok(all.some((d) => (d.id === good || d.id === second) && d.own), ids({ list: all }).join());
+  assert.ok(!all.some((d) => d.id === bad || d.id === missing || d.id === small), "garlic, a missing food, or one food is no dinner idea");
+  assert.equal(all.filter((d) => d.own).length, 1, "at most one of his own among the three");
 });
 
 test("d41: today's ticks do not shuffle the ideas while he cooks; what each shows reads the kitchen now", () => {
