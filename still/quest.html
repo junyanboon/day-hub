@@ -582,25 +582,39 @@
   .mq-ing[aria-pressed="true"] { border-color:rgba(95,211,196,.8); background:rgba(95,211,196,.18); }
   .mq-ing[aria-pressed="true"] .bx { background:#5fd3c4; border-color:#5fd3c4; } .mq-ing[aria-pressed="true"] .bx::after { content:"✓"; }
   .mq-drow { display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
-  .mq-ingw { display:flex; flex-direction:column; gap:3px; min-width:0; } .mq-ingw > .mq-ing { width:100%; }
-  .mq-take { display:flex; align-items:center; gap:5px; padding:0 4px 2px; font-size:11.5px; color:var(--ink-soft); white-space:nowrap; }
+  /* d71: one compact row per part or ingredient: the tick (food, part label, hint), an inline "took [30] g" over what is
+     left, and for a part a ⇄ that opens Use something else. Every tap target is at least 44 px tall. */
+  .mq-rows { display:flex; flex-direction:column; gap:4px; }
+  .mq-row { display:flex; align-items:stretch; min-height:44px; min-width:0; border-radius:10px; background:rgba(0,0,0,.2); box-shadow:inset 0 0 0 1px var(--glass-border); }
+  .mq-row:has(> .mq-ing[aria-pressed="true"]) { box-shadow:inset 0 0 0 1px rgba(95,211,196,.8); background:rgba(95,211,196,.18); }
+  .mq-row > .mq-ing { flex:1; min-width:0; min-height:44px; border:0; border-radius:10px; background:transparent; }
+  .mq-row > .mq-ing[aria-pressed="true"] { background:transparent; }
+  .mq-row.tk > .mq-ing .qty { display:none; } .mq-row:not(.tk) .mq-ra { display:none; }
+  .mq-take { display:flex; font-size:11.5px; color:var(--ink-soft); }
+  .mq-row .mq-take { flex:none; flex-direction:column; align-items:flex-end; justify-content:center; gap:1px; min-height:44px; padding:2px 7px 2px 0; cursor:text; }
+  .mq-tqw { display:flex; align-items:center; gap:4px; white-space:nowrap; }
   .sheet input.mq-tq { width:62px; flex:none; margin:0; padding:3px 6px; border-radius:8px; font-size:15px; text-align:right; font-variant-numeric:tabular-nums; }
-  .mq-take small { margin-left:auto; overflow:hidden; text-overflow:ellipsis; }
+  .sheet .mq-row input.mq-tq { width:52px; padding:2px 5px; }
+  .mq-take small { max-width:110px; font-size:10.5px; line-height:1.2; text-align:right; overflow-wrap:anywhere; }
+  .mq-sw { flex:none; width:44px; min-height:44px; padding:0; border:0; border-left:1px solid var(--glass-border); border-radius:0 10px 10px 0; background:transparent; color:var(--ink); font:inherit; font-size:17px; cursor:pointer; }
+  .mq-sw[aria-expanded="true"] { background:rgba(95,211,196,.18); }
+  span.mq-sw { visibility:hidden; }
+  .mq-pl { font-weight:700; color:var(--ink-soft); } .mq-prt.ok .mq-pl { color:#8fe3b0; }
   .mq-mini { font:inherit; font-size:12.5px; font-weight:600; padding:6px 12px; border-radius:10px; border:1px solid var(--glass-border); background:transparent; color:var(--ink); cursor:pointer; }
   .mq-mini.go { background:#5fd3c4; border-color:#5fd3c4; color:#0e2f2a; }
   .mq-part { margin:8px 2px 4px; } .mq-part.ok { color:#8fe3b0; }
-  .mq-ing.none .n { opacity:.7; } .mq-else { align-self:flex-start; font-size:11px; padding:3px 9px; margin-top:-2px; }
+  .mq-ing.none .n { opacity:.7; }
   .mq-other { margin-top:4px; padding:6px; border-radius:10px; background:rgba(0,0,0,.15); }
   .mq-xadd { margin-top:8px; border-style:dashed; } .sheet input.mq-xs { width:100%; margin:0 0 6px; }
   .mq-xfree { margin:4px 0 2px; }
-  .mq-full { font-size:11px; opacity:.85; }
+  .mq-full { margin-top:6px; }
   .mq-steps ol { margin:6px 0 0; padding-left:20px; font-size:13px; line-height:1.5; } .mq-steps li { margin:3px 0; }
   .mq-howbtn { font-size:12px; padding:5px 10px; }
   .de-steps { width:100%; box-sizing:border-box; resize:vertical; min-height:80px; font:inherit; font-size:14px; line-height:1.4; }
   .mq-hv { display:block; font-size:11px; color:var(--ink-soft); } .mq-hv.have { color:#8fe3b0; } .mq-hv.short, .mq-hv.out, .mq-hv.none { color:#ffc27a; }
   .mq-buy b { color:var(--ink); } .mq-inote { margin:2px 2px 8px; }
   .mq-dst { margin-left:auto; font-size:12px; color:var(--ink-soft); } .mq-dst.ok { color:#8fe3b0; font-weight:700; }
-  .mq-dbtn:focus-visible, .mq-ing:focus-visible, .mq-mini:focus-visible { outline:2px solid #5fd3c4; outline-offset:2px; }
+  .mq-dbtn:focus-visible, .mq-ing:focus-visible, .mq-mini:focus-visible, .mq-sw:focus-visible { outline:2px solid #5fd3c4; outline-offset:2px; }
   /* his own dishes (d48): "+ New dish" under them, and the dish editor */
   .mq-new { align-self:flex-start; border-style:dashed; }
   .de-top { display:flex; gap:10px; align-items:center; margin:10px 0 4px; }
@@ -2598,13 +2612,23 @@
     // "Use something else": what the kitchen in use has (not Out), less what the dish already uses
     const slotOthers = d => { const used = new Set(dishOn(d).map(e => QK().keyOf(QM.entryName(d, e))));
       return QK().items(G.kitchen, kitToday()).filter(x => x.lv !== 0 && !used.has(QK().keyOf(x.name))); };
+    /* tap-to-open lines under a dish (d53, d73): a button that says what it opens, and what it opens once open */
+    const tog = (d, kind, attr, label, body) => { const open = mqOpen.has(k + "|" + d.id + "|" + kind);
+      return { btn:`<button type="button" class="mq-mini mq-howbtn" ${attr}="${esc(d.id)}" aria-expanded="${open}">${label} <span aria-hidden="true">${open ? "▴" : "▾"}</span></button>`,
+        body:open ? body() : "" }; };
+    // the buttons share one line; what they open goes under it
+    const links = (...ts) => { ts = ts.filter(Boolean);
+      return ts.length ? `<div class="mq-steps"><div class="mq-drow">${ts.map(t => t.btn).join("")}</div>${ts.map(t => t.body).join("")}</div>` : ""; };
     /* "How to make it" (d53): tap to open the numbered steps, under every dish; a part dish's name what fills each part */
     const howTo = (d, use) => {
-      const steps = QM.stepsOf(d, use), key = k + "|" + d.id + "|how", open = mqOpen.has(key);
-      if (!steps.length && (!d.own || d.del)) return "";
-      return `<div class="mq-steps${open ? " open" : ""}"><button type="button" class="mq-mini mq-howbtn" data-dhow="${esc(d.id)}" aria-expanded="${open}">How to make it <span aria-hidden="true">${open ? "▴" : "▾"}</span></button>` +
-        (open ? (steps.length ? `<ol>${steps.map(x => `<li>${esc(x)}</li>`).join("")}</ol>` : `<p class="mq-how">No steps yet. Add them with Edit.</p>`) : "") + `</div>`;
+      const steps = QM.stepsOf(d, use);
+      if (!steps.length && (!d.own || d.del)) return null;
+      return tog(d, "how", "data-dhow", "How to make it", () => steps.length ? `<ol>${steps.map(x => `<li>${esc(x)}</li>`).join("")}</ol>` : `<p class="mq-how">No steps yet. Add them with Edit.</p>`);
     };
+    /* "Full recipe" (d73, was always shown): a part dish's whole recipe, the home one for a travel version, on a tap */
+    const fullTo = d => { const full = (d.full && QM.dishOf(d.full)) || d;
+      return tog(d, "full", "data-dfull", `Full recipe${full !== d ? " (at home)" : ""}`, () =>
+        `<p class="mq-how mq-full">${full !== d ? `<b>${esc(full.name)}:</b> ` : ""}${esc(full.items.map(([n, a]) => `${n} ${a}`).join(", "))}</p>`); };
     /* Extras (Junyan, 2026-10-21, d70: "There's no option to add bananas. I used collagen so I want to put that there and
        creatine as well"): "+ Add something you put in" at the bottom of every dish card's parts or ingredients. It opens a
        search over everything in the kitchen in use, with or without an amount (QuestKitchen.search), and takes free text
@@ -2616,10 +2640,9 @@
     const xKeyOf = (d, n) => kitEatKey(k, d.id + "+", QM.xKey(n));
     const xWord = (d, x) => { const tk = QK() && QK().taken(G.kitchen, xKeyOf(d, x.n)), it = tk && QK().item(G.kitchen, tk.id);
       return !it || it.del ? "not in the kitchen, nothing taken off" : kitLeftWord(it, tk); };
-    const xRow = (d, x) => `<div class="mq-ingw"><button type="button" class="mq-ing" data-xoff="${esc(d.id)}" data-xn="${esc(x.n)}" aria-pressed="true">` +
-      `<span class="bx"></span><span class="n">${esc(x.n)}<small class="mq-hv">added</small></span><span class="qty"></span></button>` +
-      `<label class="mq-take"><span>took</span><input class="mq-tq" type="number" inputmode="decimal" min="0" step="any" data-xq="${esc(d.id)}" data-xn="${esc(x.n)}" value="${x.q == null ? "" : x.q}" placeholder="?" aria-label="How much ${esc(x.n)} went in">` +
-      `<span>${kitUnit(x.u)}</span><small>${esc(xWord(d, x))}</small></label></div>`;
+    const xRow = (d, x) => `<div class="mq-row tk"><button type="button" class="mq-ing" data-xoff="${esc(d.id)}" data-xn="${esc(x.n)}" aria-pressed="true">` +
+      `<span class="bx"></span><span class="n">${esc(x.n)}<small class="mq-hv">added</small></span></button>` +
+      `${tookLabel(`data-xq="${esc(d.id)}" data-xn="${esc(x.n)}"`, x.q, x.u, xWord(d, x), `How much ${x.n} went in`)}</div>`;
     // the search results: kitchen items (not ones already added to this dish), then the free text as typed
     const xResults = (d, text) => {
       if (!QK()) return "";
@@ -2633,7 +2656,7 @@
     };
     const extrasBlock = d => {
       const xs = QM.extrasOf(rec, d.id), open = mqOpen.has(k + "|" + d.id + "|xtra");
-      return (xs.length ? `<p class="kt-gh mq-part ok">Also went in</p><div class="mq-ings">${xs.map(x => xRow(d, x)).join("")}</div>` : "") +
+      return (xs.length ? `<p class="kt-gh mq-part ok">Also went in</p><div class="mq-rows">${xs.map(x => xRow(d, x)).join("")}</div>` : "") +
         `<button type="button" class="mq-mini mq-xadd" data-xadd="${esc(d.id)}" aria-expanded="${open}">+ Add something you put in</button>` +
         (open ? `<div class="mq-other"><input type="search" class="mq-xs" data-xs="${esc(d.id)}" placeholder="Search the kitchen, or type a food and amount" autocomplete="off" enterkeyhint="done">` +
           `<p class="mq-how">Extras earn no points; the parts and the food tiles below do. Something in the kitchen with an amount comes off what you have.</p>` +
@@ -2641,7 +2664,7 @@
     };
     /* A "best you can" dish (d51, d52): its parts, each showing the real ingredient if the kitchen in use has it, else the
        closest swap, else "none in the kitchen" (QuestIdeas.slotRows). Any part can take something else from the kitchen
-       ("Use something else"). Points go by parts filled. The full recipe stays visible, small, so he sees the aim. */
+       ("Use something else", the ⇄ on the part's row). Points go by parts filled. The full recipe opens on a tap (d73). */
     const slotCard = d => {
       const parts = slotParts(d);
       const pick = (p, si) => {
@@ -2652,14 +2675,15 @@
           `<span class="n">${esc(x.em)} ${esc(x.name)}</span><span class="qty">${typeof x.q === "number" ? `have ${esc(x.amt)}` : x.lv == null ? "not checked" : esc(KLV[x.lv].toLowerCase())}</span></button>`).join("")}</div>`).join("")
           : `<p class="mq-how">Nothing else in the kitchen to use.</p>`}</div>`;
       };
-      return `<p class="mq-serves">For 2 people. Each part shows the real thing if you have it, else the closest swap you have. Tick what went in; it comes off the kitchen, and you can change how much. Points go by how many parts you fill.</p>` +
-        parts.map((p, si) => `<p class="kt-gh mq-part${p.filled ? " ok" : ""}">${esc(p.role)}${p.filled ? " ✓" : ""}</p><div class="mq-ings">` +
+      // one row per food (d71): the part's name as a small label, a swap's "for", and ⇄ for Use something else on its first row
+      const sw = (p, si) => `<button type="button" class="mq-sw" data-dother="${esc(d.id)}" data-si="${si}" aria-expanded="${mqOpen.has(k + "|" + d.id + "|other:" + p.id)}" aria-label="Use something else for ${esc(p.role)}" title="Use something else">⇄</button>`;
+      return parts.map((p, si) => `<div class="mq-rows mq-prt${p.filled ? " ok" : ""}">` +
           p.rows.map((r, ri) => kitTakeWrap(r.on ? kitEatKey(k, d.id, r.entry) : null,
             `<button type="button" class="mq-ing${r.st === "none" && !r.on ? " none" : ""}" data-dsl="${esc(d.id)}" data-si="${si}" data-ri="${ri}" aria-pressed="${r.on}">` +
-            `<span class="bx"></span><span class="n">${esc(r.name)}${r.on ? (r.swap ? `<small class="mq-hv">for ${esc(r.for.split(",")[0])}</small>` : "")
-              : `<small class="mq-hv ${r.st}">${r.swap ? `instead of ${esc(r.for.split(",")[0])} · ` : ""}${esc(r.word)}</small>`}</span><span class="qty">${esc(r.amt)}</span></button>`)).join("") +
-          `</div><button type="button" class="mq-mini mq-else" data-dother="${esc(d.id)}" data-si="${si}" aria-expanded="${mqOpen.has(k + "|" + d.id + "|other:" + p.id)}">Use something else</button>` + pick(p, si)).join("") +
-        ((full) => `<p class="mq-how mq-full"><b>Full recipe${full !== d ? " (at home)" : ""}:</b> ${full !== d ? `${esc(full.name)}: ` : ""}${esc(full.items.map(([n, a]) => `${n} ${a}`).join(", "))}</p>`)((d.full && QM.dishOf(d.full)) || d);
+            `<span class="bx"></span><span class="n">${esc(r.name)}<small class="mq-hv${r.on ? "" : ` ${r.st}`}"><b class="mq-pl">${esc(p.role)}${p.filled ? " ✓" : ""}</b>` +
+            `${r.swap ? ` · for ${esc(r.for.split(",")[0])}` : ""}${r.on ? `<span class="mq-ra"> · ${esc(r.amt)}</span>` : ` · ${esc(r.word)}`}</small></span><span class="qty">${esc(r.amt)}</span></button>`,
+            ri ? `<span class="mq-sw" aria-hidden="true"></span>` : sw(p, si))).join("") +
+          `</div>` + pick(p, si)).join("");
     };
     const dishCard = (d, fit) => {
       const st = QM.dishStatus(rec, d), open = mqOpen.has(k + "|" + d.id), pd = QM.dishPaid(rec, d), on = new Set(rec && rec.dish && Array.isArray(rec.dish[d.id]) ? rec.dish[d.id] : []);
@@ -2671,20 +2695,20 @@
         `<span class="mq-dn"><b>${esc(d.name)}</b><small>${st.n ? `${st.n} of ${st.m} ${unit}` : slot ? hint.charAt(0).toUpperCase() + hint.slice(1) : hint}${QM.extrasOf(rec, d.id).length ? ` · ${QM.extrasOf(rec, d.id).length} added` : ""}${d.time ? ` · ${esc(d.time)}` : ""}</small></span>` +
         `<span class="mq-dp">${d.own ? `<small>${d.del ? "deleted" : "your dish"}</small>` : pd ? sign(pd) : max ? `<small>up to</small> +${max}` : `<small>full for today</small>`}</span></button>` +
         `<i class="mq-dbar"><b style="width:${st.pct}%"></b></i>` +
-        (open && slot ? `<div class="mq-dlist">${slotCard(d)}${extrasBlock(d)}${howTo(d, slotUse(d))}` +
+        (open && slot ? `<div class="mq-dlist">${slotCard(d)}${extrasBlock(d)}${links(howTo(d, slotUse(d)), fullTo(d))}` +
           `<div class="mq-drow"><button type="button" class="mq-mini go" data-dall="${esc(d.id)}">Got everything</button><button type="button" class="mq-mini" data-dnone="${esc(d.id)}">Clear</button>` +
           `<span class="mq-dst${st.all ? " ok" : ""}">${esc(st.text)}</span></div></div>` : "") +
-        (open && !slot ? `<div class="mq-dlist"><p class="mq-serves">${d.own ? "Your usual amounts. Tick what went in; it comes off the kitchen, and you can change how much. Your dishes earn no points of their own: tap the food tiles below for those."
-          : `For 2 people${d.time ? ` · ${esc(d.time)}` : ""}. Tick what went in; what you tick comes off the kitchen, and you can change how much.`}</p>` +
-          `<div class="mq-ings">${d.items.map(([n, amt], i) => kitTakeWrap(on.has(n) ? kitEatKey(k, d.id, n) : null,
+        (open && !slot ? `<div class="mq-dlist">` +
+          `<div class="mq-rows">${d.items.map(([n, amt], i) => kitTakeWrap(on.has(n) ? kitEatKey(k, d.id, n) : null,
             `<button type="button" class="mq-ing" data-ding="${esc(d.id)}" data-i="${i}" aria-pressed="${on.has(n)}">` +
-            `<span class="bx"></span><span class="n">${esc(n)}${fit && !on.has(n) && fit.rows[i] ? `<small class="mq-hv ${fit.rows[i].st}">${esc(fit.rows[i].word)}</small>` : ""}</span><span class="qty">${esc(amt)}</span></button>`)).join("")}` +
+            `<span class="bx"></span><span class="n">${esc(n)}${fit && !on.has(n) && fit.rows[i] ? `<small class="mq-hv ${fit.rows[i].st}">${esc(fit.rows[i].word)}</small>` : ""}` +
+            `${on.has(n) ? `<small class="mq-hv mq-ra">${esc(amt)}</small>` : ""}</span><span class="qty">${esc(amt)}</span></button>`)).join("")}` +
           // d48: a food taken out of his dish since this meal ticked it still shows here, so he can untick it
           (d.own ? [...on].filter(n => !d.items.some(x => x[0] === n)).map(n => kitTakeWrap(kitEatKey(k, d.id, n),
             `<button type="button" class="mq-ing" data-dname="${esc(n)}" data-did="${esc(d.id)}" aria-pressed="true">` +
-            `<span class="bx"></span><span class="n">${esc(n)}</span><span class="qty">not in the dish now</span></button>`)).join("") : "") + `</div>${extrasBlock(d)}` +
+            `<span class="bx"></span><span class="n">${esc(n)}<small class="mq-hv">not in the dish now</small></span></button>`)).join("") : "") + `</div>${extrasBlock(d)}` +
           (fit && (fit.buy.length || fit.check.length) ? `<p class="mq-how mq-buy">${fit.buy.length ? `<b>To buy:</b> ${esc(fit.buy.join(", "))}` : ""}${fit.buy.length && fit.check.length ? "<br>" : ""}${fit.check.length ? `<b>Not checked in the kitchen:</b> ${esc(fit.check.join(", "))}` : ""}</p>` : "") +
-          howTo(d) +
+          links(howTo(d)) +
           `<div class="mq-drow"><button type="button" class="mq-mini go" data-dall="${esc(d.id)}">Got everything</button><button type="button" class="mq-mini" data-dnone="${esc(d.id)}">Clear</button>` +
           (d.own && !d.del ? `<button type="button" class="mq-mini" data-dedit="${esc(d.id)}">Edit</button>` : "") +
           `<span class="mq-dst${st.all ? " ok" : ""}">${esc(st.text)}</span></div></div>` : "") +
@@ -2798,8 +2822,8 @@
       if (mqOpen.has(key)) mqOpen.delete(key); else mqOpen.add(key);
       redraw(true);
     });
-    sh.querySelectorAll("[data-dhow]").forEach(bn => bn.onclick = () => {
-      const key = k + "|" + bn.dataset.dhow + "|how";
+    sh.querySelectorAll("[data-dhow], [data-dfull]").forEach(bn => bn.onclick = () => {
+      const key = k + "|" + (bn.dataset.dhow || bn.dataset.dfull) + "|" + (bn.dataset.dhow ? "how" : "full");
       if (mqOpen.has(key)) mqOpen.delete(key); else mqOpen.add(key);
       redraw(true);
     });
@@ -2883,12 +2907,17 @@
      in a modified Nutty Pudding): a tick takes a first portion off (QuestKitchen.portion), changeable the same way. These
      ticks earn no points; they keep the kitchen right. Keys: kitEatKey(meal, "kitchen", item id). */
   const kitUnit = u => u === "g" ? "g" : u === "ml" ? "ml" : "";
-  function kitTakeWrap(key, btn){
+  // one row (d71): the tick button, then (once ticked) "took [30] g" over what is left, then side (a part's ⇄, or nothing)
+  function kitTakeWrap(key, btn, side){
     const tk = key && QK() && QK().taken(G.kitchen, key), it = tk && QK().item(G.kitchen, tk.id);
-    if (!tk || !it || it.del) return btn;
-    return `<div class="mq-ingw">${btn}<label class="mq-take"><span>took</span><input class="mq-tq" type="number" inputmode="decimal" min="0" step="any" data-take="${esc(key)}" value="${tk.q}" aria-label="How much ${esc(it.name)} this meal took">` +
-      `<span>${kitUnit(tk.u)}</span><small>${esc(kitLeftWord(it, tk))}</small></label></div>`;
+    if (!tk || !it || it.del) return `<div class="mq-row">${btn}${side || ""}</div>`;
+    return `<div class="mq-row tk">${btn}${tookLabel(`data-take="${esc(key)}"`, tk.q, tk.u, kitLeftWord(it, tk), `How much ${it.name} this meal took`)}${side || ""}</div>`;
   }
+  /* the "took [30] g" field over its words (what is left), for a dish tick and an extra; attrs: the data-* the handler reads
+     (already escaped). The words are the label's only small: the change handlers update them in place. */
+  const tookLabel = (attrs, q, u, word, aria) => `<label class="mq-take"><span class="mq-tqw"><span>took</span>` +
+    `<input class="mq-tq" type="number" inputmode="decimal" min="0" step="any" ${attrs} value="${q == null ? "" : esc(String(q))}" placeholder="?" aria-label="${esc(aria)}">` +
+    `<span>${kitUnit(u)}</span></span><small>${esc(word)}</small></label>`;
   // beside a "took": what is left of an amount item, or (d70) a level item's level, which a tick does not change
   // what the kitchen has of an item, in a list: "have 300 g", its level, or "not checked"
   const kitHaveWord = x => typeof x.q === "number" ? `have ${x.amt}` : x.lv == null ? "not checked" : (KLV[x.lv] || "").toLowerCase();
@@ -2907,8 +2936,7 @@
       `<button type="button" class="mq-dbtn" data-dopen="kitchen" aria-expanded="${open}"><span class="mq-de">🧺</span>` +
       `<span class="mq-dn"><b>Anything else from the kitchen</b><small>${mine.size ? `${mine.size} ticked` : list.length ? `${list.length} in the ${esc(kn.name.toLowerCase())} · tap to open` : "nothing in it yet"}</small></span></button>` +
       (open ? `<div class="mq-dlist">` + (list.length
-        ? `<p class="mq-serves">Tick what else went in, like a swap or a banana. Something with an amount comes off what you have; change how much if you need to. Something on a level takes nothing off.</p>` +
-          QK().grouped(list).map(g => `<p class="kt-gh">${esc(g.group)}</p><div class="mq-ings">${g.list.map(row).join("")}</div>`).join("") +
+        ? QK().grouped(list).map(g => `<p class="kt-gh">${esc(g.group)}</p><div class="mq-rows">${g.list.map(row).join("")}</div>`).join("") +
           (mine.size ? `<div class="mq-drow"><button type="button" class="mq-mini go" data-ksave>Save as a dish</button><span class="mq-dst">Your ticks and amounts become a dish of your own.</span></div>` : "")
         : `<p class="mq-serves">Nothing in the ${esc(kn.name.toLowerCase())} yet. Add what you have in the Kitchen and it shows here.</p>`) +
         `</div>` : "") + `</div></div>`;
