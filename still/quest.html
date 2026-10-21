@@ -2763,11 +2763,12 @@
     return out;
   }
   function dishResults(S){
-    const q = S.q.trim().toLowerCase(), pool = dishPool(S);
+    // "300g navy beans" looks for Navy beans, and the 300 g goes with it when he picks it
+    const sp = S.q.trim() ? QK().splitName(S.q.trim()) : null, q = sp ? sp.name.toLowerCase() : "", pool = dishPool(S);
     const list = q ? pool.filter(x => x.name.toLowerCase().includes(q)) : pool.filter(x => typeof x.q === "number" && x.left > 0);
     const row = x => `<button type="button" class="kt-li kt-pk" data-dpick="${esc(x.id)}"><span class="e">${esc(x.em)}</span>` +
       `<span class="n">${esc(x.name)}<small>${typeof x.q === "number" ? `${esc(x.amt)} left` : "in the kitchen"}</small></span><span class="q">+ Add</span></button>`;
-    const sp = q ? QK().splitName(S.q.trim()) : null, exact = sp && list.some(x => x.name.toLowerCase() === sp.name.toLowerCase());
+    const exact = sp && list.some(x => x.name.toLowerCase() === q);
     return (q ? "" : list.length ? `<p class="kt-gh">In your kitchen now</p>` : `<p class="de-empty">Type a food to find it in your kitchen.</p>`) +
       (list.length ? `<div class="kt-list">${list.slice(0, 30).map(row).join("")}</div>` : q ? `<p class="de-empty">Not in your kitchen.</p>` : "") +
       (sp && sp.name && !exact ? `<div class="kt-list"><button type="button" class="kt-li kt-pk" data-dfree><span class="e">${esc(QK().iconFor(sp.name))}</span>` +
@@ -2802,8 +2803,8 @@
     const bindRes = () => {
       sh.querySelectorAll("[data-dpick]").forEach(bn => bn.onclick = () => {
         const it = QK().item(G.kitchen, bn.dataset.dpick); if (!it) return;
-        const p = QK().portion(it);
-        S.foods.push({ name:it.name, amt:p ? QK().fmtQ(p, it.u) : "" }); S.q = ""; again();
+        const typed = S.q.trim() ? QK().splitName(S.q.trim()).amt : "", p = QK().portion(it);
+        S.foods.push({ name:it.name, amt:typed || (p ? QK().fmtQ(p, it.u) : "") }); S.q = ""; again();
       });
       sh.querySelectorAll("[data-dfree]").forEach(bn => bn.onclick = () => {
         const sp = QK().splitName(S.q.trim()); if (!sp.name) return;
