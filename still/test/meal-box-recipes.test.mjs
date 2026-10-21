@@ -86,22 +86,25 @@ test("d79: a meal logged against an old idea still reads and keeps its points", 
   assert.ok(r1 && r1.items.length);
   const rec = { v: { "dish:r1": ["b", 9, 9, 0] }, b: 9, dish: { r1: r1.items.map((x) => x[0]) } };   // paid before d81
   assert.equal(QM.dishPaid(QM.tick(rec, r1, r1.items[0][0], opt).rec, r1), 9, "an untick after d81 takes nothing back");
-  assert.match(sheet, /\.map\(id => ideaById\(id\) \|\| recipeStub\(id\)\)\.filter\(Boolean\)\);/, "an old idea with ticks joins the list under the recipes");
-  assert.match(sheet, /\$\{RL\.map\(recipeCard\)\.join\(""\)\}\$\{ideas\.map\(d => dishCard\(d\)\)\.join\(""\)\}/);
+  // one dish per meal (2026-10-21): the meal shows what its record holds, an old idea too, through dishById
+  assert.ok(sheet.includes("const onIds = QM.onMeal(rec)"), "the dishes on the meal come from its record");
+  assert.ok(sheet.includes("const d = dishById(id); if (!d) return \"\";"), "each read through dishById (ideas and stubs too)");
+  assert.deepEqual(J(QM.onMeal(rec)), ["r1"]);
 });
 
-test("d78: What did you eat? is the first thing on the meal sheet, the same search box, ticked rows with took, Save as a dish", () => {
+test("d78 as Something else (one dish per meal, 2026-10-21): no What did you eat? box; Something else is a choice, its rows ticked with took, Save as a dish", () => {
+  assert.ok(!sheet.includes("const eatBox") && !/>What did you eat\?</.test(html) && !html.includes('lb("What did you eat?"'), "the box is gone");
   const top = sheet.slice(sheet.indexOf("openSheet(`${winHead(b)}"));
-  assert.ok(top.indexOf("${eatBox()}") > 0 && top.indexOf("${eatBox()}") < top.indexOf('<div class="mq-tips">'), "above the tips and every card");
-  const box = sheet.slice(sheet.indexOf("const eatBox = () =>"), sheet.indexOf("const slotCard ="));
-  assert.ok(box.includes("What did you eat?") && box.includes('xSearch(MEAL, "What did you eat?", "Type a food, like red pepper 1")'));
+  assert.ok(top.indexOf("What's this meal?") > 0 && top.indexOf("What's this meal?") < top.indexOf('<div class="mq-tips">'), "the choices come first");
+  assert.ok(sheet.includes("${pickCard(MEAL, cur === MEAL.id)}"), "Something else is the last choice");
+  const box = sheet.slice(sheet.indexOf("const elseRows = () =>"), sheet.indexOf("const slotCard ="));
   assert.match(box, /xRow\(MEAL, x, ""\)/, "a ticked row with took, no 'added' word");
   assert.match(box, /data-msave>Save as a dish</);
   assert.ok(!/function kitMealCard\(|<b>Anything else from the kitchen<\/b>|data-ksave/.test(html), "the old card is gone");
-  // the handlers treat the box as a dish of its own, keyed "meal"
+  // the handlers treat Something else as a dish of its own, keyed "meal"
   assert.match(sheet, /const xDish = id => id === MEAL\.id \? MEAL : dishById\(id\);/);
   for (const a of ["inp.dataset.xs", "bn.dataset.xoff", "inp.dataset.xq"]) assert.ok(sheet.includes(`xDish(${a})`), a);
-  // Save as a dish takes both the box's foods and old From your kitchen ticks
+  // Save as a dish takes both its foods and old From your kitchen ticks
   assert.match(sheet, /QK\(\)\.kitchenFoods\(G\.kitchen, kPre\)/);
   assert.match(sheet, /QM\.extrasOf\(mealRec\(\), MEAL\.id\)\.map\(x => \(\{ name:x\.n, amt:x\.q == null \? "" : QK\(\)\.fmtQ\(x\.q, x\.u\) \}\)\)/);
 });
@@ -122,10 +125,12 @@ test("d78: a food in What did you eat? takes its amount off through a tick recor
 });
 
 test("d78: his own dish card: no 'N of M ingredients · K added', added foods in the same list with Keep in the dish", () => {
-  const card = sheet.slice(sheet.indexOf("const dishCard = (d, fit) =>"), sheet.indexOf("const recipeCard = d =>"));
-  assert.match(card, /const sub = d\.own \? \(st\.n \|\| nx \? "On this meal" : "Tap to open"\)/);
-  assert.ok(card.includes(": slot ? hint.charAt(0).toUpperCase()"), "a part dish keeps its parts count");
-  const rows = sheet.slice(sheet.indexOf("const plainRows = (d, on, fit) =>"), sheet.indexOf("const recipeCard = d =>"));
+  const card = sheet.slice(sheet.indexOf("const dishCard = (d, fit, tail) =>"), sheet.indexOf("const plainRows ="));
+  assert.ok(card.length > 500, "found the dish card");
+  assert.match(card, /const sub = d\.own \? \(d\.del \? "deleted dish" : "your dish"\)/);
+  assert.ok(card.includes("${st.n} of ${st.m} ${unit}"), "a part dish keeps its parts count");
+  const rows = sheet.slice(sheet.indexOf("const plainRows = (d, on, fit) =>"), sheet.indexOf("const recipeCard = (d, tail) =>"));
+  assert.ok(rows.length > 300, "found the rows");
   assert.match(rows, /xs\.map\(x => xRow\(d, x, "added this time"\)\)\.join\(""\) \+ `<\/div>`/, "inside the same mq-rows");
   assert.match(rows, /d\.own && !d\.del && xs\.length/);
   assert.match(rows, /data-xkeep="\$\{esc\(d\.id\)\}" data-xn="\$\{esc\(x\.n\)\}">Keep \$\{esc\(x\.n\)\} in the dish</);
@@ -142,7 +147,6 @@ test("d78: his own dish card: no 'N of M ingredients · K added', added foods in
 
 test("review: a cooked recipe the book no longer has still reads from its ticks and can be unticked", () => {
   assert.match(html, /function recipeStub\(id\)\{/);
-  assert.match(html, /\.map\(id => ideaById\(id\) \|\| recipeStub\(id\)\)\.filter\(Boolean\)\);/);
   assert.match(html, /\|\| \(QR\(\) \? QR\(\)\.byId\(id\) : null\) \|\| recipeStub\(id\)/);
   // only his own dishes and recipes fold added foods into the list
   assert.match(html, /const xs = d\.own \|\| d\.recipe \? QM\.extrasOf\(rec, d\.id\) : \[\];/);
@@ -163,18 +167,17 @@ test("d80: a deleted dish keeps tonight's meal readable, also when only added fo
 });
 
 test("d79: the recipe card: shut shows time and tags; open shows ingredients, steps, swaps and Cook this; no 'you have N of M'", () => {
-  const rc = sheet.slice(sheet.indexOf("const recipeCard = d =>"), sheet.indexOf("openSheet(`${winHead(b)}"));
+  const rc = sheet.slice(sheet.indexOf("const recipeCard = (d, tail) =>"), sheet.indexOf("const choices = () =>"));
   assert.ok(rc.length > 500, "found the recipe card");
-  assert.match(rc, /const tv = trip && QR\(\)\.isTravel\(d, rule\), sub = \[d\.time, QR\(\)\.tagLine\(d\)\]/);
+  assert.match(rc, /const sub = \[d\.time, QR\(\)\.tagLine\(d\)\]/);
   assert.match(rc, /<p class="kt-gh">Steps<\/p><ol>/);
   assert.match(rc, /data-rcook="\$\{esc\(d\.id\)\}">Cook this</);
   assert.match(rc, /got = h && h\.st === "have", short = h && h\.st === "short"/, "only what the kitchen has, softly; short is not green");
   assert.ok(!/you have|buy \$|To buy/.test(rc), "no scoring of what he has");
   assert.match(sheet, /dishTap\(bn, d\.id, QR\(\)\.cookTicks\(d\)\)/);
   // the old ideas only when the book did not load; the trip line says how travel-friendly is decided
-  assert.match(sheet, /\$\{RL \? `<div class="mq-sub mq-subl"><span>Recipes · for 2 people<\/span>/);
+  assert.ok(sheet.includes('[RL ? "Recipes · for 2 people" : `Tonight\'s ideas · for 2 people'), "the ideas heading is the fallback branch");
   assert.ok(sheet.includes("On a trip: travel-friendly recipes first"));
-  assert.ok(sheet.indexOf("Tonight's ideas · for 2 people") > sheet.indexOf("${RL ?"), "the ideas heading is the fallback branch");
   assert.ok(!/Not much in the travel fridge/.test(sheet));
 });
 

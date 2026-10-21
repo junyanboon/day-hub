@@ -167,7 +167,7 @@ test("d51 to d53 on the page: parts with swaps and Use something else, How to ma
   const ed = html.slice(html.indexOf("function openDishEdit("), html.indexOf("A walk, hike or other outdoor block"));
   assert.ok(ed.includes('id="deSteps"') && ed.includes("steps:S.steps"));
   assert.match(html, /r\.why === "none" \? "not in the kitchen"/);
-  for (const [f, v] of [["quest-meals", "d81b"], ["quest-kitchen", "h81b"], ["quest-ideas", "d76"]]) assert.match(html, new RegExp(`${f}\\.js\\?v=20261021${v}"`), f);
+  for (const [f, v] of [["quest-meals", "d87"], ["quest-kitchen", "h81b"], ["quest-ideas", "d76"]]) assert.match(html, new RegExp(`${f}\\.js\\?v=20261021${v}"`), f);
   assert.ok(!/>Got everything<|>Clear<|data-dall|data-dnone/.test(body), "2026-10-21: no Got everything and no Clear on any dish card");
   assert.ok(!/For 2 people\. Each part/.test(body), "d72: the intro is gone");
 });
@@ -210,7 +210,9 @@ test("d58: the travel versions: few parts, plants only, no garlic or onion, no o
 test("d58 on the page: the travel fridge shows the travel versions, the full recipe small, and a tick on the other kitchen's dish still reads", () => {
   assert.match(html, /const bpToday = \(\) => \(QM && QM\.dishesFor && QK\(\) \? QM\.dishesFor\(kitToday\(\)\) : QM \? QM\.DISHES : \[\]\);/);
   const i = html.indexOf("function openMeal(b)"), body = html.slice(i, html.indexOf("The meal sheet's kitchen parts"));
-  assert.ok(body.includes("bps.map(d => dishCard(d))") && body.includes("dishGot(bps)"));
+  // one dish per meal (2026-10-21): the travel versions are the Blueprint choices; a meal holding the other kitchen's dish
+  // still shows it (QM.onMeal, then dishById, which looks in both kitchens' Blueprint dishes)
+  assert.ok(body.includes('[bpNow === QM.DISHES ? "Blueprint dishes" : "Blueprint dishes · travel versions", bpNow]') && body.includes("const onIds = QM.onMeal(rec)"));
   assert.ok(body.includes('" (at home)"') && body.includes("(d.full && QM.dishOf(d.full)) || d"));
   assert.match(html, /QM\.dishOf\(id, QM\.BLUEPRINT \|\| QM\.DISHES\)/);
   // an empty kitchen shows the whole recipe's steps, not only the step that needs no part

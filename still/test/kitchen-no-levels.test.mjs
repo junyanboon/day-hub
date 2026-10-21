@@ -122,15 +122,14 @@ test("on the page: no level key, no tap-to-step hint, no level words, tiles open
   assert.ok(/const kitHaveWord = x => [^\n]*QK\(\)\.ASK/.test(html), "lists say how many?");
 });
 
-test("d74, d75 and no Got everything or Clear: the dish card ends with the search box; results only once he types", () => {
-  const c0 = html.indexOf("const dishCard = (d, fit) =>"), card = html.slice(c0, html.indexOf("openSheet(", c0));
+test("d74, d75 and no Got everything or Clear: the open meal ends with the kitchen buttons (one dish per meal, 2026-10-21: shown at once, typing narrows them)", () => {
+  const c0 = html.indexOf("const dishCard = (d, fit, tail) =>"), card = html.slice(c0, html.indexOf("const plainRows", c0));
   assert.ok(card.length > 1000, "found the dish card");
   assert.ok(!/>Got everything<|data-dall|data-dnone|>Clear</.test(card));
-  const xr = html.slice(html.indexOf("const xResults = (d, text) =>"), html.indexOf("const extrasBlock = d =>"));
-  assert.match(xr, /if \(!QK\(\) \|\| !t\) return "";/, "nothing listed until he types");
-  const xb = html.slice(html.indexOf("const xSearch = (d, aria, ph) =>"), html.indexOf("const slotCard = d =>"));
-  assert.match(xb, /<div data-xres="\$\{esc\(d\.id\)\}"><\/div>/, "the results start empty");
-  assert.ok(!/mq-how/.test(xb + xr), "no helper text in the panel");
+  const kp = html.slice(html.indexOf("const kitPanel = d =>"), html.indexOf("const extrasBlock = d =>"));
+  assert.ok(kp.length > 300, "found the kitchen buttons");
+  assert.ok(kp.includes("QK().grouped(list)") && kp.includes("data-xit="), "the kitchen in use as buttons by food group");
+  assert.ok(!/mq-how/.test(kp), "no helper text in the panel");
   // the points stay on the card header
   assert.match(card, /<span class="mq-dp">/);
   const bind = html.slice(html.indexOf("function openMeal(b)"), html.indexOf("The meal sheet's kitchen parts"));

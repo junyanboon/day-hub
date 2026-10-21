@@ -204,8 +204,8 @@
   ];
   const FOOD_IDS = PRANA_FOODS.map((x) => x[0]);
   const DRAIN_IDS = DRAINS.map((x) => x[0]);
-  // the automatic drains, named in the quiz so he knows they are counted without a tap
-  const AUTO_NOTE = "Eating within 3 hours of bed and staying up past 11 count by themselves, from your calendar and your Oura ring.";
+  /* The automatic drains (eating within 3 hours of bed, up past 11) still count by themselves from the calendar and the
+     Oura ring; the note naming them left the meal sheet (Junyan, 2026-10-21, d85). */
 
   // what one row is worth: gains grow with the level multiplier, drains never do
   function value(id, opt) {
@@ -468,6 +468,45 @@
   const setExtraQ = (rec, id, n, q) => withExtras(rec, id, extrasOf(rec, id).map((y) => (xKey(y.n) === xKey(n)
     ? { ...y, q: typeof q === "number" && isFinite(q) && q >= 0 ? Math.round(q * 10) / 10 : null } : y)));
 
-  root.QuestMeals = { PRANA_FOODS, PRANA_WAYS, TIPS, DRAINS, BODY, LEGACY_BODY, JUNK, ONEOF, FOOD_IDS, DRAIN_IDS, AUTO_NOTE,
-    DISH_VALUE, DISHES, TRAVEL, BLUEPRINT, CORE, dishesFor, IDEAS, SLOTS, STEPS, isSlotDish, slotOf, entryName, extrasOf, addExtra, dropExtra, setExtraQ, xKey, entriesOf, filledOf, partsOf, stepsOf, SHORT, tileLabel, value, score, toggle, tally, tap, meterOf, dishOf, groupOf, pays, slotsUsed, dishMax, capOf, dishPay, dishStatus, tick, dishPaid, heldIds };
+  /* One dish per meal (Junyan, 2026-10-21: "what's important is me to capture the ingredients by MEAL not dishes. Super
+     Veggie is my meal, Nutty pudding is my meal"). rec.m is the dish this meal is: a dish id, or "meal" for Something
+     else (its foods are the extras of the pseudo dish "meal"). A meal logged before has no m: what it holds (dish ticks,
+     a paid dish record, extras on any dish) reads as the meal, one or more dishes, so it keeps its points and can be
+     unticked. */
+  const okPick = (x) => typeof x === "string" && /^[\w-]{1,40}$/.test(x);
+  const pickOf = (rec) => (rec && okPick(rec.m) ? rec.m : null);
+  // the dishes on this meal, its pick first, then anything else it holds (old records), in order
+  const onMeal = (rec) => [...new Set([pickOf(rec)].concat(heldIds(rec), Object.keys((rec && rec.xtra) || {})).filter(okPick))];
+  const setPick = (rec, id) => { const r = { ...(rec || {}) }; if (okPick(id)) r.m = id; else delete r.m; return r; };
+
+  /* The food tiles from what was logged (d83). want: the tile ids the meal's foods earn now (QuestFoodScore.earn). A tile
+     the foods earn is paid (tap) and marked in rec.auto; a tile in rec.auto the foods no longer earn is taken back. A tile
+     he tapped by hand (on a record from before, or a drain) is never touched, and one he took back by hand (rec.noauto)
+     is not paid again. can(id): whether a new tile may pay now (its daily limit). Returns { rec, ops } like tap(). */
+  const AUTO_IDS = FOOD_IDS.concat(BODY, [JUNK[0], "neg"]);
+  function autoSync(rec, want, opt, can) {
+    let r = { ...(rec || {}) };
+    const w = new Set(want || []), auto = new Set(Array.isArray(r.auto) ? r.auto : []), no = new Set(Array.isArray(r.noauto) ? r.noauto : []);
+    const ops = [];
+    for (const id of AUTO_IDS) {
+      const on = Array.isArray(r.sel) && r.sel.includes(id);
+      if (w.has(id) && !on && !no.has(id) && (!can || can(id))) { const t = tap(r, id, opt); r = t.rec; ops.push(...t.ops); auto.add(id); }
+      else if (!w.has(id) && on && auto.has(id)) { const t = tap(r, id, opt); r = t.rec; ops.push(...t.ops); auto.delete(id); }
+      else if (!on) auto.delete(id);
+    }
+    if (auto.size) r.auto = AUTO_IDS.filter((id) => auto.has(id)); else delete r.auto;
+    return { rec: r, ops };
+  }
+  // a tap by hand on a drain button: a paid-by-the-foods tile taken back by hand stays off; tapped on again, it is his
+  function handTap(rec, id, opt) {
+    const t = tap(rec, id, opt), r = t.rec, on = r.sel.includes(id);
+    const auto = (Array.isArray(r.auto) ? r.auto : []).filter((x) => x !== id), no = (Array.isArray(r.noauto) ? r.noauto : []).filter((x) => x !== id);
+    if (!on && Array.isArray(rec && rec.auto) && rec.auto.includes(id)) no.push(id);
+    if (auto.length) r.auto = auto; else delete r.auto;
+    if (no.length) r.noauto = no; else delete r.noauto;
+    return t;
+  }
+
+  root.QuestMeals = { PRANA_FOODS, PRANA_WAYS, TIPS, DRAINS, BODY, LEGACY_BODY, JUNK, ONEOF, FOOD_IDS, DRAIN_IDS,
+    DISH_VALUE, DISHES, TRAVEL, BLUEPRINT, CORE, dishesFor, IDEAS, SLOTS, STEPS, isSlotDish, slotOf, entryName, extrasOf, addExtra, dropExtra, setExtraQ, xKey, entriesOf, filledOf, partsOf, stepsOf, SHORT, tileLabel, value, score, toggle, tally, tap, meterOf, dishOf, groupOf, pays, slotsUsed, dishMax, capOf, dishPay, dishStatus, tick, dishPaid, heldIds, pickOf, onMeal, setPick, AUTO_IDS, autoSync, handTap };
 })(typeof window !== "undefined" ? window : globalThis);
