@@ -589,7 +589,7 @@
   .mq-row:has(> .mq-ing[aria-pressed="true"]) { box-shadow:inset 0 0 0 1px rgba(95,211,196,.8); background:rgba(95,211,196,.18); }
   .mq-row > .mq-ing { flex:1; min-width:0; min-height:44px; border:0; border-radius:10px; background:transparent; }
   .mq-row > .mq-ing[aria-pressed="true"] { background:transparent; }
-  .mq-row.tk > .mq-ing .qty { display:none; } .mq-ra { display:none; } .mq-row.tk .mq-ra { display:inline; } .mq-row.tk small.mq-ra { display:block; }
+  .mq-row.tk > .mq-ing .qty { display:none; } .mq-row:not(.tk) .mq-ra { display:none; }
   .mq-take { display:flex; font-size:11.5px; color:var(--ink-soft); }
   .mq-row .mq-take { flex:none; flex-direction:column; align-items:flex-end; justify-content:center; gap:1px; min-height:44px; padding:2px 7px 2px 0; cursor:text; }
   .mq-tqw { display:flex; align-items:center; gap:4px; white-space:nowrap; }
