@@ -950,8 +950,8 @@
 <script src="quest-levels.js?v=20261016b"></script>
 <script src="quest-gymlog.js?v=20261019a"></script>
 <script src="quest-meals.js?v=20261021d70"></script>
-<script src="quest-kitchen.js?v=20261021d70"></script>
-<script src="quest-ideas.js?v=20261021d69"></script>
+<script src="quest-kitchen.js?v=20261021d70b"></script>
+<script src="quest-ideas.js?v=20261021d69b"></script>
 <script src="quest-trends.js?v=20261019end3"></script>
 <script src="nvc-words.js?v=20261010a"></script>
 <script src="quest-fx.js?v=20261019x"></script>
@@ -2624,9 +2624,9 @@
     const xResults = (d, text) => {
       if (!QK()) return "";
       const have = new Set(QM.extrasOf(rec, d.id).map(x => QM.xKey(x.n))), t = String(text || "").trim();
-      const list = QK().search(G.kitchen, kitToday(), t).filter(x => !have.has(QM.xKey(x.name))).slice(0, t ? 12 : 60);
+      const list = QK().search(G.kitchen, kitToday(), t).filter(x => !have.has(QM.xKey(x.name))).slice(0, t ? 12 : Infinity);
       const btn = x => `<button type="button" class="mq-ing" data-xit="${esc(x.id)}" data-xd="${esc(d.id)}" aria-pressed="false"><span class="bx"></span>` +
-        `<span class="n">${esc(x.em)} ${esc(x.name)}</span><span class="qty">${typeof x.q === "number" ? `have ${esc(x.amt)}` : x.lv == null ? "not checked" : esc(KLV[x.lv].toLowerCase())}</span></button>`;
+        `<span class="n">${esc(x.em)} ${esc(x.name)}</span><span class="qty">${esc(kitHaveWord(x))}</span></button>`;
       return (t ? `<button type="button" class="mq-mini go mq-xfree" data-xfree data-xd="${esc(d.id)}">Add "${esc(t.slice(0, 40))}"</button>` : "") +
         (list.length ? (t ? `<div class="mq-ings">${list.map(btn).join("")}</div>` : QK().grouped(list).map(g => `<p class="kt-gh">${esc(g.group)}</p><div class="mq-ings">${g.list.map(btn).join("")}</div>`).join(""))
           : t ? `<p class="mq-how">Not in the ${esc(kn ? kn.name.toLowerCase() : "kitchen")}. Add it as you typed it; nothing comes off.</p>` : `<p class="mq-how">Nothing in the kitchen yet. Type a food and how much.</p>`);
@@ -2808,17 +2808,17 @@
     const mealRec = () => { const cur = (G.day.mealq || {})[k]; return cur && !cur.kind ? cur : null; };
     const putRec = r => { (G.day.mealq = G.day.mealq || {})[k] = { ...r, at:now().toISOString() }; stampDay(); saveG(); };
     function addExtraTo(d, x){
-      const cur = mealRec(), had = QM.extrasOf(cur, d.id).length;
+      const cur = mealRec();
+      if (!x.name || QM.extrasOf(cur, d.id).some(y => QM.xKey(y.n) === QM.xKey(x.name))) return;   // already on this dish
       let q = x.q, u = x.u || "";
+      if (x.lost) calToast(`${x.name} is kept in ${kitUnit(x.it.u) || "pieces"} in the kitchen, so "${x.lost}" could not come off as typed. Change how much it took.`, 5000);
       if (x.it) {
         const r0 = QK().eat(G.kitchen, kitToday(), xKeyOf(d, x.name), { id:x.it.id, note:true }, true, now(), q ?? QK().firstTake(x.it));
         const tk = QK().taken(r0.K, xKeyOf(d, x.name));
         if (tk) { q = tk.q; u = tk.u; }
         if (r0.K !== G.kitchen) { G.kitchen = r0.K; if (r0.id) kitEatToast(r0.K, [r0.id]); }
       }
-      const r = QM.addExtra(cur, d.id, { n:x.name, q, u });
-      if (QM.extrasOf(r, d.id).length === had) return;
-      putRec(r); redraw();
+      putRec(QM.addExtra(cur, d.id, { n:x.name, q, u })); redraw();
     }
     function dropExtraFrom(d, n){
       const r0 = QK() ? QK().eat(G.kitchen, kitToday(), xKeyOf(d, n), {}, false, now()) : { K:G.kitchen };
@@ -2844,7 +2844,7 @@
           const item = QK().item(G.kitchen, it.dataset.xit); if (!item) return;
           // "6 almonds" typed, then Almonds tapped: the 6 goes with it
           const p = QK().extraParse(G.kitchen, kitToday(), inp.value), same = p.it && p.it.id === item.id;
-          addExtraTo(d, { name:item.name, it:item, q:same ? p.q : null, u:same ? p.u : "" });
+          addExtraTo(d, { name:item.name, it:item, q:same ? p.q : null, u:same ? p.u : "", lost:same ? p.lost : null });
         } else if (fr && inp.value.trim()) addExtraTo(d, QK().extraParse(G.kitchen, kitToday(), inp.value));
       };
     });
@@ -2857,7 +2857,7 @@
       const d = dishById(inp.dataset.xq); if (!d) return;
       const raw = String(inp.value).trim(), v = parseFloat(raw.replace(",", ".")), q = raw === "" || isNaN(v) ? null : Math.max(0, v);
       const key = xKeyOf(d, inp.dataset.xn);
-      if (QK() && QK().taken(G.kitchen, key)) { const K2 = QK().setTake(G.kitchen, key, q ?? 0, now()); if (K2 !== G.kitchen) { G.kitchen = K2; const tk = QK().taken(K2, key); if (tk) kitEatToast(K2, [tk.id]); } }
+      if (q != null && QK() && QK().taken(G.kitchen, key)) { const K2 = QK().setTake(G.kitchen, key, q, now()); if (K2 !== G.kitchen) { G.kitchen = K2; const tk = QK().taken(K2, key); if (tk) kitEatToast(K2, [tk.id]); } }
       putRec(QM.setExtraQ(mealRec(), d.id, inp.dataset.xn, q));
       // no redraw (the next tap would be swallowed): only the words beside it change
       const sm = inp.closest(".mq-take") && inp.closest(".mq-take").querySelector("small");
@@ -2887,6 +2887,8 @@
       `<span>${kitUnit(tk.u)}</span><small>${esc(kitLeftWord(it, tk))}</small></label></div>`;
   }
   // beside a "took": what is left of an amount item, or (d70) a level item's level, which a tick does not change
+  // what the kitchen has of an item, in a list: "have 300 g", its level, or "not checked"
+  const kitHaveWord = x => typeof x.q === "number" ? `have ${x.amt}` : x.lv == null ? "not checked" : (KLV[x.lv] || "").toLowerCase();
   const kitLeftWord = (it, tk) => tk && tk.nq ? `${it.lv == null ? "not checked" : (KLV[it.lv] || "").toLowerCase()} · nothing taken off` : it.lv === 0 ? "none left" : `${it.amt} left`;
   function kitMealCard(mk){
     if (!QK() || !G.day) return "";
@@ -2897,7 +2899,7 @@
     const list = QK().mealList(G.kitchen, kk, mine);
     const row = x => kitTakeWrap(mine.has(x.id) ? pre + x.id : null,
       `<button type="button" class="mq-ing" data-kown="${esc(x.id)}" aria-pressed="${mine.has(x.id)}"><span class="bx"></span>` +
-      `<span class="n">${esc(x.em)} ${esc(x.name)}</span><span class="qty">${mine.has(x.id) ? "" : typeof x.q === "number" ? `have ${esc(x.amt)}` : x.lv == null ? "not checked" : esc(KLV[x.lv].toLowerCase())}</span></button>`);
+      `<span class="n">${esc(x.em)} ${esc(x.name)}</span><span class="qty">${mine.has(x.id) ? "" : esc(kitHaveWord(x))}</span></button>`);
     return `<div class="mq-sub mq-subl"><span>From your kitchen · ${kn.icon} ${esc(kn.name)}</span></div><div class="mq-dishes"><div class="mq-dish${open ? " open" : ""}">` +
       `<button type="button" class="mq-dbtn" data-dopen="kitchen" aria-expanded="${open}"><span class="mq-de">🧺</span>` +
       `<span class="mq-dn"><b>Anything else from the kitchen</b><small>${mine.size ? `${mine.size} ticked` : list.length ? `${list.length} in the ${esc(kn.name.toLowerCase())} · tap to open` : "nothing in it yet"}</small></span></button>` +

@@ -39,6 +39,7 @@ test("d69: what kind of food a name is: nuts, seeds, plant milk or yogurt, fruit
     "Chia seeds": "seed", "Ground flax": "seed", "Hemp seeds": "seed", "Pumpkin seeds": "seed", "Seed mix": "seed",
     "Oat milk": "milk", "Macadamia milk": "milk", "Coconut yogurt": "milk", "Soy yoghurt": "milk",
     "Bananas": "fruit", "Blueberries": "fruit", "Frozen berries": "fruit", "Cherries": "fruit", "Apples": "fruit",
+    "Cherry tomatoes": null, "Tart cherry juice": null, "Strawberry jam": null, "Flax oil": null, "Omega seed mix": "seed", "Fish oil capsules": "supp",
     "Nutmeg": null, "Butternut squash": null, "Cocoa powder": null, "Curry powder": null, "Lemons": null, "Milk": null, "Kale": null };
   for (const [n, want] of Object.entries(cases)) assert.equal(QI.kindOf(n), want, n);
 });
@@ -98,6 +99,9 @@ test("d70: what he types for an extra: a kitchen item or free text, with an amou
   assert.deepEqual(J(p("blueberries 150g")), ["Blueberries", 150, "g", "Blueberries"]);
   assert.deepEqual(J(p("Collagen")), ["Collagen", null, "", null]);
   assert.deepEqual(J(p("  ")), [null, null, "", null]);
+  // a count typed for an item kept in grams cannot come off as typed: no amount, and the page is told (lost)
+  const g = travel([["Almonds", "200 g"]]), x = K.extraParse(g, "travel", "6 almonds");
+  assert.deepEqual(J([x.name, x.q, x.u, x.lost]), ["Almonds", null, "g", "6"]);
 });
 
 test("d70: the search lists everything in the kitchen in use, with or without an amount, best match first", () => {

@@ -301,6 +301,8 @@
     return out;
   }
   const hasQ = (it) => !!it && typeof it.q === "number";
+  // the unit an item's ticks take: its amount's unit, else a count for a piece food, else the food's own (g or ml)
+  const unitOf = (it) => (hasQ(it) ? it.u : isPiece(it) ? "" : unitFor(it.name));
   // d64: an item counted by the piece (its - and + buttons): one with a count, or a level item of a food bought by the piece
   const isPiece = (it) => !!it && typeof it.name === "string" && (hasQ(it) ? it.u === "" : unitFor(it.name) === "");
   /* The meals' take-offs by item (K.used records with an amount, not taken back), worked out once per used object. */
@@ -880,7 +882,7 @@
     if (rec && !rec.off) return { K, id: null };
     const it = r.id ? item(K, r.id) : match(K, k, r.name);
     if (!it || it.del || it.k !== k || !(hasQ(it) || r.note)) return { K, id: null };
-    const u = hasQ(it) ? it.u : isPiece(it) ? "" : unitFor(it.name);
+    const u = unitOf(it);
     const q = typeof amount === "number" ? amount : recipeIn(amount, u);
     const out = clone(K);
     out.used = { ...obj(out.used), [key]: { id: it.id, q: Math.max(0, Math.round((+q || 0) * 10) / 10), u, ...(hasQ(it) ? {} : { nq: true }), t: iso(at), at: iso(at) } };
@@ -1007,8 +1009,10 @@
     const nm = it ? it.name : name;
     let p = null;
     if (amt) { const c = /^\d+(?:[.,]\d+)?$/.test(amt) ? pieceCount(raw, nm) ?? pieceCount(raw, name) : null; p = c != null ? { q: c, u: "" } : qtyFor(amt, nm, it && hasQ(it) ? it.u : undefined); }
-    if (p && it && hasQ(it) && p.u !== it.u) p = null;
-    return { name: nm, q: p ? p.q : null, u: p ? p.u : it ? (hasQ(it) ? it.u : isPiece(it) ? "" : unitFor(it.name)) : "", it };
+    // "6 almonds" for almonds kept in grams: his number cannot come off as typed; the page says so (lost)
+    let lost = null;
+    if (p && it && hasQ(it) && p.u !== it.u) { lost = amt; p = null; }
+    return { name: nm, q: p ? p.q : null, u: p ? p.u : it ? unitOf(it) : "", it, ...(lost ? { lost } : {}) };
   }
   /* d70: the extra search: kitchen k's items whose name holds what he typed (its amount left out), the closest first
      (the same food, then a name that starts with it, then the shortest). Empty: everything in the kitchen. */

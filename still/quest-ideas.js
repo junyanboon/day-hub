@@ -203,15 +203,18 @@
      auto-picked for any part), "milk" (a plant milk or yogurt), "nut" (nuts, nut butters, a nut mix), "seed" (seeds or a
      seed mix), "fruit" (berries, cherries and other fruit, not lemons or limes), else null. In this order, so "Almond milk"
      is a milk, "Blueberry nut mix" a nut and "Hemp seeds" a seed. Cow's milk is not a plant milk. */
-  const SUPP = /\b(collagen|creatine|protein|whey|isolate|supplements?|vitamins?|multivitamins?|magnesium|zinc|omega|fish oil|electrolytes?|greens powder|spirulina|chlorella|ashwagandha|probiotics?|capsules?|tablets?|pills?|gummies|pre-?workout|bcaa)\b/i;
+  const SUPP = /\b(collagen|creatine|protein|whey|isolate|supplements?|vitamins?|multivitamins?|magnesium|zinc|fish oil|electrolytes?|greens powder|spirulina|chlorella|ashwagandha|probiotics?|capsules?|softgels?|tablets?|pills?|gummies|pre-?workout|bcaa)\b/i;
   const MILK = /\b(nut|seed|hemp|coconut|oat|almond|soy|soya|cashew|macadamia|rice|pea|plant|hazelnut|pistachio|walnut|flax|quinoa)\s+(milk|mylk|drink|yogh?urts?|kefir)\b/i;
   const NUT = /\b(nuts?|almonds?|cashews?|walnuts?|pecans?|hazelnuts?|macadamias?|pistachios?|brazils?|peanuts?|trail mix|nut mix)\b/i;
   const SEED = /\b(seeds?|chia|flax|flaxseeds?|linseeds?|hemp|hemp hearts?|pepitas?|seed mix)\b/i;
   const FRUIT = /berr(y|ies)\b|\bcherr(y|ies)\b/i, CITRUS = /\b(lemons?|limes?)\b/i;
+  // made from a nut, seed or fruit but not one to eat as it ("Flax oil", "Cherry tomatoes", "Tart cherry juice", "Strawberry jam")
+  const NOT_WHOLE = /\b(oils?|tomato(es)?|juices?|jams?|jelly|syrups?|sauces?|teas?|vinegars?|extracts?|flavou?r(ed|ing)?)\b/i;
   function kindOf(name, group) {
     const n = String(name || "");
     if (SUPP.test(n)) return "supp";
     if (MILK.test(n)) return "milk";
+    if (NOT_WHOLE.test(n)) return null;
     if (NUT.test(n)) return "nut";
     if (SEED.test(n)) return "seed";
     if (FRUIT.test(n) || (!CITRUS.test(n) && (group || QK().guessGroup(n)) === "Fruit")) return "fruit";
@@ -226,8 +229,7 @@
        under his finger when the tick takes the last of it;
      - every other real ingredient shows itself when the kitchen has it, else the closest swap it has (its listed swaps
        in order, then any item matching the part's pattern, then (d69) any item of the part's kind), else itself when not
-     checked yet, else itself marked
-       "none in the kitchen". One food is never shown in two places in the dish, and real ingredients are placed first,
+       checked yet, else itself marked "none in the kitchen". One food is never shown in two places in the dish, and real ingredients are placed first,
        so a swap never takes a food another part needs.
      Returns [{ id, role, filled, rows: [{ entry (what a tick stores), name, amt, on, swap, for (the real ingredient),
      st ("have" | "unchecked" | "none"), word, it }] }]. */
