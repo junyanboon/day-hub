@@ -564,7 +564,7 @@
     const uses = usesOf(name, dishes);
     /* the first amount that can be scaled, then the largest in the same unit; a Blueprint dish's amount (the meals he
        eats most, 2026-10-21: Super Veggie's broccoli is 175 g) comes before one of tonight's ideas */
-    const bp = new Set(((root.QuestMeals && root.QuestMeals.DISHES) || []).map((d) => d.name));
+    const bp = new Set(((root.QuestMeals && (root.QuestMeals.BLUEPRINT || root.QuestMeals.DISHES)) || []).map((d) => d.name));   // the travel versions too (d58)
     const order = uses.filter((u) => bp.has(u.dish)).concat(uses.filter((u) => !bp.has(u.dish)));
     let best = null, fromBp = false;
     for (const u of order) { const a = parseAmt(u.amt); if (!a) continue; if (fromBp && !bp.has(u.dish)) break;

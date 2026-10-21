@@ -943,8 +943,8 @@
 <script src="quest-oura.js?v=20261019a"></script>
 <script src="quest-levels.js?v=20261016b"></script>
 <script src="quest-gymlog.js?v=20261019a"></script>
-<script src="quest-meals.js?v=20261021d57"></script>
-<script src="quest-kitchen.js?v=20261021d59"></script>
+<script src="quest-meals.js?v=20261021d57b"></script>
+<script src="quest-kitchen.js?v=20261021d59b"></script>
 <script src="quest-ideas.js?v=20261021d61"></script>
 <script src="quest-trends.js?v=20261019end3"></script>
 <script src="nvc-words.js?v=20261010a"></script>
@@ -2568,7 +2568,7 @@
     const kn = QK() ? QK().KITCHENS[kitToday()] : null;
     /* Super Veggie and Nutty Pudding (d58): the travel versions when the travel fridge is in use, else the full recipes, then any
        Blueprint dish of the other kitchen this meal already has ticks on, so a tick can always be taken back */
-    const bpNow = bpToday(), bps = bpNow.concat(QM.DISHES.concat(QM.TRAVEL || []).filter(d => !bpNow.includes(d) && rec && rec.dish && Array.isArray(rec.dish[d.id])));
+    const bpNow = bpToday(), bps = bpNow.concat((QM.BLUEPRINT || QM.DISHES).filter(d => !bpNow.includes(d) && rec && rec.dish && Array.isArray(rec.dish[d.id])));
     const sel = new Set(rec && Array.isArray(rec.sel) ? rec.sel : []), paid = (rec && rec.v) || {};
     const warn = mealWarn(b, all), lastFood = lastMealBefore(b.s, all), o = mqOpt();
     const sign = v => v > 0 ? `+${v}` : `${v}`;
@@ -2617,8 +2617,7 @@
             `<span class="bx"></span><span class="n">${esc(r.name)}${r.on ? (r.swap ? `<small class="mq-hv">for ${esc(r.for.split(",")[0])}</small>` : "")
               : `<small class="mq-hv ${r.st}">${r.swap ? `instead of ${esc(r.for.split(",")[0])} · ` : ""}${esc(r.word)}</small>`}</span><span class="qty">${esc(r.amt)}</span></button>`)).join("") +
           `</div><button type="button" class="mq-mini mq-else" data-dother="${esc(d.id)}" data-si="${si}" aria-expanded="${mqOpen.has(k + "|" + d.id + "|other:" + p.id)}">Use something else</button>` + pick(p, si)).join("") +
-        (d.full && QM.dishOf(d.full) ? `<p class="mq-how mq-full"><b>Full recipe (at home):</b> ${esc(QM.dishOf(d.full).name)}: ${esc(QM.dishOf(d.full).items.map(([n, a]) => `${n} ${a}`).join(", "))}</p>`
-          : `<p class="mq-how mq-full"><b>Full recipe:</b> ${esc(d.items.map(([n, a]) => `${n} ${a}`).join(", "))}</p>`);
+        ((full) => `<p class="mq-how mq-full"><b>Full recipe${full !== d ? " (at home)" : ""}:</b> ${full !== d ? `${esc(full.name)}: ` : ""}${esc(full.items.map(([n, a]) => `${n} ${a}`).join(", "))}</p>`)((d.full && QM.dishOf(d.full)) || d);
     };
     const dishCard = (d, fit) => {
       const st = QM.dishStatus(rec, d), open = mqOpen.has(k + "|" + d.id), pd = QM.dishPaid(rec, d), on = new Set(rec && rec.dish && Array.isArray(rec.dish[d.id]) ? rec.dish[d.id] : []);
@@ -2843,7 +2842,7 @@
   /* a dish by id: the Blueprint dishes, tonight's ideas and his own, a deleted one of his too (a meal logged with it), and
      any idea of the pool (d41: an idea from another day that a meal has ticks on) */
   const dishById = id => allDishes().find(d => d.id === id) || (QK() ? QK().ownDish(G.kitchen, id) : null) || ideaById(id)
-    || (QM ? QM.dishOf(id, QM.DISHES.concat(QM.TRAVEL || [])) : null);   // a Blueprint dish of the other kitchen (d58)
+    || (QM ? QM.dishOf(id, QM.BLUEPRINT || QM.DISHES) : null);   // a Blueprint dish of the other kitchen (d58)
   // his dishes for this meal: the live ones, then any deleted one this meal has ticks on
   function mealOwn(rec){
     if (!QK()) return [];
@@ -2993,7 +2992,8 @@
   const ideaById = id => (QI() ? QI().byId(id) : QM && QM.IDEAS.find(d => d.id === id)) || null;
   // the Blueprint dishes of the kitchen in use (d58): the travel versions in the travel fridge, else the full recipes
   const bpToday = () => (QM && QM.dishesFor && QK() ? QM.dishesFor(kitToday()) : QM ? QM.DISHES : []);
-  const kitDishes = () => QM ? bpToday().concat(ideasToday().list.filter(d => !d.own)) : [];
+  // kc: the kitchen a list is for (the one he is looking at), else the kitchen in use; its own Blueprint dishes (d58, d59)
+  const kitDishes = kc => QM ? (kc && QM.dishesFor ? QM.dishesFor(kc) : bpToday()).concat(ideasToday().list.filter(d => !d.own)) : [];
   function kitSave(K){ G.kitchen = K; saveG(); }
   // the trip-end question, only once the whole calendar is in (a half-loaded agenda could read a travel day as home)
   const kitTripEnd = () => lastPull && Object.keys(AG).length ? QK().tripEnd(G.kitchen, gameYmd(), kitToday()) : { ask:false, items:[] };
@@ -3021,7 +3021,7 @@
     if (fresh) KS = { k:kitToday(), view:"have", q:"", f:"all", keep:new Set(), add:{ g:null, sh:null, gT:false, shT:false }, edit:false, block:null, home:null, msg:"",
       fill:null, noBring:false, ...(o || {}) };
     const S = KS, K = G.kitchen, k = S.k, kn = QK().KITCHENS[k], today = kitToday(), shop = kitShop(k), t = now();
-    const all = QK().items(K, k), L = QK().shopList(K, k, t, shop.at, kitDishes()), end = kitTripEnd();
+    const all = QK().items(K, k), L = QK().shopList(K, k, t, shop.at, kitDishes(k)), end = kitTripEnd();
     /* the shop line (2026-10-20, d37): a Groceries block on now or earlier today (the one opened first) reads "Shopping today",
        never "no Groceries block" */
     const ob = isGroceries(S.block) ? { t:S.block.t, s:+new Date(S.block.s), e:+new Date(S.block.e) } : null, ft = x => fmtT(new Date(x));
@@ -3168,7 +3168,7 @@
   const kitFilled = new Set(), kitBlockKey = b => `${b.t}|${+b.s}`;
   function kitFillRows(S){
     const F = S.fill, shop = kitShop(S.k);
-    return QK().pickList(G.kitchen, S.k, F.use, now(), shop.at, kitDishes()).concat(F.extra);
+    return QK().pickList(G.kitchen, S.k, F.use, now(), shop.at, kitDishes(S.k)).concat(F.extra);
   }
   function kitFillOpen(S, use, names){
     S.fill = { use, on:new Set(), q:"", extra:[], amt:{} };

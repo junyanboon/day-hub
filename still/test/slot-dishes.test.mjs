@@ -155,7 +155,7 @@ test("d51 to d53 on the page: parts with swaps and Use something else, How to ma
   assert.match(body, /QI\(\)\.slotRows\(G\.kitchen, kitToday\(\), d, dishOn\(d\)\)/);
   assert.ok(body.includes("Use something else") && body.includes("data-dpk") && body.includes("data-dsl"));
   assert.ok(body.includes("How to make it") && body.includes("QM.stepsOf(d, use)") && body.includes("<ol>"));
-  assert.ok(body.includes("Full recipe:"));
+  assert.ok(body.includes("<b>Full recipe${"));
   assert.ok(/howTo\(d\) \+/.test(body), "every other dish (ideas, his own) has How to make it too");
   assert.match(body, /kitDinner\(k, d, [^;]*, amts\);/);
   const kd = html.slice(html.indexOf("function kitDinner("), html.indexOf("function kitEatToast("));
@@ -163,7 +163,7 @@ test("d51 to d53 on the page: parts with swaps and Use something else, How to ma
   const ed = html.slice(html.indexOf("function openDishEdit("), html.indexOf("A walk, hike or other outdoor block"));
   assert.ok(ed.includes('id="deSteps"') && ed.includes("steps:S.steps"));
   assert.match(html, /r\.why === "none" \? "not in the kitchen"/);
-  for (const [f, v] of [["quest-meals", "d57"], ["quest-kitchen", "d59"], ["quest-ideas", "d61"]]) assert.match(html, new RegExp(`${f}\\.js\\?v=20261021${v}"`), f);
+  for (const [f, v] of [["quest-meals", "d57b"], ["quest-kitchen", "d59b"], ["quest-ideas", "d61"]]) assert.match(html, new RegExp(`${f}\\.js\\?v=20261021${v}"`), f);
   assert.match(body, /p\.rows\.filter\(r => r\.on \|\| r\.st !== "none"\)\.map\(r => r\.entry\)/, "Got everything skips foods marked none in the kitchen");
   assert.ok(!/[—–]/.test(body.match(/For 2 people\. Each part[^<]*/)[0]));
 });
@@ -192,6 +192,9 @@ test("d58: the travel versions: few parts, plants only, no garlic or onion, no o
   const parts = QI.slotRows(k, "travel", QM.dishOf("tnp"), []);
   assert.deepEqual(J(parts.map((p) => [p.id, p.rows[0].name, p.rows[0].st])), [["chia", "Chia seeds", "none"], ["milk", "Oat milk", "have"], ["berries", "Frozen berries", "have"], ["nut", "Mixed nuts", "have"]]);
   assert.equal(QI.slotRows(k, "travel", QM.dishOf("tsv"), [])[0].rows[0].st, "none");
+  // green beans are a vegetable, not the legume part
+  const gb = K.fill({}, "travel", [{ name: "Green beans", group: "Vegetables", shelf: "cool" }], at(-5), "bring").K;
+  assert.ok(K.missing(gb, "travel").some((x) => x.name === "Cooked lentils"));
   // ticks pay by parts and share the Blueprint dishes' daily cap with the full recipes
   const o = { mult: 1.5, dish: 6, dim: [1, 0.7], dishLimit: 2 };
   const t = QM.tick(null, QM.dishOf("tnp"), ["milk:Oat milk", "berries:Frozen berries"], o);
@@ -204,8 +207,10 @@ test("d58 on the page: the travel fridge shows the travel versions, the full rec
   assert.match(html, /const bpToday = \(\) => \(QM && QM\.dishesFor && QK\(\) \? QM\.dishesFor\(kitToday\(\)\) : QM \? QM\.DISHES : \[\]\);/);
   const i = html.indexOf("function openMeal(b)"), body = html.slice(i, html.indexOf("The meal sheet's kitchen parts"));
   assert.ok(body.includes("bps.map(d => dishCard(d))") && body.includes("dishGot(bps)"));
-  assert.ok(body.includes("Full recipe (at home):") && body.includes("QM.dishOf(d.full)"));
-  assert.match(html, /QM\.dishOf\(id, QM\.DISHES\.concat\(QM\.TRAVEL \|\| \[\]\)\)/);
+  assert.ok(body.includes('" (at home)"') && body.includes("(d.full && QM.dishOf(d.full)) || d"));
+  assert.match(html, /QM\.dishOf\(id, QM\.BLUEPRINT \|\| QM\.DISHES\)/);
+  // a list reads the dishes of the kitchen he is looking at, not the one in use today (review, 2026-10-21)
+  assert.ok(html.includes("QK().shopList(K, k, t, shop.at, kitDishes(k))") && html.includes("kitDishes(S.k))"));
 });
 
 test("d61: tonight's ideas are cooked gut-friendly: steamed or simmered, never roasted, baked or fried, at most 15 ml of oil", () => {

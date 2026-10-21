@@ -150,7 +150,7 @@
      every part is core: the travel list gets these few foods, never the full home recipes (d59). */
   const TRAVEL = [
     { id: "tsv", icon: "🥗", name: "Travel Super Veggie", full: "sv", travel: true, slots: [
-      { id: "legume", role: "Cooked lentils or beans, a jar", want: [["Cooked lentils", "400 g", ["Chickpeas", "White beans"], "\\b(lentils?|beans?|chickpeas?)\\b"]] },
+      { id: "legume", role: "Cooked lentils or beans, a jar", want: [["Cooked lentils", "400 g", ["Chickpeas", "White beans"], "\\b(lentils?|chickpeas?|(white|black|navy|kidney|pinto|cannellini|butter|borlotti|mung|adzuki) beans?)\\b"]] },
       { id: "greens", role: "Greens", want: [["Baby spinach", "200 g", ["Kale", "Frozen broccoli", "Broccoli"]]] },
       { id: "lemon", role: "Lemon", want: [["Lemons", "1", ["Limes"]]] },
       { id: "seeds", role: "Seeds", want: [["Hemp seeds", "4 tbsp", ["Pumpkin seeds", "Sunflower seeds"]]] },
@@ -266,7 +266,8 @@
      [ingredient names] }, and what the dish paid in rec.v["dish:<id>"] = ["b", paid]. So they save, sync and merge
      exactly as the tiles do (G.day.mealq, one record per meal). Ingredients are kept by name, so a later change to a list
      never ticks the wrong row. */
-  const ALL_DISHES = DISHES.concat(TRAVEL, IDEAS);
+  const BLUEPRINT = DISHES.concat(TRAVEL);   // the Blueprint dishes of both kitchens
+  const ALL_DISHES = BLUEPRINT.concat(IDEAS);
   /* a dish by id: the Blueprint dishes and the ideas, and (2026-10-21, d41) any idea of the kitchen-ideas pool
      (quest-ideas.js), so a meal ticked on an idea from another day still reads and holds its slot */
   const dishOf = (id, list) => (list || ALL_DISHES).find((d) => d.id === id)
@@ -320,7 +321,7 @@
      keeps the most it may pay (its max) on its paid record, so later ticks and unticks always use the same max and an
      untick takes back exactly what it paid; Clear frees the slot. opt: { mult, dish (the habit's value), dim (DIM),
      dishLimit (its daily limit), used (slots other dishes of its group hold today) }. */
-  const groupOf = (d) => (d && d.own ? "own" : DISHES.concat(TRAVEL).some((x) => x.id === d.id) ? "bp" : "idea");   // a travel version is a Blueprint dish (d58)
+  const groupOf = (d) => (d && d.own ? "own" : BLUEPRINT.some((x) => x.id === d.id) ? "bp" : "idea");   // a travel version is a Blueprint dish (d58)
   // the slots dishes of d's group hold today across G.day.mealq, leaving out d itself on meal k. A Blueprint tile ticked
   // before 2026-10-20 still holds a Blueprint slot.
   function slotsUsed(mealq, k, d) {
@@ -412,5 +413,5 @@
   const dishPaid = (rec, d) => (rec && rec.v && rec.v["dish:" + d.id] ? +rec.v["dish:" + d.id][1] || 0 : 0);
 
   root.QuestMeals = { PRANA_FOODS, PRANA_WAYS, TIPS, DRAINS, BODY, LEGACY_BODY, JUNK, ONEOF, FOOD_IDS, DRAIN_IDS, AUTO_NOTE,
-    DISH_VALUE, DISHES, TRAVEL, CORE, dishesFor, IDEAS, SLOTS, STEPS, isSlotDish, slotOf, entryName, entriesOf, filledOf, partsOf, stepsOf, SHORT, tileLabel, value, score, toggle, tally, tap, meterOf, dishOf, groupOf, slotsUsed, dishMax, capOf, dishPay, dishStatus, tick, dishPaid };
+    DISH_VALUE, DISHES, TRAVEL, BLUEPRINT, CORE, dishesFor, IDEAS, SLOTS, STEPS, isSlotDish, slotOf, entryName, entriesOf, filledOf, partsOf, stepsOf, SHORT, tileLabel, value, score, toggle, tally, tap, meterOf, dishOf, groupOf, slotsUsed, dishMax, capOf, dishPay, dishStatus, tick, dishPaid };
 })(typeof window !== "undefined" ? window : globalThis);
