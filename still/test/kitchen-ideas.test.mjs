@@ -159,7 +159,7 @@ test("d41: today's ticks do not shuffle the ideas while he cooks; what each show
 
 test("d41: an idea from another day still reads on its meal, holds its slot, and pays like the ideas did", () => {
   const r7 = QM.dishOf("r7");
-  assert.equal(r7 && r7.name, "Black lentils with roast cauliflower");
+  assert.equal(r7 && r7.name, "Black lentils with soft cauliflower");
   assert.equal(QM.groupOf(r7), "idea");
   const o = { mult: 1.5, dish: 6, dim: [1, 0.7], dishLimit: 2 };
   const t = QM.tick(null, r7, r7.items[0][0], o);
@@ -175,6 +175,6 @@ test("d41: the page loads quest-ideas.js and the meal sheet shows today's three 
   assert.match(html, /IT\.note \? `<p class="mq-serves mq-inote">/, "a short kitchen is said in words");
   assert.match(html, /<b>To buy:<\/b>/);
   // the shopping list's amounts follow today's ideas, and a dish by id finds any idea of the pool
-  assert.match(html, /const kitDishes = \(\) => QM \? QM\.DISHES\.concat\(ideasToday\(\)\.list\.filter\(d => !d\.own\)\) : \[\]/);
-  assert.match(html, /\|\| ideaById\(id\);/);
+  assert.match(html, /const kitDishes = kc => QM \? \(kc && QM\.dishesFor \? QM\.dishesFor\(kc\) : bpToday\(\)\)\.concat\(ideasToday\(\)\.list\.filter\(d => !d\.own\)\) : \[\]/);
+  assert.match(html, /\|\| ideaById\(id\)\n/);
 });

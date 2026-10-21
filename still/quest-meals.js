@@ -67,12 +67,14 @@
   const DISH_VALUE = 6;   // the "blueprint" habit's value in quest.html, used when the page passes none (opt.dish)
   /* 2026-10-21 (Junyan: "I currently only consume 350g of broccoli and cauliflower for the two of us"): Super Veggie's
      broccoli and cauliflower are 350 g together, 175 g each (was 500 g and 300 g). Points never depended on amounts, so
-     past meals keep what they paid. These amounts are what a tick takes off the kitchen (quest-kitchen.js eat). */
+     past meals keep what they paid. These amounts are what a tick takes off the kitchen (quest-kitchen.js eat).
+     2026-10-21 (Junyan, d57 "yes", his gut plan): the olive oil is 15 ml for the two of them (was 30 ml), drizzled on at the
+     end. He is prone to colitis, and oil and heavy fibre make it worse. */
   const DISHES = [
     { id: "sv", icon: "🥗", name: "Super Veggie", items: [
       ["Black lentils, dry", "90 g"], ["Broccoli", "175 g"], ["Cauliflower", "175 g"], ["Shiitake mushrooms", "100 g"],
       ["Fresh ginger, grated", "2 tbsp"], ["Lime", "1"], ["Ground cumin", "2 tsp"], ["Apple cider vinegar", "2 tbsp"],
-      ["Hemp seeds", "4 tbsp"], ["Extra virgin olive oil", "30 ml"]] },
+      ["Hemp seeds", "4 tbsp"], ["Extra virgin olive oil", "15 ml"]] },
     { id: "np", icon: "🍮", name: "Nutty Pudding", items: [
       ["Macadamia milk", "240 ml"], ["Macadamia nuts, ground", "4 tbsp"], ["Walnuts", "2 tbsp"], ["Brazil nuts", "2"],
       ["Chia seeds", "2 tbsp"], ["Ground flaxseed", "2 tbsp"], ["Sunflower lecithin", "2 tsp"], ["Cocoa powder", "2 tbsp"],
@@ -98,7 +100,7 @@
       { id: "acid", role: "Lime and vinegar", want: [["Lime", "1", ["Lemons"]], ["Apple cider vinegar", "2 tbsp", [], "vinegar"]] },
       { id: "spice", role: "Spice", want: [["Ground cumin", "2 tsp", ["Ground coriander", "Turmeric", "Smoked paprika", "Curry powder"]]] },
       { id: "seeds", role: "Seeds", want: [["Hemp seeds", "4 tbsp", ["Pumpkin seeds", "Sunflower seeds", "Ground flax"]]] },
-      { id: "oil", role: "Oil", want: [["Extra virgin olive oil", "30 ml", [], "\\boil\\b"]] },
+      { id: "oil", role: "Oil", want: [["Extra virgin olive oil", "15 ml", [], "\\boil\\b"]] },
     ],
     np: [
       { id: "milk", role: "Nut milk", want: [["Macadamia milk", "240 ml", ["Almond milk", "Cashew milk", "Oat milk", "Soy milk"], "(nut|seed|hemp|coconut) milk"]] },
@@ -122,7 +124,7 @@
       "Slice the {mushroom} and simmer in a splash of water until soft, about 5 min.",
       "Stir in the {ginger|spice} for the last minute.",
       "Put everything in a bowl and dress it with the {acid}.",
-      "Drizzle over the {oil}.",
+      "Drizzle over the {oil} at the end, 15 ml for the two of you (1 tbsp).",
       "Top with the {seeds} and eat it warm.",
     ],
     np: [
@@ -134,25 +136,65 @@
       "Top with the {berries}.",
     ],
   };
-  for (const d of DISHES) { d.slots = SLOTS[d.id]; d.steps = STEPS[d.id]; }
+  /* The core parts (Junyan, 2026-10-21, d59: "I can't have all of these ingredients on my grocery list ... we need something
+     manageable"): only these go on the shopping list by themselves when the kitchen has nothing for them
+     (QuestKitchen.missing). The minor extras (lecithin, cinnamon, cocoa, spices, vinegar, oil) never do; they are on the
+     list only when he has them and they run Low or Out, like any item. */
+  const CORE = { sv: ["greens", "legume", "mushroom"], np: ["berries", "milk", "nuts"] };
+  for (const d of DISHES) { d.slots = SLOTS[d.id]; d.steps = STEPS[d.id]; d.core = CORE[d.id]; }
+  /* The travel versions (Junyan, 2026-10-21, d58: "travel fridge will need its own recipes"). When the travel fridge is the
+     kitchen in use, the meal sheet shows these instead of the full recipes (dishesFor), with the full recipe still named
+     small (full: the home dish it stands for). A few parts of travel-easy foods (a cooked legume from a jar, greens that
+     wilt soft, lemon, seeds; chia, a nut or oat milk, berries, a nut), plants only, no garlic, onion or asafoetida, no oil,
+     every vegetable cooked soft. They pay and count like the Blueprint dishes (the same daily cap, by parts filled), and
+     every part is core: the travel list gets these few foods, never the full home recipes (d59). */
+  const TRAVEL = [
+    { id: "tsv", icon: "🥗", name: "Travel Super Veggie", full: "sv", travel: true, slots: [
+      { id: "legume", role: "Cooked lentils or beans, a jar", want: [["Cooked lentils", "400 g", ["Chickpeas", "White beans"], "\\b(lentils?|chickpeas?|(white|black|navy|kidney|pinto|cannellini|butter|borlotti|mung|adzuki) beans?)\\b"]] },
+      { id: "greens", role: "Greens", want: [["Baby spinach", "200 g", ["Kale", "Frozen broccoli", "Broccoli"]]] },
+      { id: "lemon", role: "Lemon", want: [["Lemons", "1", ["Limes"]]] },
+      { id: "seeds", role: "Seeds", want: [["Hemp seeds", "4 tbsp", ["Pumpkin seeds", "Sunflower seeds"]]] },
+    ], steps: [
+      "Rinse the {legume} and warm them in a pan with a splash of water, about 5 min.",
+      "Add the {greens} with a little more water, cover, and cook until very soft, 3 to 5 min.",
+      "Squeeze over the {lemon}.",
+      "Top with the {seeds} and eat it warm. No oil needed.",
+    ] },
+    { id: "tnp", icon: "🍮", name: "Travel Nutty Pudding", full: "np", travel: true, slots: [
+      { id: "chia", role: "Chia", want: [["Chia seeds", "4 tbsp", []]] },
+      { id: "milk", role: "Nut or oat milk", want: [["Almond milk", "400 ml", ["Macadamia milk", "Oat milk", "Cashew milk", "Soy milk"], "(nut|seed|hemp|coconut|oat|almond|soy|cashew|macadamia) milk"]] },
+      { id: "berries", role: "Berries", want: [["Blueberries", "150 g", ["Frozen berries", "Raspberries", "Strawberries", "Cherries"], "berr(y|ies)|cherr(y|ies)"]] },
+      { id: "nut", role: "A nut", want: [["Walnuts", "2 tbsp", ["Almonds", "Mixed nuts", "Macadamias", "Brazil nuts", "Pecans"], "\\bnuts?\\b"]] },
+    ], steps: [
+      "Stir the {chia} into the {milk}, then stir again after 2 min so it does not clump.",
+      "Let it sit at least 15 min, or overnight in the cool box, until thick (longer is gentler on the gut).",
+      "Top with the {berries} and the {nut}, chopped.",
+    ] },
+  ];
+  for (const d of TRAVEL) { d.items = d.slots.flatMap((s) => s.want.map((w) => [w[0], w[1]])); d.core = d.slots.map((s) => s.id); }
+  // the Blueprint dishes for kitchen k: the travel versions in the travel fridge, else the full recipes
+  const dishesFor = (k) => (k === "travel" ? TRAVEL : DISHES);
   /* Tonight's ideas, for 2 people. Since 2026-10-21 (d41) the page shows three a day picked from what is in the kitchen
      (quest-ideas.js, whose pool starts with these three, same ids); this list is what shows when that module is not
-     loaded. Ids must stay unique across the pool. */
+     loaded. Ids must stay unique across the pool.
+     2026-10-21 (Junyan, d61 "yes"): cooked the gut-friendly way, like Super Veggie. Vegetables are steamed or simmered until
+     soft, never roasted or fried, and the oil is at most 15 ml (1 tbsp) for the two of them, drizzled on at the end. The
+     ingredients are otherwise the same. */
   const IDEAS = [
-    { id: "r1", icon: "🫘", name: "Lentil bowl with roasted peppers", time: "35 min", items: [
+    { id: "r1", icon: "🫘", name: "Lentil bowl with soft peppers", time: "35 min", items: [
       ["Green or brown lentils, dry", "140 g"], ["Red peppers", "2"], ["Courgette", "1 medium"], ["Baby spinach", "100 g"],
-      ["Extra virgin olive oil", "30 ml"], ["Lemon", "1"], ["Ground cumin", "1 tsp"], ["Smoked paprika", "1 tsp"],
+      ["Extra virgin olive oil", "15 ml"], ["Lemon", "1"], ["Ground cumin", "1 tsp"], ["Smoked paprika", "1 tsp"],
       ["Fresh parsley", "20 g"], ["Almonds, soaked", "30 g"]],
-      how: "Simmer the lentils 20 min. Roast the peppers and courgette at 220°C for 25 min. Wilt the spinach into the hot lentils, then top with veg, lemon, oil, parsley and almonds." },
+      how: "Simmer the lentils 20 min with the cumin and paprika. Steam the sliced peppers and courgette until soft, about 10 min. Wilt the spinach into the hot lentils, then top with the veg, lemon, parsley and almonds. Drizzle the oil over at the end." },
     { id: "r2", icon: "🍲", name: "Chickpea and spinach stew", time: "30 min", items: [
       ["Chickpeas, cooked", "400 g"], ["Spinach", "200 g"], ["Tomatoes", "3 medium"], ["Carrot", "1"],
-      ["Extra virgin olive oil", "30 ml"], ["Smoked paprika", "1 tsp"], ["Ground cumin", "1 tsp"], ["Saffron", "a pinch"],
+      ["Extra virgin olive oil", "15 ml"], ["Smoked paprika", "1 tsp"], ["Ground cumin", "1 tsp"], ["Saffron", "a pinch"],
       ["Sherry vinegar", "1 tbsp"], ["Pumpkin seeds", "30 g"]],
-      how: "Soften the grated carrot in oil, add the spices and chopped tomatoes for 10 min, then the chickpeas and saffron for 10 more. Fold in the spinach, finish with vinegar and seeds." },
+      how: "Simmer the grated carrot in a splash of water for 5 min, add the spices and chopped tomatoes for 10 min, then the chickpeas and saffron for 10 more. Fold in the spinach until soft. Finish with vinegar and seeds, and drizzle the oil over at the end." },
     { id: "r3", icon: "🥦", name: "Quinoa, broccoli and white beans", time: "25 min", items: [
       ["Quinoa, dry", "150 g"], ["White beans, cooked", "300 g"], ["Broccoli", "400 g"], ["Rocket", "80 g"],
-      ["Cherry tomatoes", "150 g"], ["Tahini", "2 tbsp"], ["Lemon", "1"], ["Extra virgin olive oil", "30 ml"], ["Hemp seeds", "2 tbsp"]],
-      how: "Cook the quinoa 15 min. Steam the broccoli 5 min. Whisk tahini, lemon, oil and a little water. Toss everything with the beans, rocket and tomatoes, top with hemp seeds." },
+      ["Cherry tomatoes", "150 g"], ["Tahini", "2 tbsp"], ["Lemon", "1"], ["Extra virgin olive oil", "15 ml"], ["Hemp seeds", "2 tbsp"]],
+      how: "Cook the quinoa 15 min. Steam the broccoli until soft, about 8 min. Whisk the tahini, lemon and a little water. Toss everything with the warm beans, rocket and tomatoes, drizzle the oil over and top with hemp seeds." },
   ];
   const FOOD_IDS = PRANA_FOODS.map((x) => x[0]);
   const DRAIN_IDS = DRAINS.map((x) => x[0]);
@@ -224,7 +266,8 @@
      [ingredient names] }, and what the dish paid in rec.v["dish:<id>"] = ["b", paid]. So they save, sync and merge
      exactly as the tiles do (G.day.mealq, one record per meal). Ingredients are kept by name, so a later change to a list
      never ticks the wrong row. */
-  const ALL_DISHES = DISHES.concat(IDEAS);
+  const BLUEPRINT = DISHES.concat(TRAVEL);   // the Blueprint dishes of both kitchens
+  const ALL_DISHES = BLUEPRINT.concat(IDEAS);
   /* a dish by id: the Blueprint dishes and the ideas, and (2026-10-21, d41) any idea of the kitchen-ideas pool
      (quest-ideas.js), so a meal ticked on an idea from another day still reads and holds its slot */
   const dishOf = (id, list) => (list || ALL_DISHES).find((d) => d.id === id)
@@ -278,7 +321,7 @@
      keeps the most it may pay (its max) on its paid record, so later ticks and unticks always use the same max and an
      untick takes back exactly what it paid; Clear frees the slot. opt: { mult, dish (the habit's value), dim (DIM),
      dishLimit (its daily limit), used (slots other dishes of its group hold today) }. */
-  const groupOf = (d) => (d && d.own ? "own" : DISHES.some((x) => x.id === d.id) ? "bp" : "idea");
+  const groupOf = (d) => (d && d.own ? "own" : BLUEPRINT.some((x) => x.id === d.id) ? "bp" : "idea");   // a travel version is a Blueprint dish (d58)
   // the slots dishes of d's group hold today across G.day.mealq, leaving out d itself on meal k. A Blueprint tile ticked
   // before 2026-10-20 still holds a Blueprint slot.
   function slotsUsed(mealq, k, d) {
@@ -370,5 +413,5 @@
   const dishPaid = (rec, d) => (rec && rec.v && rec.v["dish:" + d.id] ? +rec.v["dish:" + d.id][1] || 0 : 0);
 
   root.QuestMeals = { PRANA_FOODS, PRANA_WAYS, TIPS, DRAINS, BODY, LEGACY_BODY, JUNK, ONEOF, FOOD_IDS, DRAIN_IDS, AUTO_NOTE,
-    DISH_VALUE, DISHES, IDEAS, SLOTS, STEPS, isSlotDish, slotOf, entryName, entriesOf, filledOf, partsOf, stepsOf, SHORT, tileLabel, value, score, toggle, tally, tap, meterOf, dishOf, groupOf, slotsUsed, dishMax, capOf, dishPay, dishStatus, tick, dishPaid };
+    DISH_VALUE, DISHES, TRAVEL, BLUEPRINT, CORE, dishesFor, IDEAS, SLOTS, STEPS, isSlotDish, slotOf, entryName, entriesOf, filledOf, partsOf, stepsOf, SHORT, tileLabel, value, score, toggle, tally, tap, meterOf, dishOf, groupOf, slotsUsed, dishMax, capOf, dishPay, dishStatus, tick, dishPaid };
 })(typeof window !== "undefined" ? window : globalThis);
