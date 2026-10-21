@@ -128,7 +128,7 @@ test("d74, d75 and no Got everything or Clear: the dish card ends with the searc
   assert.ok(!/>Got everything<|data-dall|data-dnone|>Clear</.test(card));
   const xr = html.slice(html.indexOf("const xResults = (d, text) =>"), html.indexOf("const extrasBlock = d =>"));
   assert.match(xr, /if \(!QK\(\) \|\| !t\) return "";/, "nothing listed until he types");
-  const xb = html.slice(html.indexOf("const extrasBlock = d =>"), html.indexOf("const slotCard = d =>"));
+  const xb = html.slice(html.indexOf("const xSearch = (d, aria) =>"), html.indexOf("const slotCard = d =>"));
   assert.match(xb, /<div data-xres="\$\{esc\(d\.id\)\}"><\/div>/, "the results start empty");
   assert.ok(!/mq-how/.test(xb + xr), "no helper text in the panel");
   // the points stay on the card header
