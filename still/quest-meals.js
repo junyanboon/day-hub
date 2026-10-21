@@ -12,7 +12,7 @@
          the Oura ring), never a tap.
    2026-10-20 (Junyan, d12 to d16, "Fill the Plate"):
      - How he ate is tips, not points (d15): the three PRANA_WAYS tiles left the sheet and their words became the "How to eat"
-       box (TIPS). PRANA_WAYS stays here only so a meal rated before today still names and takes back what it paid; those
+       box (TIPS; since d88 one tip on the meal block itself, tipFor). PRANA_WAYS stays here only so a meal rated before today still names and takes back what it paid; those
        past points stay. Leftover no longer takes back a "Freshly made" from before, since fresh can no longer be tapped.
      - Blueprint dishes (d13): Super Veggie and Nutty Pudding (DISHES) and tonight's three recipes for 2 people (IDEAS) are
        checklists. A dish pays body as its ingredients are ticked, its share of the Blueprint meal's value (6, times the
@@ -48,12 +48,23 @@
   // shorter words on the compact tiles (2026-10-20); the trends keep the full labels above
   const SHORT = { fveg: "Fresh veg, raw or just cooked", pnuts: "Nuts (soaked)", stale: "Leftover or reheated" };
   const tileLabel = (row) => SHORT[row[0]] || row[2];
-  // the "How to eat" box at the top of the meal (2026-10-20, d15): [icon, words]; tips, no points
+  /* How to eat (2026-10-20, d15): [icon, words, short line]; tips, no points. Since d88 (2026-10-21) they left the meal
+     sheet: ONE tip shows on the meal block itself (the Right now card), only while the meal is on or in the TIP_LEAD
+     before it starts. tipFor turns it by date and by which meal of the day it is, so the three meals of a day get three
+     different tips and each meal's tip changes the next day. */
   const TIPS = [
-    ["🌿", "Eat it fresh, within 1.5 hours of cooking."],
-    ["🙏", "Sit two minutes before the first bite, phone face down."],
-    ["🪶", "Stop before full. You should feel light 30 minutes after."],
+    ["🌿", "Eat it fresh, within 1.5 hours of cooking.", "eat it fresh, within 1.5 h of cooking"],
+    ["🙏", "Sit two minutes before the first bite, phone face down.", "sit two minutes first, phone face down"],
+    ["🪶", "Stop before full. You should feel light 30 minutes after.", "stop before full, feel light 30 min after"],
   ];
+  const TIP_LEAD = 10 * 60000;
+  // ymd "YYYY-MM-DD" (the meal's day), n = the meal's place among that day's meals (0 = first)
+  function tipFor(ymd, n){
+    const d = Math.floor(Date.parse(ymd + "T12:00:00Z") / 86400000);
+    const i = ((Number.isFinite(d) ? d : 0) + (n | 0)) % TIPS.length;
+    return TIPS[(i + TIPS.length) % TIPS.length];
+  }
+  const tipShows = (s, e, t) => +t >= +s - TIP_LEAD && +t < +e;
   // the body food tiles (2026-10-20, d16): the Blueprint dishes have their own checklists, and supplements, fermented
   // food and xylitol are on the water card, so those four left this list. Same values and daily limits as before.
   const BODY = ["protein", "legumes", "veg", "greens", "evoo", "nuts", "berries", "seeds"];
@@ -507,6 +518,6 @@
     return t;
   }
 
-  root.QuestMeals = { PRANA_FOODS, PRANA_WAYS, TIPS, DRAINS, BODY, LEGACY_BODY, JUNK, ONEOF, FOOD_IDS, DRAIN_IDS,
+  root.QuestMeals = { PRANA_FOODS, PRANA_WAYS, TIPS, TIP_LEAD, tipFor, tipShows, DRAINS, BODY, LEGACY_BODY, JUNK, ONEOF, FOOD_IDS, DRAIN_IDS,
     DISH_VALUE, DISHES, TRAVEL, BLUEPRINT, CORE, dishesFor, IDEAS, SLOTS, STEPS, isSlotDish, slotOf, entryName, extrasOf, addExtra, dropExtra, setExtraQ, xKey, entriesOf, filledOf, partsOf, stepsOf, SHORT, tileLabel, value, score, toggle, tally, tap, meterOf, dishOf, groupOf, pays, slotsUsed, dishMax, capOf, dishPay, dishStatus, tick, dishPaid, heldIds, pickOf, onMeal, setPick, AUTO_IDS, autoSync, handTap };
 })(typeof window !== "undefined" ? window : globalThis);

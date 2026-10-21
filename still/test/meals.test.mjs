@@ -232,13 +232,13 @@ test("an old meal record with fresh, light and attention still loads, names them
   assert.deepEqual(J(M.tally({ a: old })), { foods:1, drains:0 });
 });
 
-test("the meal sheet: a How to eat box, Blueprint dishes and tonight's ideas first, compact tiles, one-line headings", () => {
+test("the meal sheet: Blueprint dishes and tonight's ideas first, compact tiles, one-line headings (the tips left it, d88)", () => {
   const i = html.indexOf("function openMeal(b)"), body = html.slice(i, html.indexOf("A walk, hike or other outdoor block"));
-  assert.ok(body.includes("How to eat") && body.includes("QM.TIPS"));
+  assert.ok(!body.includes("How to eat") && !body.includes("QM.TIPS"), "d88: one tip on the meal block instead (meal-tip.test.mjs)");
   assert.ok(!/QM\.PRANA_WAYS\.map|How you ate|⏳ Sit with the food/.test(body), "the how-you-ate tiles and the old line are gone");
-  // one dish per meal (2026-10-21): the choices first (Blueprint, his dishes, recipes or ideas), the tips at the end
-  const d = body.indexOf('"Blueprint dishes"'), y = body.indexOf('"Your dishes"'), id = body.indexOf("Tonight's ideas · for 2 people"), t = body.indexOf("QM.TIPS");
-  assert.ok(d > 0 && y > d && id > y && t > id, "dishes, his dishes, ideas, then the tips");
+  // one dish per meal (2026-10-21): the choices first (Blueprint, his dishes, recipes or ideas), then the drains
+  const d = body.indexOf('"Blueprint dishes"'), y = body.indexOf('"Your dishes"'), id = body.indexOf("Tonight's ideas · for 2 people"), t = body.indexOf("Drains · lower prana");
+  assert.ok(d > 0 && y > d && id > y && t > id, "dishes, his dishes, ideas, then the drains");
   assert.ok(body.includes("QM.tick("), "the dish checklists pay through QuestMeals.tick");
   assert.ok(!/>Got everything<|>Clear</.test(body), "ticking part by part does the job (2026-10-21)");
   assert.ok(!/fill body \(Bryan Johnson\)/.test(body), "the long heading that wrapped is gone");
