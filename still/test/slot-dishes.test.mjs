@@ -209,6 +209,9 @@ test("d58 on the page: the travel fridge shows the travel versions, the full rec
   assert.ok(body.includes("bps.map(d => dishCard(d))") && body.includes("dishGot(bps)"));
   assert.ok(body.includes('" (at home)"') && body.includes("(d.full && QM.dishOf(d.full)) || d"));
   assert.match(html, /QM\.dishOf\(id, QM\.BLUEPRINT \|\| QM\.DISHES\)/);
+  // an empty kitchen shows the whole recipe's steps, not only the step that needs no part
+  assert.ok(body.includes("return Object.values(u).some(l => l.length) ? u : undefined;"));
+  assert.equal(QM.stepsOf(QM.dishOf("tnp"), undefined).length, 3);
   // a list reads the dishes of the kitchen he is looking at, not the one in use today (review, 2026-10-21)
   assert.ok(html.includes("QK().shopList(K, k, t, shop.at, kitDishes(k))") && html.includes("kitDishes(S.k))"));
 });

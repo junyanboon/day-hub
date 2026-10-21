@@ -2586,7 +2586,9 @@
     const slotMemo = new Map(), dishOn = d => (rec && rec.dish && Array.isArray(rec.dish[d.id]) ? rec.dish[d.id] : []);
     const slotParts = d => { if (!slotMemo.has(d.id)) slotMemo.set(d.id, QI().slotRows(G.kitchen, kitToday(), d, dishOn(d))); return slotMemo.get(d.id); };
     // what the steps name: what he ticked, else what each part shows from the kitchen ("Steam the kale")
-    const slotUse = d => Object.fromEntries(slotParts(d).map(p => [p.id, p.rows.filter(r => r.on || r.st !== "none").map(r => r.name)]));
+    // nothing ticked and nothing in the kitchen for any part (an empty travel fridge): the whole recipe, by its own names
+    const slotUse = d => { const u = Object.fromEntries(slotParts(d).map(p => [p.id, p.rows.filter(r => r.on || r.st !== "none").map(r => r.name)]));
+      return Object.values(u).some(l => l.length) ? u : undefined; };
     // "Use something else": what the kitchen in use has (not Out), less what the dish already uses
     const slotOthers = d => { const used = new Set(dishOn(d).map(e => QK().keyOf(QM.entryName(d, e))));
       return QK().items(G.kitchen, kitToday()).filter(x => x.lv !== 0 && !used.has(QK().keyOf(x.name))); };
