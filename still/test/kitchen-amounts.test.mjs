@@ -257,3 +257,38 @@ test("the page: take fields in the dishes, a From your kitchen card, amounts in 
   assert.match(html, /Mark ticked items as bought/);
   assert.match(html, /From your kitchen/);
 });
+
+test("review fixes: an untick after a shop still puts back; a shop after eating past 0 gives what he bought", () => {
+  let k = withBroc("350 g");
+  k = K.eat(k, "home", "lunch", { name: "Broccoli" }, true, at(1), "175 g").K;
+  k = K.fill(k, "home", [{ name: "Broccoli", item: "h:broccoli", amt: "500 g" }], at(2), "buy").K;
+  assert.equal(it(k, "h:broccoli").left, 675);
+  k = K.eat(k, "home", "lunch", { name: "Broccoli" }, false, at(3)).K;
+  assert.equal(it(k, "h:broccoli").left, 850, "the lunch tick before the shop comes back");
+  // ate 175 g of 100 g, then bought 500 g: 500 g, not 425 g
+  let o = withBroc("100 g");
+  o = K.eat(o, "home", "x", { name: "Broccoli" }, true, at(1), "175 g").K;
+  o = K.fill(o, "home", [{ name: "Broccoli", item: "h:broccoli", amt: "500 g" }], at(2), "buy").K;
+  assert.equal(it(o, "h:broccoli").left, 500);
+});
+
+test("review fixes: thousands, plain fractions, cherry tomatoes by weight, words kept on a restock", () => {
+  assert.deepEqual(J(K.qtyOf("1,000 g", "Oats")), { q: 1000, u: "g" });
+  assert.equal(K.amtOf("1,000 g"), "1000 g");
+  assert.equal(K.splitName("1,5kg rice").amt, "1.5 kg");
+  assert.equal(K.recipeIn("1/2 tsp", "g"), 1.5); assert.equal(K.recipeIn("1/2", ""), 0.5); assert.equal(K.recipeIn("1 1/2 tbsp", "g"), 15);
+  assert.equal(K.unitFor("Cherry tomatoes"), "g"); assert.equal(K.unitFor("Tomatoes"), "");
+  const lvl = K.setLevel({}, "h:honey", 1, at(0), "tap");
+  const f = K.fill(lvl, "home", [{ name: "Honey", item: "h:honey", amt: "a jar" }], at(1), "buy").K;
+  assert.equal(it(f, "h:honey").amt, "a jar"); assert.equal(it(f, "h:honey").lv, 3);
+});
+
+test("review fixes: an untick on one device beats an amount changed on the other's stale copy", () => {
+  const base = K.eat(withBroc("500 g"), "home", "m1", { name: "Broccoli" }, true, at(1), "175 g").K;
+  const a = K.eat(base, "home", "m1", { name: "Broccoli" }, false, at(3)).K;   // device A: untick
+  const b = K.setTake(base, "m1", 100, at(4));                                 // device B (had not seen it): a new amount
+  for (const m of [M.mergeKitchen(a, b), M.mergeKitchen(b, a)]) assert.equal(it(m, "h:broccoli").left, 500);
+  // on one device the change still lands
+  assert.equal(it(b, "h:broccoli").left, 400);
+  assert.equal(it(M.mergeKitchen(base, b), "h:broccoli").left, 400);
+});

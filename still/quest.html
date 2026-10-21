@@ -921,7 +921,7 @@
 <script src="quest-levels.js?v=20261016b"></script>
 <script src="quest-gymlog.js?v=20261019a"></script>
 <script src="quest-meals.js?v=20261021am"></script>
-<script src="quest-kitchen.js?v=20261021am"></script>
+<script src="quest-kitchen.js?v=20261021an"></script>
 <script src="quest-trends.js?v=20261019end3"></script>
 <script src="nvc-words.js?v=20261010a"></script>
 <script src="quest-fx.js?v=20261019x"></script>
@@ -2624,7 +2624,7 @@
       const d = QM.dishOf(id); if (!d) return;
       const fx = window.QuestFx, rect = bn.getBoundingClientRect(), cur = (G.day.mealq || {})[k];
       const r = QM.tick(cur && !cur.kind ? cur : null, d, how, dishOpt(k, d));
-      // the kitchen (d21, d28): each ingredient ticked steps its kitchen item down a level, an untick steps it back
+      // the kitchen (d44): each ingredient ticked takes its amount off its kitchen item (one with an amount), an untick puts it back
       kitDinner(k, d, (cur && !cur.kind && cur.dish && cur.dish[d.id]) || [], (r.rec.dish && r.rec.dish[d.id]) || []);
       r.ops.forEach(op => addEnergy("b", op.d, `${name}: ${d.name}${op.on ? "" : " (taken back)"}`, d.name, !!fx));
       // d18: a finished Super Veggie or Nutty Pudding is the Blueprint meal done today; unfinishing it counts it off
@@ -2687,8 +2687,13 @@
       const v = parseFloat(String(inp.value).replace(",", "."));
       const K2 = QK().setTake(G.kitchen, inp.dataset.take, isNaN(v) ? 0 : v, now());
       if (K2 === G.kitchen) return;
-      const tk = QK().taken(K2, inp.dataset.take);
-      kitSave(K2); if (tk) kitEatToast(K2, [tk.id]); redraw();
+      const tk = QK().taken(K2, inp.dataset.take), it = tk && QK().item(K2, tk.id);
+      kitSave(K2); if (tk) kitEatToast(K2, [tk.id]);
+      /* no redraw: the change fires on the blur of the tap that comes next, and a redraw would swallow that tap. Only the
+         "left" words change here (the next redraw draws the rest). */
+      const sm = inp.closest(".mq-take") && inp.closest(".mq-take").querySelector("small");
+      if (sm && it) sm.textContent = it.lv === 0 ? "none left" : `${it.amt} left`;
+      render();
     });
     sh.querySelectorAll("[data-kown]").forEach(bn => bn.onclick = () => {
       const id = bn.dataset.kown, key = kitEatKey(mk, "kitchen", id), on = !QK().taken(G.kitchen, key), it = QK().item(G.kitchen, id);

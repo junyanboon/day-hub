@@ -170,8 +170,10 @@
     return `${mult ? `${mult.replace(",", ".")} × ` : ""}${num.replace(",", ".")}${u ? ` ${u}` : ""}`;
   }
   // "400g navy beans" -> { name: "Navy beans", amt: "400 g" }; no amount -> { name (first letter capital), amt: "" }
+  // "1,000 g" is a thousand grams, "1,5 kg" one and a half (review fix, 2026-10-21)
+  const thou = (x) => String(x).replace(/(\d),(\d{3})(?!\d)/g, "$1$2");
   function splitName(raw) {
-    const s = String(raw || "").replace(/\s+/g, " ").trim();
+    const s = thou(String(raw || "").replace(/\s+/g, " ").trim());
     let m = LEAD.exec(s);
     /* the food must start with a letter ("2 % milk" stays whole), and a bare count with no unit only splits off a plural
        ("6 eggs", but not "5 spice", "3 bean salad" or "7 Up") */
@@ -189,7 +191,7 @@
      else grams. "Black pepper", "Coconut yogurt" or "Lemon juice" are not counted by the piece. */
   const COUNT_FOODS = /\b(bananas?|avocados?|limes?|lemons?|apples?|pears?|eggs?|oranges?|clementines?|mandarins?|kiwis?|peach(es)?|nectarines?|plums?|mangoe?s?|grapefruits?|pomegranates?|coconuts?|melons?|pineapples?|courgettes?|zucchinis?|cucumbers?|peppers?|aubergines?|eggplants?|onions?|tomato(es)?|carrots?|potato(es)?|leeks?|lettuces?)\b/i;
   const LIQUID = /\b(milk|juices?|oils?|vinegars?|kefir|kombucha|water|wine|beers?|syrup|sauce|drinks?|shots?)\b/i;
-  const NOT_PIECE = /\b(yogh?urts?|flakes|powder|paste|seeds?|flour|butter|dried|(black|white) pepper|peppercorns?|leaves|puree|passata)\b/i;
+  const NOT_PIECE = /\b(yogh?urts?|flakes|powder|paste|seeds?|flour|butter|dried|(black|white) pepper|peppercorns?|leaves|puree|passata|cherry tomato(es)?)\b/i;
   function unitFor(name) {
     const n = String(name || "");
     return LIQUID.test(n) ? "ml" : !NOT_PIECE.test(n) && COUNT_FOODS.test(n) ? "" : "g";
@@ -199,7 +201,7 @@
   const AMT_N = /^(?:(\d+(?:\.\d+)?)\s*[x×]\s*)?(\d+(?:\.\d+)?)\s*(kg|g|mg|ml|cl|dl|l|lbs?|oz)?$/i;
   const TO_BASE = { kg: [1000, "g"], g: [1, "g"], mg: [0.001, "g"], lb: [454, "g"], lbs: [454, "g"], oz: [28, "g"], l: [1000, "ml"], ml: [1, "ml"], cl: [10, "ml"], dl: [100, "ml"] };
   function qtyOf(text, name, uHint) {
-    const m = AMT_N.exec(String(text == null ? "" : text).replace(/,/g, ".").replace(/\s+/g, " ").trim());
+    const m = AMT_N.exec(thou(String(text == null ? "" : text)).replace(/,/g, ".").replace(/\s+/g, " ").trim());
     if (!m) return null;
     const n = +m[2] * (m[1] ? +m[1] : 1);
     if (!isFinite(n) || n < 0) return null;
@@ -220,10 +222,11 @@
   const FRAC = { "½": 0.5, "¼": 0.25, "¾": 0.75, "⅓": 1 / 3, "⅔": 2 / 3 };
   function recipeIn(amt, u) {
     const s = String(amt || "").trim().replace(/[½¼¾⅓⅔]/g, (c) => ` ${FRAC[c]}`).trim();
-    const m = /^(\d+(?:\.\d+)?)?\s*(?:(\d+(?:\.\d+)?)\s*\/\s*(\d+))?\s*(\d*\.\d+)?\s*(kg|g|ml|l|tbsp|tsp|medium|large|small)?\b/i.exec(s);
-    if (!m || (m[1] == null && m[2] == null && m[4] == null)) return null;
-    const n = (m[1] != null ? +m[1] : 0) + (m[2] != null ? +m[2] / +m[3] : 0) + (m[4] != null ? +m[4] : 0);
-    const unit = (m[5] || "").toLowerCase();
+    // "2", "1.5", "1/2", "1 1/2", "0.5" (from ½), then the unit
+    const m = /^(?:(\d+(?:\.\d+)?)\s+(?=\d+\s*\/))?(?:(\d+)\s*\/\s*(\d+)|(\d+(?:\.\d+)?)(?:\s+(0\.\d+))?)\s*(kg|g|ml|l|tbsp|tsp|medium|large|small)?(?![a-z])/i.exec(s);
+    if (!m) return null;
+    const n = (m[1] != null ? +m[1] : 0) + (m[2] != null ? +m[2] / +m[3] : 0) + (m[4] != null ? +m[4] : 0) + (m[5] != null ? +m[5] : 0);
+    const unit = (m[6] || "").toLowerCase();
     if (!n) return null;
     if (unit === "kg" || unit === "g") return u === "g" || u === "ml" ? n * (unit === "kg" ? 1000 : 1) : null;
     if (unit === "l" || unit === "ml") return u === "g" || u === "ml" ? n * (unit === "l" ? 1000 : 1) : null;
@@ -233,7 +236,7 @@
   }
   // what he types in Edit's Amount field: "400g" -> "400 g"; anything else is kept as typed (short)
   function amtOf(s) {
-    const v = String(s == null ? "" : s).replace(/\s+/g, " ").trim(), m = AMT_ONLY.exec(v);
+    const v = thou(String(s == null ? "" : s).replace(/\s+/g, " ").trim()), m = AMT_ONLY.exec(v);
     return m ? fmtUnit(m[1], m[2], m[3]) : v.slice(0, 20);
   }
   const shelfOf = (k, id) => (KITCHENS[k] ? KITCHENS[k].shelves.find((s) => s.id === id) : null) || null;
@@ -297,7 +300,7 @@
     const left = Math.max(0, Math.round((it.q - eaten) * 10) / 10), buy = it.buy, per = perMeal(it);
     const low = per ? 2 * per : buy / 4;
     const lv = left <= 0 ? 0 : left < low ? 1 : left >= (buy * 2) / 3 ? 3 : 2;
-    return { ...it, left, low, per, eats, lv, amt: fmtQ(left, it.u) };
+    return { ...it, left, eaten, low, per, eats, lv, amt: fmtQ(left, it.u) };
   }
   // every item of the kitchen, the catalogue under what he changed, deleted ones left out, in shelf then catalogue order
   function items(K, k) {
@@ -325,7 +328,7 @@
     const out = clone(K);
     out.items = obj(out.items);
     // left, low, per and eats are only worked out (withLeft), never stored
-    const { seed, left, low, per, eats, ...rest } = it;
+    const { seed, left, eaten, low, per, eats, ...rest } = it;
     // an icon that is only what iconFor gives (or the old 🛒) is not stored, so a group change can change it (d38)
     if (!ownIcon(rest.em) || (typeof rest.name === "string" && rest.em === iconFor(rest.name, rest.group))) delete rest.em;
     // an amount item stores its base amount (q at qt), and amt as its text, so a page from before still shows a number
@@ -396,10 +399,15 @@
     const p = amount && typeof amount === "object" ? amount : amount ? qtyOf(amtOf(amount), it.name, hasQ(it0) ? it0.u : undefined) : null;
     if (hasQ(it0)) {
       const same = p && p.u === it0.u, got = same ? p.q : p ? null : it0.buy;
-      // a different unit (he typed 4 for an item kept in grams): what he typed becomes the amount
-      const q = got == null ? p.q : it0.left + got, u = got == null ? p.u : it0.u;
-      out = put(out, { ...it, q, u, qt: iso(at), buy: got == null ? p.q : got || it0.buy }, at);
-    } else if (p) out = put(out, { ...it, q: p.q, u: p.u, qt: iso(at), buy: p.q }, at);
+      if (got == null) out = put(out, { ...it, q: p.q, u: p.u, qt: iso(at), rt: iso(at), buy: p.q }, at);   // a new unit: what he typed is the amount
+      else {
+        /* the base grows by what he got, from the same qt, so a meal ticked before the shop still counts and its untick
+           still puts it back; what meals took past 0 is folded in first, so he has exactly what he bought on top of 0 */
+        const over = Math.max(0, it0.eaten - it0.q);
+        out = put(out, { ...it, q: it0.q + over + got, rt: iso(at), buy: got || it0.buy }, at);
+      }
+    } else if (p) out = put(out, { ...it, q: p.q, u: p.u, qt: iso(at), rt: iso(at), buy: p.q }, at);
+    else if (typeof amount === "string" && amtOf(amount)) out = put(out, { ...it, amt: amtOf(amount) }, at);   // words ("a jar"), as d39 kept them
     return out;
   }
 
@@ -709,8 +717,8 @@
       const was = u.prev[id];
       if (!was) { out = remove(out, id, at); continue; }
       const cur = item(out, id) || was;
-      // an amount item's level is worked out, so it is "from this fill" when its amount was set by it (qt)
-      if (ms(cur.since) !== ms(u.t) || (hasQ(cur) ? ms(cur.qt) !== ms(u.t) : cur.lv !== 3)) continue;
+      // an amount item's level is worked out, so it is "from this fill" when this fill restocked it last (rt)
+      if (ms(cur.since) !== ms(u.t) || (hasQ(cur) ? ms(cur.rt) !== ms(u.t) : cur.lv !== 3)) continue;
       const hist = arr(cur.hist).map((h) => (ms(h[0]) === ms(u.t) && h[2] === u.src ? [h[0], h[1], u.src + "-off"] : h));
       out = put(out, { ...was, hist }, at);
       const tk = u.ticks[id];
@@ -782,7 +790,9 @@
     const rec = obj(obj(K).used)[key], v = Math.max(0, Math.round((+q || 0) * 10) / 10);
     if (!rec || rec.off || typeof rec.q !== "number" || !isFinite(v) || v === rec.q) return K;
     const out = clone(K);
-    out.used = { ...obj(out.used), [key]: { ...rec, q: v, at: iso(at) } };
+    /* stamped just after the record's last change, not now: the merge keeps the later change per key, so an untick made
+       on the other device after this tick still wins over an amount changed here on a copy that had not seen it */
+    out.used = { ...obj(out.used), [key]: { ...rec, q: v, at: iso(ms(rec.at) + 1) } };
     return out;
   }
   // a tick's take-off record, when it is on and has an amount, else null
@@ -917,5 +927,5 @@
 
   root.QuestKitchen = { NEED, LEVELS, KITCHENS, SEED, FRESH, DEFAULT_SHOP, GROUP_NAMES, GROUP_ICONS, keyOf, iconFor, groupIcon, splitName, amtOf, tileLine, guessGroup, guessShelf,
     items, item, grouped, setLevel, nextLevel, tap, add, rename, move, place, remove, status, shows, pace, lowAt, lowSoon, turnAt, useFirst, nextShop, parseAmt, usesOf, amountFor,
-    shopList, tick, buyTicked, unitFor, qtyOf, fmtQ, recipeIn, perMeal, setAmount, restock, rateOf, toBuy, eat, setTake, taken, portion, TRAVEL_STARTER, pickList, preTick, fill, unfill, shopInfo, shopWhen, shopUpto, match, dinner, active, pick, noteActive, tripEnd, bringHome, dayWord, counts };
+    shopList, tick, buyTicked, hasQ, unitFor, qtyOf, fmtQ, recipeIn, perMeal, setAmount, restock, rateOf, toBuy, eat, setTake, taken, portion, TRAVEL_STARTER, pickList, preTick, fill, unfill, shopInfo, shopWhen, shopUpto, match, dinner, active, pick, noteActive, tripEnd, bringHome, dayWord, counts };
 })(typeof window !== "undefined" ? window : globalThis);
