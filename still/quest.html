@@ -590,6 +590,20 @@
   .mq-mini.go { background:#5fd3c4; border-color:#5fd3c4; color:#0e2f2a; }
   .mq-dst { margin-left:auto; font-size:12px; color:var(--ink-soft); } .mq-dst.ok { color:#8fe3b0; font-weight:700; }
   .mq-dbtn:focus-visible, .mq-ing:focus-visible, .mq-mini:focus-visible { outline:2px solid #5fd3c4; outline-offset:2px; }
+  /* his own dishes (d48): "+ New dish" under them, and the dish editor */
+  .mq-new { align-self:flex-start; border-style:dashed; }
+  .de-top { display:flex; gap:10px; align-items:center; margin:10px 0 4px; }
+  .de-ic { width:48px; height:48px; flex:none; border-radius:14px; background:var(--glass); border:1px solid var(--glass-border); display:grid; place-items:center; font-size:26px; }
+  .sheet input.de-name { flex:1; min-width:0; margin:0; }
+  .de-chips { display:flex; flex-wrap:wrap; gap:5px; margin:4px 0 8px; }
+  .de-chip { width:36px; height:36px; border-radius:10px; background:var(--glass); border:1px solid transparent; font-size:19px; }
+  .de-chip[aria-pressed="true"] { border-color:#5fd3c4; background:rgba(95,211,196,.18); }
+  .de-foods { display:flex; flex-direction:column; gap:5px; margin:6px 0; }
+  .de-row { display:flex; align-items:center; gap:8px; padding:5px 8px 5px 10px; border-radius:12px; background:var(--glass); }
+  .de-row .n { flex:1; min-width:0; font-size:14px; } .sheet .de-row input.mq-tq { width:96px; text-align:left; }
+  .de-x { flex:none; width:30px; height:30px; border-radius:9px; background:rgba(0,0,0,.2); color:var(--ink-soft); }
+  .de-empty { font-size:13px; color:var(--ink-soft); margin:4px 2px; }
+  .btn.de-del { color:#ff9c9c; }
   /* the kitchen (2026-10-20, d25 to d30): the Kitchen card under the water card, and its sheet. Levels: Plenty green, Half
      lime, Low gold, Out soft red, not checked yet grey and dashed. */
   .kq { width:100%; text-align:left; color:var(--ink); font:inherit; cursor:pointer; }
@@ -916,12 +930,12 @@
 </style>
 <script src="keeps.js?v=20261009k"></script>
 <script src="bag.js?v=20261019a"></script>
-<script src="quest-merge.js?v=20261020k1"></script>
+<script src="quest-merge.js?v=20261021d48"></script>
 <script src="quest-oura.js?v=20261019a"></script>
 <script src="quest-levels.js?v=20261016b"></script>
 <script src="quest-gymlog.js?v=20261019a"></script>
-<script src="quest-meals.js?v=20261021am"></script>
-<script src="quest-kitchen.js?v=20261021an"></script>
+<script src="quest-meals.js?v=20261021d48b"></script>
+<script src="quest-kitchen.js?v=20261021d48b"></script>
 <script src="quest-trends.js?v=20261019end3"></script>
 <script src="nvc-words.js?v=20261010a"></script>
 <script src="quest-fx.js?v=20261019x"></script>
@@ -2536,6 +2550,7 @@
   function openMeal(b){
     if (!b) return;
     const all = blocks(), k = gk(b), name = shortName(b), q = (G.day.mealq || {})[k] || null, rec = q && !q.kind ? q : null;
+    const own = mealOwn(rec);
     const sel = new Set(rec && Array.isArray(rec.sel) ? rec.sel : []), paid = (rec && rec.v) || {};
     const warn = mealWarn(b, all), lastFood = lastMealBefore(b.s, all), o = mqOpt();
     const sign = v => v > 0 ? `+${v}` : `${v}`;
@@ -2548,19 +2563,25 @@
     const dishGot = list => list.reduce((a, d) => a + QM.dishPaid(rec, d), 0);
     const lb = (txt, cls, n) => `<div class="win-lb mq-lb ${cls}"><span>${esc(txt)}</span>${n ? `<b>${sign(n)}</b>` : ""}</div>`;
     const dishCard = d => {
-      const st = QM.dishStatus(rec, d), open = mqOpen.has(k + "|" + d.id), pd = QM.dishPaid(rec, d), on = new Set(st.n ? rec.dish[d.id] : []);
+      const st = QM.dishStatus(rec, d), open = mqOpen.has(k + "|" + d.id), pd = QM.dishPaid(rec, d), on = new Set(rec && rec.dish && Array.isArray(rec.dish[d.id]) ? rec.dish[d.id] : []);
       const max = QM.capOf(rec, d, dishOpt(k, d));   // its kept max once started, else what a start now gets (0: the day's cap is reached)
       return `<div class="mq-dish${open ? " open" : ""}${st.all ? " done" : ""}">` +
-        `<button type="button" class="mq-dbtn" data-dopen="${d.id}" aria-expanded="${open}"><span class="mq-de">${d.icon}</span>` +
+        `<button type="button" class="mq-dbtn" data-dopen="${esc(d.id)}" aria-expanded="${open}"><span class="mq-de">${esc(d.icon)}</span>` +
         `<span class="mq-dn"><b>${esc(d.name)}</b><small>${st.n ? `${st.n} of ${st.m} ingredients` : `${st.m} ingredients · tap to open`}${d.time ? ` · ${esc(d.time)}` : ""}</small></span>` +
-        `<span class="mq-dp">${pd ? sign(pd) : max ? `<small>up to</small> +${max}` : `<small>full for today</small>`}</span></button>` +
+        `<span class="mq-dp">${d.own ? `<small>${d.del ? "deleted" : "your dish"}</small>` : pd ? sign(pd) : max ? `<small>up to</small> +${max}` : `<small>full for today</small>`}</span></button>` +
         `<i class="mq-dbar"><b style="width:${st.pct}%"></b></i>` +
-        (open ? `<div class="mq-dlist"><p class="mq-serves">For 2 people${d.time ? ` · ${esc(d.time)}` : ""}. Tick what went in; what you tick comes off the kitchen, and you can change how much.</p>` +
+        (open ? `<div class="mq-dlist"><p class="mq-serves">${d.own ? "Your usual amounts. Tick what went in; it comes off the kitchen, and you can change how much. Your dishes earn no points of their own: tap the food tiles below for those."
+          : `For 2 people${d.time ? ` · ${esc(d.time)}` : ""}. Tick what went in; what you tick comes off the kitchen, and you can change how much.`}</p>` +
           `<div class="mq-ings">${d.items.map(([n, amt], i) => kitTakeWrap(on.has(n) ? kitEatKey(k, d.id, n) : null,
-            `<button type="button" class="mq-ing" data-ding="${d.id}" data-i="${i}" aria-pressed="${on.has(n)}">` +
-            `<span class="bx"></span><span class="n">${esc(n)}</span><span class="qty">${esc(amt)}</span></button>`)).join("")}</div>` +
+            `<button type="button" class="mq-ing" data-ding="${esc(d.id)}" data-i="${i}" aria-pressed="${on.has(n)}">` +
+            `<span class="bx"></span><span class="n">${esc(n)}</span><span class="qty">${esc(amt)}</span></button>`)).join("")}` +
+          // d48: a food taken out of his dish since this meal ticked it still shows here, so he can untick it
+          (d.own ? [...on].filter(n => !d.items.some(x => x[0] === n)).map(n => kitTakeWrap(kitEatKey(k, d.id, n),
+            `<button type="button" class="mq-ing" data-dname="${esc(n)}" data-did="${esc(d.id)}" aria-pressed="true">` +
+            `<span class="bx"></span><span class="n">${esc(n)}</span><span class="qty">not in the dish now</span></button>`)).join("") : "") + `</div>` +
           (d.how ? `<p class="mq-how">${esc(d.how)}</p>` : "") +
-          `<div class="mq-drow"><button type="button" class="mq-mini go" data-dall="${d.id}">Got everything</button><button type="button" class="mq-mini" data-dnone="${d.id}">Clear</button>` +
+          `<div class="mq-drow"><button type="button" class="mq-mini go" data-dall="${esc(d.id)}">Got everything</button><button type="button" class="mq-mini" data-dnone="${esc(d.id)}">Clear</button>` +
+          (d.own && !d.del ? `<button type="button" class="mq-mini" data-dedit="${esc(d.id)}">Edit</button>` : "") +
           `<span class="mq-dst${st.all ? " ok" : ""}">${esc(st.text)}</span></div></div>` : "") +
         `</div>`;
     };
@@ -2570,6 +2591,8 @@
       <div class="mq-tips"><div class="mq-tl">How to eat</div>${QM.TIPS.map(([i, t]) => `<p><span>${i}</span>${esc(t)}</p>`).join("")}</div>
       ${lb("Blueprint dishes", "mb", dishGot(QM.DISHES))}
       <div class="mq-dishes">${QM.DISHES.map(dishCard).join("")}</div>
+      ${QK() ? `<div class="mq-sub mq-subl"><span>Your dishes</span></div>
+      <div class="mq-dishes">${own.map(dishCard).join("")}<button type="button" class="mq-mini mq-new" data-dnew>+ New dish</button></div>` : ""}
       <div class="mq-sub mq-subl"><span>Tonight's ideas · for 2 people</span>${dishGot(QM.IDEAS) ? `<b>${sign(dishGot(QM.IDEAS))}</b>` : ""}</div>
       <div class="mq-dishes">${QM.IDEAS.map(dishCard).join("")}</div>
       ${kitMealCard(k)}
@@ -2621,7 +2644,7 @@
     });
     // tick an ingredient, Got everything, or Clear: the dish pays (or takes back) the difference
     const dishTap = (bn, id, how, popSel) => {
-      const d = QM.dishOf(id); if (!d) return;
+      const d = dishById(id); if (!d) return;
       const fx = window.QuestFx, rect = bn.getBoundingClientRect(), cur = (G.day.mealq || {})[k];
       const r = QM.tick(cur && !cur.kind ? cur : null, d, how, dishOpt(k, d));
       // the kitchen (d44): each ingredient ticked takes its amount off its kitchen item (one with an amount), an untick puts it back
@@ -2641,13 +2664,17 @@
       if (fx && popSel) fx.pop(sh.querySelector(popSel));
     };
     sh.querySelectorAll("[data-ding]").forEach(bn => bn.onclick = () => {
-      const d = QM.dishOf(bn.dataset.ding), it = d && d.items[+bn.dataset.i]; if (!it) return;
+      const d = dishById(bn.dataset.ding), it = d && d.items[+bn.dataset.i]; if (!it) return;
       dishTap(bn, d.id, it[0], `[data-ding="${d.id}"][data-i="${bn.dataset.i}"]`);
     });
     sh.querySelectorAll("[data-dall]").forEach(bn => bn.onclick = () => dishTap(bn, bn.dataset.dall, "all"));
+    sh.querySelectorAll("[data-dname]").forEach(bn => bn.onclick = () => dishTap(bn, bn.dataset.did, bn.dataset.dname));
     // the kitchen (d44, d47): how much a tick took, and "From your kitchen" ticks
-    kitMealBind(sh, k, redraw);
+    kitMealBind(sh, k, redraw, b);
     sh.querySelectorAll("[data-dnone]").forEach(bn => bn.onclick = () => dishTap(bn, bn.dataset.dnone, "none"));
+    // his own dishes (d48): New dish and Edit open the dish editor, which comes back here
+    sh.querySelectorAll("[data-dnew]").forEach(bn => bn.onclick = () => openDishEdit(b, dishNew()));
+    sh.querySelectorAll("[data-dedit]").forEach(bn => bn.onclick = () => { const d = QK().ownDish(G.kitchen, bn.dataset.dedit); if (d && !d.del) openDishEdit(b, dishNew(d)); });
     $("mEdit").onclick = () => openEdit(b);
   }
 
@@ -2677,12 +2704,18 @@
       `<span class="mq-dn"><b>Anything else from the kitchen</b><small>${mine.size ? `${mine.size} ticked` : list.length ? `${list.length} with an amount · tap to open` : "nothing with an amount yet"}</small></span></button>` +
       (open ? `<div class="mq-dlist">` + (list.length
         ? `<p class="mq-serves">Tick what else went in, like a swap or a banana. It comes off what you have; change how much if you need to.</p>` +
-          QK().grouped(list).map(g => `<p class="kt-gh">${esc(g.group)}</p><div class="mq-ings">${g.list.map(row).join("")}</div>`).join("")
+          QK().grouped(list).map(g => `<p class="kt-gh">${esc(g.group)}</p><div class="mq-ings">${g.list.map(row).join("")}</div>`).join("") +
+          (mine.size ? `<div class="mq-drow"><button type="button" class="mq-mini go" data-ksave>Save as a dish</button><span class="mq-dst">Your ticks and amounts become a dish of your own.</span></div>` : "")
         : `<p class="mq-serves">Nothing in the ${esc(kn.name.toLowerCase())} has an amount yet. Give an item an amount on its Edit page in the Kitchen, or when you add or buy it, and it shows here.</p>`) +
         `</div>` : "") + `</div></div>`;
   }
-  function kitMealBind(sh, mk, redraw){
+  function kitMealBind(sh, mk, redraw, b){
     if (!QK()) return;
+    // "Save as a dish" (d48): this meal's kitchen ticks and what each took, in the dish editor, which asks for a name
+    sh.querySelectorAll("[data-ksave]").forEach(bn => bn.onclick = () => {
+      const foods = QK().kitchenFoods(G.kitchen, kitEatKey(mk, "kitchen", ""));
+      if (foods.length && b) openDishEdit(b, { ...dishNew(), foods:foods.map(([name, amt]) => ({ name, amt })), from:"kitchen" });
+    });
     sh.querySelectorAll("[data-take]").forEach(inp => inp.onchange = () => {
       const v = parseFloat(String(inp.value).replace(",", "."));
       const K2 = QK().setTake(G.kitchen, inp.dataset.take, isNaN(v) ? 0 : v, now());
@@ -2702,6 +2735,111 @@
       if (r.K === G.kitchen) return;
       kitSave(r.K); if (r.id) kitEatToast(r.K, [r.id]); redraw();
     });
+  }
+  /* ---------- his own dishes (Junyan, 2026-10-21, d48: "I need a create a dish where I can just click on it and then
+     indicate which food items I used and how much") ----------
+     Kept in G.kitchen.dishes (QuestKitchen.saveDish, merged per dish by QuestMerge.mergeKitchen). In every meal sheet they
+     sit under the Blueprint dishes as "Your dishes" and work like them: tap to open, tick what went in (it comes off the
+     kitchen in use, an untick puts it back, the same tick records as d44), change how much each took. They pay no points
+     of their own (QuestMeals.tick): the food tiles pay, so a dish of his never pays the Blueprint dish value.
+     The editor (New dish, Edit, or "Save as a dish" from this meal's kitchen ticks): a name, an icon (guessed, changeable),
+     and foods picked from the kitchen with a search (or typed), each with a usual amount read like the kitchen reads one.
+     Delete hides the dish; meals already logged keep it and the kitchen keeps what they took. */
+  const allDishes = () => kitDishes().concat(QK() ? QK().ownDishes(G.kitchen) : []);
+  // a dish by id: the Blueprint dishes, tonight's ideas and his own, a deleted one of his too (a meal logged with it)
+  const dishById = id => allDishes().find(d => d.id === id) || (QK() ? QK().ownDish(G.kitchen, id) : null);
+  // his dishes for this meal: the live ones, then any deleted one this meal has ticks on
+  function mealOwn(rec){
+    if (!QK()) return [];
+    const live = QK().ownDishes(G.kitchen), ids = new Set(live.map(d => d.id));
+    const gone = Object.keys((rec && rec.dish) || {}).filter(id => !ids.has(id)).map(id => QK().ownDish(G.kitchen, id)).filter(d => d && d.del);
+    return live.concat(gone);
+  }
+  const DISH_CHIPS = ["🍝", "🥗", "🍲", "🥣", "🍛", "🍜", "🌯", "🥘", "🍳", "🥙", "🫘", "🥦", "🍚", "🍽️"];
+  // the editor's state: { id (null for new), name, icon (his pick, else null: guessed), foods:[{ name, amt }], q, del }
+  const dishNew = d => ({ id:d ? d.id : null, name:d ? d.name : "", icon:d ? d.icon : null, foods:d ? d.items.map(([name, amt]) => ({ name, amt })) : [], q:"", del:false });
+  const dishGuess = S => QK().dishIcon(S.name, S.foods.map(f => [f.name]));
+  // the kitchen items he can pick: the kitchen in use first, then the other one, one per food, not already in the dish
+  function dishPool(S){
+    const kk = kitToday(), seen = new Set(S.foods.map(f => QK().keyOf(f.name))), out = [];
+    for (const k of [kk, kk === "home" ? "travel" : "home"]) for (const it of QK().items(G.kitchen, k)) {
+      const key = QK().keyOf(it.name); if (seen.has(key)) continue; seen.add(key); out.push(it);
+    }
+    return out;
+  }
+  function dishResults(S){
+    // "300g navy beans" looks for Navy beans, and the 300 g goes with it when he picks it
+    const sp = S.q.trim() ? QK().splitName(S.q.trim()) : null, q = sp ? sp.name.toLowerCase() : "", pool = dishPool(S);
+    const list = q ? pool.filter(x => x.name.toLowerCase().includes(q)) : pool.filter(x => typeof x.q === "number" && x.left > 0);
+    const row = x => `<button type="button" class="kt-li kt-pk" data-dpick="${esc(x.id)}"><span class="e">${esc(x.em)}</span>` +
+      `<span class="n">${esc(x.name)}<small>${typeof x.q === "number" ? `${esc(x.amt)} left` : "in the kitchen"}</small></span><span class="q">+ Add</span></button>`;
+    const exact = sp && list.some(x => x.name.toLowerCase() === q);
+    return (q ? "" : list.length ? `<p class="kt-gh">In your kitchen now</p>` : `<p class="de-empty">Type a food to find it in your kitchen.</p>`) +
+      (list.length ? `<div class="kt-list">${list.slice(0, 30).map(row).join("")}</div>` : q ? `<p class="de-empty">Not in your kitchen.</p>` : "") +
+      (sp && sp.name && !exact ? `<div class="kt-list"><button type="button" class="kt-li kt-pk" data-dfree><span class="e">${esc(QK().iconFor(sp.name))}</span>` +
+        `<span class="n">Add “${esc(sp.name)}”<small>${sp.amt ? esc(sp.amt) + " · " : ""}not in the kitchen, nothing comes off</small></span><span class="q">+ Add</span></button></div>` : "");
+  }
+  function openDishEdit(b, S){
+    const icon = S.icon || dishGuess(S), chips = [...new Set([dishGuess(S), ...DISH_CHIPS])];
+    const ok = () => !!S.name.trim() && S.foods.length > 0;
+    openSheet(`<div class="win-hd"><div class="de-ic" id="deIc">${esc(icon)}</div><div><div class="tt">${S.id ? "Edit your dish" : "New dish"}</div>
+        <div class="sb">${S.from === "kitchen" ? "From this meal's kitchen ticks. Give it a name." : "Pick its foods and your usual amounts."}</div></div></div>
+      <div class="de-top"><input class="kt-q de-name" id="deName" placeholder="Name, like Navy bean pasta" maxlength="40" autocomplete="off" value="${esc(S.name)}"></div>
+      <div class="de-chips">${chips.map((c, i) => `<button type="button" class="de-chip" data-dic="${esc(c)}" aria-pressed="${c === icon}"${i ? "" : ' id="deGuess"'}>${esc(c)}</button>`).join("")}</div>
+      <div class="win-lb">Foods · usual amount</div>
+      <div class="de-foods">${S.foods.length ? S.foods.map((f, i) => `<div class="de-row"><span class="n">${esc(f.name)}</span>` +
+        `<input class="mq-tq" data-damt="${i}" value="${esc(f.amt)}" placeholder="e.g. 150 g" maxlength="20" autocomplete="off" aria-label="Usual amount of ${esc(f.name)}">` +
+        `<button type="button" class="de-x" data-drm="${i}" aria-label="Take ${esc(f.name)} out">✕</button></div>`).join("")
+        : `<p class="de-empty">No foods yet. Find them below.</p>`}</div>
+      <div class="kt-tools"><input class="kt-q" id="deQ" type="search" placeholder="Find a food, or type one (300g navy beans)" autocomplete="off" value="${esc(S.q)}"></div>
+      <div id="deRes">${dishResults(S)}</div>
+      <div class="actions">${S.id ? `<button class="btn ghost de-del" id="deDel">${S.del ? "Tap again to delete" : "Delete dish"}</button>` : ""}
+        <button class="btn ghost" id="deBack">Back</button><button class="btn primary" id="deSave"${ok() ? "" : " disabled"}>Save dish</button></div>`, true);
+    // any other change disarms Delete, so only two taps in a row delete
+    const sh = $("sheet"), again = () => { S.del = false; const top = sh.scrollTop; openDishEdit(b, S); sh.scrollTop = top; };
+    const back = () => { openMeal(b); render(); };   // back to the meal sheet
+    const okBtn = () => { $("deSave").disabled = !ok(); };
+    $("deName").oninput = e => {
+      S.name = e.target.value; okBtn();
+      if (!S.icon) { const g = dishGuess(S); $("deIc").textContent = g; const gb = $("deGuess"); if (gb) { gb.textContent = g; gb.dataset.dic = g; } }
+    };
+    sh.querySelectorAll("[data-dic]").forEach(bn => bn.onclick = () => { S.icon = bn.dataset.dic; again(); });
+    sh.querySelectorAll("[data-damt]").forEach(inp => inp.oninput = () => { S.foods[+inp.dataset.damt].amt = inp.value; });
+    sh.querySelectorAll("[data-drm]").forEach(bn => bn.onclick = () => { S.foods.splice(+bn.dataset.drm, 1); again(); });
+    const bindRes = () => {
+      sh.querySelectorAll("[data-dpick]").forEach(bn => bn.onclick = () => {
+        const it = QK().item(G.kitchen, bn.dataset.dpick); if (!it) return;
+        const typed = S.q.trim() ? QK().splitName(S.q.trim()).amt : "", p = QK().serving(it);
+        S.foods.push({ name:it.name, amt:typed || (p ? QK().fmtQ(p, it.u) : "") }); S.q = ""; again();
+      });
+      sh.querySelectorAll("[data-dfree]").forEach(bn => bn.onclick = () => {
+        const sp = QK().splitName(S.q.trim()); if (!sp.name) return;
+        S.foods.push({ name:sp.name, amt:sp.amt }); S.q = ""; again();
+      });
+    };
+    bindRes();
+    // the results redraw on their own while he types, so the box keeps focus
+    $("deQ").oninput = e => { S.q = e.target.value; $("deRes").innerHTML = dishResults(S); bindRes(); };
+    $("deBack").onclick = back;
+    $("deSave").onclick = () => {
+      if (!ok()) return;
+      const r = QK().saveDish(G.kitchen, { id:S.id, name:S.name, icon:S.icon, items:S.foods.map(f => [f.name, f.amt]) }, now());
+      if (!r.id) return;
+      kitSave(r.K);
+      const d = QK().ownDish(r.K, r.id);
+      log(`Dish ${S.id ? "changed" : "saved"}: ${d.name}`);
+      mqOpen.add(gk(b) + "|" + r.id);
+      back();
+      calToast(`${d.icon} ${d.name} ${S.id ? "saved" : "is in Your dishes"}`, 3000);
+    };
+    if ($("deDel")) $("deDel").onclick = () => {
+      if (!S.del) { S.del = true; $("deDel").textContent = "Tap again to delete"; return; }
+      const d = QK().ownDish(G.kitchen, S.id);
+      kitSave(QK().delDish(G.kitchen, S.id, now()));
+      log(`Dish deleted: ${d ? d.name : S.id}`);
+      back();
+      calToast("Dish deleted. Meals already logged keep it.", 3500);
+    };
   }
 
   /* A walk, hike or other outdoor block (Junyan, 2026-10-19, d27, d32): its list is the barefoot walk tile. It pays as he

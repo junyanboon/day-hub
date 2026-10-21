@@ -797,12 +797,84 @@
   }
   // a tick's take-off record, when it is on and has an amount, else null
   const taken = (K, key) => { const r = obj(obj(K).used)[key]; return r && !r.off && typeof r.q === "number" ? r : null; };
+
+  /* His own dishes (Junyan, 2026-10-21, d48: "I need a create a dish where I can just click on it and then indicate which
+     food items I used and how much"). Kept in K.dishes, one record per dish: { id, name, icon, items:[[food, usual amount]],
+     added, at, del? }. They read in the same shape as QuestMeals.DISHES and IDEAS plus own:true, so the meal sheet (and a
+     later "ideas from the kitchen" job) can use them as they are. The merge keeps one record per dish, the later change
+     winning, and a delete is a mark (del) that keeps the name and foods, so an older copy cannot bring it back and a meal
+     logged with it can still show it. Nothing here touches K.used: deleting or editing a dish never puts back or takes off
+     what a meal already took. */
+  // a synced record is only used when it looks like one (its id goes into the page's attributes and selectors)
+  const okDish = (x, id) => !!x && typeof x === "object" && typeof x.name === "string" && !!x.name && /^[\w-]{1,40}$/.test(id);
+  const shape = (id, x) => ({ id, icon: ownIcon(x.icon) ? x.icon : "🍽️", name: x.name, own: true, items: arr(x.items).filter((r) => Array.isArray(r) && typeof r[0] === "string" && r[0])
+    .map((r) => [r[0], typeof r[1] === "string" ? r[1] : ""]), added: x.added || null, ...(x.del ? { del: true } : {}) });
+  // his dishes, deleted ones left out, oldest first (a new one goes at the end, so nothing jumps)
+  function ownDishes(K) {
+    return Object.entries(obj(obj(K).dishes)).filter(([id, x]) => okDish(x, id) && !x.del).map(([id, x]) => shape(id, x))
+      .sort((a, b) => ms(a.added) - ms(b.added) || (a.id < b.id ? -1 : 1));
+  }
+  // one dish, a deleted one too (del:true), else null
+  const ownDish = (K, id) => { const x = obj(obj(K).dishes)[id]; return okDish(x, id) ? shape(id, x) : null; };
+  // the kitchen item a food names, in either kitchen (the unit a bare number means)
+  const anyItem = (K, name) => match(K, "home", name) || match(K, "travel", name);
+  /* A usual amount as he types it, read the way the kitchen reads amounts: "300" -> "300 g" (a bare number takes the unit
+     his kitchen item has, else the food's own), "1.5kg" -> "1.5 kg", "2" limes -> "2". Words with no number ("a pinch")
+     stay as typed (short); a tick of it takes nothing off until he types how much. */
+  function dishAmt(K, name, text) {
+    const s = String(text == null ? "" : text).replace(/\s+/g, " ").trim();
+    if (!s) return "";
+    const it = anyItem(K, name), p = qtyOf(s, name, it && hasQ(it) ? it.u : undefined);
+    return p ? fmtQ(p.q, p.u) : s.slice(0, 20);
+  }
+  // the icon a new dish gets: a word in its name ("pasta" 🍝), else its first food's, else a plate
+  function dishIcon(name, items) {
+    const w = WORD_ICONS.find((x) => x[0].test(String(name || "")));
+    if (w) return w[1];
+    const f = arr(items).find((r) => Array.isArray(r) && r[0]);
+    return f ? iconFor(f[0]) : "🍽️";
+  }
+  /* Save a dish: new (no id) or an edit of his own (rename, foods, amounts, icon). d: { id?, name, icon?, items:[[food,
+     amount text]] }. One row per food (the first of the same name stays), empty rows dropped. No name: nothing saved.
+     Returns { K, id }. */
+  function saveDish(K, d, at) {
+    const name = cap(String((d && d.name) || "").replace(/\s+/g, " ").trim()).slice(0, 40);
+    if (!name) return { K, id: null };
+    const seen = new Set(), items = [];
+    for (const r of arr(d.items)) {
+      const f = cap(String((Array.isArray(r) ? r[0] : r && r.name) || "").replace(/\s+/g, " ").trim()).slice(0, 40);
+      if (!f || seen.has(f.toLowerCase())) continue;
+      seen.add(f.toLowerCase());
+      items.push([f, dishAmt(K, f, Array.isArray(r) ? r[1] : r.amt)]);
+    }
+    const old = d.id ? obj(obj(K).dishes)[d.id] : null;
+    const id = old ? d.id : "d" + ms(at).toString(36) + Math.random().toString(36).slice(2, 6);
+    const out = clone(K);
+    out.dishes = { ...obj(out.dishes), [id]: { id, name, icon: ownIcon(d.icon) ? d.icon : dishIcon(name, items), items, added: (old && old.added) || iso(at), at: iso(at) } };
+    return { K: out, id };
+  }
+  // delete one of his dishes: a mark that keeps what it was
+  function delDish(K, id, at) {
+    const x = obj(obj(K).dishes)[id];
+    if (!okDish(x, id) || x.del) return K;
+    const out = clone(K);
+    out.dishes = { ...obj(out.dishes), [id]: { ...x, del: true, at: iso(at) } };
+    return out;
+  }
+  /* "Save as a dish" (d48): a meal's "From your kitchen" ticks that are on (keys starting with pre), as foods with what
+     each took: [[name, amount]], in the order ticked. */
+  function kitchenFoods(K, pre) {
+    return Object.entries(obj(obj(K).used)).filter(([key]) => key.startsWith(pre)).map(([, r]) => r)
+      .filter((r) => r && !r.off && typeof r.q === "number").sort((a, b) => ms(a.t) - ms(b.t))
+      .map((r) => { const it = item(K, r.id); return it && it.name ? [it.name, fmtQ(r.q, r.u)] : null; }).filter(Boolean);
+  }
   /* A first portion for a "From your kitchen" tick (d47): 1 of a counted item; else a Blueprint dish's meal amount; else
      a small plate by food group. Never more than is left. */
   const PORTION = { "Spices": 3, "Herbs": 10, "Nuts and seeds": 30, "Oils, vinegars and sweet": 15, "Legumes and grains": 80, "Drinks and ferments": 250 };
+  // a plate's worth whatever is left (d48: a dish's usual amount must not shrink with today's stock)
+  const serving = (it) => (!hasQ(it) ? 0 : it.u === "" ? 1 : it.per || PORTION[it.group] || 100);
   function portion(it) {
-    if (!hasQ(it)) return 0;
-    const p = it.u === "" ? 1 : it.per || PORTION[it.group] || 100;
+    const p = serving(it);
     return Math.max(0, Math.min(p, typeof it.left === "number" ? it.left : p));
   }
 
@@ -927,5 +999,5 @@
 
   root.QuestKitchen = { NEED, LEVELS, KITCHENS, SEED, FRESH, DEFAULT_SHOP, GROUP_NAMES, GROUP_ICONS, keyOf, iconFor, groupIcon, splitName, amtOf, tileLine, guessGroup, guessShelf,
     items, item, grouped, setLevel, nextLevel, tap, add, rename, move, place, remove, status, shows, pace, lowAt, lowSoon, turnAt, useFirst, nextShop, parseAmt, usesOf, amountFor,
-    shopList, tick, buyTicked, hasQ, unitFor, qtyOf, fmtQ, recipeIn, perMeal, setAmount, restock, rateOf, toBuy, eat, setTake, taken, portion, TRAVEL_STARTER, pickList, preTick, fill, unfill, shopInfo, shopWhen, shopUpto, match, dinner, active, pick, noteActive, tripEnd, bringHome, dayWord, counts };
+    shopList, tick, buyTicked, hasQ, unitFor, qtyOf, fmtQ, recipeIn, perMeal, setAmount, restock, rateOf, toBuy, eat, setTake, taken, portion, serving, ownDishes, ownDish, saveDish, delDish, dishAmt, dishIcon, kitchenFoods, TRAVEL_STARTER, pickList, preTick, fill, unfill, shopInfo, shopWhen, shopUpto, match, dinner, active, pick, noteActive, tripEnd, bringHome, dayWord, counts };
 })(typeof window !== "undefined" ? window : globalThis);
