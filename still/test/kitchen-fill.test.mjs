@@ -54,7 +54,8 @@ test("d35 buy: the list items come first, then everything in the kitchen (grey a
   for (let i = 0; i < 3; i++) k = K.tap(k, "h:tahini", at(-100 + i));   // tahini down to Out
   const rows = K.pickList(k, "home", "buy", T0, T0 + 7 * D, DISHES);
   const top = rows.filter((r) => r.top).map((r) => r.name);
-  assert.ok(top.includes("Tahini") && top.includes("Spinach"), "what is on the shopping list comes first: " + top.join(", "));
+  // Spinach has no number, so no run-low guess puts it on the list (levels retired, 2026-10-21); Tahini was left at Out
+  assert.ok(top.includes("Tahini") && !top.includes("Spinach"), "what is on the shopping list comes first: " + top.join(", "));
   assert.ok(rows.findIndex((r) => !r.top) > rows.findLastIndex((r) => r.top), "list rows before the rest");
   assert.ok(rows.some((r) => r.name === "Broccoli" && !r.top), "grey items are offered");
   assert.equal(rows.length, K.items(k, "home").length, "every home item once (d59: the catalogue has every core recipe part, so no recipe row)");
@@ -115,7 +116,7 @@ test("d35: one undo takes back the whole batch: new ones gone, old ones back to 
   assert.equal(K.item(u, "h:spinach").since, K.item(before, "h:spinach").since);
   assert.equal(K.item(u, "h:broccoli").lv, null, "grey again");
   assert.equal(byName(u, "Miso", "home"), undefined, "the new one is gone");
-  assert.equal(K.shopList(u, "home", T0, T0 + 7 * D, DISHES).groups.flatMap((g) => g.list).find((x) => x.it.id === "h:spinach").on, true, "tick back");
+  assert.equal(u.shop["h:spinach"].on, true, "tick back");
   assert.equal(K.pace(K.item(u, "h:spinach")), K.pace(K.item(before, "h:spinach")), "the undone shop teaches nothing");
   // an item he changed again after the fill keeps his change
   const tapped = K.tap(r.K, "h:broccoli", at(0.005));

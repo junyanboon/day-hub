@@ -173,22 +173,23 @@ test("d70: the first amount an extra takes: one of a piece food, else the kitche
   assert.equal(K.firstTake(null), null);
 });
 
-test("From your kitchen lists items with no amount too (a banana on Plenty), not Out ones unless ticked", () => {
+test("From your kitchen lists items with no amount too (levels retired: an old Out one as well), not an amount at 0 unless ticked", () => {
   const k = travel([["Bananas", 3], ["Dates", null], ["Kale", 0], ["Blueberries", "300 g"], ["Oat milk", "0 ml"]]);
   const list = (mine) => K.mealList(k, "travel", new Set(mine)).map((x) => x.name).sort();
-  assert.deepEqual(J(list([])), ["Bananas", "Blueberries", "Dates"]);
+  assert.deepEqual(J(list([])), ["Bananas", "Blueberries", "Dates", "Kale"]);
   assert.deepEqual(J(list([idOf(k, "Kale"), idOf(k, "Oat milk")])), ["Bananas", "Blueberries", "Dates", "Kale", "Oat milk"]);
   assert.ok(/QK\(\)\.mealList\(G\.kitchen, kk, mine\)/.test(html), "the card uses it");
   assert.ok(/note:\s*true/.test(html.slice(html.indexOf("function kitMealBind"))), "a level item tick is recorded, nothing taken off");
 });
 
-test("d70 on the page: every dish card has + Add something you put in, a search with free text, ticked extras with took, and Clear drops them", () => {
+test("d70, d74, d75 on the page: every dish card ends with the search box itself, free text, ticked extras with took; no button, no helper text", () => {
   const body = html.slice(html.indexOf("const slotCard = d =>"), html.indexOf("function kitMealBind"));
-  assert.equal((body.match(/\$\{extrasBlock\(d\)\}/g) || []).length, 2, "the part dishes and the plain dishes (ideas, his own)");
-  assert.ok(/\+ Add something you put in/.test(html));
+  assert.equal((body.match(/\$\{extrasBlock\(d\)\}<\/div>`/g) || []).length, 2, "the part dishes and the plain dishes (ideas, his own) end with it");
+  assert.ok(!/>\+ Add something you put in<|data-xadd/.test(html), "d74: no + Add something you put in button");
+  const xb = html.slice(html.indexOf("const extrasBlock = d =>"), html.indexOf("const slotCard = d =>"));
+  assert.ok(/placeholder="Search the kitchen, or type a food and amount"/.test(xb) && !/open \?/.test(xb), "the box is always there");
   assert.ok(/data-xq=/.test(html) && /data-xoff=/.test(html) && /data-xfree/.test(html) && /data-xit=/.test(html));
-  assert.ok(/Extras earn no points/.test(html), "says that extras pay nothing");
-  const clr = html.slice(html.indexOf('sh.querySelectorAll("[data-dnone]")'), html.indexOf('sh.querySelectorAll("[data-dnone]")') + 400);
-  assert.ok(/dropAllExtras/.test(clr), "Clear drops the extras and puts them back");
+  assert.ok(!/Extras earn no points|Something in the kitchen with an amount comes off/.test(html), "d75: no helper line");
+  assert.ok(!/Add it as you typed it; nothing comes off|Type a food and how much/.test(html), "d75: no other helper text in the panel");
   assert.ok(!/[—–]/.test(body), "no dashes in the new words");
 });

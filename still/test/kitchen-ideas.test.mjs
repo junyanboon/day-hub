@@ -55,10 +55,10 @@ test("d41: the kitchen decides: shiitake, broccoli and quinoa at home make the s
   const st = QI.status(k, "home", r.list[0]);
   assert.equal(st.text, "All in your kitchen");
   assert.deepEqual(J(st.buy), []);
-  // what it shows is what is there, never a made-up number: amounts for amount items, the level word for the rest
+  // what it shows is what is there, never a made-up number: amounts for amount items, "how many?" for the rest
   const row = (n) => st.rows.find((x) => x.name === n);
   assert.equal(row("Broccoli").word, "have 500 g");
-  assert.equal(row("Fresh ginger, grated").word, "plenty");
+  assert.equal(row("Fresh ginger, grated").word, "how many?");
   assert.equal(row("Lime").word, "have 4");
 });
 
@@ -86,23 +86,25 @@ test("d41: food to use first and running-low food lift an idea", () => {
 });
 
 test("d41: short or missing food is said: only what is there, and a To buy list; staples never decide or nag", () => {
-  const k = stock([["h:broccoli", "100 g"], ["h:quinoa", "500 g"], ["h:shiitake", 0]]);
+  const k = stock([["h:broccoli", "100 g"], ["h:quinoa", "500 g"], ["h:shiitake", "0 g"], ["h:red-peppers", 0]]);
   const st = QI.status(k, "home", QI.byId("r6"));
   const row = (n) => st.rows.find((x) => x.name === n);
   assert.equal(row("Broccoli").st, "short"); assert.equal(row("Broccoli").word, "only 100 g");
   assert.equal(row("Shiitake mushrooms").st, "out");
-  assert.equal(row("Red peppers").st, "unchecked"); assert.equal(row("Red peppers").word, "not checked");
+  assert.equal(row("Shiitake mushrooms").word, "none left");
+  // an old Out with no number is not known since the levels were retired (2026-10-21): it asks how many
+  assert.equal(row("Red peppers").st, "unchecked"); assert.equal(row("Red peppers").word, "how many?");
   assert.ok(st.buy.includes("Broccoli") && st.buy.includes("Shiitake mushrooms"));
   assert.ok(st.check.includes("Red peppers"));
   assert.ok(!st.buy.includes("Tahini") && !st.check.includes("Tahini"), "a staple not checked is not nagged");
   // a staple the kitchen says is Out is to buy
-  assert.ok(QI.status(stock([["h:tahini", 0]]), "home", QI.byId("r6")).buy.includes("Tahini"));
+  assert.ok(QI.status(stock([["h:tahini", "0 g"]]), "home", QI.byId("r6")).buy.includes("Tahini"));
 });
 
 test("d41: too little in the kitchen: the note says so and the closest ideas still show with what to buy", () => {
   const none = QI.pick({}, "home", opt());
   assert.equal(none.list.length, 3);
-  assert.match(none.note, /Nothing in the kitchen is checked yet/);
+  assert.match(none.note, /Nothing in the kitchen has a number yet/);
   for (const d of none.list) for (const r of QI.status({}, "home", d).rows) assert.ok(!/\d/.test(r.word), "no made-up amount: " + r.word);
   const thin = QI.pick(stock([["h:apples", "2"]]), "home", opt());
   assert.match(thin.note, /Not much in the kitchen for dinner/);

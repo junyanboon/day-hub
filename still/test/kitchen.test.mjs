@@ -45,14 +45,15 @@ test("two quick taps are one answer, so the pace is not learned from minutes", (
   assert.equal(K.pace(it), 3);   // still the fresh default
 });
 
-test("d32: no Looks right on a shelf; a grey item's first tap means Plenty, and the Not checked filter finds the grey ones", () => {
+test("d32: no Looks right on a shelf; the No number yet filter finds every item with no number (levels retired, 2026-10-21)", () => {
   assert.equal(K.looksRight, undefined);
   assert.ok(!/Looks right|data-kok/.test(html), "no Looks right button on the page");
   let k = K.tap({}, "h:spinach", at(0));
-  assert.equal(lv(k, "Spinach"), 3);
+  k = K.setAmount(k, "h:kale", "300 g", at(0));
   const grey = K.items(k, "home").filter((x) => K.shows(x, "new", T0, T0 + 7 * D));
-  assert.equal(grey.length, K.SEED.length - 1);
-  assert.equal(grey.some((x) => x.name === "Spinach"), false);
+  assert.equal(grey.length, K.SEED.length - 1, "a stored level does not count as a number");
+  assert.equal(grey.some((x) => x.name === "Spinach"), true);
+  assert.equal(grey.some((x) => x.name === "Kale"), false);
 });
 
 test("d34: the catalogue lands in the right food groups (ordered, whole-word rules)", () => {
@@ -139,17 +140,26 @@ test("d34: tile status lines and the To buy filter", () => {
   let k = {};
   const shop = T0 + 7 * D;
   const st = (name) => K.status(K.item(k, id(k, name)), T0, shop, "Europe/Madrid");
-  assert.equal(st("Spinach"), "Not checked");
+  /* levels retired (2026-10-21, "Nothing should say plenty"): an item with no number says "how many?" whatever level is
+     stored; one left at Out or Low stays on the list (· buy) until it gets a number; no run-low guess without a number */
+  assert.equal(st("Spinach"), "how many?");
   k = K.setLevel(k, "h:quinoa", 3, at(0), "buy");
-  assert.equal(st("Quinoa"), "Plenty");
+  assert.equal(st("Quinoa"), "how many?");
   k = K.setLevel(k, "h:oats", 2, at(0), "buy");
-  assert.equal(st("Oats"), "Half");
+  assert.equal(st("Oats"), "how many?");
   k = K.setLevel(k, "h:honey", 1, at(0), "tap"); k = K.setLevel(k, "h:cumin", 0, at(0), "tap");
-  assert.equal(st("Honey"), "Low · buy"); assert.equal(st("Cumin"), "Out · buy");
-  k = K.setLevel(k, "h:spinach", 2, at(0), "buy");   // fresh food at Half runs low in about 3 days
-  assert.match(st("Spinach"), /^Low by (Fri|Thu)$/);
+  assert.equal(st("Honey"), "how many? · buy"); assert.equal(st("Cumin"), "how many? · buy");
+  k = K.setLevel(k, "h:spinach", 2, at(0), "buy");   // fresh food at Half once ran low in about 3 days: no guess now
+  assert.equal(st("Spinach"), "how many?");
+  assert.equal(K.lowSoon(K.item(k, "h:spinach"), T0, shop), false);
   const buy = K.items(k, "home").filter((x) => K.shows(x, "buy", T0, shop)).map((x) => x.name).sort();
-  assert.deepEqual(J(buy), ["Cumin", "Honey", "Spinach"]);
+  assert.deepEqual(J(buy), ["Cumin", "Honey"]);
+  // a number takes Cumin off the list by itself (enough of it), and the tile shows the number
+  k = K.setAmount(k, "h:cumin", "100 g", at(0));
+  assert.equal(st("Cumin"), "100 g");
+  assert.ok(!K.shows(K.item(k, "h:cumin"), "buy", T0, shop));
+  // no level word anywhere a tile or a list line can come from
+  for (const x of K.items(k, "home")) assert.ok(!/plenty|half|\blow\b(?! by)|not checked|\bout\b/i.test(K.tileLine(x, T0, shop, "Europe/Madrid")), K.tileLine(x, T0, shop));
 });
 
 test("run-low: fresh food defaults fast, pantry slow, and the estimate learns his own pace", () => {
@@ -227,7 +237,7 @@ test("the shopping list: low and out, plus what runs low before the next Groceri
   assert.equal(shop.at, T0 + 4 * D);
   const L = K.shopList(k, "home", T0, shop.at, DISHES);
   assert.deepEqual(J(L.groups.map((g) => [g.shelf.id, g.list.filter((r) => r.why !== "none").map((r) => [r.it.name, r.why])])),
-    [["fridge", [["Broccoli", "out"], ["Spinach", "soon"]]], ["pantry", [["Chickpeas", "low"]]]]);
+    [["fridge", [["Broccoli", "out"]]], ["pantry", [["Chickpeas", "low"]]]]);   // Spinach has no number: no run-low guess (2026-10-21)
   assert.equal(L.dinners, 4);
   const br = L.groups[0].list[0];
   assert.equal(br.amt, "700 g");   // Super Veggie's 175 g (2026-10-21), four dinners; its amount comes before an idea's 400 g
@@ -342,7 +352,7 @@ test("the page wires it: Groceries blocks open the kitchen, a Kitchen card, dinn
 
 test("d34: the sheet shows fixed tiles in groups, three filters, an add picker and a hold-to-drag that respects reduced motion", () => {
   assert.ok(!/id="kLow"|Low or out<\/button>/.test(html), "the Low or out toggle is replaced");
-  for (const f of ['["all", "All"', '["buy", "To buy"', '["new", "Not checked"', 'data-kf="${f}"']) assert.ok(html.includes(f), f);
+  for (const f of ['["all", "All"', '["buy", "To buy"', '["new", "No number yet"', 'data-kf="${f}"']) assert.ok(html.includes(f), f);
   assert.ok(html.includes("QK().grouped("), "groups inside each shelf");
   assert.ok(html.includes('class="pips"'), "a 3-bar meter");
   assert.ok(/\.ki \{[^}]*height:\s*5\dpx/.test(html), "every tile has a fixed height");

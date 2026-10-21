@@ -103,7 +103,7 @@ test("d39: adding splits the amount; the same food added again updates the amoun
   // no amount typed: none stored, and the tile line is the status alone
   r = K.add({}, "travel", "dry", "Canol Oil", at(0));
   assert.equal(K.item(r.K, r.id).amt, "");
-  assert.equal(K.tileLine(K.item(r.K, r.id), T0, T0 + 99 * H), "Plenty");
+  assert.equal(K.tileLine(K.item(r.K, r.id), T0, T0 + 99 * H), "how many?");
   r = K.add({}, "travel", "dry", "400g navy beans", at(0));
   assert.equal(K.tileLine(K.item(r.K, r.id), T0, T0 + 99 * H), "400 g");   // d42: the amount instead of the level
   // the fill-in picker's names split too, and fill the same item
