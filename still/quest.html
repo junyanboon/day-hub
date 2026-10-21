@@ -624,6 +624,30 @@
   .mq-dbtn:focus-visible, .mq-ing:focus-visible, .mq-mini:focus-visible, .mq-sw:focus-visible { outline:2px solid #5fd3c4; outline-offset:2px; }
   /* his own dishes (d48): "+ New dish" under them, and the dish editor */
   .mq-new { align-self:flex-start; border-style:dashed; }
+  /* one dish per meal (2026-10-21): the choice cards, the kitchen buttons, the drains row and the Counted line */
+  .mq-pick { margin:4px 0 6px; }
+  .mq-pks { display:grid; grid-template-columns:1fr 1fr; gap:6px; margin:2px 0 6px; } .mq-pks1 { grid-template-columns:1fr; margin-top:8px; }
+  .mq-pk { display:flex; align-items:center; gap:8px; min-height:48px; padding:6px 10px; border-radius:12px; background:var(--glass); border:1px solid var(--glass-border);
+    color:inherit; font:inherit; text-align:left; cursor:pointer; -webkit-tap-highlight-color:transparent; min-width:0; }
+  .mq-pk .mq-de { font-size:19px; } .mq-pk .mq-dn b { font-size:13px; line-height:1.2; } .mq-pk .mq-dn small { font-size:10.5px; }
+  .mq-pk.on { border-color:rgba(95,211,196,.8); background:rgba(95,211,196,.14); }
+  div.mq-dbtn { cursor:default; padding-top:9px; }
+  .mq-chg { margin:2px 0 4px; }
+  .mq-kbs { display:flex; flex-direction:column; gap:2px; }
+  .mq-kg[hidden], .mq-kb[hidden] { display:none; }
+  .mq-kg .kt-gh { margin:4px 2px 3px; }
+  .mq-kbw { display:flex; flex-wrap:wrap; gap:5px; }
+  .mq-kb { min-height:36px; padding:5px 10px; border-radius:18px; border:1px solid var(--glass-border); background:rgba(0,0,0,.2); color:var(--ink);
+    font:inherit; font-size:12.5px; cursor:pointer; -webkit-tap-highlight-color:transparent; }
+  .mq-kb small { color:var(--ink-soft); font-size:11px; font-variant-numeric:tabular-nums; }
+  .mq-kb:active, .mq-pk:active, .mq-dr:active { transform:scale(.96); }
+  .mq-drs { display:flex; flex-wrap:wrap; gap:5px; margin:4px 0 8px; }
+  .mq-dr { min-height:36px; padding:5px 10px; border-radius:18px; border:1px solid var(--glass-border); background:rgba(0,0,0,.2); color:var(--ink);
+    font:inherit; font-size:12.5px; cursor:pointer; -webkit-tap-highlight-color:transparent; }
+  .mq-dr b { color:var(--gold); font-size:11px; margin-left:2px; } .mq-dr.on { border-color:rgba(255,155,138,.75); background:rgba(255,155,138,.16); }
+  .mq-count { margin:8px 2px 10px; font-size:13px; color:var(--ink); font-variant-numeric:tabular-nums; }
+  .mq-cap { color:var(--ink-faint); }
+  .mq-kb:focus-visible, .mq-pk:focus-visible, .mq-dr:focus-visible { outline:2px solid #5fd3c4; outline-offset:2px; }
   .de-top { display:flex; gap:10px; align-items:center; margin:10px 0 4px; }
   .de-ic { width:48px; height:48px; flex:none; border-radius:14px; background:var(--glass); border:1px solid var(--glass-border); display:grid; place-items:center; font-size:26px; }
   .sheet input.de-name { flex:1; min-width:0; margin:0; }
@@ -967,7 +991,8 @@
 <script src="quest-oura.js?v=20261019a"></script>
 <script src="quest-levels.js?v=20261016b"></script>
 <script src="quest-gymlog.js?v=20261019a"></script>
-<script src="quest-meals.js?v=20261021d81b"></script>
+<script src="quest-meals.js?v=20261021d87"></script>
+<script src="quest-food-score.js?v=20261021d87"></script>
 <script src="quest-kitchen.js?v=20261021h81b"></script>
 <script src="quest-ideas.js?v=20261021d76"></script>
 <script src="quest-recipe-data.js?v=202610211914"></script>
@@ -2574,8 +2599,42 @@
      - Supplements, fermented food and xylitol moved to the water card (d16). The tiles are smaller, about four to a row
        on a phone, and each heading stays on one line with this meal's points for it on the right.
      2026-10-21 (d81 NO, "they are just recommendations for me to make meals"): only the Blueprint dishes pay. Recipe cards
-     and tonight's old ideas pay nothing of their own (QuestMeals.pays); their ticks still take amounts off the kitchen. */
+     and tonight's old ideas pay nothing of their own (QuestMeals.pays); their ticks still take amounts off the kitchen.
+     2026-10-21, one dish per meal (Junyan: "I only need ingredients when I expand something like Super veggie.. what's
+     important is me to capture the ingredients by MEAL not dishes"; d83 to d86): the sheet opens on "What's this meal?",
+     compact choice cards with no ingredients (Blueprint, his dishes, recipes, Something else). A tap makes it this meal
+     (rec.m): it opens with its parts or ingredients and the kitchen buttons; the other choices fold into Change meal.
+     The Prana foods and Body foods tile grids are gone: the same tiles are paid from what the meal logged
+     (QuestFoodScore, QuestMeals.autoSync), and one "Counted:" line says what counted. Drains stay as small buttons
+     (onion or garlic ticks itself from the food). The What did you eat? box, the dish search boxes, "full for today" and
+     the note on the automatic drains are gone. */
   const QM = window.QuestMeals;
+  const FSC = () => window.QuestFoodScore;   // what a meal's logged foods earn (d83); the meal still opens without it
+  /* Every food logged on meal k (d83), as { n, q, u } (what a tick took off the kitchen, or what was typed) or { n, amt }
+     (a tick's recipe amount, when nothing came off): the ticks of every dish it holds, the foods added to any of them
+     (Something else too), and old "From your kitchen" ticks. */
+  function mealFoods(k, rec){
+    const out = [], K = G.kitchen, took = key => (QK() ? QK().taken(K, key) : null);
+    for (const [id, ticks] of Object.entries((rec && rec.dish) || {})) {
+      const d = Array.isArray(ticks) && dishById(id); if (!d) continue;
+      for (const e of ticks) {
+        const n = QM.entryName(d, e), tk = took(kitEatKey(k, d.id, e));
+        if (tk && tk.q > 0) { out.push({ n, q:tk.q, u:tk.u }); continue; }   // 0: the recipe amount could not come off as a count
+        const sl = QM.slotOf(d, e), part = sl && d.slots.find(x => x.id === sl.slot);
+        const amt = part ? ((part.want.find(w => w[0] === n) || part.want[0])[1]) : ((d.items.find(x => x[0] === e) || [])[1] || "");
+        out.push({ n, amt });
+      }
+    }
+    for (const id of Object.keys((rec && rec.xtra) || {})) QM.extrasOf(rec, id).forEach(x => out.push({ n:x.n, q:x.q, u:x.u }));
+    if (QK()) {
+      const pre = kitEatKey(k, "kitchen", "");
+      for (const key of Object.keys((K && K.used) || {})) {
+        const tk = key.startsWith(pre) && took(key), it = tk && QK().item(K, key.slice(pre.length));
+        if (it) out.push({ n:it.name, q:tk.q, u:tk.u });
+      }
+    }
+    return out;
+  }
   const mqSum = q => [q.p ? `prana ${q.p > 0 ? "+" : ""}${q.p}` : "", q.b ? `body ${q.b > 0 ? "+" : ""}${q.b}` : ""].filter(Boolean).join(", ") || "no change";
   // dish: the Blueprint meal habit's value, the most a dish pays before the level multiplier (d13)
   // dim and dishLimit: the Blueprint meal's DIM curve and daily limit, which cap the dishes (d17)
@@ -2590,27 +2649,23 @@
     const all = blocks(), k = gk(b), name = shortName(b), q = (G.day.mealq || {})[k] || null, rec = q && !q.kind ? q : null;
     const own = mealOwn(rec);
     /* recipe cards (d79): his recipe book, travel-friendly first on a trip, this meal's recipes next. Tonight's ideas
-       (d41) only when the book did not load; with the book, only an old idea this meal already has ticks on, so it still
-       reads, keeps its points and can be unticked. d81: an idea that paid before d81 and was since cleared keeps its points
-       (QuestMeals.tick leaves them), so its card stays too (QM.heldIds: ticks or a paid record) and the total adds up */
+       (d41) only when the book did not load. A meal that holds an old idea or a recipe no longer in the book still reads
+       it (dishById; QM.onMeal lists what the record holds, d81: a paid record too), keeps its points and can be unticked. */
     const trip = !!QK() && kitToday() === "travel";
     const RL = recipesOn() ? QR().order(QR().list(), { trip, meal:QR().mealOf(name) }) : null, rule = RL ? QR().travelRule() : null;
-    const IT = RL ? { list:[], note:"" } : ideasToday(), ideas = IT.list.concat(QM.heldIds(rec)
-      .filter(id => !IT.list.some(d => d.id === id) && !(RL && RL.some(d => d.id === id))).map(id => ideaById(id) || recipeStub(id)).filter(Boolean));
-    const kn = QK() ? QK().KITCHENS[kitToday()] : null;
-    /* Super Veggie and Nutty Pudding (d58): the travel versions when the travel fridge is in use, else the full recipes, then any
-       Blueprint dish of the other kitchen this meal already has ticks on, so a tick can always be taken back */
-    const bpNow = bpToday(), bps = bpNow.concat((QM.BLUEPRINT || QM.DISHES).filter(d => !bpNow.includes(d) && rec && rec.dish && Array.isArray(rec.dish[d.id])));
+    const IT = RL ? { list:[], note:"" } : ideasToday(), kn = QK() ? QK().KITCHENS[kitToday()] : null;
+    // Super Veggie and Nutty Pudding (d58): the travel versions when the travel fridge is in use, else the full recipes
+    const bpNow = bpToday();
     const sel = new Set(rec && Array.isArray(rec.sel) ? rec.sel : []), paid = (rec && rec.v) || {};
     const warn = mealWarn(b, all), lastFood = lastMealBefore(b.s, all), o = mqOpt();
     const sign = v => v > 0 ? `+${v}` : `${v}`;
-    const row = (id, icon, txt, tag, cls) => `<button class="htile mqt${sel.has(id) ? " full" : ""}" data-q="${id}" data-icon="${esc(icon)}"><span class="hi">${icon}</span><span class="hl">${esc(txt)}</span>${sel.has(id) ? `<span class="hc">✓</span>` : ""}<b class="${cls}">${tag}</b></button>`;
-    const tagOf = (id, now) => sel.has(id) && paid[id] ? sign(paid[id][1]) : now;
-    const grid = rows => `<div class="hgrid mqg">${rows.join("")}</div>`;
-    const gold = r => row(r[0], r[1], QM.tileLabel(r), tagOf(r[0], sign(QM.value(r[0], o))), "mp");
     // what this meal has paid in a group, shown at the end of its heading (one line, never wrapped)
     const got = ids => ids.reduce((a, id) => a + (sel.has(id) && paid[id] ? +paid[id][1] || 0 : 0), 0);
-    const dishGot = list => list.reduce((a, d) => a + QM.dishPaid(rec, d), 0);
+    /* Drains (d84): a row of small buttons, each pays as he taps it and a second tap takes it back. Onion or garlic is
+       ticked by itself when an onion or garlic family food is logged (QuestFoodScore), and can still be tapped. */
+    const drain = r => { const on = sel.has(r[0]), tag = on && paid[r[0]] ? sign(paid[r[0]][1]) : sign(QM.value(r[0], o));
+      return `<button type="button" class="mq-dr${on ? " on" : ""}" data-q="${r[0]}" data-icon="${esc(r[1])}" aria-pressed="${on}">${r[1]} ${esc(QM.tileLabel(r))} <b>${tag}</b></button>`; };
+    const chg = mqOpen.has(k + "|change");   // the Change meal choices are open
     const lb = (txt, cls, n) => `<div class="win-lb mq-lb ${cls}"><span>${esc(txt)}</span>${n ? `<b>${sign(n)}</b>` : ""}</div>`;
     /* fit (tonight's ideas, d41): what the kitchen has of each ingredient (QuestIdeas.status), shown on the card and on
        each row he has not ticked; never a made-up amount */
@@ -2657,45 +2712,42 @@
     const xRow = (d, x, tag = "added") => `<div class="mq-row tk"><button type="button" class="mq-ing" data-xoff="${esc(d.id)}" data-xn="${esc(x.n)}" aria-pressed="true">` +
       `<span class="bx"></span><span class="n">${esc(x.n)}${tag ? `<small class="mq-hv">${tag}</small>` : ""}</span></button>` +
       `${tookLabel(`data-xq="${esc(d.id)}" data-xn="${esc(x.n)}"`, x.q, x.u, xWord(d, x), `How much ${x.n} went in`)}</div>`;
-    // the search results as he types (d74: nothing until then): kitchen items (not ones already added to this dish), then the free text as typed
-    const xResults = (d, text) => {
-      const t = String(text || "").trim();
-      if (!QK() || !t) return "";
+    /* The kitchen buttons (Junyan, 2026-10-21: "I only need ingredients when I expand something like Super veggie"; d86: he
+       would rather tap kitchen foods than type, and the What did you eat? box sat in the wrong place). Inside the open meal:
+       a search field, then what the kitchen in use has (an amount above 0, or no number) as small buttons in food groups
+       with the amount ("🥦 Broccoli 200 g", "how many?" when it has no number). Typing narrows the buttons and offers the
+       words as typed. A tap adds the food to this meal as a row with what it took (a piece food 1, a food by weight a
+       portion), changeable; it comes off the kitchen like a dish tick. Foods already added are left out. It replaces the
+       What did you eat? box (d78) and the search box at the end of every dish card (d74). */
+    const kitPanel = d => {
+      if (!QK()) return "";
       const have = new Set(QM.extrasOf(rec, d.id).map(x => QM.xKey(x.n)).concat(d === MEAL ? oldEat.map(x => QM.xKey(x.it.name)) : []));
-      const list = QK().search(G.kitchen, kitToday(), t).filter(x => !have.has(QM.xKey(x.name))).slice(0, 12);
-      const btn = x => `<button type="button" class="mq-ing" data-xit="${esc(x.id)}" data-xd="${esc(d.id)}" aria-pressed="false"><span class="bx"></span>` +
-        `<span class="n">${esc(x.em)} ${esc(x.name)}</span><span class="qty">${esc(kitHaveWord(x))}</span></button>`;
-      return `<button type="button" class="mq-mini go mq-xfree" data-xfree data-xd="${esc(d.id)}">Add "${esc(t.slice(0, 40))}"</button>` +
-        (list.length ? `<div class="mq-ings">${list.map(btn).join("")}</div>` : "");
+      const list = QK().mealList(G.kitchen, kitToday()).filter(x => !have.has(QM.xKey(x.name)));
+      const btn = x => `<button type="button" class="mq-kb" data-xit="${esc(x.id)}" data-xd="${esc(d.id)}">${esc(x.em)} ${esc(x.name)} <small>${esc(QK().hasQ(x) ? x.amt : QK().ASK)}</small></button>`;
+      return `<div class="mq-xbox"><input type="search" class="mq-xs" data-xs="${esc(d.id)}" placeholder="Search your kitchen, or type a food and amount" aria-label="Add a food to this meal" autocomplete="off" enterkeyhint="done">` +
+        `<div data-xfw="${esc(d.id)}"></div><div class="mq-kbs" data-xres="${esc(d.id)}">` +
+        QK().grouped(list).map(g => `<div class="mq-kg"><p class="kt-gh">${esc(g.group)}</p><div class="mq-kbw">${g.list.map(btn).join("")}</div></div>`).join("") + `</div></div>`;
     };
-    // the search box: the last thing on every open dish card (d74), and the What did you eat? box (d78)
-    const xSearch = (d, aria, ph) => `<div class="mq-xbox"><input type="search" class="mq-xs" data-xs="${esc(d.id)}" placeholder="${esc(ph || "Search the kitchen, or type a food and amount")}" aria-label="${esc(aria || `Add something else that went into ${d.name}`)}" autocomplete="off" enterkeyhint="done">` +
-      `<div data-xres="${esc(d.id)}"></div></div>`;
-    // a part dish: what else went in under "Also went in" (its parts decide points), then the search box
+    // a part dish: what else went in under "Also went in" (its parts decide its own points); the kitchen buttons add them
     const extrasBlock = d => {
       const xs = QM.extrasOf(rec, d.id);
-      return (xs.length ? `<p class="kt-gh mq-part ok">Also went in</p><div class="mq-rows">${xs.map(x => xRow(d, x)).join("")}</div>` : "") + xSearch(d);
+      return xs.length ? `<p class="kt-gh mq-part ok">Also went in</p><div class="mq-rows">${xs.map(x => xRow(d, x)).join("")}</div>` : "";
     };
-    /* "What did you eat?" (Junyan, 2026-10-21, d78: "ended up making a dish so I could record what I ate for dinner.. but
-       this seems to not make much sense"). The first thing on the meal sheet: the same search-or-type box as the dish
-       cards ("red pepper 1", "chickpeas 200 g"); each food is a ticked row with what it took, taken off the kitchen through
-       the same tick records as an extra (it is one: rec.xtra.meal, keys "<meal>|meal+|<food>"); a tap on the row puts it
-       back. No points (the food tiles score the meal). "Save as a dish" under it opens the dish editor with these foods.
-       It replaces "Anything else from the kitchen" (d47): a meal ticked there still shows its ticks here, untickable. */
-    const MEAL = { id:"meal", name:"this meal", icon:"🍽️", items:[] };
+    /* "Something else" (Junyan, 2026-10-21): a meal that is no dish. Its foods are the extras of the pseudo dish "meal"
+       (rec.xtra.meal, keys "<meal>|meal+|<food>", as the What did you eat? box of d78 kept them, so those meals read here
+       as they are): each a ticked row with what it took, taken off the kitchen; a tap on the row puts it back. They pay no
+       dish points; the foods count toward the food tiles (d83). "Save as a dish" opens the dish editor with these foods.
+       A meal ticked in "Anything else from the kitchen" (d47) still shows those ticks here, untickable. */
+    const MEAL = { id:"meal", name:"Something else", icon:"🍽️", items:[] };
     const kPre = QK() ? kitEatKey(k, "kitchen", "") : "";
     const oldEat = QK() ? Object.keys((G.kitchen && G.kitchen.used) || {}).filter(x => x.startsWith(kPre) && QK().taken(G.kitchen, x))
       .map(x => ({ id:x.slice(kPre.length), it:QK().item(G.kitchen, x.slice(kPre.length)) })).filter(x => x.it) : [];
-    const eatBox = () => {
-      if (!QK()) return "";
+    const elseRows = () => {
       const xs = QM.extrasOf(rec, MEAL.id), n = xs.length + oldEat.length;
       const old = x => kitTakeWrap(kPre + x.id, `<button type="button" class="mq-ing" data-kown="${esc(x.id)}" aria-pressed="true"><span class="bx"></span>` +
         `<span class="n">${esc(x.it.name)}</span></button>`);
-      return `${lb("What did you eat?", "mb", 0)}<div class="mq-dishes"><div class="mq-dish open mq-eat"><div class="mq-dlist">` +
-        (n ? `<div class="mq-rows">${oldEat.map(old).join("")}${xs.map(x => xRow(MEAL, x, "")).join("")}</div>` : "") +
-        xSearch(MEAL, "What did you eat?", "Type a food, like red pepper 1") +
-        (n ? `<div class="mq-drow"><button type="button" class="mq-mini mq-msave" data-msave>Save as a dish</button></div>` : "") +
-        `</div></div></div>`;
+      return (n ? `<div class="mq-rows">${oldEat.map(old).join("")}${xs.map(x => xRow(MEAL, x, "")).join("")}</div>` : "") +
+        (n && QK() ? `<div class="mq-drow"><button type="button" class="mq-mini mq-msave" data-msave>Save as a dish</button></div>` : "");
     };
     /* A "best you can" dish (d51, d52): its parts, each showing the real ingredient if the kitchen in use has it, else the
        closest swap, else "none in the kitchen" (QuestIdeas.slotRows). Any part can take something else from the kitchen
@@ -2720,30 +2772,34 @@
             ri ? `<span class="mq-sw" aria-hidden="true"></span>` : sw(p, si))).join("") +
           `</div>` + pick(p, si)).join("");
     };
-    const dishCard = (d, fit) => {
-      const st = QM.dishStatus(rec, d), open = mqOpen.has(k + "|" + d.id), pd = QM.dishPaid(rec, d), on = new Set(rec && rec.dish && Array.isArray(rec.dish[d.id]) ? rec.dish[d.id] : []);
-      // its kept max once started, else what a start now gets (0: the day's cap is reached); a recipe or idea pays nothing (d81)
+    /* The meal's dish, open (2026-10-21, one dish per meal): its parts or ingredients as compact rows, how to make it, what
+       else went in, then (on the meal's own dish) the kitchen buttons. tail: the kitchen buttons, or "". */
+    const dishCard = (d, fit, tail) => {
+      const st = QM.dishStatus(rec, d), pd = QM.dishPaid(rec, d), on = new Set(rec && rec.dish && Array.isArray(rec.dish[d.id]) ? rec.dish[d.id] : []);
+      // its kept max once started, else what a start now gets; a recipe or idea pays nothing (d81)
       const pay = QM.pays(d), max = pay && QM.capOf(rec, d, dishOpt(k, d));
       const slot = QM.isSlotDish(d) && QI() && QK(), unit = slot ? "parts" : "ingredients";
-      const hint = slot ? `you have ${QI().slotsHave(G.kitchen, kitToday(), d, [...on])} of ${st.m} parts · tap to open` : fit ? `${esc(fit.text)} · tap to open` : `${st.m} ${unit} · tap to open`;
       const nx = QM.extrasOf(rec, d.id).length;
-      /* his own dish (d78): no "5 of 5 ingredients · 1 added" count, just whether it is on this meal; a part dish keeps its
-         parts count (parts decide points) */
-      const sub = d.own ? (st.n || nx ? "On this meal" : "Tap to open")
-        : `${st.n ? `${st.n} of ${st.m} ${unit}` : slot ? hint.charAt(0).toUpperCase() + hint.slice(1) : hint}${nx ? ` · ${nx} added` : ""}${d.time ? ` · ${esc(d.time)}` : ""}`;
-      return `<div class="mq-dish${open ? " open" : ""}${st.all ? " done" : ""}">` +
-        `<button type="button" class="mq-dbtn" data-dopen="${esc(d.id)}" aria-expanded="${open}"><span class="mq-de">${esc(d.icon)}</span>` +
+      // his own dish (d78): no count, just that it is this meal; a part dish keeps its parts count (parts decide points)
+      const sub = d.own ? (d.del ? "deleted dish" : "your dish")
+        : `${st.m ? `${st.n} of ${st.m} ${unit}` : ""}${nx ? ` · ${nx} added` : ""}${d.time ? ` · ${esc(d.time)}` : ""}`;
+      /* 2026-10-21: no "full for today" on a Blueprint dish past the 2-a-day cap: it logs in full and only pays no more
+         points, said softly in the open card */
+      const capped = pay && !max && !pd;
+      return `<div class="mq-dish open${st.all ? " done" : ""}">` +
+        `<div class="mq-dbtn"><span class="mq-de">${esc(d.icon)}</span>` +
         `<span class="mq-dn"><b>${esc(d.name)}</b><small>${sub}</small></span>` +
-        `<span class="mq-dp">${d.own ? `<small>${d.del ? "deleted" : "your dish"}</small>` : pd ? sign(pd) : !pay ? "" : max ? `<small>up to</small> +${max}` : `<small>full for today</small>`}</span></button>` +
-        (d.own ? "" : `<i class="mq-dbar"><b style="width:${st.pct}%"></b></i>`) +   // d78: no count bar on his own dish
-        // no Got everything or Clear (2026-10-21: ticking part by part does the job); the search box ends the card (d74)
-        (open && slot ? `<div class="mq-dlist">${slotCard(d)}${links(howTo(d, slotUse(d)), fullTo(d))}${extrasBlock(d)}</div>` : "") +
-        (open && !slot ? `<div class="mq-dlist">` + plainRows(d, on, fit) +
-          (fit && (fit.buy.length || fit.check.length) ? `<p class="mq-how mq-buy">${fit.buy.length ? `<b>To buy:</b> ${esc(fit.buy.join(", "))}` : ""}${fit.buy.length && fit.check.length ? "<br>" : ""}${fit.check.length ? `<b>How many do you have?</b> ${esc(fit.check.join(", "))}` : ""}</p>` : "") +
-          links(howTo(d)) +
-          (d.own && !d.del ? `<div class="mq-drow"><button type="button" class="mq-mini" data-dedit="${esc(d.id)}">Edit</button></div>` : "") +
-          `${d.own || d.recipe ? xSearch(d) : extrasBlock(d)}</div>` : "") +
-        `</div>`;
+        `<span class="mq-dp">${pd ? sign(pd) : pay && max ? `<small>up to</small> +${max}` : ""}</span></div>` +
+        (d.own || !pay ? "" : `<i class="mq-dbar"><b style="width:${st.pct}%"></b></i>`) +   // a count bar only where parts pay
+        `<div class="mq-dlist">` +
+        (capped ? `<p class="mq-how mq-cap">No more points today: two Blueprint meals are counted. It still logs in full.</p>` : "") +
+        (slot ? `${slotCard(d)}${links(howTo(d, slotUse(d)), fullTo(d))}${extrasBlock(d)}`
+          : plainRows(d, on, fit) +
+            (fit && (fit.buy.length || fit.check.length) ? `<p class="mq-how mq-buy">${fit.buy.length ? `<b>To buy:</b> ${esc(fit.buy.join(", "))}` : ""}${fit.buy.length && fit.check.length ? "<br>" : ""}${fit.check.length ? `<b>How many do you have?</b> ${esc(fit.check.join(", "))}` : ""}</p>` : "") +
+            links(howTo(d)) +
+            (d.own && !d.del ? `<div class="mq-drow"><button type="button" class="mq-mini" data-dedit="${esc(d.id)}">Edit</button></div>` : "") +
+            (d.own || d.recipe ? "" : extrasBlock(d))) +
+        (tail || "") + `</div></div>`;
     };
     /* a plain dish's tick rows: its ingredients, then (his own, d48) a food taken out of it since this meal ticked it, then
        what was added this time (d78: in the same list, marked "added this time", not under its own heading). On his own
@@ -2766,60 +2822,77 @@
        he unticks what he did not have. Once cooked it is a dish card's tick list (with the search box) above the steps.
        Unticking everything takes it back to the shut recipe. No points of its own (d81, "they are just recommendations for
        me to make meals"): the food tiles score the meal; a meal that paid on a recipe before d81 keeps it and shows it. */
-    const recipeCard = d => {
-      const on = new Set(dishOn(d)), xs = QM.extrasOf(rec, d.id), cooked = on.size > 0 || xs.length > 0, open = mqOpen.has(k + "|" + d.id), pd = QM.dishPaid(rec, d);
-      const tv = trip && QR().isTravel(d, rule), sub = [d.time, QR().tagLine(d)].filter(Boolean).join(" · ");
-      const have = !cooked && open && QI() && QK() ? QI().status(G.kitchen, kitToday(), d).rows : [];
+    const recipeCard = (d, tail) => {
+      const on = new Set(dishOn(d)), xs = QM.extrasOf(rec, d.id), cooked = on.size > 0 || xs.length > 0, pd = QM.dishPaid(rec, d);
+      const sub = [d.time, QR().tagLine(d)].filter(Boolean).join(" · ");
+      const have = !cooked && QI() && QK() ? QI().status(G.kitchen, kitToday(), d).rows : [];
       const steps = d.steps.length ? `<div class="mq-steps"><p class="kt-gh">Steps</p><ol>${d.steps.map(x => `<li>${esc(x)}</li>`).join("")}</ol></div>` : "";
       const swaps = Object.entries(d.swaps || {}).filter(([, l]) => l.length);
-      return `<div class="mq-dish${open ? " open" : ""}">` +
-        `<button type="button" class="mq-dbtn" data-dopen="${esc(d.id)}" aria-expanded="${open}"><span class="mq-de">${esc(d.icon)}</span>` +
+      return `<div class="mq-dish open">` +
+        `<div class="mq-dbtn"><span class="mq-de">${esc(d.icon)}</span>` +
         `<span class="mq-dn"><b>${esc(d.name)}</b><small>${esc(sub)}</small></span>` +
-        `<span class="mq-dp">${pd ? sign(pd) : cooked ? "<small>cooked</small>" : tv ? "<small>travel</small>" : ""}</span></button>` +
-        (open ? `<div class="mq-dlist">` + (cooked ? plainRows(d, on) + steps + xSearch(d)
+        `<span class="mq-dp">${pd ? sign(pd) : cooked ? "<small>cooked</small>" : ""}</span></div>` +
+        `<div class="mq-dlist">` + (cooked ? plainRows(d, on) + steps
           : `<ul class="mq-rcl">${d.items.map(([n, amt], i) => { const h = have[i], got = h && h.st === "have", short = h && h.st === "short";
               return `<li><span class="n">${esc(n)}${QR().optional(amt) ? ` <small>optional</small>` : ""}${got ? ` <small class="have">${esc(h.word)}</small>` : short ? ` <small>${esc(h.word)}</small>` : ""}</span><span class="qty">${esc(QR().amtText(amt))}</span></li>`; }).join("")}</ul>` +
             steps +
             (swaps.length ? `<p class="mq-how"><b>Swaps:</b> ${esc(swaps.map(([n, l]) => `${n}: ${l.join(", ")}`).join("; "))}</p>` : "") +
             `<div class="mq-drow"><button type="button" class="mq-mini go mq-cook" data-rcook="${esc(d.id)}">Cook this</button><span class="mq-dst">Untick what you did not have.</span></div>`) +
-          `</div>` : "") +
-        `</div>`;
+        (tail || "") + `</div></div>`;
+    };
+    /* "What's this meal?" (Junyan, 2026-10-21: "Super Veggie is my meal, Nutty pudding is my meal"). The choices as compact
+       cards, no ingredients: the Blueprint dishes (the travel versions on a trip), his own dishes, the recipe cards (or
+       tonight's ideas when the recipe book did not load), then Something else. A tap makes it this meal (rec.m). */
+    const choices = () => [[bpNow === QM.DISHES ? "Blueprint dishes" : "Blueprint dishes · travel versions", bpNow], ["Your dishes", QK() ? own.filter(d => !d.del) : []], [RL ? "Recipes · for 2 people" : `Tonight's ideas · for 2 people${kn ? ` · from ${esc(kn.icon)} ${esc(kn.name)}` : ""}`, RL || IT.list]];
+    const pickSub = d => d === MEAL ? "from your kitchen" : d.own ? "your dish" : QM.isSlotDish(d) ? `${QM.partsOf(d)} parts` : RL && RL.includes(d) ? (trip && QR().isTravel(d, rule) ? "travel" : d.time || "") : d.time || "";
+    const pickCard = (d, cur) => `<button type="button" class="mq-pk${cur ? " on" : ""}" data-mpick="${esc(d.id)}" aria-pressed="${cur}"><span class="mq-de">${esc(d.icon)}</span>` +
+      `<span class="mq-dn"><b>${esc(d.name)}</b>${pickSub(d) ? `<small>${esc(pickSub(d))}</small>` : ""}</span></button>`;
+    // t: the group's heading (already escaped)
+    const picker = cur => choices().filter(([, l]) => l.length).map(([t, l]) => `<p class="kt-gh">${t}</p><div class="mq-pks">${l.map(d => pickCard(d, d.id === cur)).join("")}</div>`).join("") +
+      (IT.note ? `<p class="mq-serves mq-inote">${esc(IT.note)}</p>` : "") +
+      `<div class="mq-pks mq-pks1">${pickCard(MEAL, cur === MEAL.id)}</div>` +
+      (QK() ? `<div class="mq-drow"><button type="button" class="mq-mini mq-new" data-dnew>+ New dish</button></div>` : "") +
+      (RL && trip ? `<p class="mq-serves mq-inote">On a trip: travel-friendly recipes first.</p>` : "");
+    // the dishes on this meal (rec.m first; a meal from before shows all it holds), and old "From your kitchen" ticks
+    const onIds = QM.onMeal(rec).concat(oldEat.length && !QM.onMeal(rec).includes(MEAL.id) ? [MEAL.id] : []);
+    const mainId = onIds[0] || null;
+    const mealCard = (id, tail) => {
+      if (id === MEAL.id) return `<div class="mq-dish open"><div class="mq-dbtn"><span class="mq-de">${MEAL.icon}</span><span class="mq-dn"><b>${MEAL.name}</b><small>pick foods from your kitchen</small></span></div>` +
+        `<div class="mq-dlist">${elseRows()}${tail || ""}</div></div>`;
+      const d = dishById(id); if (!d) return "";
+      if (RL && QR().byId(id) && d.recipe) return recipeCard(d, tail);
+      return dishCard(d, !RL && !d.own && !QM.pays(d) && QI() && QK() ? QI().status(G.kitchen, kitToday(), d) : null, tail);
+    };
+    /* "Counted:" (d83): what this meal's points came from, in one line, and the meal's total (prana and body together) */
+    const counted = (r0 = rec) => {
+      const r = r0 || {}, v = r.v || {}, words = [];
+      onIds.forEach(id => { const d = id !== MEAL.id && dishById(id); if (d && QM.dishPaid(r, d) > 0) words.push(d.name); });
+      (Array.isArray(r.sel) ? r.sel : []).forEach(id => { if (v[id] && +v[id][1] > 0 && FSC() && FSC().WORD[id]) words.push(FSC().WORD[id]); });
+      const tot = Math.round(((+r.p || 0) + (+r.b || 0)) * 10) / 10;
+      return `<p class="mq-count" data-mcount>${words.length ? `Counted: ${esc([...new Set(words)].join(", "))} · ${sign(tot)}` : tot ? `This meal: ${sign(tot)}` : "Nothing counted yet."}</p>`;
     };
     openSheet(`${winHead(b)}
       ${warn ? `<div class="warnline">${esc(warn)}</div>` : ""}
       ${lastFood ? `<p>Last food ended ${fmtT(lastFood)} (${fmtHM(Math.round((b.s - lastFood) / 60000))} before this).</p>` : ""}
-      ${eatBox()}
-      <div class="mq-tips"><div class="mq-tl">How to eat</div>${QM.TIPS.map(([i, t]) => `<p><span>${i}</span>${esc(t)}</p>`).join("")}</div>
-      ${lb(bpNow === QM.DISHES ? "Blueprint dishes" : "Blueprint dishes · travel versions", "mb", dishGot(bps))}
-      <div class="mq-dishes">${bps.map(d => dishCard(d)).join("")}</div>
-      ${QK() ? `<div class="mq-sub mq-subl"><span>Your dishes</span></div>
-      <div class="mq-dishes">${own.filter(d => !ideas.some(x => x.id === d.id)).map(d => dishCard(d)).join("")}<button type="button" class="mq-mini mq-new" data-dnew>+ New dish</button></div>` : ""}
-      ${RL ? `<div class="mq-sub mq-subl"><span>Recipes · for 2 people</span>${dishGot(RL.concat(ideas)) ? `<b>${sign(dishGot(RL.concat(ideas)))}</b>` : ""}</div>
-      ${trip ? `<p class="mq-serves mq-inote">On a trip: travel-friendly recipes first (${rule === "tag" ? "the ones your recipe book tags travel" : "no oven, 8 ingredients or fewer, 30 min or less"}).</p>` : ""}
-      <div class="mq-dishes">${RL.map(recipeCard).join("")}${ideas.map(d => dishCard(d)).join("")}</div>`
-      : `<div class="mq-sub mq-subl"><span>Tonight's ideas · for 2 people${kn ? ` · from ${esc(kn.icon)} ${esc(kn.name)}` : ""}</span>${dishGot(ideas) ? `<b>${sign(dishGot(ideas))}</b>` : ""}</div>
-      ${IT.note ? `<p class="mq-serves mq-inote">${esc(IT.note)}</p>` : ""}
-      <div class="mq-dishes">${ideas.map(d => dishCard(d, QI() && QK() ? QI().status(G.kitchen, kitToday(), d) : null)).join("")}</div>`}
-      ${lb("Prana foods · Sadhguru", "mp", got(QM.FOOD_IDS))}
-      ${grid(QM.PRANA_FOODS.map(gold))}
-      ${lb("Body foods · Bryan Johnson", "mb", got(QM.BODY.concat(QM.JUNK[0])))}
-      ${grid(QM.BODY.map(id => { const h = HABITS.find(x => x[0] === id), g = habitGain(id); return row(id, h[4], h[5], tagOf(id, g ? sign(g) : "full"), "mb"); })
-        .concat(row(QM.JUNK[0], QM.JUNK[1], QM.JUNK[2], tagOf(QM.JUNK[0], sign(QM.JUNK[3])), "mb")))}
+      ${mainId ? `${lb("This meal", "mb", 0)}
+      <div class="mq-dishes">${onIds.map(id => mealCard(id, id === mainId ? kitPanel(id === MEAL.id ? MEAL : dishById(id) || MEAL) : "")).join("")}</div>
+      <div class="mq-drow mq-chg"><button type="button" class="mq-mini mq-howbtn" data-mchange aria-expanded="${chg}">Change meal <span aria-hidden="true">${chg ? "▴" : "▾"}</span></button></div>
+      ${chg ? `<div class="mq-pick">${picker(mainId)}</div>` : ""}`
+      : `${lb("What's this meal?", "mb", 0)}<div class="mq-pick">${picker(null)}</div>`}
+      ${counted()}
       ${lb("Drains · lower prana", "mp", got(QM.DRAIN_IDS))}
-      ${grid(QM.DRAINS.map(gold))}
-      <div class="mq-sub">${esc(QM.AUTO_NOTE)}</div>
-      <div class="hint" style="margin:10px 2px">${q && (q.p || q.b) ? `This meal so far: ${esc(mqSum(q))}.` : "Nothing counted yet."}</div>
+      <div class="mq-drs">${QM.DRAINS.map(drain).join("")}</div>
+      <div class="mq-tips"><div class="mq-tl">How to eat</div>${QM.TIPS.map(([i, t]) => `<p><span>${i}</span>${esc(t)}</p>`).join("")}</div>
       <div class="actions"><button class="btn ghost" id="mEdit">Change time or name</button></div>`, true);
     const sh = $("sheet");
     // the sheet redraws on every tap and keeps its scroll
     const redraw = quiet => { const top = sh.scrollTop; openMeal(b); sh.scrollTop = top; if (!quiet) render(); };
-    sh.querySelectorAll("[data-q]").forEach(bn => bn.onclick = () => {
-      const id = bn.dataset.q, fx = window.QuestFx, rect = bn.getBoundingClientRect();
-      if (mqCounted(id) && !sel.has(id) && id !== "heavy" && !habitGain(id)) { if (fx) fx.nope(bn); return; }   // full for today
-      const cur = (G.day.mealq || {})[k];
-      const r = QM.tap(cur && !cur.kind ? cur : null, id, mqOpt());
+    const mealRec = () => { const cur = (G.day.mealq || {})[k]; return cur && !cur.kind ? cur : null; };
+    const putRec = r => { (G.day.mealq = G.day.mealq || {})[k] = { ...r, at:now().toISOString() }; stampDay(); saveG(); };
+    // a food tile's payment or take-back (a drain he taps, or one the foods earn): the meters, the log, and the daily counts
+    const applyOps = (ops, fx) => {
       G.day.habits = G.day.habits || {};
-      r.ops.forEach(op => {
+      ops.forEach(op => {
         if (mqCounted(op.id)) {   // habits only go up when devices merge, so a take-back is counted off in G.day.voided
           if (op.on) G.day.habits[op.id] = (G.day.habits[op.id] || 0) + 1;
           else (G.day.voided = G.day.voided || {})[op.id] = ((G.day.voided || {})[op.id] || 0) + 1;
@@ -2828,8 +2901,27 @@
         if (op.d) addEnergy(op.m, op.d, `${name}: ${label}${op.on ? "" : " (taken back)"}`, label, !!fx);
         else log(`${name}: ${label}${op.on ? "" : " (taken back)"}`);
       });
-      (G.day.mealq = G.day.mealq || {})[k] = { ...r.rec, at:now().toISOString() };
-      stampDay(); saveG();
+    };
+    /* d83: the food tiles from what this meal logged. Every food on it (dish ticks with what they took, else the recipe
+       amount; foods added; old From your kitchen ticks) goes through QuestFoodScore.earn, and QuestMeals.autoSync pays
+       what it earns now and takes back what it no longer earns (a tile he tapped by hand is left alone). Run after every
+       change on the meal, never on opening it, so a meal from before keeps exactly what it paid until he changes it. */
+    const morning = /breakfast/i.test(name) || new Date(b.s).getHours() < 11;
+    function syncFoods(){
+      const cur = mealRec(); if (!cur || !FSC()) return;
+      const foods = mealFoods(k, cur);
+      const r = QM.autoSync(cur, FSC().earn(foods, { morning }).ids, mqOpt(), id => !mqCounted(id) || habitGain(id) > 0);
+      if (!r.ops.length && JSON.stringify(r.rec.auto || null) === JSON.stringify(cur.auto || null)) return;
+      applyOps(r.ops, window.QuestFx);
+      putRec(r.rec);
+    }
+    // the drains (d84): a tap pays, a second tap takes it back
+    sh.querySelectorAll("[data-q]").forEach(bn => bn.onclick = () => {
+      const id = bn.dataset.q, fx = window.QuestFx, rect = bn.getBoundingClientRect();
+      if (mqCounted(id) && !sel.has(id) && id !== "heavy" && !habitGain(id)) { if (fx) fx.nope(bn); return; }   // its daily limit
+      const r = QM.handTap(mealRec(), id, mqOpt());
+      applyOps(r.ops, fx);
+      putRec(r.rec);
       redraw();
       const on = r.ops.find(op => op.id === id && op.on), off = r.ops.find(op => op.id === id && !op.on && op.d);
       if (fx && on) {
@@ -2840,30 +2932,28 @@
         fx.pop(sh.querySelector(`[data-q="${id}"]`));
       }
     });
-    // a dish card opens and closes its checklist
-    sh.querySelectorAll("[data-dopen]").forEach(bn => bn.onclick = () => {
-      const key = k + "|" + bn.dataset.dopen;
-      if (mqOpen.has(key)) mqOpen.delete(key); else mqOpen.add(key);
-      redraw(true);
-    });
-    // tick or untick an ingredient: the dish pays (or takes back) the difference
-    // amts: { tick: amount } for a part dish (the real ingredient's amount, also for a swap)
-    const dishTap = (bn, id, how, popSel, amts) => {
-      const d = dishById(id); if (!d) return;
-      const fx = window.QuestFx, rect = bn.getBoundingClientRect(), cur = (G.day.mealq || {})[k];
-      const r = QM.tick(cur && !cur.kind ? cur : null, d, how, dishOpt(k, d));
+    // tick or untick an ingredient: a Blueprint dish pays (or takes back) the difference; the food tiles follow (d83)
+    // amts: { tick: amount } for a part dish (the real ingredient's amount, also for a swap). Returns the dish op, if any.
+    const tickDish = (d, how, amts, fx) => {
+      const cur = mealRec();
+      const r = QM.tick(cur, d, how, dishOpt(k, d));
       // the kitchen (d44): each ingredient ticked takes its amount off its kitchen item (one with an amount), an untick puts it back
-      kitDinner(k, d, (cur && !cur.kind && cur.dish && cur.dish[d.id]) || [], (r.rec.dish && r.rec.dish[d.id]) || [], amts);
+      kitDinner(k, d, (cur && cur.dish && cur.dish[d.id]) || [], (r.rec.dish && r.rec.dish[d.id]) || [], amts);
       r.ops.forEach(op => addEnergy("b", op.d, `${name}: ${d.name}${op.on ? "" : " (taken back)"}`, d.name, !!fx));
       // d18: a finished Super Veggie or Nutty Pudding is the Blueprint meal done today; unfinishing it counts it off
       // (habits only go up when devices merge, so the take-back goes in G.day.voided, as the tiles do)
       G.day.habits = G.day.habits || {};
       if (r.done > 0) G.day.habits.blueprint = (G.day.habits.blueprint || 0) + 1;
       else if (r.done < 0) (G.day.voided = G.day.voided || {}).blueprint = ((G.day.voided || {}).blueprint || 0) + 1;
-      (G.day.mealq = G.day.mealq || {})[k] = { ...r.rec, at:now().toISOString() };
-      stampDay(); saveG();
+      putRec(r.rec);
+      return r.ops[0];
+    };
+    const dishTap = (bn, id, how, popSel, amts) => {
+      const d = dishById(id); if (!d) return;
+      const fx = window.QuestFx, rect = bn.getBoundingClientRect();
+      const op = tickDish(d, how, amts, fx);
+      syncFoods();
       redraw();
-      const op = r.ops[0];
       if (fx && op && op.on) fx.tap(rect, { icon:d.icon, gain:op.d, color:"#8fe3b0" });
       else if (fx && op) fx.back(rect, { gain:-op.d });
       if (fx && popSel) fx.pop(sh.querySelector(popSel));
@@ -2895,9 +2985,7 @@
       redraw(true);
     });
     sh.querySelectorAll("[data-dname]").forEach(bn => bn.onclick = () => dishTap(bn, bn.dataset.did, bn.dataset.dname));
-    // extras (d70, d74): search, add from the kitchen or as typed, change what one took, take one off
-    const mealRec = () => { const cur = (G.day.mealq || {})[k]; return cur && !cur.kind ? cur : null; };
-    const putRec = r => { (G.day.mealq = G.day.mealq || {})[k] = { ...r, at:now().toISOString() }; stampDay(); saveG(); };
+    // foods added (d70): from the kitchen buttons or as typed, change what one took, take one off
     function addExtraTo(d, x){
       const cur = mealRec();
       if (!x.name || QM.extrasOf(cur, d.id).some(y => QM.xKey(y.n) === QM.xKey(x.name))) return;   // already on this dish
@@ -2912,34 +3000,41 @@
         if (tk) { q = guess == null ? null : tk.q; u = tk.u; }
         if (r0.K !== G.kitchen) { G.kitchen = r0.K; if (r0.id) kitEatToast(r0.K, [r0.id]); }
       }
-      putRec(QM.addExtra(cur, d.id, { n:x.name, q, u })); redraw();
+      putRec(QM.addExtra(cur, d.id, { n:x.name, q, u })); syncFoods(); redraw();
     }
     function dropExtraFrom(d, n){
       const r0 = QK() ? QK().eat(G.kitchen, kitToday(), xKeyOf(d, n), {}, false, now()) : { K:G.kitchen };
       if (r0.K !== G.kitchen) { G.kitchen = r0.K; if (r0.id) kitEatToast(r0.K, [r0.id]); }
       putRec(QM.dropExtra(mealRec(), d.id, n));
     }
-    const xDish = id => id === MEAL.id ? MEAL : dishById(id);   // the What did you eat? box is a dish of its own here
+    const xDish = id => id === MEAL.id ? MEAL : dishById(id);   // Something else is a dish of its own here
     sh.querySelectorAll("[data-xs]").forEach(inp => {
-      const d = xDish(inp.dataset.xs), box = d && sh.querySelector(`[data-xres="${d.id}"]`); if (!box) return;
-      // the results change in place as he types (a redraw would drop the keyboard)
-      inp.oninput = () => { box.innerHTML = xResults(d, inp.value); };
+      const d = xDish(inp.dataset.xs), box = d && sh.querySelector(`[data-xres="${d.id}"]`), fw = d && sh.querySelector(`[data-xfw="${d.id}"]`); if (!box) return;
+      /* typing narrows the kitchen buttons to what matches (QuestKitchen.search) and offers the words as typed; in place,
+         since a redraw would drop the keyboard */
+      inp.oninput = () => {
+        const t = inp.value.trim(), hit = t ? new Set(QK().search(G.kitchen, kitToday(), t).map(x => x.id)) : null;
+        box.querySelectorAll("[data-xit]").forEach(x => { x.hidden = !!hit && !hit.has(x.dataset.xit); });
+        box.querySelectorAll(".mq-kg").forEach(g => { g.hidden = !g.querySelector("[data-xit]:not([hidden])"); });
+        if (fw) fw.innerHTML = t ? `<button type="button" class="mq-mini go mq-xfree" data-xfree>Add "${esc(t.slice(0, 40))}"</button>` : "";
+      };
       inp.onkeydown = e => { if (e.key === "Enter" && inp.value.trim()) { e.preventDefault(); addExtraTo(d, QK().extraParse(G.kitchen, kitToday(), inp.value)); } };
+      if (fw) fw.onclick = e => { if (e.target.closest("[data-xfree]") && inp.value.trim()) addExtraTo(d, QK().extraParse(G.kitchen, kitToday(), inp.value)); };
       box.onclick = e => {
-        const it = e.target.closest("[data-xit]"), fr = e.target.closest("[data-xfree]");
-        if (it) {
-          const item = QK().item(G.kitchen, it.dataset.xit); if (!item) return;
-          // "6 almonds" typed, then Almonds tapped: the 6 goes with it
-          const p = QK().extraParse(G.kitchen, kitToday(), inp.value), same = p.it && p.it.id === item.id;
-          addExtraTo(d, { name:item.name, it:item, q:same ? p.q : null, u:same ? p.u : "", lost:same ? p.lost : null });
-        } else if (fr && inp.value.trim()) addExtraTo(d, QK().extraParse(G.kitchen, kitToday(), inp.value));
+        const it = e.target.closest("[data-xit]"); if (!it) return;
+        const item = QK().item(G.kitchen, it.dataset.xit); if (!item) return;
+        // "6 almonds" typed, then Almonds tapped: the 6 goes with it
+        const p = QK().extraParse(G.kitchen, kitToday(), inp.value), same = p.it && p.it.id === item.id;
+        addExtraTo(d, { name:item.name, it:item, q:same ? p.q : null, u:same ? p.u : "", lost:same ? p.lost : null });
       };
     });
     sh.querySelectorAll("[data-xoff]").forEach(bn => bn.onclick = () => {
       const d = xDish(bn.dataset.xoff); if (!d) return;
       const fx = window.QuestFx; if (fx) fx.back(bn.getBoundingClientRect(), { gain:0 });
-      dropExtraFrom(d, bn.dataset.xn); redraw();
+      dropExtraFrom(d, bn.dataset.xn); syncFoods(); redraw();
     });
+    // the Counted line, redrawn in place after a change that does not redraw the sheet
+    const recount = () => { const c = sh.querySelector("[data-mcount]"); if (c) c.outerHTML = counted(mealRec()); };
     sh.querySelectorAll("[data-xq]").forEach(inp => inp.onchange = () => {
       const d = xDish(inp.dataset.xq); if (!d) return;
       const raw = String(inp.value).trim(), v = QK().numOf(raw), q = raw === "" || isNaN(v) ? null : Math.max(0, v);
@@ -2950,6 +3045,7 @@
       const sm = inp.closest(".mq-take") && inp.closest(".mq-take").querySelector("small");
       const x = QM.extrasOf(mealRec(), d.id).find(y => QM.xKey(y.n) === QM.xKey(inp.dataset.xn));
       if (sm && x) sm.textContent = xWord(d, x);
+      syncFoods(); recount();
       render();
     });
     // d78: Keep X in the dish: X joins his dish (its amount as the usual one) and becomes an ingredient tick on this meal
@@ -2976,8 +3072,34 @@
         .concat(QM.extrasOf(mealRec(), MEAL.id).map(x => ({ name:x.n, amt:x.q == null ? "" : QK().fmtQ(x.q, x.u) })));
       if (foods.length) openDishEdit(b, { ...dishNew(), foods, from:"meal" });
     });
-    // the kitchen (d44, d47): how much a tick took, and old "From your kitchen" ticks (now rows of What did you eat?)
-    kitMealBind(sh, k, redraw, b);
+    // the kitchen (d44, d47): how much a tick took, and old "From your kitchen" ticks (now rows of Something else)
+    kitMealBind(sh, k, redraw, b, () => { syncFoods(); recount(); });
+    /* One dish per meal: a choice card makes it this meal (rec.m). Changing to another dish first takes the old one off,
+       ticks and added foods, which puts back what it took (asked once when anything was ticked); Blueprint points it paid
+       come back off with its ticks. */
+    sh.querySelectorAll("[data-mchange]").forEach(bn => bn.onclick = () => {
+      if (chg) mqOpen.delete(k + "|change"); else mqOpen.add(k + "|change");
+      redraw(true);
+    });
+    sh.querySelectorAll("[data-mpick]").forEach(bn => bn.onclick = () => {
+      const id = bn.dataset.mpick, to = xDish(id); if (!to) return;
+      mqOpen.delete(k + "|change");
+      if (id === mainId && onIds.length === 1) { redraw(true); return; }
+      const cur = mealRec(), off = onIds.filter(x => x !== id);
+      const busy = off.filter(x => x === MEAL.id ? QM.extrasOf(cur, x).length || oldEat.length : QM.onMeal(cur).includes(x) && (dishOn({ id:x }).length || QM.extrasOf(cur, x).length));
+      if (busy.length && !confirm(`Change this meal to ${to.name}? What ${busy.map(x => (xDish(x) || {}).name || "it").join(" and ")} took goes back to the kitchen.`)) { redraw(true); return; }
+      const fx = window.QuestFx;
+      off.forEach(x => {
+        const d = xDish(x); if (!d) return;
+        QM.extrasOf(mealRec(), x).forEach(e => dropExtraFrom(d, e.n));
+        if (x === MEAL.id) {   // old From your kitchen ticks
+          oldEat.forEach(e => { const r0 = QK().eat(G.kitchen, kitToday(), kPre + e.id, { id:e.id }, false, now()); if (r0.K !== G.kitchen) kitSave(r0.K); });
+        } else if (dishOn(d).length) tickDish(d, "none", undefined, fx);
+      });
+      putRec(QM.setPick(mealRec(), id));
+      syncFoods();
+      redraw();
+    });
     // his own dishes (d48): New dish and Edit open the dish editor, which comes back here
     sh.querySelectorAll("[data-dnew]").forEach(bn => bn.onclick = () => openDishEdit(b, dishNew()));
     sh.querySelectorAll("[data-dedit]").forEach(bn => bn.onclick = () => { const d = QK().ownDish(G.kitchen, bn.dataset.dedit); if (d && !d.del) openDishEdit(b, dishNew(d)); });
@@ -3005,7 +3127,7 @@
   const kitHaveWord = x => QK().hasQ(x) ? (x.lv === 0 ? "none left" : `have ${x.amt}`) : QK().ASK;
   // beside a "took": what is left of an amount item; an item with no number (d70) had nothing taken off
   const kitLeftWord = (it, tk) => tk && tk.nq ? "nothing taken off" : it.lv === 0 ? "none left" : `${it.amt} left`;
-  function kitMealBind(sh, mk, redraw, b){
+  function kitMealBind(sh, mk, redraw, b, after){
     if (!QK()) return;
     sh.querySelectorAll("[data-take]").forEach(inp => inp.onchange = () => {
       const v = QK().numOf(inp.value);   // ".5" and "½" are half (2026-10-21)
@@ -3017,6 +3139,7 @@
          "left" words change here (the next redraw draws the rest). */
       const sm = inp.closest(".mq-take") && inp.closest(".mq-take").querySelector("small");
       if (sm && it) sm.textContent = kitLeftWord(it, tk);
+      if (after) after();   // the meal's food tiles follow what it took (d83)
       render();
     });
     sh.querySelectorAll("[data-kown]").forEach(bn => bn.onclick = () => {
@@ -3024,7 +3147,7 @@
       if (!it) return;
       const r = QK().eat(G.kitchen, kitToday(), key, { id, note:true }, on, now(), on ? QK().firstTake(it) : null);
       if (r.K === G.kitchen) return;
-      kitSave(r.K); if (r.id) kitEatToast(r.K, [r.id]); redraw();
+      kitSave(r.K); if (r.id) kitEatToast(r.K, [r.id]); if (after) after(); redraw();
     });
   }
   /* ---------- his own dishes (Junyan, 2026-10-21, d48: "I need a create a dish where I can just click on it and then

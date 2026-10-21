@@ -62,13 +62,15 @@ test("a meal block opens one screen that is the meal: no plate list, no Rate thi
   assert.equal([...html.matchAll(/openMeal\(/g)].length, 5, "the definition, the block tap, the redraw after a tap, the planner's button, the dish editor's way back (d48)");
 });
 
-test("the meal screen is grouped Prana foods, Body foods, Drains in the meters' colours, and loads quest-meals.js", () => {
+test("the meal screen (d83 to d85): What's this meal?, the Counted line, then the drains; no food tile grids, no note on the automatic drains", () => {
   const i = html.indexOf("function openMeal(b)"), body = html.slice(i, html.indexOf("The meal sheet's kitchen parts"));
-  const a = body.indexOf("Prana foods"), b = body.indexOf("Body foods"), c = body.indexOf("Drains");
-  assert.ok(a > 0 && b > a && c > b, "groups out of order or missing");
-  assert.ok(/<script src="quest-meals\.js\?v=\w+"><\/script>/.test(html));
-  assert.ok(body.includes("QM.AUTO_NOTE"), "the automatic drains are named in the quiz");
-  assert.ok(body.includes("QM.tap("), "each tile pays as he taps");
+  const a = body.indexOf("What's this meal?"), b = body.indexOf("${counted()}"), c = body.indexOf("Drains · lower prana");
+  assert.ok(a > 0 && b > a && c > b, "out of order or missing");
+  assert.ok(!/Prana foods · Sadhguru|Body foods · Bryan Johnson/.test(body), "d83: the tile grids are gone");
+  assert.ok(/<script src="quest-meals\.js\?v=\w+"><\/script>\s*<script src="quest-food-score\.js\?v=\w+"><\/script>/.test(html));
+  assert.ok(!/AUTO_NOTE|Eating within 3 hours of bed and staying up past 11 count by themselves/.test(html + fs.readFileSync(new URL("../quest-meals.js", import.meta.url), "utf8")), "d85: the note is gone");
+  assert.ok(body.includes("QM.handTap("), "a drain pays as he taps");
+  assert.ok(body.includes("QM.autoSync(") && body.includes("FSC().earn(foods, { morning })"), "the food tiles follow what was logged");
 });
 
 test("tiles pay as he taps, and a second tap takes back exactly what was paid", () => {
@@ -234,10 +236,11 @@ test("the meal sheet: a How to eat box, Blueprint dishes and tonight's ideas fir
   const i = html.indexOf("function openMeal(b)"), body = html.slice(i, html.indexOf("A walk, hike or other outdoor block"));
   assert.ok(body.includes("How to eat") && body.includes("QM.TIPS"));
   assert.ok(!/QM\.PRANA_WAYS\.map|How you ate|⏳ Sit with the food/.test(body), "the how-you-ate tiles and the old line are gone");
-  const t = body.indexOf("QM.TIPS"), d = body.indexOf("Blueprint dishes"), id = body.indexOf("Tonight's ideas · for 2 people"), p = body.indexOf("Prana foods");
-  assert.ok(t > 0 && d > t && id > d && p > id, "tips, dishes, ideas, then the tiles");
+  // one dish per meal (2026-10-21): the choices first (Blueprint, his dishes, recipes or ideas), the tips at the end
+  const d = body.indexOf('"Blueprint dishes"'), y = body.indexOf('"Your dishes"'), id = body.indexOf("Tonight's ideas · for 2 people"), t = body.indexOf("QM.TIPS");
+  assert.ok(d > 0 && y > d && id > y && t > id, "dishes, his dishes, ideas, then the tips");
   assert.ok(body.includes("QM.tick("), "the dish checklists pay through QuestMeals.tick");
-  assert.ok(body.includes("Got everything") && body.includes("Clear"));
+  assert.ok(!/>Got everything<|>Clear</.test(body), "ticking part by part does the job (2026-10-21)");
   assert.ok(!/fill body \(Bryan Johnson\)/.test(body), "the long heading that wrapped is gone");
   assert.match(html, /\.mq-lb \{[^}]*white-space:nowrap/);
   assert.match(html, /\.hgrid\.mqg \{ grid-template-columns:repeat\(4, 1fr\)/);
@@ -314,7 +317,7 @@ test("d18: a finished Super Veggie or Nutty Pudding counts as the Blueprint meal
 
 test("d17 d18 on the page: the meal sheet passes the day's slots and counts a finished dish in the habit", () => {
   const i = html.indexOf("function openMeal(b)"), body = html.slice(i, html.indexOf("A walk, hike or other outdoor block"));
-  assert.match(body, /const r = QM\.tick\(cur && !cur\.kind \? cur : null, d, how, dishOpt\(k, d\)\);/);
+  assert.match(body, /const r = QM\.tick\(cur, d, how, dishOpt\(k, d\)\);/);
   assert.match(body, /if \(r\.done > 0\) G\.day\.habits\.blueprint = \(G\.day\.habits\.blueprint \|\| 0\) \+ 1;/);
   assert.match(body, /else if \(r\.done < 0\) \(G\.day\.voided = G\.day\.voided \|\| \{\}\)\.blueprint = \(\(G\.day\.voided \|\| \{\}\)\.blueprint \|\| 0\) \+ 1;/);
   assert.match(html, /dish:h\[2\], dim:DIM, dishLimit:h\[3\] \}/);

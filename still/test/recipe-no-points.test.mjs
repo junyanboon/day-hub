@@ -81,5 +81,7 @@ test("d81: an idea that paid before and was since cleared keeps its card on the 
   const cleared = QM.tick(old, d, "none", opt).rec;
   assert.equal(cleared.dish.r1, undefined);
   assert.deepEqual(J(QM.heldIds(cleared)).sort(), ["r1", "sv"], "the paid record keeps r1, tiles are not dishes");
-  assert.match(sheet, /ideas = IT\.list\.concat\(QM\.heldIds\(rec\)/, "the meal sheet lists held dishes, not only ticked ones");
+  // one dish per meal (2026-10-21): the meal lists what its record holds (QM.onMeal uses heldIds)
+  assert.ok(sheet.includes("const onIds = QM.onMeal(rec)"), "the meal sheet lists held dishes, not only ticked ones");
+  assert.deepEqual(J(QM.onMeal(cleared)).sort(), ["r1", "sv"]);
 });

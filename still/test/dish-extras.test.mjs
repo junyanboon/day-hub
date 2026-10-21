@@ -183,13 +183,12 @@ test("From your kitchen lists items with no amount too (levels retired: an old O
   assert.ok(/note:\s*true/.test(html.slice(html.indexOf("function kitMealBind"))), "a level item tick is recorded, nothing taken off");
 });
 
-test("d70, d74, d75 on the page: every dish card ends with the search box itself, free text, ticked extras with took; no button, no helper text", () => {
+test("d70, d74, d75 on the page (one dish per meal, 2026-10-21: the search box moved to the kitchen buttons of the open meal): ticked extras with took, free text, no button, no helper text", () => {
   const body = html.slice(html.indexOf("const slotCard = d =>"), html.indexOf("function kitMealBind"));
-  assert.equal((body.match(/\$\{extrasBlock\(d\)\}<\/div>`/g) || []).length, 1, "the part dishes end with it");
-  assert.ok(body.includes("${d.own || d.recipe ? xSearch(d) : extrasBlock(d)}</div>`"), "his own dishes and recipes end with the box alone (d78); other plain dishes keep Also went in");
+  assert.ok(body.includes("${extrasBlock(d)}"), "a part dish shows Also went in");
+  assert.ok(body.includes("(d.own || d.recipe ? \"\" : extrasBlock(d))"), "his own dishes and recipes list added foods in their own list (d78)");
   assert.ok(!/>\+ Add something you put in<|data-xadd/.test(html), "d74: no + Add something you put in button");
-  const xb = html.slice(html.indexOf("const xSearch = (d, aria, ph) =>"), html.indexOf("const slotCard = d =>"));
-  assert.ok(xb.includes('ph || "Search the kitchen, or type a food and amount"') && !/open \?/.test(xb), "the box is always there");
+  assert.ok(!html.includes("const xSearch ="), "no search box on the dish cards");
   assert.ok(/data-xq=/.test(html) && /data-xoff=/.test(html) && /data-xfree/.test(html) && /data-xit=/.test(html));
   assert.ok(!/Extras earn no points|Something in the kitchen with an amount comes off/.test(html), "d75: no helper line");
   assert.ok(!/Add it as you typed it; nothing comes off|Type a food and how much/.test(html), "d75: no other helper text in the panel");
