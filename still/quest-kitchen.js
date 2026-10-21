@@ -882,7 +882,7 @@
     if (rec && !rec.off) return { K, id: null };
     const it = r.id ? item(K, r.id) : match(K, k, r.name);
     if (!it || it.del || it.k !== k || !(hasQ(it) || r.note)) return { K, id: null };
-    const u = unitOf(it);
+    const u = !hasQ(it) && ["", "g", "ml"].includes(r.u) ? r.u : unitOf(it);   // a level item: the unit he typed ("6 almonds")
     const q = typeof amount === "number" ? amount : recipeIn(amount, u);
     const out = clone(K);
     out.used = { ...obj(out.used), [key]: { id: it.id, q: Math.max(0, Math.round((+q || 0) * 10) / 10), u, ...(hasQ(it) ? {} : { nq: true }), t: iso(at), at: iso(at) } };
@@ -1145,7 +1145,7 @@
   // (d42) an amount item's status already is its amount
   const tileLine = (it, now, shopAt, tz) => status(it, now, shopAt, tz) + (it && it.amt && !hasQ(it) ? ` · ${it.amt}` : "");
 
-  root.QuestKitchen = { NEED, LEVELS, KITCHENS, SEED, FRESH, DEFAULT_SHOP, GROUP_NAMES, GROUP_ICONS, keyOf, iconFor, groupIcon, splitName, amtOf, tileLine, guessGroup, guessShelf, firstTake, mealList, extraParse, search,
+  root.QuestKitchen = { NEED, LEVELS, KITCHENS, SEED, FRESH, DEFAULT_SHOP, GROUP_NAMES, GROUP_ICONS, keyOf, iconFor, groupIcon, splitName, amtOf, tileLine, guessGroup, guessShelf, firstTake, mealList, extraParse, search, unitOf,
     items, item, grouped, setLevel, nextLevel, tap, add, rename, move, place, remove, status, shows, pace, lowAt, lowSoon, turnAt, useFirst, nextShop, parseAmt, usesOf, amountFor,
     shopList, missing, MAX_RECIPE_ROWS, stepList, tick, buyTicked, hasQ, isPiece, pieceCount, stepCount, unitFor, qtyOf, fmtQ, recipeIn, perMeal, setAmount, restock, rateOf, toBuy, eat, setTake, taken, portion, serving, ownDishes, ownDish, saveDish, delDish, dishAmt, dishIcon, kitchenFoods, TRAVEL_STARTER, pickList, preTick, fill, unfill, shopInfo, shopWhen, shopUpto, match, dinner, active, pick, noteActive, tripEnd, bringHome, dayWord, counts };
 })(typeof window !== "undefined" ? window : globalThis);

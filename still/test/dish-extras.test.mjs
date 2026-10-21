@@ -157,6 +157,10 @@ test("d70: an extra of a kitchen item with an amount takes off through a tick re
   assert.equal(K.item(k, blue).left, 300);
   k = K.eat(k, "travel", "x2", { id: ban }, false, at(2)).K;
   assert.equal(K.taken(k, "x2"), null);
+  // a level item keeps the unit he typed ("6 almonds" on almonds kept by weight)
+  let a = travel([["Almonds", 3]]);
+  a = K.eat(a, "travel", "x5", { id: idOf(a, "Almonds"), note: true, u: "" }, true, at(0), 6).K;
+  assert.deepEqual(J([K.taken(a, "x5").q, K.taken(a, "x5").u]), [6, ""]);
   // without note a level item is left alone, as before
   assert.equal(K.eat(travel([["Kale", 3]]), "travel", "x9", { name: "Kale" }, true, at(0), "100 g").id, null);
 });

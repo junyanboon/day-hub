@@ -163,7 +163,7 @@ test("d51 to d53 on the page: parts with swaps and Use something else, How to ma
   const ed = html.slice(html.indexOf("function openDishEdit("), html.indexOf("A walk, hike or other outdoor block"));
   assert.ok(ed.includes('id="deSteps"') && ed.includes("steps:S.steps"));
   assert.match(html, /r\.why === "none" \? "not in the kitchen"/);
-  for (const [f, v] of [["quest-meals", "d70"], ["quest-kitchen", "d70b"], ["quest-ideas", "d69b"]]) assert.match(html, new RegExp(`${f}\\.js\\?v=20261021${v}"`), f);
+  for (const [f, v] of [["quest-meals", "d70"], ["quest-kitchen", "d70d"], ["quest-ideas", "d69b"]]) assert.match(html, new RegExp(`${f}\\.js\\?v=20261021${v}"`), f);
   assert.match(body, /p\.rows\.filter\(r => r\.on \|\| r\.st !== "none"\)\.map\(r => r\.entry\)/, "Got everything skips foods marked none in the kitchen");
   assert.ok(!/[—–]/.test(body.match(/For 2 people\. Each part[^<]*/)[0]));
 });

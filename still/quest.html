@@ -950,7 +950,7 @@
 <script src="quest-levels.js?v=20261016b"></script>
 <script src="quest-gymlog.js?v=20261019a"></script>
 <script src="quest-meals.js?v=20261021d70"></script>
-<script src="quest-kitchen.js?v=20261021d70b"></script>
+<script src="quest-kitchen.js?v=20261021d70d"></script>
 <script src="quest-ideas.js?v=20261021d69b"></script>
 <script src="quest-trends.js?v=20261019end3"></script>
 <script src="nvc-words.js?v=20261010a"></script>
@@ -2813,9 +2813,12 @@
       let q = x.q, u = x.u || "";
       if (x.lost) calToast(`${x.name} is kept in ${kitUnit(x.it.u) || "pieces"} in the kitchen, so "${x.lost}" could not come off as typed. Change how much it took.`, 5000);
       if (x.it) {
-        const r0 = QK().eat(G.kitchen, kitToday(), xKeyOf(d, x.name), { id:x.it.id, note:true }, true, now(), q ?? QK().firstTake(x.it));
+        /* nothing typed: an amount item's portion, one of a piece food; a level item kept by weight (collagen) is left
+           blank for him to fill in, never a made-up 100 g */
+        const guess = q ?? (typeof x.it.q === "number" || QK().unitOf(x.it) === "" ? QK().firstTake(x.it) : null);
+        const r0 = QK().eat(G.kitchen, kitToday(), xKeyOf(d, x.name), { id:x.it.id, note:true, ...(x.q != null ? { u } : {}) }, true, now(), guess ?? 0);
         const tk = QK().taken(r0.K, xKeyOf(d, x.name));
-        if (tk) { q = tk.q; u = tk.u; }
+        if (tk) { q = guess == null ? null : tk.q; u = tk.u; }
         if (r0.K !== G.kitchen) { G.kitchen = r0.K; if (r0.id) kitEatToast(r0.K, [r0.id]); }
       }
       putRec(QM.addExtra(cur, d.id, { n:x.name, q, u })); redraw();
