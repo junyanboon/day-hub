@@ -65,6 +65,13 @@
     return TIPS[(i + TIPS.length) % TIPS.length];
   }
   const tipShows = (s, e, t) => +t >= +s - TIP_LEAD && +t < +e;
+  // the tip for meal block b at time t, or null when it is not on (or about to start). meals = the plan's meal blocks
+  // ({ key, s, e }), dayOf = the page's game day of a time (the day runs to 4 AM)
+  function tipOn(b, meals, t, dayOf){
+    if (!b || !tipShows(b.s, b.e, t)) return null;
+    const ymd = dayOf(b.s), n = meals.filter(x => dayOf(x.s) === ymd).findIndex(x => x.key === b.key);
+    return tipFor(ymd, Math.max(0, n));
+  }
   // the body food tiles (2026-10-20, d16): the Blueprint dishes have their own checklists, and supplements, fermented
   // food and xylitol are on the water card, so those four left this list. Same values and daily limits as before.
   const BODY = ["protein", "legumes", "veg", "greens", "evoo", "nuts", "berries", "seeds"];
@@ -518,6 +525,6 @@
     return t;
   }
 
-  root.QuestMeals = { PRANA_FOODS, PRANA_WAYS, TIPS, TIP_LEAD, tipFor, tipShows, DRAINS, BODY, LEGACY_BODY, JUNK, ONEOF, FOOD_IDS, DRAIN_IDS,
+  root.QuestMeals = { PRANA_FOODS, PRANA_WAYS, TIPS, TIP_LEAD, tipFor, tipShows, tipOn, DRAINS, BODY, LEGACY_BODY, JUNK, ONEOF, FOOD_IDS, DRAIN_IDS,
     DISH_VALUE, DISHES, TRAVEL, BLUEPRINT, CORE, dishesFor, IDEAS, SLOTS, STEPS, isSlotDish, slotOf, entryName, extrasOf, addExtra, dropExtra, setExtraQ, xKey, entriesOf, filledOf, partsOf, stepsOf, SHORT, tileLabel, value, score, toggle, tally, tap, meterOf, dishOf, groupOf, pays, slotsUsed, dishMax, capOf, dishPay, dishStatus, tick, dishPaid, heldIds, pickOf, onMeal, setPick, AUTO_IDS, autoSync, handTap };
 })(typeof window !== "undefined" ? window : globalThis);

@@ -996,7 +996,7 @@
 <script src="quest-oura.js?v=20261019a"></script>
 <script src="quest-levels.js?v=20261016b"></script>
 <script src="quest-gymlog.js?v=20261019a"></script>
-<script src="quest-meals.js?v=20261021d88"></script>
+<script src="quest-meals.js?v=20261021d88b"></script>
 <script src="quest-food-score.js?v=20261021d87t"></script>
 <script src="quest-kitchen.js?v=20261021h81b"></script>
 <script src="quest-ideas.js?v=20261021d76"></script>
@@ -2210,11 +2210,12 @@
   /* d88 (Junyan, 2026-10-21): one How to eat tip on the meal block itself, only while it is on or in the 10 minutes
      before it starts (QuestMeals.tipShows), never on past or future meals. It turns by date and by which meal of the
      day this is (tipFor). A line to read, no points. */
-  function mealTip(b, all, t){
-    if (!b || !isMeal(b) || !QM.tipShows || !QM.tipShows(b.s, b.e, t)) return "";
-    const ymd = tzYmd(b.s), n = all.filter(x => isMeal(x) && tzYmd(x.s) === ymd).findIndex(x => x.key === b.key);
-    const [icon, , line] = QM.tipFor(ymd, Math.max(0, n));
-    return `<div class="mealtip"><span aria-hidden="true">${icon}</span>${esc(shortName(b))} · ${esc(line)}</div>`;
+  function mealTip(b, all, t, named){
+    if (!b || !isMeal(b) || !QM.tipOn) return "";
+    const tp = QM.tipOn(b, all.filter(isMeal), t, gameDayOf); if (!tp) return "";
+    // the cards already name the meal in their title; the Next line names it ("Dinner · sit two minutes first")
+    const line = named ? `${esc(shortName(b))} · ${esc(tp[2])}` : esc(tp[2].replace(/^./, c => c.toUpperCase()));
+    return `<div class="mealtip"><span aria-hidden="true">${tp[0]}</span>${line}</div>`;
   }
   // d78: a meal that ends less than 3 hr before bed or practice
   function mealWarn(b, all){
@@ -2605,7 +2606,8 @@
      pop; a second tap takes it back. No plate checklist, no separate rating step, no Confirm.
      Eating within 3 hours of bed and staying up past 11 stay automatic.
      2026-10-20 ("Fill the Plate", d12 to d16):
-     - How he ate is a "How to eat" tip box at the top, no points (d15). A meal rated before keeps what it paid.
+     - How he ate is tips, no points (d15). A meal rated before keeps what it paid. Since d88 (2026-10-21) the tips are
+       not on this sheet: one shows on the meal block on the Right now card (mealTip).
      - Blueprint dishes first (d13): Super Veggie and Nutty Pudding, then tonight's three ideas for 2 people, each a card
        that opens its ingredient checklist with amounts. A dish pays body as its ingredients are ticked, up to the
        Blueprint meal's value (+9 at level 1), each dish on its own; an untick or Clear takes its share back
@@ -6507,7 +6509,7 @@
     const qt = $("main").querySelector(".quest-title"), tb = cur || nxt;
     if (qt && tb && !z && tb.kind !== "open") qt.onclick = () => openStop(tb);
 
-    put("nextLine", cur && nxt && !z ? `<div class="next"><span>Next: <b>${esc(shortName(nxt))}</b></span><span>${fmtT(nxt.s)}</span></div>${isMeal(cur) ? "" : mealTip(nxt, all, t)}` : "");
+    put("nextLine", cur && nxt && !z ? `<div class="next"><span>Next: <b>${esc(shortName(nxt))}</b></span><span>${fmtT(nxt.s)}</span></div>${isMeal(cur) ? "" : mealTip(nxt, all, t, true)}` : "");
 
     // Change course is gone (2026-10-14): the calendar below is changed in place. The button only shows during a logged interruption
     $("zap").hidden = !z;

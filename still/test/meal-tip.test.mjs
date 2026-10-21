@@ -40,6 +40,19 @@ test("the tip shows only while the meal is on, and from 10 minutes before it sta
   assert.equal(M.tipShows(new Date(s), new Date(e), new Date(s)), true, "Date objects too");
 });
 
+test("tipOn: the meal's place among its game day's meals picks the tip, only while it shows", () => {
+  const H = 3600000, dayOf = d => new Date(+d - 4 * H).toISOString().slice(0, 10);
+  const at = h => Date.UTC(2026, 9, 21, h), meals = [
+    { key: "late", s: at(1), e: at(2) },              // 1 AM: still the 20th's game day
+    { key: "bk", s: at(8), e: at(9) }, { key: "ln", s: at(12), e: at(13) }, { key: "dn", s: at(18), e: at(19) }];
+  assert.deepEqual(J(M.tipOn(meals[2], meals, at(12) + 60000, dayOf)), J(M.tipFor("2026-10-21", 1)), "lunch is the 2nd meal of the 21st");
+  assert.deepEqual(J(M.tipOn(meals[1], meals, at(8) - 5 * 60000, dayOf)), J(M.tipFor("2026-10-21", 0)), "breakfast, 5 minutes before");
+  assert.deepEqual(J(M.tipOn(meals[0], meals, at(1), dayOf)), J(M.tipFor("2026-10-20", 0)), "a 1 AM meal belongs to the day before");
+  assert.equal(M.tipOn(meals[3], meals, at(12), dayOf), null, "a later meal shows nothing");
+  assert.equal(M.tipOn(meals[1], meals, at(10), dayOf), null, "a past meal shows nothing");
+  assert.equal(M.tipOn(null, meals, at(10), dayOf), null);
+});
+
 test("the meal sheet has no How to eat box any more", () => {
   assert.ok(!sheet.includes("QM.TIPS") && !sheet.includes("How to eat") && !sheet.includes("mq-tips"));
   assert.ok(!/\.mq-tips\s*\{/.test(html), "its style left too");
@@ -48,14 +61,13 @@ test("the meal sheet has no How to eat box any more", () => {
 test("the page draws the tip on the meal block on the Right now card, the between card and the Next line only", () => {
   const fn = html.slice(html.indexOf("function mealTip("), html.indexOf("// d78: a meal that ends less than 3 hr"));
   assert.ok(fn.includes("if (!b || !isMeal(b)"), "only meal blocks");
-  assert.ok(fn.includes("QM.tipShows(b.s, b.e, t)"), "only while it is on, or 10 minutes before");
-  assert.ok(fn.includes("QM.tipFor("), "turned by date and meal");
+  assert.ok(fn.includes("QM.tipOn(b, all.filter(isMeal), t, gameDayOf)"), "on now or 10 minutes before, turned by game day and meal");
   assert.ok(!/addPrana|addBody|logHabit|xp/.test(fn), "no points");
   const main = html.slice(html.indexOf("// main card"), html.indexOf('put("main", html);'));
   assert.ok(main.includes("mealTip(cur, all, t)"), "the meal on now");
   assert.ok(main.includes("mealTip(nxt, all, t)"), "a meal about to start, between blocks");
   const nl = html.slice(html.indexOf('put("nextLine"'), html.indexOf('put("nextLine"') + 400);
-  assert.ok(nl.includes("mealTip(nxt, all, t)") && nl.includes('isMeal(cur) ? "" : mealTip(nxt, all, t)'), "a meal about to start after another block");
+  assert.ok(nl.includes('isMeal(cur) ? "" : mealTip(nxt, all, t, true)'), "a meal about to start after another block");
   assert.match(html, /\.mealtip \{[^}]*white-space:nowrap[^}]*text-overflow:ellipsis/, "one line");
   const cal = html.slice(html.indexOf("function calendarHTML("), html.indexOf("function calDayLine("));
   assert.ok(!cal.includes("mealTip("), "nothing on calendar blocks, past or future");
