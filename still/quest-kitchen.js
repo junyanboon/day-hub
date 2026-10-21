@@ -595,25 +595,43 @@
     }
     return { groups, count: rows.length, dinners };
   }
-  /* The full Blueprint recipes on the list (Junyan, 2026-10-21, d53: "First I will need to be encouraged based on the
-     grocery list"; "it can just put it on my shopping list, no notes needed"). Every real ingredient of Super Veggie and
-     Nutty Pudding (QuestMeals.DISHES) that the home kitchen does not have at all (never added, or deleted) is a plain row
-     on its list, like any other. Low and Out ones are on it already. It is a row only, not an item: id "n:<name key>",
+  /* The Blueprint recipes on the list (Junyan, 2026-10-21, d53: "First I will need to be encouraged based on the grocery
+     list"), kept short (d59: "I can't have all of these ingredients on my grocery list for travel ... we need something
+     manageable"). Only a dish's core parts (QuestMeals CORE: Super Veggie's greens, lentils or beans and mushroom; Nutty
+     Pudding's berries, nut milk and main nut; every part of a travel version) can put a row on the list by themselves,
+     and only when kitchen k has nothing at all for that part (not the real ingredient, nor any swap). The row is the
+     part's first real ingredient. At most MAX_RECIPE_ROWS such rows, the dishes taking turns. The minor extras (lecithin,
+     cinnamon, cocoa, spices, vinegar, oil) are never added for the recipe; they are on the list only when he has them and
+     they run Low or Out, like any item. A food he deleted from this kitchen is never put back by this rule.
+     Each kitchen reads its own dishes: home the full recipes, the travel fridge its travel versions (QuestMeals.dishesFor),
+     so nothing from the full home recipes goes on the travel list. A row only, not an item: id "n:<kitchen>:<name>",
      none:true, on the shelf it would go on. Ticking it and "Mark ticked items as bought", or "What did you buy?", adds it
-     to the kitchen. Home only: the travel fridge holds a few things for a trip, not the full recipes. */
-  const shortName = (name) => cap(String(name).split(",")[0].trim().replace(/^(fresh|extra virgin) /i, ""));
-  // dishes: the list shopList was given (its part dishes are the Blueprint ones), else QuestMeals.DISHES
+     to the kitchen. */
+  const MAX_RECIPE_ROWS = 5;
+  const shortName = (name) => cap(String(name).split(",")[0].replace(/\([^)]*\)/g, "").trim().replace(/^(fresh|extra virgin|baby) /i, ""));
+  // dishes: the list shopList was given, else QuestMeals.dishesFor(k); only part dishes of this kitchen count
   function missing(K, k, dishes) {
-    if (k !== "home") return [];
-    const have = new Set(items(K, k).map((x) => keyOf(x.name))), out = [];
-    const bp = arr(dishes || (root.QuestMeals && root.QuestMeals.DISHES)).filter((d) => d && Array.isArray(d.slots));
-    for (const d of bp) for (const [ing] of arr(d.items)) {
-      const key = keyOf(ing);
-      if (!key || have.has(key)) continue;
-      have.add(key);
-      const sd = SEED_ITEMS.find((x) => keyOf(x.name) === key), name = sd ? sd.name : shortName(ing), group = sd ? clean(sd).group : guessGroup(name);
-      out.push({ id: "n:" + slug(key), k, name, group, shelf: sd ? sd.shelf : guessShelf(k, group), em: sd ? sd.em : iconFor(name, group), lv: null, none: true });
-    }
+    if (!KITCHENS[k]) return [];
+    const QM = root.QuestMeals, list = dishes || (QM && QM.dishesFor ? QM.dishesFor(k) : QM && k === "home" ? QM.DISHES : []);
+    const bp = arr(list).filter((d) => d && Array.isArray(d.slots) && Array.isArray(d.core) && !!d.travel === (k === "travel"));
+    const mine = items(K, k), have = new Set(mine.map((x) => keyOf(x.name)));
+    // what he deleted from this kitchen (a catalogue item or his own): never put back for a recipe
+    const gone = new Set(Object.entries(obj(obj(K).items)).filter(([id, x]) => x && x.del && (x.k || (SEED_ITEMS.some((sd) => sd.id === id) ? "home" : null)) === k)
+      .map(([id, x]) => keyOf(x.name || (SEED_ITEMS.find((sd) => sd.id === id) || {}).name)));
+    // a part is covered when the kitchen has any food for it: a real ingredient, a swap, or a name its pattern matches
+    const covers = (w) => have.has(keyOf(w[0])) || arr(w[2]).some((n) => have.has(keyOf(n))) || (w[3] ? mine.some((it) => new RegExp(w[3], "i").test(it.name)) : false);
+    const queues = bp.map((d) => d.slots.filter((sl) => d.core.includes(sl.id) && !sl.want.some(covers))
+      .map((sl) => sl.want.map((w) => w[0]).find((n) => !gone.has(keyOf(n)))).filter(Boolean));
+    const out = [], seen = new Set();
+    for (let i = 0; out.length < MAX_RECIPE_ROWS && queues.some((q) => i < q.length); i++)
+      for (const q of queues) {
+        if (out.length >= MAX_RECIPE_ROWS || i >= q.length) continue;
+        const ing = q[i], key = keyOf(ing);
+        if (!key || seen.has(key) || have.has(key)) continue;
+        seen.add(key);
+        const sd = SEED_ITEMS.find((x) => keyOf(x.name) === key), name = sd ? sd.name : shortName(ing), group = sd ? clean(sd).group : guessGroup(name);
+        out.push({ id: `n:${k}:${slug(key)}`, k, name, group, shelf: sd && k === "home" ? sd.shelf : guessShelf(k, group), em: sd ? sd.em : iconFor(name, group), lv: null, none: true });
+      }
     return out;
   }
   /* What to buy of an amount item (d45): enough for his use until the shop after this one plus the low line, less what
@@ -1035,5 +1053,5 @@
 
   root.QuestKitchen = { NEED, LEVELS, KITCHENS, SEED, FRESH, DEFAULT_SHOP, GROUP_NAMES, GROUP_ICONS, keyOf, iconFor, groupIcon, splitName, amtOf, tileLine, guessGroup, guessShelf,
     items, item, grouped, setLevel, nextLevel, tap, add, rename, move, place, remove, status, shows, pace, lowAt, lowSoon, turnAt, useFirst, nextShop, parseAmt, usesOf, amountFor,
-    shopList, missing, stepList, tick, buyTicked, hasQ, unitFor, qtyOf, fmtQ, recipeIn, perMeal, setAmount, restock, rateOf, toBuy, eat, setTake, taken, portion, serving, ownDishes, ownDish, saveDish, delDish, dishAmt, dishIcon, kitchenFoods, TRAVEL_STARTER, pickList, preTick, fill, unfill, shopInfo, shopWhen, shopUpto, match, dinner, active, pick, noteActive, tripEnd, bringHome, dayWord, counts };
+    shopList, missing, MAX_RECIPE_ROWS, stepList, tick, buyTicked, hasQ, unitFor, qtyOf, fmtQ, recipeIn, perMeal, setAmount, restock, rateOf, toBuy, eat, setTake, taken, portion, serving, ownDishes, ownDish, saveDish, delDish, dishAmt, dishIcon, kitchenFoods, TRAVEL_STARTER, pickList, preTick, fill, unfill, shopInfo, shopWhen, shopUpto, match, dinner, active, pick, noteActive, tripEnd, bringHome, dayWord, counts };
 })(typeof window !== "undefined" ? window : globalThis);

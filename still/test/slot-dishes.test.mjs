@@ -82,26 +82,58 @@ test("d51: a swap tick takes the real ingredient's amount off the swap's own kit
   assert.equal(K.item(s.K, "h:pumpkin-seeds").left, 160);   // 4 tbsp about 40 g
 });
 
-test("d53: the full recipes go on the home shopping list: a food with no item at all is a plain row, and buying it adds it", () => {
-  let k = K.remove(stock([["h:walnuts", 3]]), "h:walnuts", at(-1));   // he deleted walnuts
-  const L = K.shopList(k, "home", T0, T0 + 3 * D, QM.DISHES);
-  const rows = L.groups.flatMap((g) => g.list.filter((r) => r.why === "none").map((r) => [g.shelf.id, r.it.name, r.it.id]));
-  assert.deepEqual(J(rows), [["pantry", "Walnuts", "n:walnut"], ["pantry", "Sunflower lecithin", "n:sunflower-lecithin"]]);
-  assert.ok(L.groups.flatMap((g) => g.list).find((r) => r.it.name === "Sunflower lecithin").uses.some((u) => u.dish === "Nutty Pudding"));
-  // the travel fridge never gets the full recipes
-  assert.equal(K.shopList({}, "travel", T0, T0 + 2 * D, QM.DISHES).count, 0);
-  // tick it, then Mark ticked items as bought: it is in the kitchen (the deleted walnuts come back), at Plenty, off the list
-  k = K.tick(K.tick(k, "n:walnut", at(0)), "n:sunflower-lecithin", at(0));
-  const b = K.buyTicked(k, "home", at(1));
-  assert.equal(b.n, 2);
-  const it = K.items(b.K, "home").filter((x) => /walnut|lecithin/i.test(x.name)).map((x) => [x.name, x.lv]);
-  assert.deepEqual(J(it), [["Walnuts", 3], ["Sunflower lecithin", 3]]);
-  assert.equal(K.shopList(b.K, "home", T0, T0 + 3 * D, QM.DISHES).groups.flatMap((g) => g.list).filter((r) => r.why === "none").length, 0);
-  // What did you buy? lists it at the top with no item yet, and filling it adds it
-  const pk = K.pickList(k, "home", "buy", T0, T0 + 3 * D, QM.DISHES).find((r) => r.name === "Sunflower lecithin");
-  assert.deepEqual(J([pk.top, pk.item, pk.shelf]), [true, null, "pantry"]);
-  const f = K.fill(k, "home", [pk], at(2), "buy");
-  assert.ok(K.items(f.K, "home").some((x) => x.name === "Sunflower lecithin" && x.lv === 3));
+test("d59: the recipe rows on a list are a short set of core foods, never the extras, and a deleted food is not put back", () => {
+  const none = (k, kk) => J(K.shopList(k, kk, T0, T0 + 3 * D, QM.dishesFor(kk)).groups.flatMap((g) => g.list.filter((r) => r.why === "none").map((r) => [g.shelf.id, r.it.name, r.it.id])));
+  assert.deepEqual(J(QM.DISHES.map((d) => d.core)), [["greens", "legume", "mushroom"], ["berries", "milk", "nuts"]]);
+  // home: the catalogue has a food for every core part, so nothing is added, and Sunflower lecithin no longer is
+  assert.deepEqual(none({}, "home"), []);
+  // he deleted the lecithin and walnuts: neither comes back
+  let k = K.remove(K.remove(stock([["h:walnuts", 3]]), "h:walnuts", at(-1)), "h:cocoa", at(-1));
+  assert.deepEqual(none(k, "home"), []);
+  // a core part with nothing at all (every legume deleted but chickpeas) is still covered by what is left
+  for (const id of ["h:black-lentils", "h:green-lentils", "h:white-beans"]) k = K.remove(k, id, at(-1));
+  assert.deepEqual(none(k, "home"), []);
+  // ...and once the chickpeas go too, the part is empty but its foods were all deleted by him: nothing is put back
+  assert.deepEqual(none(K.remove(k, "h:chickpeas", at(-1)), "home"), []);
+  // a core food the kitchen never had: its part's first real ingredient is a row (here the berries part, after he removed
+  // every berry the catalogue names; the deleted ones are skipped)
+  const cat = { items: { "h:blueberries": { id: "h:blueberries", k: "home", name: "Blueberries", del: true, at: at(-1) },
+    "h:cherries": { id: "h:cherries", k: "travel", name: "Cherries", shelf: "cool", at: at(-1) },
+    "h:frozen-berries": { id: "h:frozen-berries", k: "travel", name: "Frozen berries", shelf: "cool", at: at(-1) } } };
+  assert.deepEqual(none(cat, "home"), [["freezer", "Cherries", "n:home:cherry"]]);
+  // an extra he has and that runs Low is on the list like any item; one he does not have never is
+  const lec = K.add({}, "home", "pantry", "Sunflower lecithin", at(-5), "Other");
+  const low = K.setLevel(lec.K, lec.id, 1, at(-1), "tap");
+  const L = K.shopList(low, "home", T0, T0 + 3 * D, QM.DISHES).groups.flatMap((g) => g.list).map((r) => [r.it.name, r.why]);
+  assert.deepEqual(J(L), [["Sunflower lecithin", "low"]]);
+  // the passed list decides; a home dish never puts a row on the travel list
+  assert.deepEqual(J(K.missing({}, "travel", QM.DISHES)), []);
+});
+
+test("d58, d59: the travel list holds at most 5 of the travel versions' few foods, buying one adds it to the travel fridge", () => {
+  const rows = (k) => K.shopList(k, "travel", T0, T0 + 2 * D, QM.dishesFor("travel")).groups.flatMap((g) => g.list.filter((r) => r.why === "none").map((r) => [g.shelf.id, r.it.name]));
+  const empty = rows({});   // by shelf: cool box, then dry bag
+  assert.equal(empty.length, K.MAX_RECIPE_ROWS);
+  assert.deepEqual(J(empty), [["cool", "Spinach"], ["cool", "Almond milk"], ["cool", "Lemons"], ["dry", "Cooked lentils"], ["dry", "Chia seeds"]]);
+  const homeOnly = /shiitake|macadamia|lecithin|cocoa|cinnamon|pomegranate|flax|brazil|cumin|vinegar|oil|ginger|cauliflower/i;
+  assert.ok(!empty.some(([, n]) => homeOnly.test(n)), "nothing from the full home recipes");
+  // with the travel starter's Mixed nuts and some lentils in, those parts are covered and the next foods move up
+  let k = K.fill({}, "travel", [{ name: "Mixed nuts", group: "Nuts and seeds", shelf: "dry" }, { name: "Green lentils", group: "Legumes and grains", shelf: "dry" }], at(-5), "bring").K;
+  assert.deepEqual(J(rows(k)), [["cool", "Spinach"], ["cool", "Lemons"], ["cool", "Almond milk"], ["dry", "Chia seeds"], ["dry", "Hemp seeds"]]);
+  // tick one and Mark ticked items as bought: it is in the travel fridge, off the list
+  const id = K.missing(k, "travel").find((x) => x.name === "Chia seeds").id;
+  assert.equal(id, "n:travel:chia-seed");
+  const b = K.buyTicked(K.tick(k, id, at(0)), "travel", at(1));
+  assert.equal(b.n, 1);
+  assert.ok(K.items(b.K, "travel").some((x) => x.name === "Chia seeds" && x.lv === 3 && x.shelf === "dry"));
+  assert.ok(!K.items(b.K, "home").some((x) => x.name === "Chia seeds" && x.lv === 3), "home is untouched");
+  // a food he deleted from the travel fridge is not put back: with the green lentils gone the part is empty, so its real
+  // ingredient (cooked lentils) is offered, but not once he has deleted that too
+  const g = K.items(k, "travel").find((x) => x.name === "Green lentils");
+  const k2 = K.remove(k, g.id, at(0));
+  assert.ok(rows(k2).some(([, n]) => n === "Cooked lentils"));
+  const c = K.add(k2, "travel", "dry", "Cooked lentils", at(0), "Legumes and grains");
+  assert.ok(!rows(K.remove(c.K, c.id, at(0.5))).some(([, n]) => n === "Cooked lentils"));
 });
 
 test("d53: his own dishes take optional steps, one a line, kept with the dish", () => {
@@ -131,7 +163,56 @@ test("d51 to d53 on the page: parts with swaps and Use something else, How to ma
   const ed = html.slice(html.indexOf("function openDishEdit("), html.indexOf("A walk, hike or other outdoor block"));
   assert.ok(ed.includes('id="deSteps"') && ed.includes("steps:S.steps"));
   assert.match(html, /r\.why === "none" \? "not in the kitchen"/);
-  for (const f of ["quest-meals", "quest-kitchen", "quest-ideas"]) assert.match(html, new RegExp(`${f}\\.js\\?v=20261021d51`), f);
+  for (const [f, v] of [["quest-meals", "d57"], ["quest-kitchen", "d59"], ["quest-ideas", "d61"]]) assert.match(html, new RegExp(`${f}\\.js\\?v=20261021${v}"`), f);
   assert.match(body, /p\.rows\.filter\(r => r\.on \|\| r\.st !== "none"\)\.map\(r => r\.entry\)/, "Got everything skips foods marked none in the kitchen");
   assert.ok(!/[—–]/.test(body.match(/For 2 people\. Each part[^<]*/)[0]));
+});
+
+test("d57: Super Veggie's oil is 15 ml for the two of them, drizzled on at the end, and the list sizes it from that", () => {
+  assert.deepEqual(J(sv.items.find((x) => /olive oil/.test(x[0]))), ["Extra virgin olive oil", "15 ml"]);
+  assert.deepEqual(J(sv.slots.find((s) => s.id === "oil").want[0].slice(0, 2)), ["Extra virgin olive oil", "15 ml"]);
+  assert.ok(QM.stepsOf(sv).some((x) => /^Drizzle over the extra virgin olive oil at the end, 15 ml/.test(x)), QM.stepsOf(sv).join(" / "));
+  assert.equal(K.amountFor("Olive oil", QM.DISHES, 2).amt, "30 ml", "two dinners of 15 ml");
+});
+
+test("d58: the travel versions: few parts, plants only, no garlic or onion, no oil, soft cooked; they pay like the Blueprint dishes", () => {
+  assert.deepEqual(J(QM.dishesFor("travel").map((d) => [d.id, d.name, d.full, d.slots.length])), [["tsv", "Travel Super Veggie", "sv", 4], ["tnp", "Travel Nutty Pudding", "np", 4]]);
+  assert.equal(QM.dishesFor("home"), QM.DISHES);
+  for (const d of QM.TRAVEL) {
+    assert.ok(!d.items.some((x) => QI.banned(x[0]) || /\boil\b/i.test(x[0])), d.id);
+    for (const x of QM.stepsOf(d)) assert.ok(!/\b(fry|fried|roast|raw)\b/i.test(x), x);
+    assert.equal(QM.groupOf(d), "bp");
+    assert.deepEqual(J(d.core), J(d.slots.map((s) => s.id)));
+  }
+  assert.deepEqual(J(QM.stepsOf(QM.dishOf("tsv"))), ["Rinse the cooked lentils and warm them in a pan with a splash of water, about 5 min.",
+    "Add the baby spinach with a little more water, cover, and cook until very soft, 3 to 5 min.", "Squeeze over the lemons.", "Top with the hemp seeds and eat it warm. No oil needed."]);
+  // the travel fridge's foods fill the parts: Mixed nuts stands in for walnuts, Hummus is not a legume swap
+  let k = K.fill({}, "travel", [{ name: "Mixed nuts", group: "Nuts and seeds", shelf: "dry" }, { name: "Oat milk", group: "Drinks and ferments", shelf: "cool" },
+    { name: "Frozen berries", group: "Fruit", shelf: "cool" }, { name: "Hummus", group: "Legumes and grains", shelf: "cool" }], at(-5), "bring").K;
+  const parts = QI.slotRows(k, "travel", QM.dishOf("tnp"), []);
+  assert.deepEqual(J(parts.map((p) => [p.id, p.rows[0].name, p.rows[0].st])), [["chia", "Chia seeds", "none"], ["milk", "Oat milk", "have"], ["berries", "Frozen berries", "have"], ["nut", "Mixed nuts", "have"]]);
+  assert.equal(QI.slotRows(k, "travel", QM.dishOf("tsv"), [])[0].rows[0].st, "none");
+  // ticks pay by parts and share the Blueprint dishes' daily cap with the full recipes
+  const o = { mult: 1.5, dish: 6, dim: [1, 0.7], dishLimit: 2 };
+  const t = QM.tick(null, QM.dishOf("tnp"), ["milk:Oat milk", "berries:Frozen berries"], o);
+  assert.equal(t.rec.v["dish:tnp"][1], 5);   // 2 of 4 parts of +9
+  assert.equal(QM.slotsUsed({ m1: t.rec }, "m2", sv), 1, "it holds a Blueprint slot");
+  assert.equal(QM.tick(null, QM.dishOf("tnp"), QM.dishOf("tnp").slots.map((s) => `${s.id}:${s.want[0][0]}`), o).done, 1, "all four parts: the Blueprint meal done");
+});
+
+test("d58 on the page: the travel fridge shows the travel versions, the full recipe small, and a tick on the other kitchen's dish still reads", () => {
+  assert.match(html, /const bpToday = \(\) => \(QM && QM\.dishesFor && QK\(\) \? QM\.dishesFor\(kitToday\(\)\) : QM \? QM\.DISHES : \[\]\);/);
+  const i = html.indexOf("function openMeal(b)"), body = html.slice(i, html.indexOf("The meal sheet's kitchen parts"));
+  assert.ok(body.includes("bps.map(d => dishCard(d))") && body.includes("dishGot(bps)"));
+  assert.ok(body.includes("Full recipe (at home):") && body.includes("QM.dishOf(d.full)"));
+  assert.match(html, /QM\.dishOf\(id, QM\.DISHES\.concat\(QM\.TRAVEL \|\| \[\]\)\)/);
+});
+
+test("d61: tonight's ideas are cooked gut-friendly: steamed or simmered, never roasted, baked or fried, at most 15 ml of oil", () => {
+  for (const d of QI.POOL) {
+    const oil = d.items.filter((x) => /\boil\b/i.test(x[0]));
+    for (const [, a] of oil) assert.ok(parseFloat(a) <= 15, `${d.id} ${a}`);
+    assert.ok(!/\b(roast|roasted|bake|baked|fry|fried|in the oil|°C)\b/i.test(d.how + " " + d.name), `${d.id}: ${d.how}`);
+    if (oil.length) assert.match(d.how, /drizzl/i, d.id);
+  }
 });

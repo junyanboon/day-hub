@@ -24,8 +24,8 @@ test("Home starts from the catalogue, every item grey (not checked); the travel 
   assert.equal(K.items({}, "travel").length, 0);
   const c = K.counts({}, "home", T0, T0 + 7 * D);
   assert.deepEqual(J(c), { total: K.SEED.length, unchecked: K.SEED.length, low: 0, soon: 0 });
-  // grey is never on the list; only a Blueprint recipe food the kitchen has no item for at all is (d53)
-  assert.deepEqual(J(K.shopList({}, "home", T0, T0 + 7 * D, DISHES).groups.flatMap((g) => g.list.map((r) => [r.it.name, r.why]))), [["Sunflower lecithin", "none"]]);
+  // grey is never on the list, and the catalogue has a food for every core recipe part, so nothing is added (d59)
+  assert.equal(K.shopList({}, "home", T0, T0 + 7 * D, DISHES).count, 0);
 });
 
 test("one tap steps down: grey to Plenty, then Half, Low, Out, and back to Plenty", () => {

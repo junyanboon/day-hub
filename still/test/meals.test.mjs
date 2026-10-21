@@ -127,7 +127,7 @@ test("Blueprint dishes: Super Veggie and Nutty Pudding with amounts for 2, and n
 });
 
 test("tonight's ideas: three recipes for 2 with a time and steps, in one list", () => {
-  assert.deepEqual(J(M.IDEAS.map(d => [d.name, d.time])), [["Lentil bowl with roasted peppers", "35 min"],
+  assert.deepEqual(J(M.IDEAS.map(d => [d.name, d.time])), [["Lentil bowl with soft peppers", "35 min"],
     ["Chickpea and spinach stew", "30 min"], ["Quinoa, broccoli and white beans", "25 min"]]);
   for (const d of M.IDEAS) { assert.ok(d.how && d.how.length > 40, d.id); assert.ok(d.items.length >= 9, d.id); }
   const ids = M.DISHES.concat(M.IDEAS).map(d => d.id);
@@ -187,8 +187,8 @@ test("d53: How to make it: numbered steps for every dish, and a part dish names 
   const np = M.stepsOf(M.dishOf("np"), { milk:["Oat milk"], nuts:["Almonds"], walnuts:["Walnuts"], brazil:["Brazil nuts"] });
   assert.ok(np.includes("Add the almonds, walnuts and Brazil nuts and blend until smooth, about 1 min."), np.join(" / "));
   // tonight's ideas: their paragraph in sentences; his own dish: his list; nothing: none
-  assert.deepEqual(J(M.stepsOf(M.dishOf("r1"))), ["Simmer the lentils 20 min.", "Roast the peppers and courgette at 220°C for 25 min.",
-    "Wilt the spinach into the hot lentils, then top with veg, lemon, oil, parsley and almonds."]);
+  assert.deepEqual(J(M.stepsOf(M.dishOf("r1"))), ["Simmer the lentils 20 min with the cumin and paprika.", "Steam the sliced peppers and courgette until soft, about 10 min.",
+    "Wilt the spinach into the hot lentils, then top with the veg, lemon, parsley and almonds.", "Drizzle the oil over at the end."]);
   assert.deepEqual(J(M.stepsOf({ own:true, items:[], steps:[" Boil water ", "", 3] })), ["Boil water"]);
   assert.deepEqual(J(M.stepsOf({ own:true, items:[] })), []);
   for (const d of M.DISHES) assert.ok(!/[—–]/.test(d.steps.join(" ")), "no dashes");

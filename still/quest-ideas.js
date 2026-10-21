@@ -17,6 +17,9 @@
      shuffle while he cooks; what each idea shows (have, short, to buy) reads the kitchen as it is now.
    - Never a made-up amount: an item with no amount shows its level word, one not checked yet shows "not checked", and
      a short kitchen is said in words (note) with the closest ideas and what each needs to buy.
+   - Cooked the gut-friendly way (Junyan, 2026-10-21, d61 "yes"; he is prone to colitis, and oil and heavy fibre make it
+     worse): vegetables steamed or simmered until soft, never roasted or fried, and at most 15 ml (1 tbsp) of oil for the
+     two of them, drizzled on at the end. The ingredients are the same as before.
    Pure, so it can be tested (node --test still/test). Needs QuestMeals and QuestKitchen loaded first. */
 (function (root) {
   "use strict";
@@ -34,8 +37,8 @@
   const MORE = [
     { id: "r4", icon: "🥑", name: "Kale, avocado and quinoa salad", time: "20 min", base: "quinoa", items: [
       ["Quinoa, dry", "150 g"], ["Kale", "150 g"], ["Avocados", "2"], ["Cherry tomatoes", "150 g"], ["Sprouts", "50 g"],
-      ["Lemon", "1"], ["Extra virgin olive oil", "30 ml"], ["Pumpkin seeds", "30 g"], ["Sea salt", "a pinch"]],
-      how: "Cook the quinoa 15 min and let it cool a little. Rub the kale with the lemon juice, oil and salt until soft. Toss in the quinoa, tomatoes and sliced avocado, then top with sprouts and seeds." },
+      ["Lemon", "1"], ["Extra virgin olive oil", "15 ml"], ["Pumpkin seeds", "30 g"], ["Sea salt", "a pinch"]],
+      how: "Cook the quinoa 15 min. Steam the chopped kale until soft, about 5 min, and toss it with the lemon juice and salt. Add the quinoa, tomatoes and sliced avocado, drizzle the oil over, then top with sprouts and seeds." },
     { id: "r5", icon: "🍛", name: "Turmeric chickpeas with spinach and rice", time: "30 min", base: "chickpea", items: [
       ["Basmati rice, dry", "150 g"], ["Chickpeas, cooked", "400 g"], ["Spinach", "200 g"], ["Tomatoes", "2 medium"],
       ["Fresh ginger, grated", "1 tbsp"], ["Turmeric", "1 tsp"], ["Ground cumin", "1 tsp"], ["Coconut yogurt", "100 g"],
@@ -44,32 +47,32 @@
     { id: "r6", icon: "🍄", name: "Shiitake and broccoli with quinoa and tahini", time: "25 min", base: "quinoa", items: [
       ["Quinoa, dry", "150 g"], ["Broccoli", "300 g"], ["Shiitake mushrooms", "150 g"], ["Red peppers", "1"],
       ["Fresh ginger, grated", "1 tbsp"], ["Tahini", "2 tbsp"], ["Lime", "1"], ["Extra virgin olive oil", "15 ml"], ["Hemp seeds", "2 tbsp"]],
-      how: "Cook the quinoa. Steam the broccoli 4 min. Cook the shiitake and pepper in the oil for 5 min, add the ginger and broccoli. Whisk tahini, lime and a little water, pour over, top with hemp seeds." },
-    { id: "r7", icon: "🥦", name: "Black lentils with roast cauliflower", time: "40 min", base: "lentil", items: [
+      how: "Cook the quinoa. Steam the broccoli until soft, about 8 min. Simmer the sliced shiitake and pepper in a splash of water for 5 min, then add the ginger and broccoli. Whisk tahini, lime and a little water, pour over, drizzle the oil and top with hemp seeds." },
+    { id: "r7", icon: "🥦", name: "Black lentils with soft cauliflower", time: "40 min", base: "lentil", items: [
       ["Black lentils, dry", "120 g"], ["Cauliflower", "400 g"], ["Carrots", "2"], ["Rocket", "60 g"], ["Tahini", "2 tbsp"],
-      ["Lemon", "1"], ["Ground cumin", "1 tsp"], ["Smoked paprika", "1 tsp"], ["Extra virgin olive oil", "30 ml"], ["Walnuts", "30 g"]],
-      how: "Roast the cauliflower and sliced carrots with half the oil and the spices at 220°C for 30 min. Simmer the lentils 25 min. Serve on the rocket with tahini, lemon and the rest of the oil, walnuts on top." },
+      ["Lemon", "1"], ["Ground cumin", "1 tsp"], ["Smoked paprika", "1 tsp"], ["Extra virgin olive oil", "15 ml"], ["Walnuts", "30 g"]],
+      how: "Simmer the lentils 25 min. Steam the cauliflower and sliced carrots until soft, about 12 min, and toss them with the spices. Serve on the rocket with tahini and lemon, drizzle the oil over at the end, walnuts on top." },
     { id: "r8", icon: "🍲", name: "White bean and kale soup", time: "30 min", base: "bean", items: [
       ["White beans, cooked", "400 g"], ["Kale", "150 g"], ["Carrots", "2"], ["Courgette", "1"], ["Tomatoes", "3 medium"],
-      ["Smoked paprika", "1 tsp"], ["Extra virgin olive oil", "30 ml"], ["Lemon", "1"], ["Fresh parsley", "20 g"], ["Pumpkin seeds", "30 g"]],
-      how: "Soften the diced carrot and courgette in half the oil for 5 min. Add the paprika, chopped tomatoes and 800 ml water for 15 min. Add the beans and kale for 5 more. Finish with lemon, parsley, the rest of the oil and seeds." },
+      ["Smoked paprika", "1 tsp"], ["Extra virgin olive oil", "15 ml"], ["Lemon", "1"], ["Fresh parsley", "20 g"], ["Pumpkin seeds", "30 g"]],
+      how: "Simmer the diced carrot and courgette, the paprika and chopped tomatoes in 800 ml water for 15 min. Add the beans and kale for 5 more, until the kale is soft. Finish with lemon, parsley and seeds, and drizzle the oil over at the end." },
     { id: "r9", icon: "🌱", name: "Green lentil sprout bowl", time: "25 min", base: "lentil", items: [
       ["Green or brown lentils, dry", "140 g"], ["Avocados", "1"], ["Sprouts", "80 g"], ["Baby spinach", "100 g"],
-      ["Cherry tomatoes", "150 g"], ["Lime", "1"], ["Extra virgin olive oil", "30 ml"], ["Hemp seeds", "2 tbsp"], ["Ground cumin", "1 tsp"]],
-      how: "Simmer the lentils 20 min, drain and toss warm with the cumin, oil and lime. Fold in the spinach so it just wilts, then top with tomatoes, avocado, sprouts and hemp seeds." },
+      ["Cherry tomatoes", "150 g"], ["Lime", "1"], ["Extra virgin olive oil", "15 ml"], ["Hemp seeds", "2 tbsp"], ["Ground cumin", "1 tsp"]],
+      how: "Simmer the lentils 20 min, drain and toss warm with the cumin and lime. Fold in the spinach until it wilts soft, then top with tomatoes, avocado, sprouts and hemp seeds. Drizzle the oil over at the end." },
     { id: "r10", icon: "🫛", name: "Quinoa with peas, courgette and lemon", time: "20 min", base: "quinoa", items: [
       ["Quinoa, dry", "150 g"], ["Peas", "200 g"], ["Courgette", "2"], ["Baby spinach", "100 g"], ["Lemon", "1"],
-      ["Extra virgin olive oil", "30 ml"], ["Fresh parsley", "20 g"], ["Almonds, soaked", "30 g"], ["Hemp seeds", "2 tbsp"]],
-      how: "Cook the quinoa, adding the peas for the last 3 min. Cook the sliced courgette in the oil for 5 min. Toss everything with the spinach, lemon zest and juice, parsley, almonds and hemp seeds." },
-    { id: "r11", icon: "🫑", name: "Roast vegetable tray with chickpeas and tahini", time: "35 min", base: "chickpea", items: [
+      ["Extra virgin olive oil", "15 ml"], ["Fresh parsley", "20 g"], ["Almonds, soaked", "30 g"], ["Hemp seeds", "2 tbsp"]],
+      how: "Cook the quinoa, adding the peas for the last 3 min. Steam the sliced courgette until soft, about 6 min. Toss everything with the spinach, lemon zest and juice, parsley, almonds and hemp seeds, and drizzle the oil over at the end." },
+    { id: "r11", icon: "🫑", name: "Steamed vegetables with chickpeas and tahini", time: "35 min", base: "chickpea", items: [
       ["Chickpeas, cooked", "400 g"], ["Red peppers", "2"], ["Courgette", "1"], ["Carrots", "2"], ["Broccoli", "200 g"],
-      ["Tahini", "2 tbsp"], ["Lemon", "1"], ["Smoked paprika", "1 tsp"], ["Extra virgin olive oil", "30 ml"], ["Fresh parsley", "20 g"]],
-      how: "Toss the chopped vegetables and chickpeas with the oil and paprika and roast at 220°C for 25 min, the broccoli for the last 10. Drizzle with tahini thinned with lemon and water, scatter parsley." },
+      ["Tahini", "2 tbsp"], ["Lemon", "1"], ["Smoked paprika", "1 tsp"], ["Extra virgin olive oil", "15 ml"], ["Fresh parsley", "20 g"]],
+      how: "Steam the chopped carrots and peppers 6 min, then add the courgette and broccoli and steam until everything is soft, 8 min more. Warm the chickpeas in a splash of water with the paprika. Drizzle with tahini thinned with lemon and water and the oil, scatter parsley." },
     { id: "r12", icon: "🍚", name: "Kitchari: rice and lentils with ginger", time: "35 min", base: "rice", items: [
       ["Basmati rice, dry", "100 g"], ["Green or brown lentils, dry", "100 g"], ["Carrots", "2"], ["Spinach", "100 g"],
       ["Fresh ginger, grated", "1 tbsp"], ["Turmeric", "1 tsp"], ["Ground cumin", "1 tsp"], ["Extra virgin olive oil", "15 ml"],
       ["Lime", "1"], ["Fresh parsley", "15 g"]],
-      how: "Warm the cumin, ginger and turmeric in the oil for a minute. Add the rinsed rice and lentils, the diced carrot and 1 L water, and simmer 30 min until soft. Stir in the spinach, finish with lime and parsley." },
+      how: "Put the rinsed rice and lentils, the diced carrot, the cumin, ginger and turmeric in 1 L water, and simmer 30 min until soft. Stir in the spinach, finish with lime and parsley, and drizzle the oil over at the end." },
     { id: "r13", icon: "🥘", name: "Broccoli, pea and chickpea curry", time: "30 min", base: "chickpea", items: [
       ["Frozen broccoli", "300 g"], ["Peas", "150 g"], ["Chickpeas, cooked", "400 g"], ["Tomatoes", "3 medium"],
       ["Coconut yogurt", "150 g"], ["Fresh ginger, grated", "1 tbsp"], ["Turmeric", "1 tsp"], ["Ground cumin", "1 tsp"],
@@ -77,16 +80,16 @@
       how: "Cook the rice. Warm the ginger and spices, add the chopped tomatoes for 8 min, then the chickpeas, broccoli and peas for 8 more. Off the heat, stir in the yogurt." },
     { id: "r14", icon: "🍄", name: "Shiitake, kale and white bean skillet", time: "20 min", base: "bean", items: [
       ["White beans, cooked", "400 g"], ["Shiitake mushrooms", "150 g"], ["Kale", "150 g"], ["Tomatoes", "2 medium"],
-      ["Extra virgin olive oil", "30 ml"], ["Smoked paprika", "1 tsp"], ["Lemon", "1"], ["Walnuts", "30 g"]],
-      how: "Cook the shiitake in the oil for 5 min, add the paprika and chopped tomatoes for 3, then the beans and kale until the kale is soft. Finish with lemon and walnuts." },
+      ["Extra virgin olive oil", "15 ml"], ["Smoked paprika", "1 tsp"], ["Lemon", "1"], ["Walnuts", "30 g"]],
+      how: "Simmer the sliced shiitake in a splash of water for 5 min, add the paprika and chopped tomatoes for 3, then the beans and kale until the kale is soft. Finish with lemon and walnuts, and drizzle the oil over at the end." },
     { id: "r15", icon: "🥗", name: "Rainbow sprout salad with black lentils", time: "30 min", base: "lentil", items: [
       ["Black lentils, dry", "100 g"], ["Sprouts", "100 g"], ["Carrots", "2"], ["Red peppers", "1"], ["Rocket", "80 g"],
-      ["Apples", "1"], ["Walnuts", "30 g"], ["Apple cider vinegar", "2 tbsp"], ["Extra virgin olive oil", "30 ml"]],
-      how: "Simmer the lentils 25 min and cool a little. Grate the carrot and apple, slice the pepper. Toss everything with the vinegar and oil, top with sprouts and walnuts." },
+      ["Apples", "1"], ["Walnuts", "30 g"], ["Apple cider vinegar", "2 tbsp"], ["Extra virgin olive oil", "15 ml"]],
+      how: "Simmer the lentils 25 min. Steam the sliced carrots and pepper until soft, about 8 min, and grate the apple. Toss everything with the vinegar and the rocket, drizzle the oil over, and top with sprouts and walnuts." },
     { id: "r16", icon: "🫑", name: "Stuffed peppers with quinoa and lentils", time: "45 min", base: "quinoa", items: [
       ["Red peppers", "4"], ["Quinoa, dry", "100 g"], ["Black lentils, dry", "80 g"], ["Tomatoes", "2 medium"],
       ["Spinach", "100 g"], ["Ground cumin", "1 tsp"], ["Smoked paprika", "1 tsp"], ["Extra virgin olive oil", "15 ml"], ["Pumpkin seeds", "30 g"]],
-      how: "Cook the quinoa and lentils. Mix with the chopped tomatoes, spinach, spices and oil. Halve the peppers, fill them, and bake at 200°C for 25 min. Top with seeds." },
+      how: "Cook the quinoa and lentils. Mix with the chopped tomatoes, spinach and spices. Halve the peppers, fill them, and simmer them covered in a pan with 2 cm of water until soft, about 20 min. Drizzle the oil over and top with seeds." },
   ];
   // the three ideas from before keep their ids (a meal ticked on them still reads); r1 to r3 get a base too
   const OLD_BASE = { r1: "lentil", r2: "chickpea", r3: "quinoa" };
