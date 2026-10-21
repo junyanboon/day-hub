@@ -18,6 +18,19 @@
    - Trip end (d27, d30): once the travel fridge stops being the active kitchen, ask once what to bring home, then empty it.
    - Receipt photos (d29) are not built. The seam: anything that fills levels in bulk calls setLevel(K, id, lv, at, src) with
      its own src (a receipt would use "receipt", which counts as a restock), so learning and the shopping list need no change.
+   2026-10-21 (Junyan, d42 to d47: "42 yes", "44 yes", "45 yes", "46 yes", "47 yes"): amounts instead of levels.
+   - An item may hold an amount (q, in u: "g", "ml", or "" for a count, like bananas or limes). Its tile shows what is left
+     ("350 g", "4"); the pips are a rough fill against what he last bought (buy). Items with no number keep their levels and
+     their tap (d46); nothing gets a made-up number.
+   - Amounts go down by themselves from the meal sheet (d44, d47), never from a tap (d43): a tap on an amount item opens
+     its Edit page, which is the one manual fix.
+   - What a meal took is a record per tick in K.used (key: the day, the meal, the dish and the ingredient, or "kitchen"
+     and the item id), { id, q, u, t, at, off }. The amount left is worked out on every read: the stored amount (q, set at
+     qt) minus every record for that item ticked since qt that is not taken back, never below 0. Nothing is subtracted in
+     place, so a redraw or a merge cannot take anything off twice: the merge keeps one record per key (the later change),
+     and an untick is the same record marked off. A tick from before amounts (no q) takes nothing off.
+   - Low (d45): under 2 meals' worth by the Blueprint dishes that use it, else under a quarter of what he last bought;
+     0 is Out. "Low by" and the shopping amounts use his real use over the last 14 days, else one dish a day.
    The state is G.kitchen, kept across days and synced like the rest of the game; QuestMerge.mergeKitchen (quest-merge.js, also
    run by still-api) merges two devices item by item, the later change winning. Pure, so it can be tested (node --test still/test). */
 (function (root) {
@@ -165,7 +178,58 @@
     if (m && /^[a-z]/i.test(m[4]) && (m[3] || /[a-z]s$/i.test(m[4]))) return { name: cap(m[4].trim()).slice(0, 40), amt: fmtUnit(m[1], m[2], m[3]) };
     m = TRAIL.exec(s);
     if (m && /[a-z]/i.test(m[1])) return { name: cap(m[1].trim()).slice(0, 40), amt: fmtUnit(m[2], m[3], m[4]) };
+    /* a bare count at the end (d42: "Bananas 4"): only after a plural or a food bought by the piece, so "Omega 3",
+       "Vitamin B 12" or "Room 7" stay whole */
+    m = TRAIL_N.exec(s);
+    if (m && (/[a-z]s$/i.test(m[1]) || unitFor(m[1]) === "")) return { name: cap(m[1].trim()).slice(0, 40), amt: fmtUnit(null, m[2], "") };
     return { name: cap(s).slice(0, 40), amt: "" };
+  }
+  const TRAIL_N = /^(.*?[a-z])\s+(\d{1,3}(?:[.,]5)?)$/i;
+  /* The unit a bare number means for a food (d42): a count for what is bought by the piece, ml for drinks and oils,
+     else grams. "Black pepper", "Coconut yogurt" or "Lemon juice" are not counted by the piece. */
+  const COUNT_FOODS = /\b(bananas?|avocados?|limes?|lemons?|apples?|pears?|eggs?|oranges?|clementines?|mandarins?|kiwis?|peach(es)?|nectarines?|plums?|mangoe?s?|grapefruits?|pomegranates?|coconuts?|melons?|pineapples?|courgettes?|zucchinis?|cucumbers?|peppers?|aubergines?|eggplants?|onions?|tomato(es)?|carrots?|potato(es)?|leeks?|lettuces?)\b/i;
+  const LIQUID = /\b(milk|juices?|oils?|vinegars?|kefir|kombucha|water|wine|beers?|syrup|sauce|drinks?|shots?)\b/i;
+  const NOT_PIECE = /\b(yogh?urts?|flakes|powder|paste|seeds?|flour|butter|dried|(black|white) pepper|peppercorns?|leaves|puree|passata)\b/i;
+  function unitFor(name) {
+    const n = String(name || "");
+    return LIQUID.test(n) ? "ml" : !NOT_PIECE.test(n) && COUNT_FOODS.test(n) ? "" : "g";
+  }
+  /* An amount as a number (d42): "400 g", "1.5 kg", "2 × 400 g", "1 L", "4" -> { q, u } in g, ml or a count (""). A bare
+     number takes the unit the item already has (uHint), else the food's own (unitFor). null when there is no number. */
+  const AMT_N = /^(?:(\d+(?:\.\d+)?)\s*[x×]\s*)?(\d+(?:\.\d+)?)\s*(kg|g|mg|ml|cl|dl|l|lbs?|oz)?$/i;
+  const TO_BASE = { kg: [1000, "g"], g: [1, "g"], mg: [0.001, "g"], lb: [454, "g"], lbs: [454, "g"], oz: [28, "g"], l: [1000, "ml"], ml: [1, "ml"], cl: [10, "ml"], dl: [100, "ml"] };
+  function qtyOf(text, name, uHint) {
+    const m = AMT_N.exec(String(text == null ? "" : text).replace(/,/g, ".").replace(/\s+/g, " ").trim());
+    if (!m) return null;
+    const n = +m[2] * (m[1] ? +m[1] : 1);
+    if (!isFinite(n) || n < 0) return null;
+    if (!m[3]) return { q: n, u: typeof uHint === "string" ? uHint : unitFor(name) };
+    const [f, u] = TO_BASE[m[3].toLowerCase()];
+    return { q: Math.round(n * f * 10) / 10, u };
+  }
+  // an amount for the tile and the fields: "350 g", "1.2 kg", "500 ml", "1.5 L", "4", "0.5"
+  function fmtQ(q, u) {
+    const v = Math.max(0, +q || 0);
+    if (u === "g") return v >= 1000 ? `${+(v / 1000).toFixed(2)} kg` : `${+v.toFixed(v < 10 ? 1 : 0)} g`;
+    if (u === "ml") return v >= 1000 ? `${+(v / 1000).toFixed(2)} L` : `${+v.toFixed(v < 10 ? 1 : 0)} ml`;
+    return String(+v.toFixed(1));
+  }
+  /* A recipe amount in an item's unit, for taking it off (d44): grams and ml as they are (1 ml is taken as about 1 g),
+     spoons roughly (1 tbsp about 10 g or 15 ml, 1 tsp about 3 g or 5 ml), a count ("1", "2", "1 medium") only for an
+     item counted by the piece. "a pinch", a bunch, or a count against grams: null (he can type it). */
+  const FRAC = { "½": 0.5, "¼": 0.25, "¾": 0.75, "⅓": 1 / 3, "⅔": 2 / 3 };
+  function recipeIn(amt, u) {
+    const s = String(amt || "").trim().replace(/[½¼¾⅓⅔]/g, (c) => ` ${FRAC[c]}`).trim();
+    const m = /^(\d+(?:\.\d+)?)?\s*(?:(\d+(?:\.\d+)?)\s*\/\s*(\d+))?\s*(\d*\.\d+)?\s*(kg|g|ml|l|tbsp|tsp|medium|large|small)?\b/i.exec(s);
+    if (!m || (m[1] == null && m[2] == null && m[4] == null)) return null;
+    const n = (m[1] != null ? +m[1] : 0) + (m[2] != null ? +m[2] / +m[3] : 0) + (m[4] != null ? +m[4] : 0);
+    const unit = (m[5] || "").toLowerCase();
+    if (!n) return null;
+    if (unit === "kg" || unit === "g") return u === "g" || u === "ml" ? n * (unit === "kg" ? 1000 : 1) : null;
+    if (unit === "l" || unit === "ml") return u === "g" || u === "ml" ? n * (unit === "l" ? 1000 : 1) : null;
+    if (unit === "tbsp") return u === "g" ? n * 10 : u === "ml" ? n * 15 : null;
+    if (unit === "tsp") return u === "g" ? n * 3 : u === "ml" ? n * 5 : null;
+    return u === "" ? n : null;   // a count, or "1 medium"
   }
   // what he types in Edit's Amount field: "400g" -> "400 g"; anything else is kept as typed (short)
   function amtOf(s) {
@@ -181,20 +245,73 @@
   function clean(it) {
     const sp = typeof it.amt === "string" || typeof it.name !== "string" ? null : splitName(it.name);
     const name = sp && sp.amt ? sp.name : it.name, group = okGroup(it.group) || guessGroup(name);
-    return { ...it, name, amt: sp ? sp.amt : it.amt, lv: okLv(it.lv), group, em: ownIcon(it.em) ? it.em : iconFor(name, group) };
+    const out = { ...it, name, amt: sp ? sp.amt : it.amt, lv: okLv(it.lv), group, em: ownIcon(it.em) ? it.em : iconFor(name, group) };
+    /* d42: the amount as a number. One stored (q) stands; else the d39 amount ("400 g") is its first amount, read the same
+       way on both devices with no write, from the item's last change (so only meals ticked after that count). */
+    if (!(typeof out.q === "number" && isFinite(out.q) && out.q >= 0)) {
+      delete out.q; delete out.u; delete out.qt; delete out.buy;
+      const p = out.amt ? qtyOf(out.amt, name) : null;
+      if (p) Object.assign(out, { q: p.q, u: p.u, qt: it.at || it.added || null, buy: p.q });
+    } else {
+      out.u = out.u === "g" || out.u === "ml" ? out.u : "";
+      out.buy = +out.buy > 0 ? +out.buy : out.q;
+    }
+    return out;
+  }
+  const hasQ = (it) => !!it && typeof it.q === "number";
+  /* The meals' take-offs by item (K.used records with an amount, not taken back), worked out once per used object. */
+  const eatCache = new WeakMap();
+  function eatsById(K) {
+    const u = obj(K).used;
+    if (!u || typeof u !== "object") return new Map();
+    let m = eatCache.get(u);
+    if (m) return m;
+    m = new Map();
+    for (const [key, e] of Object.entries(u)) {
+      if (!e || e.off || typeof e.q !== "number" || !e.id) continue;
+      if (!m.has(e.id)) m.set(e.id, []);
+      m.get(e.id).push({ key, q: Math.max(0, e.q), t: ms(e.t) });
+    }
+    eatCache.set(u, m);
+    return m;
+  }
+  /* A meal's worth of an item (d45): the most one Blueprint dish (QuestMeals.DISHES) uses, in the item's unit. Tonight's
+     ideas change from day to day, so they do not set what "low" means. 0 when no dish uses it (or the unit cannot match). */
+  const perCache = new Map();
+  function perMeal(it) {
+    const dishes = (root.QuestMeals && root.QuestMeals.DISHES) || [];
+    const ck = `${it.name}|${it.u}|${dishes.length}`;
+    if (perCache.has(ck)) return perCache.get(ck);
+    let best = 0;
+    for (const u of usesOf(it.name, dishes)) { const v = recipeIn(u.amt, it.u); if (v != null && v > best) best = v; }
+    perCache.set(ck, best);
+    return best;
+  }
+  /* An amount item as read (d42, d45): left (what is there now), low (the line under which it is low), per (a meal's
+     worth), eats (its take-offs) and its level worked out: 0 Out, 1 Low, then 2 or 3 pips by how much of what he last
+     bought is left. A level stored on it is not used. */
+  function withLeft(K, it) {
+    if (!hasQ(it)) return it;
+    const from = ms(it.qt), eats = eatsById(K).get(it.id) || [];
+    const eaten = eats.filter((e) => e.t >= from).reduce((a, e) => a + e.q, 0);
+    const left = Math.max(0, Math.round((it.q - eaten) * 10) / 10), buy = it.buy, per = perMeal(it);
+    const low = per ? 2 * per : buy / 4;
+    const lv = left <= 0 ? 0 : left < low ? 1 : left >= (buy * 2) / 3 ? 3 : 2;
+    return { ...it, left, low, per, eats, lv, amt: fmtQ(left, it.u) };
   }
   // every item of the kitchen, the catalogue under what he changed, deleted ones left out, in shelf then catalogue order
   function items(K, k) {
     const st = obj(obj(K).items), out = [], seen = new Set();
-    for (const s of SEED_ITEMS) { seen.add(s.id); const it = clean(st[s.id] ? { ...s, ...st[s.id] } : s); if (!it.del && it.k === k) out.push(it); }
-    for (const [id, it] of Object.entries(st)) if (!seen.has(id) && it && !it.del && it.k === k && typeof it.name === "string") out.push(clean({ ...it, id }));
+    for (const s of SEED_ITEMS) { seen.add(s.id); const it = clean(st[s.id] ? { ...s, ...st[s.id] } : s); if (!it.del && it.k === k) out.push(withLeft(K, it)); }
+    for (const [id, it] of Object.entries(st)) if (!seen.has(id) && it && !it.del && it.k === k && typeof it.name === "string") out.push(withLeft(K, clean({ ...it, id })));
     const order = (KITCHENS[k] || { shelves: [] }).shelves.map((s) => s.id);
     return out.sort((a, b) => (order.indexOf(a.shelf) - order.indexOf(b.shelf)) || ((a.seed ?? 1e6) - (b.seed ?? 1e6)) || ms(b.added) - ms(a.added));
   }
   function item(K, id) {
     const st = obj(obj(K).items)[id], s = SEED_ITEMS.find((x) => x.id === id);
     if (!st && !s) return null;
-    return clean(st ? { ...(s || {}), ...st, id } : s);
+    const it = clean(st ? { ...(s || {}), ...st, id } : s);
+    return it.del ? it : withLeft(K, it);
   }
   /* A shelf's items in food groups (d34): the groups in GROUP_NAMES order, each alphabetical, so a tile never jumps when
      its level changes. list: the items to show. Returns [{ group, list }], empty groups left out. */
@@ -207,9 +324,12 @@
   function put(K, it, at) {
     const out = clone(K);
     out.items = obj(out.items);
-    const { seed, ...rest } = it;
+    // left, low, per and eats are only worked out (withLeft), never stored
+    const { seed, left, low, per, eats, ...rest } = it;
     // an icon that is only what iconFor gives (or the old 🛒) is not stored, so a group change can change it (d38)
     if (!ownIcon(rest.em) || (typeof rest.name === "string" && rest.em === iconFor(rest.name, rest.group))) delete rest.em;
+    // an amount item stores its base amount (q at qt), and amt as its text, so a page from before still shows a number
+    if (hasQ(rest)) rest.amt = fmtQ(rest.q, rest.u);
     out.items[it.id] = { ...rest, at: iso(at) };
     return out;
   }
@@ -244,37 +364,81 @@
   }
   // one tap: not checked yet -> Plenty, then Plenty, Half, Low, Out, and back to Plenty (d25)
   const nextLevel = (lv) => (lv == null || lv === 0 ? 3 : lv - 1);
-  const tap = (K, id, at) => { const it = item(K, id); return it ? setLevel(K, id, nextLevel(it.lv), at, "tap") : K; };
+  // an item with an amount does not step (d43: its tap opens its Edit page, and meals take the amount off)
+  const tap = (K, id, at) => { const it = item(K, id); return it && !hasQ(it) ? setLevel(K, id, nextLevel(it.lv), at, "tap") : K; };
+
+  /* Set the amount there is now (d43: Edit's Amount field, the one manual fix). text: "350 g", "4", "1.5 L"; a bare
+     number takes the item's unit (else the food's). It becomes the new base (q at qt), so meals ticked before it no longer
+     count. "" takes the number away: the item goes back to the level it shows (d46). Text with no number ("a jar") is kept
+     as words, as d39 did. Nothing changes (K back as is) when it already reads so. */
+  function setAmount(K, id, text, at) {
+    const it = item(K, id); if (!it || it.del) return K;
+    const s = amtOf(text);
+    if (!s) {
+      if (!hasQ(it) && !it.amt) return K;
+      const { q, u, qt, buy, ...rest } = it;
+      return put(K, { ...rest, amt: "", lv: it.lv ?? null }, at);
+    }
+    const p = qtyOf(s, it.name, hasQ(it) ? it.u : undefined);
+    if (!p) { if (s === (it.amt || "") && !hasQ(it)) return K; const { q, u, qt, buy, ...rest } = it; return put(K, { ...rest, amt: s }, at); }
+    if (hasQ(it) && p.u === it.u && Math.abs(p.q - it.left) < 0.05) return K;
+    // what he last bought (the pips' full mark) stays, unless this is his first number, a new unit, or more than that
+    const buy = !hasQ(it) || p.u !== it.u ? p.q : Math.max(it.buy, p.q);
+    return put(K, { ...it, q: p.q, u: p.u, qt: iso(at), buy: buy || p.q, lv: it.lv == null ? 3 : it.lv }, at);
+  }
+  /* Restock (Add, What did you buy?, What did you bring?, Mark ticked items as bought, brought home): what he got is added
+     to what is left. amount: text ("500 g", "4") or { q, u }; none given: an amount item adds what he last bought, a level
+     item goes to Plenty with no number (d46). Starts a new run-low cycle and a fresh shelf-life clock, as before. */
+  function restock(K, id, amount, at, src) {
+    const it0 = item(K, id); if (!it0) return K;
+    let out = setLevel(K, id, 3, at, src || "buy");
+    const it = item(out, id);
+    const p = amount && typeof amount === "object" ? amount : amount ? qtyOf(amtOf(amount), it.name, hasQ(it0) ? it0.u : undefined) : null;
+    if (hasQ(it0)) {
+      const same = p && p.u === it0.u, got = same ? p.q : p ? null : it0.buy;
+      // a different unit (he typed 4 for an item kept in grams): what he typed becomes the amount
+      const q = got == null ? p.q : it0.left + got, u = got == null ? p.u : it0.u;
+      out = put(out, { ...it, q, u, qt: iso(at), buy: got == null ? p.q : got || it0.buy }, at);
+    } else if (p) out = put(out, { ...it, q: p.q, u: p.u, qt: iso(at), buy: p.q }, at);
+    return out;
+  }
 
   /* Add something new (Plenty: he just put it there), in the group he picked (else the guess from its name). The same name
-     already in that kitchen is set to Plenty instead of making a second tile; a deleted one comes back on the chosen shelf. */
-  function add(K, k, shelf, name, at, group) {
+     already in that kitchen is restocked instead of making a second tile; a deleted one comes back on the chosen shelf.
+     amt (d42): an amount from a field; else one typed in the name ("Bananas 4", "400g oats"); else none. */
+  function add(K, k, shelf, name, at, group, amt) {
     const sp = splitName(name), nm = sp.name;   // "400g navy beans": Navy beans, 400 g (d39)
+    const given = amtOf(amt) || sp.amt;
     if (!nm || !shelfOf(k, shelf)) return { K, id: null };
     const key = keyOf(nm);
     const live = items(K, k).find((x) => keyOf(x.name) === key);
-    if (live) { const out = setLevel(K, live.id, 3, at, "add");
-      return { K: sp.amt ? put(out, { ...item(out, live.id), amt: sp.amt }, at) : out, id: live.id }; }
+    if (live) return { K: restock(K, live.id, given || null, at, "add"), id: live.id };
     const dead = Object.entries(obj(obj(K).items)).find(([, x]) => x && x.del && x.k === k && keyOf(splitName(x.name || (item(K, x.id) || {}).name).name) === key);
     const sd = k === "home" ? SEED_ITEMS.find((x) => keyOf(x.name) === key) : null;
     const id = dead ? dead[0] : sd ? sd.id : "u" + ms(at).toString(36) + Math.random().toString(36).slice(2, 6);
     const g = okGroup(group) || okGroup((obj(obj(K).items)[id] || {}).group) || guessGroup(nm);
     const old = obj(obj(K).items)[id] || {}, sem = sd ? sd.em : null;
-    const base = { ...(item(K, id) || {}), id, k, shelf, name: nm, amt: sp.amt, group: g, em: ownIcon(old.em) ? old.em : sem || iconFor(nm, g), lv: null, hist: [], added: iso(at) };
-    delete base.del;
+    const base = { ...(item(K, id) || {}), id, k, shelf, name: nm, amt: "", group: g, em: ownIcon(old.em) ? old.em : sem || iconFor(nm, g), lv: null, hist: [], added: iso(at) };
+    delete base.del; delete base.q; delete base.u; delete base.qt; delete base.buy;
+    const p = given ? qtyOf(given, nm) : null;
+    if (p) Object.assign(base, { q: p.q, u: p.u, qt: iso(at), buy: p.q });
+    else if (given) base.amt = given;
     return { K: setLevel(put(K, base, at), id, 3, at, "add"), id };
   }
   /* Rename, and (d39) the amount: one typed in the name is split off and wins; else amt (Edit's Amount field) when given,
-     else the amount it had. An icon that came from its old name or group follows the new name (put leaves it out). */
+     else the amount it had. An icon that came from its old name or group follows the new name (put leaves it out).
+     The amount goes through setAmount (d42), so a new number is the amount there is now. */
   function rename(K, id, name, at, amt) {
     const it = item(K, id), sp = splitName(name);
     if (!it || !sp.name) return K;
-    const a = sp.amt || (amt === undefined ? it.amt || "" : amtOf(amt));
+    const a = sp.amt || (amt === undefined ? null : amtOf(amt));
     const raw = obj(obj(K).items)[id] || {}, seedEm = (SEED_ITEMS.find((x) => x.id === id) || {}).em;
     // an icon of its own or the catalogue's stays; one worked out from the old name is worked out again from the new one
     const em = ownIcon(raw.em) || seedEm ? it.em : iconFor(sp.name, it.group);
-    if (sp.name === it.name && a === (it.amt || "") && typeof raw.amt === "string") return K;
-    return put(K, { ...it, name: sp.name, amt: a, em }, at);
+    let out = K;
+    if (sp.name !== it.name || typeof raw.amt !== "string") out = put(K, { ...it, name: sp.name, em }, at);
+    if (a != null && a !== (it.amt || "")) out = setAmount(out, id, a, at);
+    return out;
   }
   const move = (K, id, shelf, at) => { const it = item(K, id); return it && shelfOf(it.k, shelf) ? put(K, { ...it, shelf }, at) : K; };
   /* Put an item in a group and on a shelf (d34: Edit's pickers, or a drag onto another group or shelf). Either may be left
@@ -312,8 +476,24 @@
     return Math.max(0.25, Math.min(90, (def + s.reduce((a, b) => a + b, 0)) / (1 + s.length)));
   }
   // when it will be Low (ms); null when not checked yet. Low or Out: already (its level time).
+  /* An amount item's use per day (d45): what meals took off it in the last 14 days, over the days since the first of
+     those (at least 2), once it has two take-offs; else a meal's worth a day when a Blueprint dish uses it; else null. */
+  function rateOf(it, now) {
+    if (!hasQ(it)) return null;
+    const t = ms(now), recent = arr(it.eats).filter((e) => e.t <= t && e.t > t - 14 * DAY && e.q > 0);
+    if (recent.length >= 2) {
+      const first = Math.min(...recent.map((e) => e.t)), days = Math.max(2, (t - first) / DAY + 1);
+      return recent.reduce((a, e) => a + e.q, 0) / days;
+    }
+    return it.per || null;
+  }
   function lowAt(it, now) {
     if (!it || it.lv == null) return null;
+    if (hasQ(it) && typeof it.left === "number") {
+      if (it.lv <= 1) return ms(now);
+      const r = rateOf(it, now);
+      return r ? ms(now) + ((it.left - it.low) / r) * DAY : null;   // no use known: no guess
+    }
     const since = ms(it.since) || ms(it.at) || ms(now);
     if (it.lv <= 1) return since;
     const p = pace(it) * DAY;
@@ -322,7 +502,7 @@
     return est;
   }
   // will it run low before the next shop (only items at Half or Plenty)
-  const lowSoon = (it, now, shopAt) => !!it && it.lv != null && it.lv >= 2 && lowAt(it, now) <= ms(shopAt);
+  const lowSoon = (it, now, shopAt) => { if (!it || it.lv == null || it.lv < 2) return false; const a = lowAt(it, now); return a != null && a <= ms(shopAt); };
   // when fresh food is expected to turn (ms), or null for food that keeps
   function turnAt(it) {
     const life = FRESH[keyOf(it.name)];
@@ -374,8 +554,13 @@
   }
   function amountFor(name, dishes, dinners) {
     const uses = usesOf(name, dishes);
-    let best = null;   // the first amount that can be scaled, then the largest in the same unit
-    for (const u of uses) { const a = parseAmt(u.amt); if (!a) continue; if (!best || (a.u === best.u && a.q > best.q)) best = a; }
+    /* the first amount that can be scaled, then the largest in the same unit; a Blueprint dish's amount (the meals he
+       eats most, 2026-10-21: Super Veggie's broccoli is 175 g) comes before one of tonight's ideas */
+    const bp = new Set(((root.QuestMeals && root.QuestMeals.DISHES) || []).map((d) => d.name));
+    const order = uses.filter((u) => bp.has(u.dish)).concat(uses.filter((u) => !bp.has(u.dish)));
+    let best = null, fromBp = false;
+    for (const u of order) { const a = parseAmt(u.amt); if (!a) continue; if (fromBp && !bp.has(u.dish)) break;
+      if (!best || (a.u === best.u && a.q > best.q)) { best = a; fromBp = bp.has(u.dish); } }
     return { uses, dinners: uses.length ? dinners : 0, amt: best ? fmtAmt(best.q * dinners, best.u) : null };
   }
 
@@ -390,7 +575,9 @@
       if (it.lv == null) continue;
       const why = it.lv === 0 ? "out" : it.lv === 1 ? "low" : lowSoon(it, t, shopAt) ? "soon" : null;
       if (!why) continue;
-      rows.push({ it, why, at: lowAt(it, t), on: !!(ticks[it.id] && ticks[it.id].on), ...amountFor(it.name, dishes, dinners) });
+      const row = { it, why, at: lowAt(it, t) ?? t, on: !!(ticks[it.id] && ticks[it.id].on), ...amountFor(it.name, dishes, dinners) };
+      if (hasQ(it)) row.amt = fmtQ(toBuy(it, t, shopAt), it.u);   // d45: from what is left and his real use
+      rows.push(row);
     }
     const groups = [];
     for (const sh of KITCHENS[k].shelves) {
@@ -398,6 +585,15 @@
       if (list.length) groups.push({ shelf: sh, list });
     }
     return { groups, count: rows.length, dinners };
+  }
+  /* What to buy of an amount item (d45): enough for his use until the shop after this one plus the low line, less what
+     is left; with no use known, what he bought last time. Rounded up (10 g or ml, 50 above 200; whole pieces). */
+  function toBuy(it, now, shopAt) {
+    const r = rateOf(it, now), days = Math.max(1, (ms(shopAt) - ms(now)) / DAY);
+    let need = r ? r * days + it.low - it.left : it.buy;
+    if (!(need > 0)) need = it.per || it.buy;
+    const step = it.u === "" ? 1 : need > 200 ? 50 : 10;
+    return Math.ceil(need / step) * step;
   }
   const tick = (K, id, at) => { const out = clone(K), cur = obj(out.shop)[id];
     out.shop = { ...obj(out.shop), [id]: { on: !(cur && cur.on), at: iso(at) } }; return out; };
@@ -407,7 +603,7 @@
     for (const it of items(K, k)) {
       const s = obj(obj(K).shop)[it.id];
       if (!s || !s.on) continue;
-      out = setLevel(out, it.id, 3, at, "buy"); n++;
+      out = restock(out, it.id, null, at, "buy"); n++;
       out.shop = { ...obj(out.shop), [it.id]: { on: false, at: iso(at) } };
     }
     return { K: out, n };
@@ -449,19 +645,19 @@
   }
   /* The seam for later fillers (d29, a receipt photo): the names it read pre-tick the same picker. A name that matches a
      row ticks it; any other becomes a new row (group and shelf guessed, changeable before he adds). Returns { on: row ids,
-     extra: new rows }. */
+     extra: new rows, amt: { row id: an amount read with the name } (d42) }. */
   function preTick(rows, names, k) {
-    const on = [], extra = [], byKey = new Map(arr(rows).map((r) => [keyOf(r.name), r]));
+    const on = [], extra = [], amt = {}, byKey = new Map(arr(rows).map((r) => [keyOf(r.name), r]));
     for (const n of arr(names)) {
-      const nm = String(n || "").trim().slice(0, 40), food = splitName(nm).name, key = keyOf(food);
+      const nm = String(n || "").trim().slice(0, 40), sp = splitName(nm), food = sp.name, key = keyOf(food);
       if (!key) continue;
       const r = byKey.get(key);
-      if (r) { if (!on.includes(r.id)) on.push(r.id); continue; }
+      if (r) { if (!on.includes(r.id)) on.push(r.id); if (sp.amt) amt[r.id] = sp.amt; continue; }
       if (extra.some((x) => keyOf(x.name) === key)) continue;
       const group = guessGroup(food);
       extra.push({ id: "p:" + key, name: nm, em: iconFor(food, group), group, shelf: guessShelf(k || "home", group), item: null, lv: null, src: "new", top: false });
     }
-    return { on, extra };
+    return { on, extra, amt };
   }
   /* "Add N items": every picked food into kitchen k at Plenty. One already there is set to Plenty (its run-low clock and
      shelf-life clock start again, its shopping tick clears); a new one is added on the shelf the row gives (else, at home,
@@ -478,11 +674,14 @@
       keys.add(key);
       const have = (p.item && item(out, p.item) && item(out, p.item).k === k && !item(out, p.item).del ? item(out, p.item) : null)
         || items(out, k).find((x) => keyOf(x.name) === key);
+      // d42: an amount from the picker's field (p.amt), else one typed in the name, else none (an amount item adds what
+      // he last bought; a level item goes to Plenty with no number)
+      const given = amtOf(p.amt) || sp.amt;
       if (have) {
         prev[have.id] = clone(have);
         ticks[have.id] = obj(out.shop)[have.id] ? clone(out.shop[have.id]) : null;
-        out = setLevel(out, have.id, 3, t, s);
-        out = put(out, { ...item(out, have.id), fresh: t, ...(sp.amt ? { amt: sp.amt } : {}) }, t);
+        out = restock(out, have.id, given || null, t, s);
+        out = put(out, { ...item(out, have.id), fresh: t }, t);
         if (ticks[have.id] && ticks[have.id].on) out.shop = { ...obj(out.shop), [have.id]: { on: false, at: t } };
         ids.push(have.id);
         continue;
@@ -490,7 +689,7 @@
       const sd = k === "home" ? SEED_ITEMS.find((x) => keyOf(x.name) === key) : null;
       const group = okGroup(p.group) || (sd && clean(sd).group) || guessGroup(nm);
       const shelf = shelfOf(k, p.shelf) ? p.shelf : sd ? sd.shelf : guessShelf(k, group);
-      const r = add(out, k, shelf, p.name, t, group);
+      const r = add(out, k, shelf, p.name, t, group, given);
       if (!r.id) continue;
       out = r.K;
       if (p.em && p.em !== "🛒") out = put(out, { ...item(out, r.id), em: p.em }, t);
@@ -510,7 +709,8 @@
       const was = u.prev[id];
       if (!was) { out = remove(out, id, at); continue; }
       const cur = item(out, id) || was;
-      if (cur.lv !== 3 || ms(cur.since) !== ms(u.t)) continue;
+      // an amount item's level is worked out, so it is "from this fill" when its amount was set by it (qt)
+      if (ms(cur.since) !== ms(u.t) || (hasQ(cur) ? ms(cur.qt) !== ms(u.t) : cur.lv !== 3)) continue;
       const hist = arr(cur.hist).map((h) => (ms(h[0]) === ms(u.t) && h[2] === u.src ? [h[0], h[1], u.src + "-off"] : h));
       out = put(out, { ...was, hist }, at);
       const tk = u.ticks[id];
@@ -551,6 +751,51 @@
     return { K: out, id: it && it.lv === rec.to ? rec.id : null };
   }
 
+  /* Meals take amounts off (Junyan, 2026-10-21, d44: "I do modify the nutty pudding and stuff based on what I have", d47).
+     eat(K, k, key, ref, on, at, amount): a tick on the meal sheet. ref: { name } (a dish ingredient, matched to kitchen
+     k's item by its name key) or { id } (a row of "From your kitchen"). amount: a number in the item's unit, or a recipe
+     amount ("175 g", "2 tbsp") turned into it (recipeIn; one that cannot be turned is 0, for him to fill in).
+     - Only an item with an amount is touched (d46); a record with no item is never written.
+     - A tick already on (a redraw, a second device's copy, the breakfast he ticked before amounts shipped) changes nothing.
+     - An untick marks the same record off (a later change, so the merge keeps it); a tick from before amounts (no q) is
+       put back the old way (dinner). A tick again after an untick is a new take-off from now.
+     Returns { K, id } (id: the item it took from or gave back to, else null). */
+  function eat(K, k, key, ref, on, at, amount) {
+    const rec = obj(obj(K).used)[key], r = ref || {};
+    if (!on) {
+      if (!rec || rec.off) return { K, id: null };
+      if (typeof rec.q !== "number") return dinner(K, k, key, r.name, false, at);
+      const out = clone(K);
+      out.used = { ...obj(out.used), [key]: { ...rec, off: true, at: iso(at) } };
+      return { K: out, id: rec.id };
+    }
+    if (rec && !rec.off) return { K, id: null };
+    const it = r.id ? item(K, r.id) : match(K, k, r.name);
+    if (!it || it.del || it.k !== k || !hasQ(it)) return { K, id: null };
+    const q = typeof amount === "number" ? amount : recipeIn(amount, it.u);
+    const out = clone(K);
+    out.used = { ...obj(out.used), [key]: { id: it.id, q: Math.max(0, Math.round((+q || 0) * 10) / 10), u: it.u, t: iso(at), at: iso(at) } };
+    return { K: out, id: it.id };
+  }
+  // the amount this meal took (d44: changed in the meal sheet); only a tick that is on and has an amount
+  function setTake(K, key, q, at) {
+    const rec = obj(obj(K).used)[key], v = Math.max(0, Math.round((+q || 0) * 10) / 10);
+    if (!rec || rec.off || typeof rec.q !== "number" || !isFinite(v) || v === rec.q) return K;
+    const out = clone(K);
+    out.used = { ...obj(out.used), [key]: { ...rec, q: v, at: iso(at) } };
+    return out;
+  }
+  // a tick's take-off record, when it is on and has an amount, else null
+  const taken = (K, key) => { const r = obj(obj(K).used)[key]; return r && !r.off && typeof r.q === "number" ? r : null; };
+  /* A first portion for a "From your kitchen" tick (d47): 1 of a counted item; else a Blueprint dish's meal amount; else
+     a small plate by food group. Never more than is left. */
+  const PORTION = { "Spices": 3, "Herbs": 10, "Nuts and seeds": 30, "Oils, vinegars and sweet": 15, "Legumes and grains": 80, "Drinks and ferments": 250 };
+  function portion(it) {
+    if (!hasQ(it)) return 0;
+    const p = it.u === "" ? 1 : it.per || PORTION[it.group] || 100;
+    return Math.max(0, Math.min(p, typeof it.left === "number" ? it.left : p));
+  }
+
   /* Which kitchen is in use: his pick for today, else the travel fridge on a day the app reads as travelling (the same
      home or travelling guess the basics and the gym use, with his Home / Travelling switch first). */
   function active(K, today, mode) {
@@ -577,7 +822,10 @@
     for (const t of items(K, "travel")) {
       if (want.has(t.id)) {
         const home = match(out, "home", t.name);
-        if (home) {
+        if (home && hasQ(home)) {
+          // d42: an amount comes home on top of Home's, in the same unit; anything else leaves Home's amount as it is
+          if (hasQ(t) && t.u === home.u && t.left > 0) out = restock(out, home.id, { q: t.left, u: t.u }, at, "home");
+        } else if (home) {
           const lv = Math.max(home.lv ?? -1, t.lv ?? -1);
           if (lv >= 0 && lv !== home.lv) out = setLevel(out, home.id, lv, at, "home");
         } else {
@@ -586,8 +834,9 @@
           if (r.id) {
             const n = item(out, r.id);
             if (t.lv == null) out = put(out, { ...n, lv: null, hist: [], since: null }, at);
-            else if (t.lv !== 3) out = setLevel(out, r.id, t.lv, at, "home");
-            out = put(out, { ...item(out, r.id), em: t.em || n.em, fresh: t.fresh || n.fresh }, at);
+            else if (t.lv !== 3 && !hasQ(t)) out = setLevel(out, r.id, t.lv, at, "home");
+            const q = hasQ(t) ? { q: t.left, u: t.u, qt: iso(at), buy: t.buy } : {};
+            out = put(out, { ...item(out, r.id), ...q, em: t.em || n.em, fresh: t.fresh || n.fresh }, at);
           }
         }
       }
@@ -640,6 +889,13 @@
      runs low before the next shop), or "Not checked". */
   function status(it, now, shopAt, tz) {
     if (!it || it.lv == null) return "Not checked";
+    // d42: an amount item shows what is left instead of a level word ("350 g", "120 g · buy", "4 · low by Thu")
+    if (hasQ(it) && typeof it.left === "number") {
+      if (it.lv === 0) return "Out · buy";
+      const a = fmtQ(it.left, it.u);
+      if (it.lv === 1) return `${a} · buy`;
+      return lowSoon(it, now, shopAt) ? `${a} · low by ${dayWord(lowAt(it, now), now, tz)}` : a;
+    }
     if (it.lv === 0) return "Out · buy";
     if (it.lv === 1) return "Low · buy";
     if (lowSoon(it, now, shopAt)) return `Low by ${dayWord(lowAt(it, now), now, tz)}`;
@@ -656,9 +912,10 @@
   }
 
   // a tile's second line (d39): the status, then the amount when it has one ("Plenty · 400 g")
-  const tileLine = (it, now, shopAt, tz) => status(it, now, shopAt, tz) + (it && it.amt ? ` · ${it.amt}` : "");
+  // (d42) an amount item's status already is its amount
+  const tileLine = (it, now, shopAt, tz) => status(it, now, shopAt, tz) + (it && it.amt && !hasQ(it) ? ` · ${it.amt}` : "");
 
   root.QuestKitchen = { NEED, LEVELS, KITCHENS, SEED, FRESH, DEFAULT_SHOP, GROUP_NAMES, GROUP_ICONS, keyOf, iconFor, groupIcon, splitName, amtOf, tileLine, guessGroup, guessShelf,
     items, item, grouped, setLevel, nextLevel, tap, add, rename, move, place, remove, status, shows, pace, lowAt, lowSoon, turnAt, useFirst, nextShop, parseAmt, usesOf, amountFor,
-    shopList, tick, buyTicked, TRAVEL_STARTER, pickList, preTick, fill, unfill, shopInfo, shopWhen, shopUpto, match, dinner, active, pick, noteActive, tripEnd, bringHome, dayWord, counts };
+    shopList, tick, buyTicked, unitFor, qtyOf, fmtQ, recipeIn, perMeal, setAmount, restock, rateOf, toBuy, eat, setTake, taken, portion, TRAVEL_STARTER, pickList, preTick, fill, unfill, shopInfo, shopWhen, shopUpto, match, dinner, active, pick, noteActive, tripEnd, bringHome, dayWord, counts };
 })(typeof window !== "undefined" ? window : globalThis);

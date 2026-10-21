@@ -229,7 +229,7 @@ test("the shopping list: low and out, plus what runs low before the next Groceri
     [["fridge", [["Broccoli", "out"], ["Spinach", "soon"]]], ["pantry", [["Chickpeas", "low"]]]]);
   assert.equal(L.dinners, 4);
   const br = L.groups[0].list[0];
-  assert.equal(br.amt, "2 kg");   // Super Veggie's 500 g, four dinners
+  assert.equal(br.amt, "700 g");   // Super Veggie's 175 g (2026-10-21), four dinners; its amount comes before an idea's 400 g
   assert.deepEqual(J(br.uses.map((u) => u.dish)), ["Super Veggie", "Quinoa, broccoli and white beans"]);
   assert.equal(L.groups[1].list[0].amt, "1.6 kg");
   // no Groceries block in sight: a week at home, 2 days on a trip
@@ -333,7 +333,7 @@ test("the page wires it: Groceries blocks open the kitchen, a Kitchen card, dinn
   assert.ok(/<script src="quest-kitchen\.js\?v=\w+"><\/script>/.test(html), "script tag");
   assert.ok(html.includes('if (isGroceries(b)) return "kitchen";'), "Groceries route");
   assert.ok(html.includes("kitchenHTML()"), "Kitchen card");
-  assert.ok(html.includes("QK().dinner("), "dinner ticks");
+  assert.ok(html.includes("QK().eat("), "dinner ticks (d44: they take amounts off)");
   assert.ok(html.includes("QK().NEED"), "needs line");
   assert.ok(!/📷|Fill from a receipt/i.test(html), "no receipt button (d29: later, no placeholder)");
   assert.ok(html.indexOf('if (isGroceries(b)) return "kitchen";') < html.indexOf('if (isMeal(b)) return "meal";'));

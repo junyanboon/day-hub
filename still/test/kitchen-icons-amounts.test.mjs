@@ -99,17 +99,17 @@ test("d39: adding splits the amount; the same food added again updates the amoun
   assert.equal(it.name, "Navy beans"); assert.equal(it.amt, "400 g"); assert.equal(it.group, "Legumes and grains");
   r = K.add(r.K, "travel", "dry", "navy beans 800 g", at(1));
   assert.equal(K.items(r.K, "travel").length, 1);
-  assert.equal(K.item(r.K, r.id).amt, "800 g");
+  assert.equal(K.item(r.K, r.id).amt, "1.2 kg");   // d42: what he adds goes on top of what is there (400 g + 800 g)
   // no amount typed: none stored, and the tile line is the status alone
   r = K.add({}, "travel", "dry", "Canol Oil", at(0));
   assert.equal(K.item(r.K, r.id).amt, "");
   assert.equal(K.tileLine(K.item(r.K, r.id), T0, T0 + 99 * H), "Plenty");
   r = K.add({}, "travel", "dry", "400g navy beans", at(0));
-  assert.equal(K.tileLine(K.item(r.K, r.id), T0, T0 + 99 * H), "Plenty · 400 g");
+  assert.equal(K.tileLine(K.item(r.K, r.id), T0, T0 + 99 * H), "400 g");   // d42: the amount instead of the level
   // the fill-in picker's names split too, and fill the same item
   const f = K.fill(r.K, "travel", [{ name: "800g navy beans" }, { name: "500g pasta" }], at(2), "buy");
   assert.equal(K.items(f.K, "travel").length, 2);
-  assert.equal(find(f.K, "Navy beans").amt, "800 g");
+  assert.equal(find(f.K, "Navy beans").amt, "1.2 kg");   // 400 g there + 800 g bought (d42)
   assert.equal(find(f.K, "Pasta").amt, "500 g");
   assert.equal(K.preTick([{ id: "p:pasta", name: "Pasta" }], ["500g pasta"], "travel").on[0], "p:pasta");
 });
@@ -134,14 +134,17 @@ test("d39: his existing items are split once on read, written as split at their 
     [["Navy beans", "400 g"], ["Pasta", "500 g"], ["Canol Oil", ""]]);
   // reading twice is the same (no write, nothing to repeat)
   assert.deepEqual(J(K.items(OLD, "travel")), J(K.items(OLD, "travel")));
-  // a tap on the new page stores the split name and amount
-  const mine = K.tap(OLD, "u1", at(5));
-  assert.equal(mine.items.u1.name, "Navy beans"); assert.equal(mine.items.u1.amt, "400 g");
+  // a change on the new page stores the split name and amount (d42: a tap no longer steps an item with an amount)
+  assert.equal(K.tap(OLD, "u1", at(5)), OLD);
+  const mine = K.move(OLD, "u1", "cool", at(5));
+  assert.equal(mine.items.u1.name, "Navy beans"); assert.equal(mine.items.u1.amt, "400 g"); assert.equal(mine.items.u1.q, 400);
   // a later change from a device still on the old page (raw name) reads the same after the merge
   const other = J(OLD); other.items.u1 = { ...other.items.u1, lv: 1, at: at(6) };
   for (const m of [M.mergeKitchen(mine, other), M.mergeKitchen(other, mine)]) {
     const it = K.item(m, "u1");
-    assert.equal(it.name, "Navy beans"); assert.equal(it.amt, "400 g"); assert.equal(it.em, "🫘"); assert.equal(it.lv, 1);
+    assert.equal(it.name, "Navy beans"); assert.equal(it.amt, "400 g"); assert.equal(it.em, "🫘");
+    // d42: its 400 g is its amount now, so a level tapped on an old page does not change what it shows
+    assert.equal(it.q, 400); assert.equal(it.lv, 3);
   }
   // a split item renamed on purpose with no amount stays unsplit (amt stored as "")
   const k = K.rename(OLD, "u1", "Navy beans", at(7), "");
