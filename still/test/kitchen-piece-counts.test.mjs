@@ -77,9 +77,11 @@ test("d64: typed '4', '4 tomatoes', '4 lemons' or 'Tomatoes 4' saves as the coun
   assert.deepEqual([K.item(K.setAmount(N, "n", "500 g", at(1)), "n").q, K.item(K.setAmount(N, "n", "500 g", at(1)), "n").u], [500, "g"]);
   const O = stored("o", { name: "Olive oil", amt: "" });
   assert.equal(K.item(K.setAmount(O, "o", "1 L", at(1)), "o").q, 1000);
-  // a count of some other thing is not a count of the item ("2 cans" of beans stays words)
+  // a count of a container is a count of that container since 2026-10-21 ("2 cans" of beans is 2 cans); other words stay words
   const c2 = K.item(K.setAmount(N, "n", "2 cans", at(1)), "n");
-  assert.equal(K.hasQ(c2), false); assert.equal(c2.amt, "2 cans");
+  assert.deepEqual([c2.q, c2.u, c2.amt], [2, "", "2 cans"]);
+  const c3 = K.item(K.setAmount(N, "n", "2 bunches", at(1)), "n");
+  assert.equal(K.hasQ(c3), false); assert.equal(c3.amt, "2 bunches");
 });
 
 test("d64: the - and + step (one at a time, from 1 when there is none, never below 0)", () => {

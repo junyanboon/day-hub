@@ -968,7 +968,7 @@
 <script src="quest-levels.js?v=20261016b"></script>
 <script src="quest-gymlog.js?v=20261019a"></script>
 <script src="quest-meals.js?v=20261021d79"></script>
-<script src="quest-kitchen.js?v=20261021d76"></script>
+<script src="quest-kitchen.js?v=20261021h81"></script>
 <script src="quest-ideas.js?v=20261021d76"></script>
 <script src="quest-recipe-data.js?v=202610211914"></script>
 <script src="quest-recipes.js?v=20261021d79"></script>
@@ -2937,7 +2937,7 @@
     });
     sh.querySelectorAll("[data-xq]").forEach(inp => inp.onchange = () => {
       const d = xDish(inp.dataset.xq); if (!d) return;
-      const raw = String(inp.value).trim(), v = parseFloat(raw.replace(",", ".")), q = raw === "" || isNaN(v) ? null : Math.max(0, v);
+      const raw = String(inp.value).trim(), v = QK().numOf(raw), q = raw === "" || isNaN(v) ? null : Math.max(0, v);
       const key = xKeyOf(d, inp.dataset.xn);
       if (q != null && QK() && QK().taken(G.kitchen, key)) { const K2 = QK().setTake(G.kitchen, key, q, now()); if (K2 !== G.kitchen) { G.kitchen = K2; const tk = QK().taken(K2, key); if (tk) kitEatToast(K2, [tk.id]); } }
       putRec(QM.setExtraQ(mealRec(), d.id, inp.dataset.xn, q));
@@ -3003,7 +3003,7 @@
   function kitMealBind(sh, mk, redraw, b){
     if (!QK()) return;
     sh.querySelectorAll("[data-take]").forEach(inp => inp.onchange = () => {
-      const v = parseFloat(String(inp.value).replace(",", "."));
+      const v = QK().numOf(inp.value);   // ".5" and "½" are half (2026-10-21)
       const K2 = QK().setTake(G.kitchen, inp.dataset.take, isNaN(v) ? 0 : v, now());
       if (K2 === G.kitchen) return;
       const tk = QK().taken(K2, inp.dataset.take), it = tk && QK().item(K2, tk.id);
@@ -3590,9 +3590,8 @@
       <div class="win-lb">Name</div><input id="kiName" value="${esc(it.name)}" maxlength="40" autocomplete="off">
       ${piece ? `<div class="win-lb">How many${typeof it.q === "number" ? " now" : ""} <small>(${typeof it.q === "number" ? "meals take it down by themselves; fix it here" : "with a number, meals take it down"})</small></div>`
         : typeof it.q === "number" ? `<div class="win-lb">Amount now <small>(meals take it down by themselves; fix it here)</small></div>`
-        : `<div class="win-lb">How much <small>(e.g. 400 g; with a number, meals take it down)</small></div>`}${piece
-        ? `<div class="ki-step"><button type="button" class="mq-mini" id="kiMinus" aria-label="One less">−</button><input id="kiAmt" value="${esc(it.amt || "")}" maxlength="20" autocomplete="off" placeholder="How many?" aria-label="How many ${esc(it.name)}"><button type="button" class="mq-mini" id="kiPlus" aria-label="One more">+</button></div>`
-        : `<input id="kiAmt" value="${esc(it.amt || "")}" maxlength="20" autocomplete="off" placeholder="Amount">`}
+        : `<div class="win-lb">How much <small>(e.g. 400 g; with a number, meals take it down)</small></div>`}
+      <div class="ki-step"><button type="button" class="mq-mini" id="kiMinus" aria-label="One less"${piece ? "" : " hidden"}>−</button><input id="kiAmt" value="${esc(it.amt || "")}" maxlength="20" autocomplete="off" placeholder="${piece ? "How many?" : "Amount"}" aria-label="${piece ? "How many" : "How much"} ${esc(it.name)}"><button type="button" class="mq-mini" id="kiPlus" aria-label="One more"${piece ? "" : " hidden"}>+</button></div>
       <div class="win-lb">Group</div><div class="kt-tools">${QK().GROUP_NAMES.map(g => `<button type="button" class="kt-chip" data-kig="${esc(g)}" aria-pressed="${g === it.group}">${esc(g)}</button>`).join("")}</div>
       <div class="win-lb">Shelf</div><div class="kt-tools">${kn.shelves.map(s => `<button type="button" class="kt-chip" data-kish="${s.id}" aria-pressed="${s.id === it.shelf}">${esc(s.name)}</button>`).join("")}</div>
       <div class="actions"><button class="btn danger" id="kiDel">Delete this item</button></div>
@@ -3602,8 +3601,12 @@
       $("sheet").querySelectorAll("[data-kish]").forEach(x => x.setAttribute("aria-pressed", x.dataset.kish === shelf)); });
     $("sheet").querySelectorAll("[data-kig]").forEach(bn => bn.onclick = () => { group = bn.dataset.kig;
       $("sheet").querySelectorAll("[data-kig]").forEach(x => x.setAttribute("aria-pressed", x.dataset.kig === group)); });
-    if (piece) for (const [bid, dir] of [["kiMinus", -1], ["kiPlus", 1]])
+    for (const [bid, dir] of [["kiMinus", -1], ["kiPlus", 1]])
       $(bid).onclick = () => { const f = $("kiAmt"); f.value = QK().stepCount(f.value, it.name, dir); };
+    /* 2026-10-21: - and + show once the field is a count ("1 jar" on Mini Honey Jars, "2" on a piece food), and go again
+       for grams ("30 g") */
+    $("kiAmt").oninput = () => { const f = $("kiAmt"), c = piece || QK().isCountText(f.value, it.name, QK().hasQ(it) ? it.u : undefined);
+      $("kiMinus").hidden = $("kiPlus").hidden = !c; };
     $("kiBack").onclick = () => openKitchen();
     $("kiSave").onclick = () => { let K = G.kitchen; const nm = $("kiName").value.trim();
       const amt = $("kiAmt").value.trim();
