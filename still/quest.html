@@ -588,6 +588,8 @@
   .mq-take small { margin-left:auto; overflow:hidden; text-overflow:ellipsis; }
   .mq-mini { font:inherit; font-size:12.5px; font-weight:600; padding:6px 12px; border-radius:10px; border:1px solid var(--glass-border); background:transparent; color:var(--ink); cursor:pointer; }
   .mq-mini.go { background:#5fd3c4; border-color:#5fd3c4; color:#0e2f2a; }
+  .mq-hv { display:block; font-size:11px; color:var(--ink-soft); } .mq-hv.have { color:#8fe3b0; } .mq-hv.short, .mq-hv.out, .mq-hv.none { color:#ffc27a; }
+  .mq-buy b { color:var(--ink); } .mq-inote { margin:2px 2px 8px; }
   .mq-dst { margin-left:auto; font-size:12px; color:var(--ink-soft); } .mq-dst.ok { color:#8fe3b0; font-weight:700; }
   .mq-dbtn:focus-visible, .mq-ing:focus-visible, .mq-mini:focus-visible { outline:2px solid #5fd3c4; outline-offset:2px; }
   /* his own dishes (d48): "+ New dish" under them, and the dish editor */
@@ -934,8 +936,9 @@
 <script src="quest-oura.js?v=20261019a"></script>
 <script src="quest-levels.js?v=20261016b"></script>
 <script src="quest-gymlog.js?v=20261019a"></script>
-<script src="quest-meals.js?v=20261021d48b"></script>
+<script src="quest-meals.js?v=20261021d41"></script>
 <script src="quest-kitchen.js?v=20261021d48b"></script>
+<script src="quest-ideas.js?v=20261021d41"></script>
 <script src="quest-trends.js?v=20261019end3"></script>
 <script src="nvc-words.js?v=20261010a"></script>
 <script src="quest-fx.js?v=20261019x"></script>
@@ -2551,6 +2554,10 @@
     if (!b) return;
     const all = blocks(), k = gk(b), name = shortName(b), q = (G.day.mealq || {})[k] || null, rec = q && !q.kind ? q : null;
     const own = mealOwn(rec);
+    /* tonight's ideas (d41): today's three from the kitchen, then any idea this meal already has ticks on (from another
+       day's three, or before the kitchen changed), so a tick can always be taken back */
+    const IT = ideasToday(), ideas = IT.list.concat(Object.keys((rec && rec.dish) || {})
+      .filter(id => !IT.list.some(d => d.id === id)).map(id => QI() ? QI().byId(id) : (QM.IDEAS.find(d => d.id === id) || null)).filter(Boolean));
     const sel = new Set(rec && Array.isArray(rec.sel) ? rec.sel : []), paid = (rec && rec.v) || {};
     const warn = mealWarn(b, all), lastFood = lastMealBefore(b.s, all), o = mqOpt();
     const sign = v => v > 0 ? `+${v}` : `${v}`;
@@ -2562,23 +2569,26 @@
     const got = ids => ids.reduce((a, id) => a + (sel.has(id) && paid[id] ? +paid[id][1] || 0 : 0), 0);
     const dishGot = list => list.reduce((a, d) => a + QM.dishPaid(rec, d), 0);
     const lb = (txt, cls, n) => `<div class="win-lb mq-lb ${cls}"><span>${esc(txt)}</span>${n ? `<b>${sign(n)}</b>` : ""}</div>`;
-    const dishCard = d => {
+    /* fit (tonight's ideas, d41): what the kitchen has of each ingredient (QuestIdeas.status), shown on the card and on
+       each row he has not ticked; never a made-up amount */
+    const dishCard = (d, fit) => {
       const st = QM.dishStatus(rec, d), open = mqOpen.has(k + "|" + d.id), pd = QM.dishPaid(rec, d), on = new Set(rec && rec.dish && Array.isArray(rec.dish[d.id]) ? rec.dish[d.id] : []);
       const max = QM.capOf(rec, d, dishOpt(k, d));   // its kept max once started, else what a start now gets (0: the day's cap is reached)
       return `<div class="mq-dish${open ? " open" : ""}${st.all ? " done" : ""}">` +
         `<button type="button" class="mq-dbtn" data-dopen="${esc(d.id)}" aria-expanded="${open}"><span class="mq-de">${esc(d.icon)}</span>` +
-        `<span class="mq-dn"><b>${esc(d.name)}</b><small>${st.n ? `${st.n} of ${st.m} ingredients` : `${st.m} ingredients · tap to open`}${d.time ? ` · ${esc(d.time)}` : ""}</small></span>` +
+        `<span class="mq-dn"><b>${esc(d.name)}</b><small>${st.n ? `${st.n} of ${st.m} ingredients` : fit ? `${esc(fit.text)} · tap to open` : `${st.m} ingredients · tap to open`}${d.time ? ` · ${esc(d.time)}` : ""}</small></span>` +
         `<span class="mq-dp">${d.own ? `<small>${d.del ? "deleted" : "your dish"}</small>` : pd ? sign(pd) : max ? `<small>up to</small> +${max}` : `<small>full for today</small>`}</span></button>` +
         `<i class="mq-dbar"><b style="width:${st.pct}%"></b></i>` +
         (open ? `<div class="mq-dlist"><p class="mq-serves">${d.own ? "Your usual amounts. Tick what went in; it comes off the kitchen, and you can change how much. Your dishes earn no points of their own: tap the food tiles below for those."
           : `For 2 people${d.time ? ` · ${esc(d.time)}` : ""}. Tick what went in; what you tick comes off the kitchen, and you can change how much.`}</p>` +
           `<div class="mq-ings">${d.items.map(([n, amt], i) => kitTakeWrap(on.has(n) ? kitEatKey(k, d.id, n) : null,
             `<button type="button" class="mq-ing" data-ding="${esc(d.id)}" data-i="${i}" aria-pressed="${on.has(n)}">` +
-            `<span class="bx"></span><span class="n">${esc(n)}</span><span class="qty">${esc(amt)}</span></button>`)).join("")}` +
+            `<span class="bx"></span><span class="n">${esc(n)}${fit && !on.has(n) && fit.rows[i] ? `<small class="mq-hv ${fit.rows[i].st}">${esc(fit.rows[i].word)}</small>` : ""}</span><span class="qty">${esc(amt)}</span></button>`)).join("")}` +
           // d48: a food taken out of his dish since this meal ticked it still shows here, so he can untick it
           (d.own ? [...on].filter(n => !d.items.some(x => x[0] === n)).map(n => kitTakeWrap(kitEatKey(k, d.id, n),
             `<button type="button" class="mq-ing" data-dname="${esc(n)}" data-did="${esc(d.id)}" aria-pressed="true">` +
             `<span class="bx"></span><span class="n">${esc(n)}</span><span class="qty">not in the dish now</span></button>`)).join("") : "") + `</div>` +
+          (fit && (fit.buy.length || fit.check.length) ? `<p class="mq-how mq-buy">${fit.buy.length ? `<b>To buy:</b> ${esc(fit.buy.join(", "))}` : ""}${fit.buy.length && fit.check.length ? "<br>" : ""}${fit.check.length ? `<b>Not checked in the kitchen:</b> ${esc(fit.check.join(", "))}` : ""}</p>` : "") +
           (d.how ? `<p class="mq-how">${esc(d.how)}</p>` : "") +
           `<div class="mq-drow"><button type="button" class="mq-mini go" data-dall="${esc(d.id)}">Got everything</button><button type="button" class="mq-mini" data-dnone="${esc(d.id)}">Clear</button>` +
           (d.own && !d.del ? `<button type="button" class="mq-mini" data-dedit="${esc(d.id)}">Edit</button>` : "") +
@@ -2590,11 +2600,12 @@
       ${lastFood ? `<p>Last food ended ${fmtT(lastFood)} (${fmtHM(Math.round((b.s - lastFood) / 60000))} before this).</p>` : ""}
       <div class="mq-tips"><div class="mq-tl">How to eat</div>${QM.TIPS.map(([i, t]) => `<p><span>${i}</span>${esc(t)}</p>`).join("")}</div>
       ${lb("Blueprint dishes", "mb", dishGot(QM.DISHES))}
-      <div class="mq-dishes">${QM.DISHES.map(dishCard).join("")}</div>
+      <div class="mq-dishes">${QM.DISHES.map(d => dishCard(d)).join("")}</div>
       ${QK() ? `<div class="mq-sub mq-subl"><span>Your dishes</span></div>
-      <div class="mq-dishes">${own.map(dishCard).join("")}<button type="button" class="mq-mini mq-new" data-dnew>+ New dish</button></div>` : ""}
-      <div class="mq-sub mq-subl"><span>Tonight's ideas · for 2 people</span>${dishGot(QM.IDEAS) ? `<b>${sign(dishGot(QM.IDEAS))}</b>` : ""}</div>
-      <div class="mq-dishes">${QM.IDEAS.map(dishCard).join("")}</div>
+      <div class="mq-dishes">${own.filter(d => !ideas.some(x => x.id === d.id)).map(d => dishCard(d)).join("")}<button type="button" class="mq-mini mq-new" data-dnew>+ New dish</button></div>` : ""}
+      <div class="mq-sub mq-subl"><span>Tonight's ideas · for 2 people${QK() ? ` · from ${QK().KITCHENS[kitToday()].icon} ${esc(QK().KITCHENS[kitToday()].name)}` : ""}</span>${dishGot(ideas) ? `<b>${sign(dishGot(ideas))}</b>` : ""}</div>
+      ${IT.note ? `<p class="mq-serves mq-inote">${esc(IT.note)}</p>` : ""}
+      <div class="mq-dishes">${ideas.map(d => dishCard(d, QI() && QK() ? QI().status(G.kitchen, kitToday(), d) : null)).join("")}</div>
       ${kitMealCard(k)}
       ${lb("Prana foods · Sadhguru", "mp", got(QM.FOOD_IDS))}
       ${grid(QM.PRANA_FOODS.map(gold))}
@@ -2746,8 +2757,9 @@
      and foods picked from the kitchen with a search (or typed), each with a usual amount read like the kitchen reads one.
      Delete hides the dish; meals already logged keep it and the kitchen keeps what they took. */
   const allDishes = () => kitDishes().concat(QK() ? QK().ownDishes(G.kitchen) : []);
-  // a dish by id: the Blueprint dishes, tonight's ideas and his own, a deleted one of his too (a meal logged with it)
-  const dishById = id => allDishes().find(d => d.id === id) || (QK() ? QK().ownDish(G.kitchen, id) : null);
+  /* a dish by id: the Blueprint dishes, tonight's ideas and his own, a deleted one of his too (a meal logged with it), and
+     any idea of the pool (d41: an idea from another day that a meal has ticks on) */
+  const dishById = id => allDishes().find(d => d.id === id) || (QK() ? QK().ownDish(G.kitchen, id) : null) || (QI() && QI().byId(id)) || null;
   // his dishes for this meal: the live ones, then any deleted one this meal has ticks on
   function mealOwn(rec){
     if (!QK()) return [];
@@ -2881,7 +2893,15 @@
     return out;
   }
   const kitShop = k => QK().nextShop(kitBlocks(), now(), k);
-  const kitDishes = () => QM ? QM.DISHES.concat(QM.IDEAS) : [];
+  /* Tonight's ideas from the kitchen (Junyan, 2026-10-21, d41: "yes"): three a day for 2 people, picked by quest-ideas.js
+     from what the kitchen in use has (more for food to use first, running low, or with an amount), read as it was when
+     the day began (4 AM) so they hold while he cooks. His own dishes join when all their foods are in. With no module,
+     the three fixed ideas. The shopping list's amounts follow today's three. */
+  const QI = () => window.QuestIdeas;
+  const ideaSince = () => window.QuestSuggest ? QuestSuggest.at(gameYmd(), 4, 0, TZ()) : 0;
+  const ideasToday = () => QI() && QK() && G.day ? QI().pick(G.kitchen, kitToday(), { day:gameYmd(), since:ideaSince(), now:+now() })
+    : { list:QM ? QM.IDEAS : [], note:"", ready:3 };
+  const kitDishes = () => QM ? QM.DISHES.concat(ideasToday().list.filter(d => !d.own)) : [];
   function kitSave(K){ G.kitchen = K; saveG(); }
   // the trip-end question, only once the whole calendar is in (a half-loaded agenda could read a travel day as home)
   const kitTripEnd = () => lastPull && Object.keys(AG).length ? QK().tripEnd(G.kitchen, gameYmd(), kitToday()) : { ask:false, items:[] };
