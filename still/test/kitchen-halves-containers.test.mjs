@@ -124,3 +124,19 @@ test("page: the item page's - and + show once the field is a count, and halves a
   assert.ok(f.includes("QK().isCountText("), "the field's input toggles the buttons");
   assert.ok(f.includes('id="kiMinus"') && f.includes('id="kiPlus"'));
 });
+
+test("review: dates and big fractions stay as typed; old grams on a container name stay grams; '½ lemon' as an extra is half a lemon", () => {
+  for (const t of ["12/2024", "21/10", "3/2"]) assert.equal(K.numText(t), t, t);
+  assert.equal(K.qtyOf("12/2024", "Rice"), null);
+  assert.equal(K.numText("1 1/2"), "1.5");
+  assert.equal(K.numText("2 x 400 g"), "2 x 400 g");
+  assert.equal(K.numText("1,000 g"), "1,000 g");
+  // stored by an older build: 5 g of something whose name ends in a container word is still 5 g
+  const old = K.item(stored("b", { name: "Lentils bag", q: 5, u: "g", qt: at(0), buy: 5, amt: "5 g" }), "b");
+  assert.equal(old.u, "g");
+  const S = K.setAmount(stored("l", { name: "Lemons", amt: "" }), "l", "2", at(1));
+  for (const t of ["½ lemon", ".5 lemon", "1/2 lemon"]) {
+    const x = K.extraParse(S, "travel", t);
+    assert.deepEqual([x.it && x.it.id, x.q, x.u], ["l", 0.5, ""], t);
+  }
+});

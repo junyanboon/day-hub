@@ -3420,7 +3420,7 @@
     const sp = QK().splitName(r.name).amt;
     if (sp) return sp;
     const it = r.item && QK().item(G.kitchen, r.item);
-    return it && typeof it.q === "number" ? QK().fmtQ(it.buy, it.u) : "";
+    return it && QK().hasQ(it) ? QK().fmtItem(it, it.buy) : "";   // "1 jar" keeps its jar (2026-10-21)
   }
   function kitFillBind(S, redraw){
     const sh = $("sheet"), F = S.fill;

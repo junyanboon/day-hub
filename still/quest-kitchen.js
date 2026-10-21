@@ -208,19 +208,21 @@
   const COUNT_FOODS = /\b(bananas?|avocados?|limes?|lemons?|apples?|pears?|eggs?|oranges?|clementines?|mandarins?|kiwis?|peach(es)?|nectarines?|plums?|mangoe?s?|grapefruits?|pomegranates?|coconuts?|melons?|pineapples?|courgettes?|zucchinis?|cucumbers?|peppers?|aubergines?|eggplants?|onions?|tomato(es)?|carrots?|potato(es)?|leeks?|lettuces?|capsicums?|beetroots?|beets?|parsnips?|turnips?|artichokes?|figs?|apricots?|persimmons?|papayas?|guavas?|chill?i(es)?|jalapenos?|tortillas?|wraps?|pitas?|bagels?|buns?|croissants?|muffins?|fior di latte|mozzarellas?|burratas?)\b/i;
   const LIQUID = /\b(milk|juices?|oils?|vinegars?|kefir|kombucha|water|wine|beers?|syrup|sauce|drinks?|shots?)\b/i;
   const NOT_PIECE = /\b(yogh?urts?|flakes|powder|paste|seeds?|flour|butter|dried|shredded|grated|(black|white) pepper|peppercorns?|leaves|puree|passata|cherry tomato(es)?)\b/i;
-  function unitFor(name) {
+  // the unit by the food alone (a few grams of such a food read as a count, d64)
+  function foodUnit(name) {
     const n = String(name || "");
-    if (nameCw(n)) return "";   // "Mini Honey Jars", "Tea bags": counted in what the name says (2026-10-21)
     return LIQUID.test(n) ? "ml" : !NOT_PIECE.test(n) && COUNT_FOODS.test(n) ? "" : "g";
   }
+  // "Mini Honey Jars", "Tea bags": counted in what the name says (2026-10-21), else by the food
+  const unitFor = (name) => (nameCw(name) ? "" : foodUnit(name));
   /* Half counts and container counts (Junyan, 2026-10-21: half a lemon typed ".5" was kept as words, and "1 jar" of Mini
      Honey Jars was not tracked). numText writes a typed half the one way the parsers read: ".5" and "½" as "0.5", "1½",
      "1 ½" and "1 1/2" as "1.5", "1/2" as "0.5". */
   function numText(text) {
     return String(text == null ? "" : text)
       .replace(/(\d+)?\s*([½¼¾⅓⅔])/g, (_, w, c) => ` ${+((w ? +w : 0) + FRAC[c]).toFixed(2)}`)
-      .replace(/(\d+)\s+(\d+)\s*\/\s*(\d+)(?![\d.])/g, (a, w, x, y) => (+y ? String(+(+w + x / y).toFixed(2)) : a))
-      .replace(/(^|[^\d.,])(\d+)\s*\/\s*(\d+)(?![\d.])/g, (a, b, x, y) => (+y ? b + String(+(x / y).toFixed(2)) : a))
+      .replace(/(^|[^\d.,/])(\d{1,3}) (\d)\/(\d{1,2})(?![\d./])/g, (a, b, w, x, y) => (+y > +x ? b + String(+(+w + x / y).toFixed(2)) : a))
+      .replace(/(^|[^\d.,/])(\d)\/(\d{1,2})(?![\d./])/g, (a, b, x, y) => (+y > +x ? b + String(+(x / y).toFixed(2)) : a))
       .replace(/(^|[^\d])[.,](\d)/g, "$10.$2").replace(/\s+/g, " ").trim();
   }
   // a number he typed in a "took" field: ".5", "½", "1/2", "0,5", "30 g" (the number); NaN when there is none
@@ -350,7 +352,7 @@
       /* d64: a food bought by the piece stored as a few grams ("Capsicum 1 g": a bare "1" read as grams before capsicum
          was on the list) is a count. Under PIECE_G grams nobody means weight for a whole capsicum or banana. Grams he
          types from this build on ("5 g" of lemon) are kept: put marks them wg, and a marked item stays in grams. */
-      if (out.u === "g" && !it.wg && unitFor(name) === "" && out.q < PIECE_G && out.buy < PIECE_G) out.u = "";
+      if (out.u === "g" && !it.wg && foodUnit(name) === "" && out.q < PIECE_G && out.buy < PIECE_G) out.u = "";
       if (out.u !== "" || !okCw(out.cw)) delete out.cw;
     }
     return out;
@@ -434,7 +436,7 @@
     if (hasQ(rest) && rest.u === "" && okCw(rest.cw)) rest.cw = okCw(rest.cw); else delete rest.cw;
     if (hasQ(rest)) rest.amt = fmtItem(rest, rest.q);
     // d64: a few grams of a piece food that he typed as grams stays grams (clean reads an unmarked one as a count)
-    if (hasQ(rest) && rest.u === "g" && typeof rest.name === "string" && unitFor(rest.name) === "" && rest.q < PIECE_G) rest.wg = true;
+    if (hasQ(rest) && rest.u === "g" && typeof rest.name === "string" && foodUnit(rest.name) === "" && rest.q < PIECE_G) rest.wg = true;
     else delete rest.wg;
     out.items[it.id] = { ...rest, at: iso(at) };
     return out;
@@ -1067,7 +1069,7 @@
      used), else null. q, u: what it took, in the item's unit when it has an amount ("" a count, "g", "ml"); q null
      when he gave none, or when a count was typed for an item kept in grams. */
   function extraParse(K, k, text) {
-    const raw = String(text == null ? "" : text).replace(/\s+/g, " ").trim();
+    const raw = numText(text);   // "½ lemon", ".5 lemon": half a lemon (2026-10-21)
     if (!raw) return { name: null, q: null, u: "", it: null };
     let { name, amt } = splitName(raw);
     if (!amt) { const m = /^(\d+(?:[.,]\d+)?)\s+([a-z].*)$/i.exec(raw); if (m) { name = cap(m[2]).slice(0, 40); amt = m[1]; } }
