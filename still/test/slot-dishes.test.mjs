@@ -155,8 +155,8 @@ test("d51 to d53 on the page: parts with swaps and Use something else, How to ma
   assert.match(body, /QI\(\)\.slotRows\(G\.kitchen, kitToday\(\), d, dishOn\(d\)\)/);
   assert.ok(body.includes("Use something else") && body.includes("data-dpk") && body.includes("data-dsl"));
   assert.ok(body.includes("How to make it") && body.includes("QM.stepsOf(d, use)") && body.includes("<ol>"));
-  assert.ok(body.includes("<b>Full recipe${"));
-  assert.ok(/howTo\(d\) \+/.test(body), "every other dish (ideas, his own) has How to make it too");
+  assert.ok(body.includes("`Full recipe${"), "the full recipe, on a tap since d73");
+  assert.ok(/links\(howTo\(d\)\) \+/.test(body), "every other dish (ideas, his own) has How to make it too");
   assert.match(body, /kitDinner\(k, d, [^;]*, amts\);/);
   const kd = html.slice(html.indexOf("function kitDinner("), html.indexOf("function kitEatToast("));
   assert.match(kd, /QM\.entryName\(d, name\)/); assert.match(kd, /\{ name:food \}/);
@@ -165,7 +165,7 @@ test("d51 to d53 on the page: parts with swaps and Use something else, How to ma
   assert.match(html, /r\.why === "none" \? "not in the kitchen"/);
   for (const [f, v] of [["quest-meals", "d70"], ["quest-kitchen", "d70d"], ["quest-ideas", "d69b"]]) assert.match(html, new RegExp(`${f}\\.js\\?v=20261021${v}"`), f);
   assert.match(body, /p\.rows\.filter\(r => r\.on \|\| r\.st !== "none"\)\.map\(r => r\.entry\)/, "Got everything skips foods marked none in the kitchen");
-  assert.ok(!/[—–]/.test(body.match(/For 2 people\. Each part[^<]*/)[0]));
+  assert.ok(!/For 2 people\. Each part/.test(body), "d72: the intro is gone");
 });
 
 test("d57: Super Veggie's oil is 15 ml for the two of them, drizzled on at the end, and the list sizes it from that", () => {
