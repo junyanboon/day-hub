@@ -159,14 +159,14 @@ test("d41: today's ticks do not shuffle the ideas while he cooks; what each show
   assert.equal(K.match(k2, "home", "Shiitake").left, 50);
 });
 
-test("d41: an idea from another day still reads on its meal, holds its slot, and pays like the ideas did", () => {
+test("d41, d81: an idea from another day still reads on its meal and pays nothing", () => {
   const r7 = QM.dishOf("r7");
   assert.equal(r7 && r7.name, "Black lentils with soft cauliflower");
   assert.equal(QM.groupOf(r7), "idea");
   const o = { mult: 1.5, dish: 6, dim: [1, 0.7], dishLimit: 2 };
   const t = QM.tick(null, r7, r7.items[0][0], o);
-  assert.ok(t.rec.v["dish:r7"][1] > 0);
-  assert.equal(QM.slotsUsed({ m1: t.rec }, "m2", QM.dishOf("r1")), 1, "it holds one of the ideas' two slots");
+  assert.deepEqual(J(t.rec.dish.r7), [r7.items[0][0]]);
+  assert.equal(t.rec.v["dish:r7"], undefined); assert.equal(t.rec.b, 0);
 });
 
 test("d41: the page loads quest-ideas.js and the meal sheet shows today's three from the kitchen with what they use and need", () => {
