@@ -65,9 +65,12 @@
      time?, how? }. A dish pays up to the Blueprint meal's value (DISH_VALUE times the level multiplier), in proportion
      to the ingredients ticked. Super Veggie has no garlic (d12). */
   const DISH_VALUE = 6;   // the "blueprint" habit's value in quest.html, used when the page passes none (opt.dish)
+  /* 2026-10-21 (Junyan: "I currently only consume 350g of broccoli and cauliflower for the two of us"): Super Veggie's
+     broccoli and cauliflower are 350 g together, 175 g each (was 500 g and 300 g). Points never depended on amounts, so
+     past meals keep what they paid. These amounts are what a tick takes off the kitchen (quest-kitchen.js eat). */
   const DISHES = [
     { id: "sv", icon: "🥗", name: "Super Veggie", items: [
-      ["Black lentils, dry", "90 g"], ["Broccoli", "500 g"], ["Cauliflower", "300 g"], ["Shiitake mushrooms", "100 g"],
+      ["Black lentils, dry", "90 g"], ["Broccoli", "175 g"], ["Cauliflower", "175 g"], ["Shiitake mushrooms", "100 g"],
       ["Fresh ginger, grated", "2 tbsp"], ["Lime", "1"], ["Ground cumin", "2 tsp"], ["Apple cider vinegar", "2 tbsp"],
       ["Hemp seeds", "4 tbsp"], ["Extra virgin olive oil", "30 ml"]] },
     { id: "np", icon: "🍮", name: "Nutty Pudding", items: [
