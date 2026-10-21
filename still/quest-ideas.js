@@ -199,12 +199,34 @@
     return res;
   }
 
+  /* What kind of food a name is, for a part's stand-ins (Junyan, 2026-10-21, d69): "supp" (a supplement: never
+     auto-picked for any part), "milk" (a plant milk or yogurt), "nut" (nuts, nut butters, a nut mix), "seed" (seeds or a
+     seed mix), "fruit" (berries, cherries and other fruit, not lemons or limes), else null. In this order, so "Almond milk"
+     is a milk, "Blueberry nut mix" a nut and "Hemp seeds" a seed. Cow's milk is not a plant milk. */
+  const SUPP = /\b(collagen|creatine|protein|whey|isolate|supplements?|vitamins?|multivitamins?|magnesium|zinc|omega|fish oil|electrolytes?|greens powder|spirulina|chlorella|ashwagandha|probiotics?|capsules?|tablets?|pills?|gummies|pre-?workout|bcaa)\b/i;
+  const MILK = /\b(nut|seed|hemp|coconut|oat|almond|soy|soya|cashew|macadamia|rice|pea|plant|hazelnut|pistachio|walnut|flax|quinoa)\s+(milk|mylk|drink|yogh?urts?|kefir)\b/i;
+  const NUT = /\b(nuts?|almonds?|cashews?|walnuts?|pecans?|hazelnuts?|macadamias?|pistachios?|brazils?|peanuts?|trail mix|nut mix)\b/i;
+  const SEED = /\b(seeds?|chia|flax|flaxseeds?|linseeds?|hemp|hemp hearts?|pepitas?|seed mix)\b/i;
+  const FRUIT = /berr(y|ies)\b|\bcherr(y|ies)\b/i, CITRUS = /\b(lemons?|limes?)\b/i;
+  function kindOf(name, group) {
+    const n = String(name || "");
+    if (SUPP.test(n)) return "supp";
+    if (MILK.test(n)) return "milk";
+    if (NUT.test(n)) return "nut";
+    if (SEED.test(n)) return "seed";
+    if (FRUIT.test(n) || (!CITRUS.test(n) && (group || QK().guessGroup(n)) === "Fruit")) return "fruit";
+    return null;
+  }
+  // a food that may stand in for part s by itself: of the part's kind when it has one, never a supplement
+  const standsIn = (s, name, group) => { const kd = kindOf(name, group); return kd !== "supp" && (!s.kind || kd === s.kind); };
+
   /* "Best you can" parts (Junyan, 2026-10-21, d51). For a part dish (QuestMeals SLOTS: Super Veggie, Nutty Pudding) and
      the meal's ticks on it, what each part shows in kitchen k:
      - a tick stays where it is (the food he used, matched to the real ingredient it stands for), so a row never moves
        under his finger when the tick takes the last of it;
      - every other real ingredient shows itself when the kitchen has it, else the closest swap it has (its listed swaps
-       in order, then any item matching the part's pattern), else itself when not checked yet, else itself marked
+       in order, then any item matching the part's pattern, then (d69) any item of the part's kind), else itself when not
+     checked yet, else itself marked
        "none in the kitchen". One food is never shown in two places in the dish, and real ingredients are placed first,
        so a swap never takes a food another part needs.
      Returns [{ id, role, filled, rows: [{ entry (what a tick stores), name, amt, on, swap, for (the real ingredient),
@@ -227,14 +249,17 @@
     });
     const open = () => parts.flatMap((p) => p.rows.filter((r) => !r.entry && !r.name).map((r) => ({ p, r })));
     const take = (r, name, swap) => { r.name = name; r.swap = swap; used.add(key(name)); };
-    const cands = (w) => { const out = (w[2] || []).slice();
+    // d69: only real stand-ins, of the part's kind, never a supplement
+    const okFor = (s, name) => { const it = kit.get(key(name)); return standsIn(s, name, it && it.group); };
+    const cands = (s, w) => { const out = (w[2] || []).slice();
       if (w[3]) { const re = new RegExp(w[3], "i"); for (const it of all) if (re.test(it.name)) out.push(it.name); }
-      return out; };
+      if (s.kind) for (const it of all) out.push(it.name);
+      return out.filter((n) => okFor(s, n)); };
     // the real ingredients the kitchen has, then swaps it has, then real ones not checked yet, then swaps not checked yet
     for (const { r } of open()) if (!used.has(key(r.for)) && look(r.for).st === "have") take(r, r.for, false);
-    for (const { r } of open()) { const n = cands(r.w).find((c) => !used.has(key(c)) && look(c).st === "have"); if (n) take(r, (kit.get(key(n)) || {}).name || n, true); }
+    for (const { p, r } of open()) { const n = cands(p.s, r.w).find((c) => !used.has(key(c)) && look(c).st === "have"); if (n) take(r, (kit.get(key(n)) || {}).name || n, true); }
     for (const { r } of open()) if (!used.has(key(r.for)) && look(r.for).st === "unchecked") take(r, r.for, false);
-    for (const { r } of open()) { const n = (r.w[2] || []).find((c) => !used.has(key(c)) && look(c).st === "unchecked"); if (n) take(r, (kit.get(key(n)) || {}).name || n, true); }
+    for (const { p, r } of open()) { const n = (r.w[2] || []).find((c) => !used.has(key(c)) && look(c).st === "unchecked" && okFor(p.s, c)); if (n) take(r, (kit.get(key(n)) || {}).name || n, true); }
     for (const { r } of open()) { r.name = r.for; r.swap = false; r.none = true; }
     return parts.map(({ s, rows }) => ({ id: s.id, role: s.role, filled: rows.some((r) => r.entry),
       rows: rows.map((r) => { const l = r.none ? { it: null, st: "none" } : look(r.name);
@@ -245,5 +270,5 @@
   // the parts a part dish could fill from kitchen k now (ticked, or a food it has): "you have 6 of 8 parts"
   const slotsHave = (K, k, d, entries) => slotRows(K, k, d, entries).filter((p) => p.filled || p.rows.some((r) => r.st === "have")).length;
 
-  root.QuestIdeas = { get POOL() { return POOL(); }, MORE, banned, byId, staple, read, status, pick, jitter, atStart, slotRows, slotsHave };
+  root.QuestIdeas = { get POOL() { return POOL(); }, MORE, banned, byId, staple, read, status, pick, jitter, atStart, slotRows, slotsHave, kindOf, standsIn };
 })(typeof window !== "undefined" ? window : globalThis);

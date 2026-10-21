@@ -87,6 +87,11 @@
      any (a pattern: any kitchen item whose name matches, "any mushroom")]. The meal sheet shows each real ingredient if
      the kitchen in use has it, else the closest swap it has, else "none in the kitchen" (QuestIdeas.slotRows). A swap
      takes the real ingredient's amount. d52: the dish pays by parts filled (5 of 8 parts, 5/8 of its value).
+     d69 (Junyan, 2026-10-21: the auto-swap had put a blueberry nut mix in Chia and collagen in "A nut"): a part with a
+     kind ("nut", "seed", "milk", "fruit") only auto-picks a stand-in of that kind (QuestIdeas.kindOf): a nut part nuts, nut
+     butters or a nut mix; a seeds part seeds or a seed mix; milk a plant milk or yogurt; berries berries or other fruit.
+     Supplements (collagen, creatine, protein powder) are never auto-picked for any part. He can still put anything in
+     by hand with "Use something else", or as an extra (d70).
      Steps (d53): "How to make it", numbered. A {part} in a step is filled with what he is using today; {a|b} joins the
      names of both parts; a step whose parts are all empty is left out. Cooked soft and with little oil (his gut plan,
      2026-10-21): steamed or simmered, never fried. Plain strings, so a recipe library can feed the same shape later. */
@@ -99,21 +104,21 @@
       { id: "ginger", role: "Ginger", want: [["Fresh ginger, grated", "2 tbsp", []]] },
       { id: "acid", role: "Lime and vinegar", want: [["Lime", "1", ["Lemons"]], ["Apple cider vinegar", "2 tbsp", [], "vinegar"]] },
       { id: "spice", role: "Spice", want: [["Ground cumin", "2 tsp", ["Ground coriander", "Turmeric", "Smoked paprika", "Curry powder"]]] },
-      { id: "seeds", role: "Seeds", want: [["Hemp seeds", "4 tbsp", ["Pumpkin seeds", "Sunflower seeds", "Ground flax"]]] },
+      { id: "seeds", role: "Seeds", kind: "seed", want: [["Hemp seeds", "4 tbsp", ["Pumpkin seeds", "Sunflower seeds", "Ground flax"]]] },
       { id: "oil", role: "Oil", want: [["Extra virgin olive oil", "15 ml", [], "\\boil\\b"]] },
     ],
     np: [
-      { id: "milk", role: "Nut milk", want: [["Macadamia milk", "240 ml", ["Almond milk", "Cashew milk", "Oat milk", "Soy milk"], "(nut|seed|hemp|coconut) milk"]] },
-      { id: "nuts", role: "Ground nuts", want: [["Macadamia nuts, ground", "4 tbsp", ["Almonds", "Cashews", "Hazelnuts", "Pecans"], "\\bnuts?\\b"]] },
-      { id: "walnuts", role: "Walnuts", want: [["Walnuts", "2 tbsp", ["Pecans"]]] },
-      { id: "brazil", role: "Brazil nuts", want: [["Brazil nuts", "2", []]] },
-      { id: "chia", role: "Chia", want: [["Chia seeds", "2 tbsp", []]] },
-      { id: "flax", role: "Flax", want: [["Ground flaxseed", "2 tbsp", []]] },
+      { id: "milk", role: "Nut milk", kind: "milk", want: [["Macadamia milk", "240 ml", ["Almond milk", "Cashew milk", "Oat milk", "Soy milk"], "(nut|seed|hemp|coconut) milk"]] },
+      { id: "nuts", role: "Ground nuts", kind: "nut", want: [["Macadamia nuts, ground", "4 tbsp", ["Almonds", "Cashews", "Hazelnuts", "Pecans"], "\\bnuts?\\b"]] },
+      { id: "walnuts", role: "Walnuts", kind: "nut", want: [["Walnuts", "2 tbsp", ["Pecans"]]] },
+      { id: "brazil", role: "Brazil nuts", kind: "nut", want: [["Brazil nuts", "2", []]] },
+      { id: "chia", role: "Chia", kind: "seed", want: [["Chia seeds", "2 tbsp", []]] },
+      { id: "flax", role: "Flax", kind: "seed", want: [["Ground flaxseed", "2 tbsp", []]] },
       { id: "lecithin", role: "Lecithin", want: [["Sunflower lecithin", "2 tsp", ["Soy lecithin"]]] },
       { id: "cocoa", role: "Cocoa", want: [["Cocoa powder", "2 tbsp", ["Cacao powder", "Cacao"]]] },
       { id: "cinnamon", role: "Cinnamon", want: [["Cinnamon", "½ tsp", []]] },
       { id: "juice", role: "Juice", want: [["Pomegranate juice", "120 ml", ["Tart cherry juice"], "juice"]] },
-      { id: "berries", role: "Berries", want: [["Blueberries", "100 g", ["Frozen berries", "Raspberries", "Blackberries", "Strawberries"], "berr(y|ies)|cherr(y|ies)"],
+      { id: "berries", role: "Berries", kind: "fruit", want: [["Blueberries", "100 g", ["Frozen berries", "Raspberries", "Blackberries", "Strawberries"], "berr(y|ies)|cherr(y|ies)"],
         ["Cherries", "100 g", ["Frozen berries", "Raspberries", "Blackberries", "Strawberries"], "berr(y|ies)|cherr(y|ies)"]] },
     ],
   };
@@ -153,7 +158,7 @@
       { id: "legume", role: "Cooked lentils or beans, a jar", want: [["Cooked lentils", "400 g", ["Chickpeas", "White beans"], "\\b(lentils?|chickpeas?|(white|black|navy|kidney|pinto|cannellini|butter|borlotti|mung|adzuki) beans?)\\b"]] },
       { id: "greens", role: "Greens", want: [["Baby spinach", "200 g", ["Kale", "Frozen broccoli", "Broccoli"]]] },
       { id: "lemon", role: "Lemon", want: [["Lemons", "1", ["Limes"]]] },
-      { id: "seeds", role: "Seeds", want: [["Hemp seeds", "4 tbsp", ["Pumpkin seeds", "Sunflower seeds"]]] },
+      { id: "seeds", role: "Seeds", kind: "seed", want: [["Hemp seeds", "4 tbsp", ["Pumpkin seeds", "Sunflower seeds"]]] },
     ], steps: [
       "Rinse the {legume} and warm them in a pan with a splash of water, about 5 min.",
       "Add the {greens} with a little more water, cover, and cook until very soft, 3 to 5 min.",
@@ -161,10 +166,10 @@
       "Top with the {seeds} and eat it warm. No oil needed.",
     ] },
     { id: "tnp", icon: "🍮", name: "Travel Nutty Pudding", full: "np", travel: true, slots: [
-      { id: "chia", role: "Chia", want: [["Chia seeds", "4 tbsp", []]] },
-      { id: "milk", role: "Nut or oat milk", want: [["Almond milk", "400 ml", ["Macadamia milk", "Oat milk", "Cashew milk", "Soy milk"], "(nut|seed|hemp|coconut|oat|almond|soy|cashew|macadamia) milk"]] },
-      { id: "berries", role: "Berries", want: [["Blueberries", "150 g", ["Frozen berries", "Raspberries", "Strawberries", "Cherries"], "berr(y|ies)|cherr(y|ies)"]] },
-      { id: "nut", role: "A nut", want: [["Walnuts", "2 tbsp", ["Almonds", "Mixed nuts", "Macadamias", "Brazil nuts", "Pecans"], "\\bnuts?\\b"]] },
+      { id: "chia", role: "Chia", kind: "seed", want: [["Chia seeds", "4 tbsp", []]] },
+      { id: "milk", role: "Nut or oat milk", kind: "milk", want: [["Almond milk", "400 ml", ["Macadamia milk", "Oat milk", "Cashew milk", "Soy milk"], "(nut|seed|hemp|coconut|oat|almond|soy|cashew|macadamia) milk"]] },
+      { id: "berries", role: "Berries", kind: "fruit", want: [["Blueberries", "150 g", ["Frozen berries", "Raspberries", "Strawberries", "Cherries"], "berr(y|ies)|cherr(y|ies)"]] },
+      { id: "nut", role: "A nut", kind: "nut", want: [["Walnuts", "2 tbsp", ["Almonds", "Mixed nuts", "Macadamias", "Brazil nuts", "Pecans"], "\\bnuts?\\b"]] },
     ], steps: [
       "Stir the {chia} into the {milk}, then stir again after 2 min so it does not clump.",
       "Let it sit at least 15 min, or overnight in the cool box, until thick (longer is gentler on the gut).",
@@ -412,6 +417,36 @@
   // what one dish has paid on this record (shown on its card)
   const dishPaid = (rec, d) => (rec && rec.v && rec.v["dish:" + d.id] ? +rec.v["dish:" + d.id][1] || 0 : 0);
 
+  /* Extras (Junyan, 2026-10-21, d70: "There's no option to add bananas. I used collagen so I want to put that there and
+     creatine as well"). "+ Add something you put in" on any dish card puts a food on the meal beyond the dish's own parts
+     or ingredients: rec.xtra = { <dish id>: [{ n (the food), q (what it took, a number or null), u ("" a count, "g",
+     "ml") }] }, one row per food (by name, any case). They live on the meal's record like the dish ticks, so they save,
+     sync and merge with it. They pay no points and fill no part (the parts and the food tiles decide points: tying an
+     extra to a food tile could pay the same banana twice). The page takes a kitchen item's amount off through the same
+     tick records as a dish tick (QuestKitchen.eat), and puts it back when the extra is removed. */
+  const xName = (n) => String(n == null ? "" : n).replace(/[|\s]+/g, " ").trim().slice(0, 40);
+  const xKey = (n) => xName(n).toLowerCase();
+  function extrasOf(rec, id) {
+    const l = rec && rec.xtra && Array.isArray(rec.xtra[id]) ? rec.xtra[id] : [];
+    return l.filter((x) => x && typeof x === "object" && xName(x.n)).map((x) => ({ n: xName(x.n),
+      q: typeof x.q === "number" && isFinite(x.q) && x.q >= 0 ? x.q : null, u: x.u === "g" || x.u === "ml" ? x.u : "" }));
+  }
+  function withExtras(rec, id, list) {
+    const r = { ...(rec || {}), xtra: { ...((rec && rec.xtra) || {}) } };
+    if (list.length) r.xtra[id] = list; else delete r.xtra[id];
+    if (!Object.keys(r.xtra).length) delete r.xtra;
+    return r;
+  }
+  // add one: x = { n, q, u }; a food already on the dish is left as it is
+  function addExtra(rec, id, x) {
+    const l = extrasOf(rec, id), n = xName(x && x.n);
+    if (!n || l.some((y) => xKey(y.n) === xKey(n))) return rec || {};
+    return withExtras(rec, id, l.concat(extrasOf({ xtra: { [id]: [{ ...x, n }] } }, id)));
+  }
+  const dropExtra = (rec, id, n) => withExtras(rec, id, extrasOf(rec, id).filter((y) => xKey(y.n) !== xKey(n)));
+  const setExtraQ = (rec, id, n, q) => withExtras(rec, id, extrasOf(rec, id).map((y) => (xKey(y.n) === xKey(n)
+    ? { ...y, q: typeof q === "number" && isFinite(q) && q >= 0 ? Math.round(q * 10) / 10 : null } : y)));
+
   root.QuestMeals = { PRANA_FOODS, PRANA_WAYS, TIPS, DRAINS, BODY, LEGACY_BODY, JUNK, ONEOF, FOOD_IDS, DRAIN_IDS, AUTO_NOTE,
-    DISH_VALUE, DISHES, TRAVEL, BLUEPRINT, CORE, dishesFor, IDEAS, SLOTS, STEPS, isSlotDish, slotOf, entryName, entriesOf, filledOf, partsOf, stepsOf, SHORT, tileLabel, value, score, toggle, tally, tap, meterOf, dishOf, groupOf, slotsUsed, dishMax, capOf, dishPay, dishStatus, tick, dishPaid };
+    DISH_VALUE, DISHES, TRAVEL, BLUEPRINT, CORE, dishesFor, IDEAS, SLOTS, STEPS, isSlotDish, slotOf, entryName, extrasOf, addExtra, dropExtra, setExtraQ, xKey, entriesOf, filledOf, partsOf, stepsOf, SHORT, tileLabel, value, score, toggle, tally, tap, meterOf, dishOf, groupOf, slotsUsed, dishMax, capOf, dishPay, dishStatus, tick, dishPaid };
 })(typeof window !== "undefined" ? window : globalThis);

@@ -312,7 +312,7 @@
     if (m) return m;
     m = new Map();
     for (const [key, e] of Object.entries(u)) {
-      if (!e || e.off || typeof e.q !== "number" || !e.id) continue;
+      if (!e || e.off || e.nq || typeof e.q !== "number" || !e.id) continue;   // nq: a level item's tick took nothing (d70)
       if (!m.has(e.id)) m.set(e.id, []);
       m.get(e.id).push({ key, q: Math.max(0, e.q), t: ms(e.t) });
     }
@@ -862,6 +862,9 @@
      amount ("175 g", "2 tbsp") turned into it (recipeIn; one that cannot be turned is 0, for him to fill in).
      - Only an item with an amount is touched (d46); a record with no item is never written.
      - A tick already on (a redraw, a second device's copy, the breakfast he ticked before amounts shipped) changes nothing.
+     - ref.note (d70, 2026-10-21): an item on a level (no amount) is recorded too, with what he says it took and nq:true, so
+       "From your kitchen" and an extra can show it ticked with a "took" amount. It takes nothing off and never counts
+       against an amount given later (eatsById skips it); its level stays.
      - An untick marks the same record off (a later change, so the merge keeps it); a tick from before amounts (no q) is
        put back the old way (dinner). A tick again after an untick is a new take-off from now.
      Returns { K, id } (id: the item it took from or gave back to, else null). */
@@ -876,10 +879,11 @@
     }
     if (rec && !rec.off) return { K, id: null };
     const it = r.id ? item(K, r.id) : match(K, k, r.name);
-    if (!it || it.del || it.k !== k || !hasQ(it)) return { K, id: null };
-    const q = typeof amount === "number" ? amount : recipeIn(amount, it.u);
+    if (!it || it.del || it.k !== k || !(hasQ(it) || r.note)) return { K, id: null };
+    const u = hasQ(it) ? it.u : isPiece(it) ? "" : unitFor(it.name);
+    const q = typeof amount === "number" ? amount : recipeIn(amount, u);
     const out = clone(K);
-    out.used = { ...obj(out.used), [key]: { id: it.id, q: Math.max(0, Math.round((+q || 0) * 10) / 10), u: it.u, t: iso(at), at: iso(at) } };
+    out.used = { ...obj(out.used), [key]: { id: it.id, q: Math.max(0, Math.round((+q || 0) * 10) / 10), u, ...(hasQ(it) ? {} : { nq: true }), t: iso(at), at: iso(at) } };
     return { K: out, id: it.id };
   }
   // the amount this meal took (d44: changed in the meal sheet); only a tick that is on and has an amount
@@ -978,6 +982,44 @@
   function portion(it) {
     const p = serving(it);
     return Math.max(0, Math.min(p, typeof it.left === "number" ? it.left : p));
+  }
+  /* d70: the first "took" of a tick that need not come off (an extra, or a level item in "From your kitchen"): an
+     amount item's portion; else 1 of a food bought by the piece; else a small plate by food group. null: no item. */
+  function firstTake(it) {
+    if (!it) return null;
+    if (hasQ(it)) return portion(it);
+    return isPiece(it) ? 1 : PORTION[okGroup(it.group) || guessGroup(it.name)] || 100;
+  }
+  /* "From your kitchen" (d47; 2026-10-21, d70 brief: "a banana on Plenty can still be ticked"): what kitchen k has, with or
+     without an amount: an amount item with some left, a level item that is not Out (or not checked yet), and anything
+     this meal already ticked (mine: item ids). */
+  const mealList = (K, k, mine) => items(K, k).filter((x) => (mine && mine.has(x.id)) || (hasQ(x) ? x.left > 0 : x.lv !== 0));
+  /* d70: what he types for an extra, read like the kitchen reads a name and an amount: "Creatine 5 g", "6 almonds",
+     "200 ml coconut yogurt", "1 banana", "Collagen". it: the item of kitchen k it names (then the item's own name is
+     used), else null. q, u: what it took, in the item's unit when it has an amount ("" a count, "g", "ml"); q null
+     when he gave none, or when a count was typed for an item kept in grams. */
+  function extraParse(K, k, text) {
+    const raw = String(text == null ? "" : text).replace(/\s+/g, " ").trim();
+    if (!raw) return { name: null, q: null, u: "", it: null };
+    let { name, amt } = splitName(raw);
+    if (!amt) { const m = /^(\d+(?:[.,]\d+)?)\s+([a-z].*)$/i.exec(raw); if (m) { name = cap(m[2]).slice(0, 40); amt = m[1]; } }
+    const it = match(K, k, name);
+    const nm = it ? it.name : name;
+    let p = null;
+    if (amt) { const c = /^\d+(?:[.,]\d+)?$/.test(amt) ? pieceCount(raw, nm) ?? pieceCount(raw, name) : null; p = c != null ? { q: c, u: "" } : qtyFor(amt, nm, it && hasQ(it) ? it.u : undefined); }
+    if (p && it && hasQ(it) && p.u !== it.u) p = null;
+    return { name: nm, q: p ? p.q : null, u: p ? p.u : it ? (hasQ(it) ? it.u : isPiece(it) ? "" : unitFor(it.name)) : "", it };
+  }
+  /* d70: the extra search: kitchen k's items whose name holds what he typed (its amount left out), the closest first
+     (the same food, then a name that starts with it, then the shortest). Empty: everything in the kitchen. */
+  function search(K, k, text) {
+    const all = items(K, k), raw = String(text == null ? "" : text).trim();
+    if (!raw) return all;
+    const nm = (extraParse(K, k, raw).name || raw).toLowerCase(), key = keyOf(nm);
+    let hit = all.filter((x) => x.name.toLowerCase().includes(nm));
+    if (!hit.length) hit = all.filter((x) => keyOf(x.name).includes(key));
+    const rank = (x) => (keyOf(x.name) === key ? 0 : x.name.toLowerCase().startsWith(nm) ? 1 : 2);
+    return hit.sort((a, b) => rank(a) - rank(b) || a.name.length - b.name.length || a.name.localeCompare(b.name));
   }
 
   /* Which kitchen is in use: his pick for today, else the travel fridge on a day the app reads as travelling (the same
@@ -1099,7 +1141,7 @@
   // (d42) an amount item's status already is its amount
   const tileLine = (it, now, shopAt, tz) => status(it, now, shopAt, tz) + (it && it.amt && !hasQ(it) ? ` · ${it.amt}` : "");
 
-  root.QuestKitchen = { NEED, LEVELS, KITCHENS, SEED, FRESH, DEFAULT_SHOP, GROUP_NAMES, GROUP_ICONS, keyOf, iconFor, groupIcon, splitName, amtOf, tileLine, guessGroup, guessShelf,
+  root.QuestKitchen = { NEED, LEVELS, KITCHENS, SEED, FRESH, DEFAULT_SHOP, GROUP_NAMES, GROUP_ICONS, keyOf, iconFor, groupIcon, splitName, amtOf, tileLine, guessGroup, guessShelf, firstTake, mealList, extraParse, search,
     items, item, grouped, setLevel, nextLevel, tap, add, rename, move, place, remove, status, shows, pace, lowAt, lowSoon, turnAt, useFirst, nextShop, parseAmt, usesOf, amountFor,
     shopList, missing, MAX_RECIPE_ROWS, stepList, tick, buyTicked, hasQ, isPiece, pieceCount, stepCount, unitFor, qtyOf, fmtQ, recipeIn, perMeal, setAmount, restock, rateOf, toBuy, eat, setTake, taken, portion, serving, ownDishes, ownDish, saveDish, delDish, dishAmt, dishIcon, kitchenFoods, TRAVEL_STARTER, pickList, preTick, fill, unfill, shopInfo, shopWhen, shopUpto, match, dinner, active, pick, noteActive, tripEnd, bringHome, dayWord, counts };
 })(typeof window !== "undefined" ? window : globalThis);
