@@ -20,10 +20,10 @@ const LEVEL_WORD = /plenty|\bhalf\b|not checked|\blow\b(?! by)|\bout\b/i;
 test("d76: a count with a word for what he counts at the end: the word goes, the count stays", () => {
   for (const [typed, name, amt] of [["Bread 1 piece", "Bread", "1 piece"], ["Seeded bread 2 slices", "Seeded bread", "2 pieces"],
     ["Chickpeas 2 cans", "Chickpeas", "2 pieces"], ["Fior di latte 2 balls", "Fior di latte", "2 pieces"], ["Tomato paste 1 jar", "Tomato paste", "1 piece"],
-    ["Sourdough 1 loaf", "Sourdough", "1 piece"], ["Tofu 3 packs", "Tofu", "3 pieces"], ["Pizza bases 2 pcs", "Pizza bases", "2 pieces"]])
+    ["Sourdough 1 loaf", "Sourdough", "1 piece"], ["Olive oil 1 bottle", "Olive oil", "1 piece"], ["Tofu 3 packs", "Tofu", "3 pieces"], ["Pizza bases 2 pcs", "Pizza bases", "2 pieces"]])
     assert.deepEqual(J(K.splitName(typed)), { name, amt }, typed);
   // a name that only ends in such a word, with no number before it, stays whole
-  for (const typed of ["Mozzarella balls", "Energy balls", "Bread slices", "Coconut pieces", "Chickpeas in cans"])
+  for (const typed of ["Mozzarella balls", "Energy balls", "Bread slices", "Coconut pieces", "Chickpeas in cans", "Bread 1.5 slices"])
     assert.deepEqual(J(K.splitName(typed)), { name: typed, amt: "" }, typed);
   // the earlier splits are unchanged
   assert.deepEqual(J(K.splitName("400g navy beans")), { name: "Navy beans", amt: "400 g" });

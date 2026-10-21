@@ -2606,9 +2606,9 @@
     // nothing ticked and nothing in the kitchen for any part (an empty travel fridge): the whole recipe, by its own names
     const slotUse = d => { const u = Object.fromEntries(slotParts(d).map(p => [p.id, p.rows.filter(r => r.on || r.st !== "none").map(r => r.name)]));
       return Object.values(u).some(l => l.length) ? u : undefined; };
-    // "Use something else": what the kitchen in use has (not Out), less what the dish already uses
+    // "Use something else": what the kitchen in use has (an amount above 0, or no number), less what the dish already uses
     const slotOthers = d => { const used = new Set(dishOn(d).map(e => QK().keyOf(QM.entryName(d, e))));
-      return QK().items(G.kitchen, kitToday()).filter(x => x.lv !== 0 && !used.has(QK().keyOf(x.name))); };
+      return QK().items(G.kitchen, kitToday()).filter(x => (!QK().hasQ(x) || x.left > 0) && !used.has(QK().keyOf(x.name))); };
     /* tap-to-open lines under a dish (d53, d73): a button that says what it opens, and what it opens once open */
     const tog = (d, kind, attr, label, body) => { const open = mqOpen.has(k + "|" + d.id + "|" + kind);
       return { btn:`<button type="button" class="mq-mini mq-howbtn" ${attr}="${esc(d.id)}" aria-expanded="${open}">${label} <span aria-hidden="true">${open ? "▴" : "▾"}</span></button>`,
@@ -2898,7 +2898,7 @@
     `<input class="mq-tq" type="number" inputmode="decimal" min="0" step="any" ${attrs} value="${q == null ? "" : esc(String(q))}" placeholder="?" aria-label="${esc(aria)}">` +
     `<span>${kitUnit(u)}</span></span><small>${esc(word)}</small></label>`;
   // what the kitchen has of an item, in a list: "have 300 g", "none left", or "how many?" when it has no number (levels retired, 2026-10-21)
-  const kitHaveWord = x => typeof x.q === "number" ? (x.lv === 0 ? "none left" : `have ${x.amt}`) : QK().ASK;
+  const kitHaveWord = x => QK().hasQ(x) ? (x.lv === 0 ? "none left" : `have ${x.amt}`) : QK().ASK;
   // beside a "took": what is left of an amount item; an item with no number (d70) had nothing taken off
   const kitLeftWord = (it, tk) => tk && tk.nq ? "nothing taken off" : it.lv === 0 ? "none left" : `${it.amt} left`;
   function kitMealCard(mk){
@@ -3157,7 +3157,7 @@
       if (!S.home) S.home = new Set(end.items.filter(x => x.lv !== 0).map(x => x.id));
       ask = `<div class="kt-ask"><b>Bring any of this home?</b><p>The trip is over. Tick what comes home; the travel fridge is emptied after.</p>` +
         `<div class="mq-ings">${end.items.map(x => `<button type="button" class="mq-ing" data-khome="${esc(x.id)}" aria-pressed="${S.home.has(x.id)}">` +
-          `<span class="bx"></span><span class="n">${esc(x.em)} ${esc(x.name)}</span><span class="qty">${typeof x.q === "number" ? esc(x.amt) : QK().ASK}</span></button>`).join("")}</div>` +
+          `<span class="bx"></span><span class="n">${esc(x.em)} ${esc(x.name)}</span><span class="qty">${QK().hasQ(x) ? esc(x.amt) : QK().ASK}</span></button>`).join("")}</div>` +
         `<div class="mq-drow"><button type="button" class="mq-mini go" id="kHomeGo">Bring ticked home</button><button type="button" class="mq-mini" id="kHomeNone">Nothing to bring</button></div></div>`;
     }
     const head = `<div class="win-hd"><span class="kt-ico">🧺</span><div><div class="tt">Kitchen</div><div class="sb">${kn.icon} ${esc(kn.name)} · ${esc(when)}</div></div></div>` +
@@ -3554,7 +3554,7 @@
   // "Kitchen: Broccoli 175 g left, Limes 3 left"
   function kitEatToast(K, ids){
     const names = [...new Set(ids)].map(x => QK().item(K, x)).filter(Boolean)
-      .filter(x => typeof x.q === "number").map(x => `${x.name} ${x.lv === 0 ? "none left" : `${x.amt} left`}`);   // no number: nothing came off
+      .filter(QK().hasQ).map(x => `${x.name} ${x.lv === 0 ? "none left" : `${x.amt} left`}`);   // no number: nothing came off
     if (names.length) calToast(`Kitchen: ${names.slice(0, 3).join(", ")}${names.length > 3 ? ` and ${names.length - 3} more` : ""}`, 3500);
   }
 

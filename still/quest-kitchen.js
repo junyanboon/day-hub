@@ -196,11 +196,11 @@
        the word, so a name that only ends in such a word ("Mozzarella balls", "Energy balls") stays whole. The amount is
        given as "N pieces", which qtyFor reads as a count of the item whatever the food. */
     m = TRAIL_C.exec(s);
-    if (m && /[a-z]/i.test(m[1])) return { name: cap(m[1].trim()).slice(0, 40), amt: `${m[2].replace(",", ".")} ${+m[2].replace(",", ".") === 1 ? "piece" : "pieces"}` };
+    if (m) return { name: cap(m[1].trim()).slice(0, 40), amt: `${m[2]} ${+m[2] === 1 ? "piece" : "pieces"}` };
     return { name: cap(s).slice(0, 40), amt: "" };
   }
   const TRAIL_N = /^(.*?[a-z])\s+(\d{1,3}(?:[.,]5)?)$/i;
-  const TRAIL_C = /^(.*?[a-z])\s+(\d{1,3}(?:[.,]5)?)\s*(?:pieces?|pcs?|slices?|loaf|loaves|cans?|tins?|jars?|packs?|packets?|balls?)\.?$/i;
+  const TRAIL_C = /^(.*?[a-z])\s+(\d{1,3})\s*(?:pieces?|pcs?|slices?|loaf|loaves|cans?|tins?|jars?|packs?|packets?|bottles?|balls?)\.?$/i;
   const PIECE_G = 10;
   /* The unit a bare number means for a food (d42): a count for what is bought by the piece, ml for drinks and oils,
      else grams. "Black pepper", "Coconut yogurt" or "Lemon juice" are not counted by the piece. d64 (2026-10-21): capsicum
@@ -1013,7 +1013,7 @@
   /* "From your kitchen" (d47; 2026-10-21, d70 brief: "a banana on Plenty can still be ticked"): what kitchen k has, with or
      without an amount: an amount item with some left, every item with no number (its old level is not shown any more, so
      it is not used to hide one), and anything this meal already ticked (mine: item ids). */
-  const mealList = (K, k, mine) => items(K, k).filter((x) => (mine && mine.has(x.id)) || (hasQ(x) ? x.left > 0 : true));
+  const mealList = (K, k, mine) => items(K, k).filter((x) => (mine && mine.has(x.id)) || (!hasQ(x) || x.left > 0));
   /* d70: what he types for an extra, read like the kitchen reads a name and an amount: "Creatine 5 g", "6 almonds",
      "200 ml coconut yogurt", "1 banana", "Collagen". it: the item of kitchen k it names (then the item's own name is
      used), else null. q, u: what it took, in the item's unit when it has an amount ("" a count, "g", "ml"); q null

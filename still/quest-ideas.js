@@ -15,8 +15,8 @@
      (lentils, chickpeas, beans, quinoa, rice) while there are others to pick.
    - The ranking reads the kitchen as it was at the start of the day (meals ticked today put back), so ideas do not
      shuffle while he cooks; what each idea shows (have, short, to buy) reads the kitchen as it is now.
-   - Never a made-up amount: an item with no number shows "how many?" (QuestKitchen.ASK; the levels were retired on
-     2026-10-21, "Nothing should say plenty"), one with an amount at 0 "none left", and a short kitchen is said in words (note) with the closest ideas and what each needs to buy.
+   - Never a made-up amount: an item with no number shows "how many?" (QuestKitchen.ASK; the levels were
+     retired on 2026-10-21, "Nothing should say plenty"), one with an amount at 0 "none left", and a short kitchen is said in words (note) with the closest ideas and what each needs to buy.
    - Cooked the gut-friendly way (Junyan, 2026-10-21, d61 "yes"; he is prone to colitis, and oil and heavy fibre make it
      worse): vegetables steamed or simmered until soft, never roasted or fried, and at most 15 ml (1 tbsp) of oil for the
      two of them, drizzled on at the end. The ingredients are the same as before.
@@ -120,9 +120,11 @@
     return d.items.map(([name, amt]) => {
       const it = kit.get(QK().keyOf(name)) || null, sp = staple(name);
       if (!it) return { name, amt, st: "none", word: "not in the kitchen", staple: sp, it: null };
-      if (it.lv == null) return { name, amt, st: "unchecked", word: QK().ASK, staple: sp, it };
-      if (it.lv === 0) return { name, amt, st: "out", word: typeof it.q === "number" ? "none left" : QK().ASK, staple: sp, it };
-      if (typeof it.q === "number") {
+      /* no number (levels retired, 2026-10-21): never marked, or left at an old Out, is not known ("how many?"); one he
+         once marked as there still counts as had, so the ideas keep following his kitchen */
+      if (!QK().hasQ(it) && (it.lv == null || it.lv === 0)) return { name, amt, st: "unchecked", word: QK().ASK, staple: sp, it };
+      if (it.lv === 0) return { name, amt, st: "out", word: "none left", staple: sp, it };
+      if (QK().hasQ(it)) {
         const need = QK().recipeIn(amt, it.u);
         if (need != null && it.left < need) return { name, amt, st: "short", word: `only ${it.amt}`, staple: sp, it };
         return { name, amt, st: "have", word: `have ${it.amt}`, staple: sp, it };
@@ -186,11 +188,12 @@
     const out = [], bases = new Set(), mine = () => out.some((c) => c.d.own);
     for (const c of cands) { if (out.length === 3) break; if ((c.d.base && bases.has(c.d.base)) || (c.d.own && mine())) continue; out.push(c); if (c.d.base) bases.add(c.d.base); }
     for (const c of cands) { if (out.length === 3) break; if (!out.includes(c) && !(c.d.own && mine())) out.push(c); }
-    const known = [...kit.values()].some((it) => it.lv != null);
+    // he has said something about the kitchen: a number on anything, or an item he once marked (stored levels, read only)
+    const known = [...kit.values()].some((it) => QK().hasQ(it) || it.lv != null);
     // ready: every main ingredient had in full (short counts as missing here, so the note never says too much)
     const ready = out.filter((c) => read(c.d, kit).every((r) => r.staple || r.st === "have")).length;
     const where = k === "travel" ? "travel fridge" : "kitchen";
-    const note = !known ? `Nothing in the ${where} is checked yet, so these ideas show what to buy. Check the ${where} and they follow what you have.`
+    const note = !known ? `Nothing in the ${where} has a number yet, so these ideas show what to buy. Say how many you have and they follow it.`
       : ready === 0 && out[0].fit < 0.5 ? `Not much in the ${where} for dinner. These are the closest; each one says what to buy.`
       : ready === 0 ? `None of these is all in the ${where}; each one says what to buy.`
       : ready < 3 ? `Only ${ready === 1 ? "one of these" : "two of these"} can be made from what you have; the ${3 - ready === 1 ? "other says" : "others say"} what to buy.` : "";
@@ -237,7 +240,7 @@
     const M = QM(), kit = byKey(K, k), all = QK().items(K, k), key = QK().keyOf;
     const look = (name) => { const it = kit.get(key(name)) || null;
       // an item with no number left at an old Out is not known now (levels retired, 2026-10-21): "how many?", not "none"
-      const st = !it || (it.lv === 0 && typeof it.q === "number") ? "none" : it.lv == null || it.lv === 0 ? "unchecked" : "have";
+      const st = !it || (it.lv === 0 && QK().hasQ(it)) ? "none" : it.lv == null || it.lv === 0 ? "unchecked" : "have";
       return { it: st === "none" ? null : it, st }; };
     const ents = (entries || []).map((e) => ({ e, p: M.slotOf(d, e) })).filter((x) => x.p);
     const used = new Set(ents.map((x) => key(x.p.name)));
@@ -266,7 +269,7 @@
     for (const { r } of open()) { r.name = r.for; r.swap = false; r.none = true; }
     return parts.map(({ s, rows }) => ({ id: s.id, role: s.role, filled: rows.some((r) => r.entry),
       rows: rows.map((r) => { const l = r.none ? { it: null, st: "none" } : look(r.name);
-        const word = l.st === "none" ? "none in the kitchen" : l.it && typeof l.it.q === "number" ? (l.st === "out" ? "none left" : `have ${l.it.amt}`) : QK().ASK;
+        const word = l.st === "none" ? "none in the kitchen" : QK().hasQ(l.it) ? `have ${l.it.amt}` : QK().ASK;
         return { entry: r.entry || `${s.id}:${r.name}`, name: r.name, amt: r.amt, on: !!r.entry, swap: !!r.swap, for: r.for, st: l.st, word, it: l.it }; }) }));
   }
   // the parts a part dish could fill from kitchen k now (ticked, or a food it has): "you have 6 of 8 parts"
