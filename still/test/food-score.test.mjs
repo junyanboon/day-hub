@@ -130,3 +130,24 @@ test("one dish per meal: the pick is stored, and an old record reads by what it 
   assert.equal(QM.setPick({ m: "sv" }, null).m, undefined);
   assert.equal(QM.setPick({}, "bad id!").m, undefined, "ids are checked");
 });
+
+test("review: fractions and spelled-out units read right; home cooking and spices are not junk or veg", () => {
+  assert.equal(FS.gramsOf({ n: "Walnuts", amt: "1/2 cup" }), 120);
+  assert.equal(FS.gramsOf({ n: "Lentils", amt: "1 1/2 cups" }), 360);
+  assert.equal(FS.gramsOf({ n: "Broccoli", amt: "100 grams" }), 100);
+  assert.equal(FS.gramsOf({ n: "Olive oil", amt: "1 tablespoon" }), 15);
+  assert.equal(FS.gramsOf({ n: "Brazil nuts", amt: "2" }), 10, "a plain count still reads");
+  const k = (n) => Object.entries(FS.kindsOf(n)).filter(([, v]) => v).map(([x]) => x).sort().join(",");
+  assert.equal(k("Split peas"), "legume");
+  assert.equal(k("Bay leaves"), "");
+  assert.equal(k("Stir-fried tofu"), "");
+  assert.equal(k("Fried rice"), "");
+  assert.equal(k("Rice cakes"), "");
+  assert.equal(k("Salt and pepper"), "");
+  assert.equal(k("Pepper"), "");
+  assert.equal(k("Red pepper"), "veg");
+  assert.equal(k("Banana bread"), "");
+  assert.equal(k("Sprouted bread"), "");
+  assert.equal(k("Deep-fried tofu"), "junk");
+  assert.equal(k("Salad leaves"), "greens,veg");
+});

@@ -992,7 +992,7 @@
 <script src="quest-levels.js?v=20261016b"></script>
 <script src="quest-gymlog.js?v=20261019a"></script>
 <script src="quest-meals.js?v=20261021d87"></script>
-<script src="quest-food-score.js?v=20261021d87"></script>
+<script src="quest-food-score.js?v=20261021d87b"></script>
 <script src="quest-kitchen.js?v=20261021h81b"></script>
 <script src="quest-ideas.js?v=20261021d76"></script>
 <script src="quest-recipe-data.js?v=202610211914"></script>
@@ -2621,7 +2621,7 @@
         const n = QM.entryName(d, e), tk = took(kitEatKey(k, d.id, e));
         if (tk && tk.q > 0) { out.push({ n, q:tk.q, u:tk.u }); continue; }   // 0: the recipe amount could not come off as a count
         const sl = QM.slotOf(d, e), part = sl && d.slots.find(x => x.id === sl.slot);
-        const amt = part ? ((part.want.find(w => w[0] === n) || part.want[0])[1]) : ((d.items.find(x => x[0] === e) || [])[1] || "");
+        const w = part ? (part.want.find(x => x[0] === n) || part.want[0]) : d.items.find(x => x[0] === e), amt = (w && w[1]) || "";
         out.push({ n, amt });
       }
     }

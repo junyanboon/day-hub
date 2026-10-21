@@ -14,15 +14,15 @@
   "use strict";
   const has = (re, s) => re.test(s);
   // the words that make a food something else: a drink, an oil, a jam, a powder (they never count as the fresh food)
-  const MADE = /\b(juices?|jams?|jelly|syrups?|powder|dried|dehydrated|oils?|vinegars?|milks?|extracts?|flavou?r(ed)?|sauces?|tea)\b/i;
+  const MADE = /\b(juices?|jams?|jelly|syrups?|powder|dried|dehydrated|oils?|vinegars?|milks?|extracts?|flavou?r(ed)?|sauces?|tea|breads?|muffins?|cakes?|cookies|bars?|crackers?)\b/i;
   const ALLIUM = /\b(onions?|garlic|shallots?|leeks?|chives|scallions?|ramps?)\b/i;
-  const JUNK = /\b(chips|crisps|fries|fried|nuggets?|hot ?dogs?|bacon|sausages?|candy|candies|sweets|gumm(y|ies)|sodas?|cola|cookies|biscuits|donuts?|doughnuts?|cakes?|pastr(y|ies)|croissants?|instant noodles|pizza|burgers?|energy drinks?|chocolate bars?|ice cream|margarine)\b/i;
+  const JUNK = /\b(chips|crisps|fries|deep[- ]fried|fried (chicken|food|snacks?|potato(es)?)|nuggets?|hot ?dogs?|bacon|sausages?|candy|candies|sweets|gumm(y|ies)|sodas?|cola|cookies|biscuits|donuts?|doughnuts?|(?<!rice |oat )cakes?|pastr(y|ies)|croissants?|instant noodles|pizza|burgers?|energy drinks?|chocolate bars?|ice cream|margarine)\b/i;
   const TOMATO = /\btomato(es)?\b/i;
   const FRUIT = /\b(berry|berries|blueberries|raspberries|strawberries|blackberries|cherry|cherries|apples?|pears?|bananas?|oranges?|clementines?|mandarins?|figs?|dates|grapes?|kiwis?|mangoe?s?|pomegranates?|melons?|watermelons?|peach(es)?|nectarines?|apricots?|plums?|pineapples?|papayas?|persimmons?|avocados?)\b/i;
   const BERRY = /\b(berry|berries|blueberries|raspberries|strawberries|blackberries|cherry|cherries)\b/i;
-  const GREENS = /\b(spinach|kale|rocket|arugula|lettuce|chard|collards?|bok choy|pak choi|watercress|greens|leaves|mesclun|romaine)\b/i;
-  const VEG = /\b(broccoli|broccolini|cauliflower|mushrooms?|shiitake|portobello|tomato(es)?|peppers?|capsicums?|courgettes?|zucchinis?|carrots?|cucumbers?|beetroots?|beets?|celery|cabbage|squash|pumpkin|aubergines?|eggplants?|asparagus|fennel|peas|green beans|string beans|runner beans|brussels sprouts|romanesco|radish(es)?|turnips?|parsnips?|okra|artichokes?|corn)\b/i;
-  const NOT_FRESH_VEG = /\b(pickled|canned|tinned|crisps|chips|fries|powder|paste|sauce|soup|flakes|(black|white|ground|cayenne) pepper|peppercorns?)\b/i;
+  const GREENS = /\b(spinach|kale|rocket|arugula|lettuce|chard|collards?|bok choy|pak choi|watercress|greens|(salad|mixed|baby|beet|mustard) leaves|mesclun|romaine)\b/i;
+  const VEG = /\b(broccoli|broccolini|cauliflower|mushrooms?|shiitake|portobello|tomato(es)?|peppers|(red|green|yellow|orange|bell|sweet) pepper|capsicums?|courgettes?|zucchinis?|carrots?|cucumbers?|beetroots?|beets?|celery|cabbage|squash|pumpkin|aubergines?|eggplants?|asparagus|fennel|peas|green beans|string beans|runner beans|brussels sprouts|romanesco|radish(es)?|turnips?|parsnips?|okra|artichokes?|corn)\b/i;
+  const NOT_FRESH_VEG = /\b(pickled|canned|tinned|crisps|chips|fries|powder|paste|sauce|soup|flakes|(black|white|ground|cayenne) peppers?|peppercorns?|salt and peppers?|split peas)\b/i;
   const SPROUTS = /\b(sprouts?|sprouted|microgreens|alfalfa)\b/i;
   const LEGUME = /\b(lentils?|chickpeas?|garbanzos?|beans?|split peas|dal|dhal)\b/i;
   const NOT_LEGUME = /\b(green beans|string beans|runner beans|bean sprouts|coffee beans?|cocoa beans?|vanilla beans?|jelly beans?)\b/i;
@@ -69,13 +69,16 @@
   const pieceG = (name) => { const hit = PIECE.find(([re]) => re.test(String(name || ""))); return hit ? hit[1] : null; };
   // "2 tbsp", "½ tsp", "175 g", "15 ml", "1", "1 medium": { n, unit } or null
   const FRAC = { "½": 0.5, "¼": 0.25, "¾": 0.75, "⅓": 1 / 3, "⅔": 2 / 3 };
+  const UNITS = { g: "g", gram: "g", grams: "g", kg: "kg", ml: "ml", l: "l", litre: "l", liter: "l", tbsp: "tbsp", tablespoon: "tbsp", tablespoons: "tbsp",
+    tsp: "tsp", teaspoon: "tsp", teaspoons: "tsp", cup: "cup", cups: "cup", medium: "", large: "", small: "" };
   function readAmt(text) {
     const s = String(text || "").trim().replace(/[½¼¾⅓⅔]/g, (c) => ` ${FRAC[c]}`).trim();
-    const m = /^(\d+(?:\.\d+)?)?(?:\s*(\d+)\s*\/\s*(\d+)|\s+(0\.\d+))?\s*(kg|g|ml|l|tbsp|tsp|cups?|medium|large|small)?(?![a-z])/i.exec(s);
-    if (!m || (m[1] == null && m[2] == null && m[4] == null)) return null;
+    // "1 1/2", "1/2", "1.5", "1 0.5" (from "1½"), then a unit word
+    const m = /^(?:(\d+(?:\.\d+)?)\s+)?(?:(\d+)\s*\/\s*(\d+)|(\d+(?:\.\d+)?))?\s*([a-z]+)?/i.exec(s);
+    if (!m || (m[2] == null && m[4] == null && m[1] == null)) return null;
     const n = (m[1] != null ? +m[1] : 0) + (m[2] != null ? +m[2] / +m[3] : 0) + (m[4] != null ? +m[4] : 0);
-    const u = (m[5] || "").toLowerCase();
-    return n > 0 ? { n, unit: u === "medium" || u === "large" || u === "small" ? "" : u } : null;
+    const w = (m[5] || "").toLowerCase(), unit = Object.prototype.hasOwnProperty.call(UNITS, w) ? UNITS[w] : "";
+    return n > 0 ? { n, unit } : null;
   }
   /* About how many grams (or ml) of a food: { n (name), q, u } with q in u ("g", "ml", "" a count), or { n, amt } (a
      recipe amount text). Spoons: 1 tbsp 15 ml of a liquid or oil, else 10 g; 1 tsp 5 ml or 3 g; a cup 240. null when it
@@ -90,7 +93,7 @@
     if (u === "kg" || u === "l") return n * 1000;
     if (u === "tbsp") return n * (liquid ? 15 : 10);
     if (u === "tsp") return n * (liquid ? 5 : 3);
-    if (u === "cup" || u === "cups") return n * 240;
+    if (u === "cup") return n * 240;
     const p = pieceG(f.n);
     return p == null ? null : n * p;
   }
@@ -132,7 +135,7 @@
       if (g == null) continue;
       if (k.legume && DRY.test(f.n)) g *= 2.5;   // dry lentils or beans weigh about 2.5 times as much cooked
       if (k.legume) got.legumes += g;
-      if (k.veg && !/\bpotato(es)?\b/i.test(f.n)) got.veg += g;
+      if (k.veg) got.veg += g;
       if (k.greens) got.greens += g;
       if (k.oliveoil) got.evoo += g;
       if (k.nut) got.nuts += g;
