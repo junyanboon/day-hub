@@ -691,6 +691,17 @@
   .kt-first { margin-top:10px; padding:9px 12px; border-radius:14px; background:rgba(0,0,0,.22); border:1px solid rgba(255,194,122,.7); font-size:13.5px; }
   .kt-first b { color:var(--warn); }
   .kt-tools { display:flex; gap:6px; flex-wrap:wrap; align-items:center; margin-top:10px; }
+  /* the recipe book (2026-10-22, d9): all of Paprika, loaded when it opens (quest-library.js) */
+  .rb-list { display:flex; flex-direction:column; gap:4px; margin-top:8px; }
+  .rb-it { display:flex; flex-direction:column; align-items:flex-start; text-align:left; padding:8px 10px; border-radius:10px; background:var(--glass);
+    border:1px solid var(--glass-border); color:var(--ink); font:inherit; cursor:pointer; }
+  .rb-it b { font-size:14px; font-weight:600; } .rb-it small, .rb-more { font-size:11.5px; color:var(--ink-soft); }
+  .rb-chips { display:flex; gap:6px; flex-wrap:wrap; margin-top:8px; }
+  .rb-chips button { padding:5px 10px; border-radius:999px; background:var(--glass); border:1px solid var(--glass-border); color:var(--ink); font:inherit; font-size:12px; cursor:pointer; }
+  .rb-chips button[aria-pressed="true"] { border-color:#8fe3b0; background:rgba(143,227,176,.22); }
+  .rb-swap { margin:8px 0; padding:8px 10px; border-radius:10px; background:rgba(255,194,122,.14); border:1px solid rgba(255,194,122,.5); font-size:12.5px; }
+  .rb-steps { margin:4px 0 0 18px; font-size:13px; line-height:1.45; } .rb-steps li { margin:4px 0; }
+  .rb-notes { white-space:pre-wrap; font-size:12.5px; color:var(--ink-soft); }
   .sheet input.kt-q { flex:1; min-width:120px; width:auto; margin:0; padding:8px 12px; border-radius:12px; font-size:14px; }
   .kt-chip { font:inherit; font-size:12.5px; font-weight:600; padding:6px 11px; border-radius:999px; border:1px solid var(--glass-border); background:transparent; color:var(--ink); }
   .kt-chip[aria-pressed="true"] { background:rgba(255,255,255,.22); border-color:#fff; }
@@ -1020,6 +1031,7 @@
 <script src="quest-suggest.js?v=20261019a"></script>
 <script src="quest-water.js?v=20261020p"></script>
 <script src="quest-gut.js?v=20261022g1"></script>
+<script src="quest-library.js?v=20261022b1"></script>
 <script src="quest-gym.js?v=20261019x"></script>
 <script src="quest-morning.js?v=20261019a"></script>
 <script src="quest-agenda.js?v=20261020c"></script>
@@ -2905,7 +2917,8 @@
     const picker = cur => choices().filter(([, l]) => l.length).map(([t, l]) => `<p class="kt-gh">${t}</p><div class="mq-pks">${l.map(d => pickCard(d, d.id === cur)).join("")}</div>`).join("") +
       (IT.note ? `<p class="mq-serves mq-inote">${esc(IT.note)}</p>` : "") +
       `<div class="mq-pks mq-pks1">${pickCard(MEAL, cur === MEAL.id)}</div>` +
-      (QK() ? `<div class="mq-drow"><button type="button" class="mq-mini mq-new" data-dnew>+ New dish</button></div>` : "") +
+      (QK() || window.QuestLibrary ? `<div class="mq-drow">${QK() ? `<button type="button" class="mq-mini mq-new" data-dnew>+ New dish</button>` : ""}` +
+        `${window.QuestLibrary ? `<button type="button" class="mq-mini" data-rbook>📖 Recipe book</button>` : ""}</div>` : "") +
       (RL && trip ? `<p class="mq-serves mq-inote">On a trip: travel-friendly recipes first.</p>` : "");
     // the dishes on this meal (rec.m first; a meal from before shows all it holds), and old "From your kitchen" ticks
     const onIds = QM.onMeal(rec).concat(oldEat.length && !QM.onMeal(rec).includes(MEAL.id) ? [MEAL.id] : []);
@@ -3463,7 +3476,8 @@
     }
     const head = `<div class="win-hd"><span class="kt-ico">🧺</span><div><div class="tt">Kitchen</div><div class="sb">${kn.icon} ${esc(kn.name)} · ${esc(when)}</div></div></div>` +
       (S.block ? `<p class="kt-blk">${esc(shortName(S.block))} · ${kitBlkDay(S.block, t)}${fmtT(S.block.s)} to ${fmtT(S.block.e)}</p>` : "") +
-      `<p class="kt-need">${esc(QK().NEED)}</p>`;
+      `<p class="kt-need">${esc(QK().NEED)}</p>` +
+      (window.QuestLibrary ? `<div class="mq-drow"><button type="button" class="mq-mini" data-rbook>📖 Recipe book</button></div>` : "");
     let body;
     if (S.view === "have") {
       const first = QK().useFirst(K, k, t);
@@ -4560,6 +4574,50 @@
   }
   function closeSheet(){ $("sheet").classList.remove("open"); $("scrim").style.display = "none"; stopRest(); }
   $("scrim").onclick = closeSheet;
+  /* ---------- The recipe book (Junyan, 2026-10-22, d6, d8 to d10; quest-library.js) ----------
+     All of his Paprika book, text only, read only. The file is fetched the first time it opens (not on page load), so
+     the app opens as fast as before; after that the service worker has it, offline too. Any [data-rbook] opens it. */
+  const QL = () => window.QuestLibrary;
+  let RB = { q:"", f:"all", id:null, list:null, err:"" }, rbLoading = null;
+  function rbLoad(){
+    if (RB.list || rbLoading) return rbLoading;
+    rbLoading = fetch(`quest-library.json?v=${QL().V}`).then(r => { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
+      .then(d => { RB.list = QL().load(d); RB.err = ""; })
+      .catch(() => { RB.err = "The recipe book did not load. It needs the internet the first time."; })
+      .finally(() => { rbLoading = null; if ($("sheet").querySelector(".rb")) openBook(); });
+    return rbLoading;
+  }
+  function openBook(){
+    if (!QL()) return;
+    const L = QL(), keep = $("rbQ") && document.activeElement === $("rbQ");
+    if (!RB.list) rbLoad();
+    let body;
+    const r = RB.id && RB.list ? RB.list.find(x => x.id === RB.id) : null;
+    if (r) body = `<button type="button" class="mq-mini" data-rbback>‹ All recipes</button>` +
+      `<div class="win-hd"><span class="kt-ico">📖</span><div><div class="tt">${esc(r.name)}</div><div class="sb">${esc([L.sub(r), r.serves ? `serves ${r.serves}` : ""].filter(Boolean).join(" · "))}</div></div></div>` +
+      (r.swap.length ? `<p class="rb-swap">${esc(L.swapLine(r))}</p>` : "") +
+      `<div class="win-lb">Ingredients</div><ul class="mq-rcl">${r.items.map(x => `<li><span class="n">${esc(x)}</span></li>`).join("")}</ul>` +
+      (r.steps.length ? `<div class="win-lb">Steps</div><ol class="rb-steps">${r.steps.map(x => `<li>${esc(x)}</li>`).join("")}</ol>` : "") +
+      (r.notes ? `<div class="win-lb">Notes</div><p class="rb-notes">${esc(r.notes)}</p>` : "") +
+      (r.url ? `<p class="rb-more"><a href="${esc(r.url)}" target="_blank" rel="noopener">Where it came from ›</a></p>` : "");
+    else {
+      const hits = RB.list ? L.search(RB.list, RB.q, RB.f) : [], MAX = 60;
+      body = `<div class="win-hd"><span class="kt-ico">📖</span><div><div class="tt">Recipe book</div><div class="sb">${RB.list ? `${RB.list.length} recipes from Paprika` : RB.err ? "" : "Opening…"}</div></div></div>` +
+        `<div class="kt-tools"><input class="kt-q" id="rbQ" type="search" placeholder="Find a recipe or an ingredient" autocomplete="off" value="${esc(RB.q)}"></div>` +
+        `<div class="rb-chips">${L.FILTERS.map(([id, nm]) => `<button type="button" data-rbf="${id}" aria-pressed="${RB.f === id}">${esc(nm)}</button>`).join("")}</div>` +
+        (RB.err ? `<p class="rb-swap">${esc(RB.err)}</p>` : "") +
+        (RB.list ? `<div class="rb-list">${hits.slice(0, MAX).map(x => `<button type="button" class="rb-it" data-rbid="${esc(x.id)}"><b>${esc(x.name)}</b>${L.sub(x) ? `<small>${esc(L.sub(x))}</small>` : ""}</button>`).join("")}</div>` +
+          `<p class="rb-more">${hits.length > MAX ? `Showing ${MAX} of ${hits.length}. Type to narrow it down.` : hits.length ? "" : "Nothing found."}</p>` : "");
+    }
+    openSheet(`<div class="rb">${body}</div>`, true);
+    const sh = $("sheet"), q = $("rbQ");
+    if (q) { q.oninput = () => { RB.q = q.value; openBook(); }; if (keep) { q.focus(); q.setSelectionRange(q.value.length, q.value.length); } }
+    sh.querySelectorAll("[data-rbf]").forEach(b => b.onclick = () => { RB.f = b.dataset.rbf; openBook(); });
+    sh.querySelectorAll("[data-rbid]").forEach(b => b.onclick = () => { RB.id = b.dataset.rbid; openBook(); sh.scrollTop = 0; });
+    sh.querySelectorAll("[data-rbback]").forEach(b => b.onclick = () => { RB.id = null; openBook(); });
+  }
+  // any "📖 Recipe book" button (the kitchen, the meal sheet) opens it
+  $("sheet").addEventListener("click", e => { if (e.target.closest("[data-rbook]")) { RB.id = null; openBook(); } });
 
   function openZapSheet(){
     let sel = null;
