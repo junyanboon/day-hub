@@ -1,7 +1,7 @@
-/* His recipe book, copied from the recipe wiki by scripts/pull-recipes.mjs on 2026-10-21. Do not edit by
+/* His recipe book, copied from the recipe wiki by scripts/pull-recipes.mjs on 2026-10-22. Do not edit by
    hand: change the wiki and run the script again. Read by quest-recipes.js. */
 (typeof window !== "undefined" ? window : globalThis).QuestRecipeData = {
- "updated": "2026-10-21",
+ "updated": "2026-10-22",
  "recipes": [
   {
    "id": "banana-oat-porridge",
@@ -165,7 +165,11 @@
     ],
     [
      "Pumpkin or hemp seeds",
-     "2 tbsp"
+     "2 tbsp (optional)"
+    ],
+    [
+     "Artichoke hearts, chopped",
+     "50 g (optional)"
     ]
    ],
    "steps": [
@@ -173,16 +177,12 @@
     "Add the pasta. 6 minutes before it is done, add the broccoli to the same pot. [[techniques/soft-broccoli]]",
     "Save a mug of pasta water, then drain.",
     "Back in the pot, mash some of the broccoli with a fork and stir with 4 tbsp pasta water, lemon zest and juice, salt and pepper until glossy.",
-    "Plate, then drizzle the oil and scatter the seeds."
+    "Plate, then drizzle the oil. Top with the seeds or the artichoke, whichever you have."
    ],
    "swaps": {
     "Broccoli": [
      "zucchini (add 3 minutes before the end)",
      "peas"
-    ],
-    "Seeds": [
-     "50 g artichoke hearts",
-     "chopped"
     ]
    },
    "slots": [],
@@ -855,5 +855,101 @@
    "name": "Water sauté (cooking without frying)",
    "how": "1. Heat the pan on medium. Add 3 tbsp water.\n2. Add ginger, spices and the veg. Stir as the water bubbles away.\n3. When it sticks, add 1 to 2 tbsp more water and scrape the bottom: that brown layer is the flavour.\n4. Repeat until the veg is soft. Add oil, if any, at the end off the heat."
   }
- ]
+ ],
+ "run": {
+  "day": "2026-10-21",
+  "file": "2026-10-21-1.json",
+  "ideas": [
+   {
+    "id": "cavatappi-soft-broccoli",
+    "icon": "🍝",
+    "name": "Cavatappi with soft broccoli and artichoke",
+    "time": "20 min",
+    "items": [
+     [
+      "Cavatappi Pasta",
+      "180 g"
+     ],
+     [
+      "Broccoli",
+      "200 g"
+     ],
+     [
+      "Artichoke Hearts",
+      "50 g"
+     ]
+    ],
+    "steps": [
+     "Boil a big pot of salted water. Cut the broccoli into small florets.",
+     "Add the pasta. 6 minutes before it is done, add the broccoli to the same pot.",
+     "Save a mug of pasta water, then drain.",
+     "Back in the pot, mash some of the broccoli with a fork. Stir in the chopped artichoke, 4 tbsp pasta water, lemon zest and juice (if you have a lemon), salt and pepper until glossy.",
+     "Plate. Add 10 ml olive oil and 2 tbsp pumpkin or hemp seeds if you have them."
+    ],
+    "from": "cavatappi-soft-broccoli"
+   },
+   {
+    "id": "soft-lentil-red-pepper-soup",
+    "icon": "🥣",
+    "name": "Soft lentil and red pepper soup",
+    "time": "30 to 40 min",
+    "items": [
+     [
+      "Lentils",
+      "45 g"
+     ],
+     [
+      "Capsicum Red",
+      "1"
+     ]
+    ],
+    "steps": [
+     "Check the lentil type. Split red or yellow: no soak. Whole brown, green or black: soak 2 to 8 hours and throw the water away.",
+     "Rinse the lentils until the water runs clear.",
+     "Water-sauté the diced capsicum with grated ginger and 1 tsp cumin for 5 minutes.",
+     "Add the lentils and 500 ml water. Simmer with the lid on until they squash easily: 15 to 20 minutes for split red or yellow, 25 to 35 for whole lentils.",
+     "Blend smooth, or mash hard with a fork.",
+     "Season with salt, pepper and a squeeze of lemon."
+    ],
+    "from": "new"
+   },
+   {
+    "id": "warm-bean-smash-honey-banana",
+    "icon": "🫘",
+    "name": "Warm white bean smash with guacamole and a honey banana bowl",
+    "time": "15 min",
+    "items": [
+     [
+      "Navy bean canned",
+      "200 g"
+     ],
+     [
+      "Guacamole",
+      "100 g"
+     ],
+     [
+      "Bananas",
+      "2"
+     ],
+     [
+      "Blueberries",
+      "a handful"
+     ],
+     [
+      "Mini Honey Jars",
+      "1 tsp"
+     ]
+    ],
+    "steps": [
+     "Check the guacamole and bean labels for onion or garlic. If either has them, do not use it.",
+     "Drain and rinse the beans well.",
+     "Simmer the beans in a little water with grated ginger for 10 minutes, until very soft.",
+     "Drain, then mash roughly with a fork. Add lemon, salt and pepper.",
+     "Serve warm with the guacamole on top.",
+     "Pudding: slice the bananas, add the blueberries and drizzle the honey."
+    ],
+    "from": "new"
+   }
+  ]
+ }
 };
