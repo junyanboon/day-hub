@@ -1045,7 +1045,7 @@
 <script src="quest-library.js?v=20261022b1"></script>
 <script src="quest-gym.js?v=20261019x"></script>
 <script src="quest-morning.js?v=20261019a"></script>
-<script src="quest-agenda.js?v=20261022s1"></script>
+<script src="quest-agenda.js?v=20261022t"></script>
 <script src="quest-offline.js?v=20261017a"></script>
 <script src="quest-nearby.js?v=20261016k"></script>
 </head>
@@ -1318,11 +1318,15 @@
     await flushOps();
     // an edit made on this phone that has not gone up yet stands over the server's copy and the saved one
     const out = QuestOffline.pendingOps(readJSON(OPS_OUT, {}), dayKey());
-    if (out) { OPS = out; return; }
+    if (out) { OPS = out; return true; }
     const r = await fetch(API + "/ops?d=" + encodeURIComponent(dayKey()), { cache:"no-store", signal:quick() });
-    if (!r.ok) return;
+    if (!r.ok) return false;
     const d = await r.json();
-    if (d && d.date === dayKey()) OPS = { edits:d.edits||{}, drops:d.drops||[], adds:d.adds||[], ts:d.ts||0 };
+    // a change queued on this phone while the server answered still stands over the answer (2026-10-22)
+    const late = QuestOffline.pendingOps(readJSON(OPS_OUT, {}), dayKey());
+    if (late) { OPS = late; return true; }
+    if (d && d.date === dayKey()) { OPS = { edits:d.edits||{}, drops:d.drops||[], adds:d.adds||[], ts:d.ts||0 }; return true; }
+    return false;
   }
   /* Notion task ticks made offline (done, undo, note) wait here in order and go up on the next pull (2026-10-17).
      Only a network failure queues; an answer from still-api that says no is shown as before. */
@@ -1373,7 +1377,8 @@
       }
       pullAgenda().then(() => { saveSnap(); if (!$("sheet").classList.contains("open")) render(); }).catch(() => {});
       // one answer missing offline no longer blanks the rest (2026-10-17)
-      await Promise.all([pullOps().catch(() => {}), pullTasks().catch(() => {}), pullState()]);
+      // his changes still on their way stay where he put them, put back right after this pull's own copy lands
+      await Promise.all([pullOps().then(got => { if (got) OPS_WAIT.forEach(m => m(OPS)); }).catch(() => {}), pullTasks().catch(() => {}), pullState()]);
       seedFromOura();
       undoTimedPay();
       settleTicks();
@@ -1402,14 +1407,32 @@
   }
   /* Same protocol as Stillness: the whole day's edit layer, last-write-wins on
      ts. Pull first so a phone edit made a minute ago is not overwritten. */
-  async function writeOps(mutate){
+  /* The change shows at once (Junyan, 2026-10-22: "adding and moving things is really slow and glitchy": a drop waited on a
+     pull and a save, two round trips, before the block moved). early: his own move, add or remove. Its mutate goes on the
+     edit layer on screen now and is drawn; the save then takes its turn (one at a time, in order): the pull, and, when
+     the pull brought a fresh copy, the same change again on it, so a phone edit made a minute ago is still not
+     overwritten. When nothing came back (offline, no outbox) the change is already in, so it is not made twice.
+     Early changes still waiting their turn are put back on the screen copy after each save. */
+  const OPS_WAIT = [];
+  let opsTurn = Promise.resolve();
+  function writeOps(mutate, early){
+    if (early) { mutate(OPS); OPS_WAIT.push(mutate); render(); }
+    const run = opsTurn.then(() => writeOpsNow(mutate, early));
+    opsTurn = run.catch(() => {});
+    return run;
+  }
+  async function writeOpsNow(mutate, early){
+    if (early) OPS_WAIT.splice(OPS_WAIT.indexOf(mutate), 1);
+    const was = OPS;
     await pullOps().catch(() => {});
-    mutate(OPS);
+    const fresh = OPS !== was;
+    if (fresh || !early) mutate(OPS);
     OPS.ts = Date.now();
-    if (DRY) { render(); return; }
+    if (DRY) { if (fresh) OPS_WAIT.forEach(m => m(OPS)); render(); return; }
     // kept on the phone first, then sent: offline it waits in the outbox and goes up when the internet is back
     store.set(OPS_OUT, JSON.stringify(QuestOffline.queueOps(readJSON(OPS_OUT, {}), dayKey(), OPS)));
     saveSnap();
+    if (fresh) OPS_WAIT.forEach(m => m(OPS));   // after the outbox copy, so each is sent by its own turn only
     await flushOps();
     render();
   }
@@ -2555,39 +2578,58 @@
   function saveBlock(b, s, e, t, placed){
     if (!placed && timeMoved(b, s, e)) ({ s, e } = placeOwn(b, s, e));
     log(`Changed ${b.t}${t !== b.t ? ` to ${t}` : ""}: ${fmtT(s)} to ${fmtT(e)}`);
-    return writeOps(o => setBlock(o, b, s, e, t));
+    return writeOps(o => setBlock(o, b, s, e, t), true);
   }
   /* Calendar writes: a block that came from Google Calendar (it has an id) can be moved or renamed in the calendar
      itself. Only that one event changes (his own move); nothing else is moved for it. */
   const canCal = b => !!(b.id && b.calId && questKey() && !DRY);
+  // shown at its new time and name at once; the calendar saves behind it (2026-10-22, "really slow and glitchy")
   async function saveBlockCal(b, s, e, t){
     if (timeMoved(b, s, e)) ({ s, e } = placeOwn(b, s, e));
+    const k = "id:" + b.id;
+    PEND[k] = { s:+s, e:+e, ...(t !== b.t ? { t } : {}), at:Date.now() }; redrawCal();
     try {
       await qfetch("/cal/event", { method:"POST", body:JSON.stringify({
         id:b.id, calId:b.calId, raw:b.raw, s:s.toISOString(), e:e.toISOString(), title: t !== b.t ? t : "" }) });
     } catch (err) {
-      alert(`Could not change the calendar (${err.message}). Saved for today only.`);
-      return saveBlock(b, s, e, t);
+      delete PEND[k];
+      calToast(`Could not change the calendar (${err.message}). Saved for today only.`, 7000);
+      return saveBlock(b, s, e, t, true);
     }
     log(`Changed ${b.t} in the calendar${t !== b.t ? ` to ${t}` : ""}: ${fmtT(s)} to ${fmtT(e)}`);
-    await writeOps(o => { delete o.edits[b.key]; });   // the calendar now holds the change
-    await pullAll();
+    if (OPS.edits[b.key]) await writeOps(o => { delete o.edits[b.key]; });   // the calendar now holds the change
+    await pullCal();
   }
   const jointId = () => AGD() ? AGD().JOINT : undefined;   // where Day Quest's adds go by default (d41)
   const calName = id => { const c = AGD() && AGD().ADD_CALS.find(x => x.id === id); return c ? ` (${c.name})` : ""; };
   /* calId: the calendar it goes on. Adds from Day Quest go on Joint Plans unless he picks another (d41, 2026-10-19:
      "when I add an item on the day quest it should go to the joint plans calendar by default"). */
+  /* It shows where he put it at once, as a ghost, while Google Calendar saves it and the plan is read back (2026-10-22: the
+     block used to appear only after the save and a full pull, about 3 seconds); a failed save takes the ghost away. */
+  const GHOST = {};
   async function addBlockCal(t, s, e, calId = jointId()){
     ({ s, e } = placeOwn({ key:"new", t, calId }, s, e));
+    const g = "ghost-" + newKey(s), c = AGD() && AGD().ADD_CALS.find(x => x.id === calId);
+    GHOST[g] = { key:g, s:+s, e:+e, t, calId, cal:c ? c.name : "", at:Date.now() }; redrawCal();
     let made = {};
     try { made = await qfetch("/cal/event", { method:"POST", body:JSON.stringify({ s:s.toISOString(), e:e.toISOString(), title:t, calId,
       ...(isGym({ t }) ? { color:"3", desc:"Added from Day Quest: a gym session. Move it or delete it as you like." } : {}) }) }); }
     catch (err) {
+      delete GHOST[g]; redrawCal();
       // today's plan cannot hold another day, so a failed add there is only reported
       if (gameDayOf(s) !== gameYmd()) return calToast(`Could not add ${t} to the calendar (${err.message}). Nothing was added.`, 7000);
-      alert(`Could not add it to the calendar (${err.message}). Added for today only.`); return addBlock(t, s, e); }
+      calToast(`Could not add ${t} to the calendar (${err.message}). Added for today only.`, 7000); return addBlock(t, s, e); }
+    if (GHOST[g]) GHOST[g].id = made.id;   // it stays until the plan read back holds this event
     log(`Added ${t} to the calendar${calName(made.calId || calId)}: ${fmtT(s)} to ${fmtT(e)}`);
-    await pullAll();
+    await pullCal();
+  }
+  // the calendar column drawn again now, not on the next tick
+  function redrawCal(){ $("calBody")._h = ""; if (!$("sheet").classList.contains("open")) render(); }
+  /* After his own calendar write only the calendar is read back: today's plan and the other days, side by side. The whole
+     pull (tasks, game state, steps, sleep, insights, about 30 requests) waits for its 2-minute turn. */
+  async function pullCal(){
+    try { await Promise.all([pullPlan(), pullAgenda()]); saveSnap(); } catch {}
+    render();
   }
   function dropBlock(b){
     log(`Removed ${b.t} from today`);
@@ -2595,13 +2637,13 @@
     return writeOps(o => {
       if (b.extra) o.adds = o.adds.filter(x => x.key !== b.key);
       else { if (!o.drops.includes(b.key)) o.drops.push(b.key); delete o.edits[b.key]; }
-    });
+    }, true);
   }
   function addBlock(t, s, e){
     const key = newKey(s);
     ({ s, e } = placeOwn({ key, t, extra:true }, s, e));
     log(`Added ${t}: ${fmtT(s)} to ${fmtT(e)}`);
-    return writeOps(o => { o.adds.push({ key, s:s.toISOString(), e:e.toISOString(), t, type:"task", cal:"you" }); });
+    return writeOps(o => { o.adds.push({ key, s:s.toISOString(), e:e.toISOString(), t, type:"task", cal:"you" }); }, true);
   }
   // time inputs speak the calendar's clock, not the device's
   const toField = d => { const p = tzParts(d, { hour:"2-digit", minute:"2-digit", hourCycle:"h23" });
@@ -4387,13 +4429,14 @@
   // put the pick on today's plan (or move its block there), glow it, and offer Undo for 5 seconds
   async function pickMove(p){
     let r = null;
-    await writeOps(o => { r = AGD().placePick(o.adds, p, newKey(p.s), pickDone); o.adds = r.adds; FRESH = { key:r.key, at:Date.now() }; });
+    const key = newKey(p.s);
+    await writeOps(o => { r = AGD().placePick(o.adds, p, key, pickDone); o.adds = r.adds; FRESH = { key:r.key, at:Date.now() }; }, true);
     if (!r) return;
     const msg = `${r.moved ? "Moved" : "Added"}: ${p.t}, ${AGD().rangeText(fmtT(p.s), fmtT(p.e))}`;
     log(msg.replace(/^Added/, "Planned")); saveG(); render();
     const el = document.querySelector(`.cal-ev.fresh`); if (el) el.scrollIntoView({ behavior:"smooth", block:"nearest" });
     undoToast(msg, async () => {
-      await writeOps(o => { o.adds = AGD().undoPick(o.adds, r); });
+      await writeOps(o => { o.adds = AGD().undoPick(o.adds, r); }, true);
       FRESH = { key:"", at:0 }; log(`Undone: ${msg}`); saveG(); render();
     });
   }
@@ -5104,11 +5147,12 @@
   async function moveGymNow(b, o, what, from, k){
     const r = placeOwn(b.game ? b : { ...b, key:"new" }, new Date(o.s), new Date(o.e), true);   // only this one moves
     if (r.hit) o = { ...o, s:+r.s, e:+r.e, label:QG().label(+r.s, TZ()) };
+    // it lands on the new day at once and the sheet closes; the calendar saves behind it (2026-10-22, "slow and glitchy")
+    PEND[k] = { s:+o.s, e:+o.e, at:Date.now() }; closeSheet(); redrawCal();
     try {
-      PEND[k] = { s:+o.s, e:+o.e, at:Date.now() };
       await qfetch("/cal/event", { method:"POST", body:JSON.stringify({ id:b.id, calId:b.calId, raw:b.raw, s:new Date(o.s).toISOString(),
         e:new Date(o.e).toISOString(), title:"", note:`moved by Junyan from ${from}` }) });
-    } catch (err) { delete PEND[k]; calToast(`Could not move it (${err.message}). It is still at ${from}.`, 7000); return; }
+    } catch (err) { delete PEND[k]; redrawCal(); calToast(`Could not move it (${err.message}). It is still at ${from}.`, 7000); return; }
     const prev = (G.gymMoves = G.gymMoves || {})[b.id], iso = new Date(+b.s).toISOString();
     // a session the planner placed keeps its slot key, so its old week is not filled again either way
     const key = (prev && prev.key) || (Object.entries(G.gymPlan || {}).find(([, v]) => v && !v.failed && Math.abs(Date.parse(v.s) - +b.s) < 60000) || [])[0] || null;
@@ -5117,7 +5161,6 @@
     clearMoveOpts();
     for (const d in PLANS) delete PLANS[d];
     store.set(GYM_AT, "");
-    closeSheet();
     calToast(`${r.hit ? snapSay(b, r) + " " : ""}${what}: ${o.label}. Saved to Google Calendar${b.cal ? ` (${b.cal})` : ""}.`);
     try { if (b.game && OPS.edits[b.key]) await writeOps(x => { delete x.edits[b.key]; }); await pushG(); await pullAll(); } catch {}
     if (window.QuestMorning && QuestMorning.isOpen()) QuestMorning.redraw();
@@ -6243,7 +6286,9 @@
     for (const k in PEND) if (Date.now() - PEND[k].at > 3 * 60000) delete PEND[k];
     const others = Object.values(AG).map(list => list.map(b => ({ ...b, key:keyOf(b), kind:kindOf(b) })));
     // a block added in Quest uses up the open space under it (Your move, 2026-10-14)
-    return AGD().carveFree(AGD().applyPending(AGD().mergeAgenda(game, others), PEND, Date.now()));
+    for (const k in GHOST) if (Date.now() - GHOST[k].at > 3 * 60000) delete GHOST[k];
+    const merged = AGD().applyPending(AGD().mergeAgenda(game, others), PEND, Date.now());
+    return AGD().carveFree(AGD().withGhosts ? AGD().withGhosts(merged, GHOST, Date.now()).map(b => b.ghost ? { ...b, kind:kindOf(b) } : b) : merged);
   }
   // win { a0, z0 }: just that stretch, to look at only (Plan your day shows the rest of today this way, Junyan 2026-10-16)
   function calendarHTML(stops, cur, t, win){
@@ -6419,8 +6464,10 @@
     if (dk.kind === "day") {
       // a block added in Quest lives in today's plan, which has no other days
       if (gameDayOf(s) !== gameYmd() || gameDayOf(e - 60000) !== gameYmd()) { show(); calToast(`${what} was added in Quest, so it lives in today's plan only. It can move within its day, not to another day.`, 6000); return; }
-      await saveBlock(b, s, e, b.t, true);
+      // it lands at once; the save runs behind the toast
+      const saving = saveBlock(b, s, e, b.t, true);
       calToast(`${snapped}${what}: ${when}. Saved in today's plan.`);
+      await saving;
       return;
     }
     PEND[k] = pend; show();
@@ -6438,7 +6485,7 @@
         // the calendar now holds the change, so drop any today-only edit of it
         if (OPS.edits[b.key]) await writeOps(o => { delete o.edits[b.key]; });
       }
-      await pullAll();
+      await pullCal();
     } catch {}   // the calendar has it; the next pull shows it
   }
   // a block on another day of the agenda: what it is, and how to change it
@@ -6782,7 +6829,8 @@
   }
 
   /* tick every second; render() only touches the DOM when markup changed */
-  setInterval(() => { tick(); if (!$("sheet").classList.contains("open")) render(); }, 1000);
+  // not while a block is held: the drag moves it by itself, and a phone felt the full redraw each second
+  setInterval(() => { tick(); if (!$("sheet").classList.contains("open") && !(DRAG && DRAG.live)) render(); }, 1000);
   setInterval(pullAll, 2 * 60 * 1000);
   /* A Home Screen app wakes with the page it had in memory, sometimes from
      before the last update, so the phone and the Mac ran different versions
