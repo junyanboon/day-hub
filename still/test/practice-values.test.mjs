@@ -10,7 +10,7 @@ for (const f of ["../quest-basics.js", "../quest-meals.js"]) vm.runInNewContext(
 const B = ctx.QuestBasics, M = ctx.QuestMeals;
 const html = fs.readFileSync(fileURLToPath(new URL("../quest.html", import.meta.url)), "utf8");
 
-const WANT = { angam:25, yogasana:25, shambhavi:20, surya:20, kriya:10, bhuta:8, upa:5, nadi:4, lamp:3, neem:3 };
+const WANT = { angam:50, yogasana:50, shambhavi:40, surya:40, kriya:20, bhuta:16, upa:10, nadi:8, lamp:3, neem:3 };   // yoga doubled 2026-10-22
 
 test("each practice in a block checklist pays exactly its listed value, with no level multiplier", () => {
   assert.deepEqual(JSON.parse(JSON.stringify(B.PRACTICE_PAY)), WANT);
@@ -30,12 +30,7 @@ test("quest.html's habit list carries the same values, and habitGain uses practi
   assert.match(html, /practicePay\(id, n, h\[3\]\)/);
 });
 
-test("a realistic strong day with pranic food lands at about 71 prana", () => {
-  const ticks = ["shambhavi", "angam", "bhuta", "lamp", "neem"];   // Shambhavi, one long practice, Bhuta Shuddhi, lamp, neem
-  const practice = ticks.reduce((s, id) => s + B.practicePay(id, 0, 2), 0);
-  assert.equal(practice, 59);
-  // pranic food across the day's meals, at level 1 (x1.5): fresh fruit, fresh vegetables, ate with attention, stopped before full
-  const food = ["fruit", "fveg", "attn", "light"].reduce((s, id) => s + M.value(id, { mult:1.5 }), 0);
-  assert.equal(food, 12);
-  assert.ok(Math.abs(practice + food - 71) <= 2, String(practice + food));
+test("yoga pays a lot more (2026-10-22): Shambhavi and one long practice take prana to about 90", () => {
+  assert.equal(B.practicePay("shambhavi", 0, 1) + B.practicePay("angam", 0, 1), 90);
+  assert.equal(B.practicePay("lamp", 0, 2) + B.practicePay("neem", 0, 1), 6);   // the lamp and neem stay as they were
 });

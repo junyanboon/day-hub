@@ -14,13 +14,13 @@ vm.runInNewContext(fs.readFileSync(here + "quest-meals.js", "utf8"), ctx);
 const M = ctx.QuestMeals;
 const J = x => JSON.parse(JSON.stringify(x));
 
-test("Ate out takes prana and body, never grows with the level, and a second tap gives it back", () => {
-  assert.equal(M.value("outp", { mult: 3 }), -4);
+test("Ate out takes prana -10 and body -20 (d14), never grows with the level, and a second tap gives it back", () => {
+  assert.equal(M.value("outp", { mult: 3 }), -10);
   assert.equal(M.meterOf("outp"), "p");
   assert.equal(M.meterOf("outb"), "b");
-  assert.deepEqual(J(M.score({ outp: true, outb: true }, {})), { p: -4, b: -4 });
+  assert.deepEqual(J(M.score({ outp: true, outb: true }, {})), { p: -10, b: -20 });
   let r = M.handTap(null, "outp", {}).rec; r = M.handTap(r, "outb", {}).rec;
-  assert.deepEqual([r.p, r.b], [-4, -4]);
+  assert.deepEqual([r.p, r.b], [-10, -20]);
   r = M.handTap(r, "outb", {}).rec;
   assert.equal(r.b, 0);
 });

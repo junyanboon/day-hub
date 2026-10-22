@@ -47,10 +47,10 @@
   ];
   /* Ate out (Junyan, 2026-10-22, d13: "eating out really hurts me even if I try to eat healthy"): picking Ate out as a
      meal takes [id, icon, label, value] from prana (outp) and from body (outb), whatever he ate there. tally counts it
-     as a drain and as one meal out (out), so the day history keeps how often he ate out (outWeek). */
+     as a drain and as one meal out (out), so the day history keeps how often he ate out (outWeek). d14 (2026-10-22: "more damage to the body than the prana (20 off body?)"): prana -10, body -20. */
   const EAT_OUT = [
-    ["outp", "🍴", "Ate out", -4],
-    ["outb", "🍴", "Ate out", -4],
+    ["outp", "🍴", "Ate out", -10],
+    ["outb", "🍴", "Ate out", -20],
   ];
   const OUT_IDS = EAT_OUT.map((x) => x[0]);
   // shorter words on the compact tiles (2026-10-20); the trends keep the full labels above
