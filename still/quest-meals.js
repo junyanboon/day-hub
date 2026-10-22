@@ -45,6 +45,14 @@
     ["stale", "🧊", "Leftover or reheated food", -2],
     ["heavy", "🥘", "Heavy, or ate too much", -5],
   ];
+  /* Ate out (Junyan, 2026-10-22, d13: "eating out really hurts me even if I try to eat healthy"): picking Ate out as a
+     meal takes [id, icon, label, value] from prana (outp) and from body (outb), whatever he ate there. tally counts it
+     as a drain and as one meal out (out), so the day history keeps how often he ate out (outWeek). */
+  const EAT_OUT = [
+    ["outp", "🍴", "Ate out", -4],
+    ["outb", "🍴", "Ate out", -4],
+  ];
+  const OUT_IDS = EAT_OUT.map((x) => x[0]);
   // shorter words on the compact tiles (2026-10-20); the trends keep the full labels above
   const SHORT = { fveg: "Fresh veg, raw or just cooked", pnuts: "Nuts (soaked)", stale: "Leftover or reheated" };
   const tileLabel = (row) => SHORT[row[0]] || row[2];
@@ -228,7 +236,7 @@
   // what one row is worth: gains grow with the level multiplier, drains never do
   function value(id, opt) {
     const o = opt || {}, mult = o.mult ?? 1;
-    const row = PRANA_FOODS.concat(PRANA_WAYS, DRAINS).find((x) => x[0] === id);
+    const row = PRANA_FOODS.concat(PRANA_WAYS, DRAINS, EAT_OUT).find((x) => x[0] === id);
     if (row) {
       if (id === "heavy" && typeof o.heavy === "number") return o.heavy;
       return row[3] > 0 ? Math.round(row[3] * mult) : row[3];
@@ -239,9 +247,10 @@
   // { p, b } for a set of ticks; opt = { mult, heavy, bodyGain(id) }
   function score(sel, opt) {
     let p = 0, b = 0;
-    for (const id of FOOD_IDS.concat(PRANA_WAYS.map((x) => x[0]), DRAIN_IDS)) if (sel[id]) p += value(id, opt);
+    for (const id of FOOD_IDS.concat(PRANA_WAYS.map((x) => x[0]), DRAIN_IDS, ["outp"])) if (sel[id]) p += value(id, opt);
     for (const id of BODY) if (sel[id]) b += value(id, opt);
     if (sel[JUNK[0]]) b += JUNK[3];
+    if (sel.outb) b += value("outb", opt);
     return { p, b };
   }
   // tick or untick one row; fresh and leftover cannot both be true
@@ -252,20 +261,28 @@
   }
   // pranic foods eaten and drains hit across a day's ratings (G.day.mealq), activity checks and gym feelings skipped
   function tally(mealq) {
-    let foods = 0, drains = 0;
+    let foods = 0, drains = 0, out = 0;
     for (const q of Object.values(mealq || {})) {
       if (!q || q.kind || !Array.isArray(q.sel)) continue;
       for (const id of q.sel) { if (FOOD_IDS.includes(id) || id === "pos") foods++;   // "pos": a pranic food in the quiz before 2026-10-19
-        else if (DRAIN_IDS.includes(id)) drains++; }
+        else if (DRAIN_IDS.includes(id) || id === "outp") drains++;
+        if (id === "outp") out++; }
     }
-    return { foods, drains };
+    return { foods, drains, ...(out ? { out } : {}) };
+  }
+  /* meals out in the week of today (Monday to today): days = [{ day:"YYYY-MM-DD", out }] from the day history, today's
+     own count among them */
+  function outWeek(days, today) {
+    const t = Date.parse(today + "T12:00:00Z"); if (!Number.isFinite(t)) return 0;
+    const mon = new Date(t - ((new Date(t).getUTCDay() + 6) % 7) * 86400000).toISOString().slice(0, 10);
+    return (days || []).reduce((a, d) => a + (d && d.day >= mon && d.day <= today ? +d.out || 0 : 0), 0);
   }
 
   /* Pay as he taps (Junyan, 2026-10-19: one screen that IS the meal, no Confirm step). rec is the meal's record in
      G.day.mealq: { sel:[ids], v:{ id:[meter, paid] }, p, b }. A tap on a picked tile takes back exactly what it paid;
      fresh and leftover cannot both stand, so picking one takes the other back. Returns { rec, ops:[{ id, on, m, d }] }
      (m "p" or "b"); the page moves the meters by each d. A record from before (no v) takes back today's value. */
-  const meterOf = (id) => (BODY.includes(id) || LEGACY_BODY.includes(id) || id === JUNK[0] || String(id).startsWith("dish:") ? "b" : "p");
+  const meterOf = (id) => (BODY.includes(id) || LEGACY_BODY.includes(id) || id === JUNK[0] || id === "outb" || String(id).startsWith("dish:") ? "b" : "p");
   function tap(rec, id, opt) {
     const r = { ...(rec || {}), sel: [...((rec && Array.isArray(rec.sel)) ? rec.sel : [])], v: { ...((rec && rec.v) || {}) }, p: +((rec && rec.p) || 0), b: +((rec && rec.b) || 0) };   // keeps the dish ticks (2026-10-20)
     const ops = [];
@@ -527,6 +544,6 @@
     return t;
   }
 
-  root.QuestMeals = { PRANA_FOODS, PRANA_WAYS, TIPS, TIP_LEAD, tipFor, tipShows, tipOn, DRAINS, BODY, LEGACY_BODY, JUNK, ONEOF, FOOD_IDS, DRAIN_IDS,
+  root.QuestMeals = { PRANA_FOODS, PRANA_WAYS, TIPS, TIP_LEAD, tipFor, tipShows, tipOn, DRAINS, EAT_OUT, OUT_IDS, outWeek, BODY, LEGACY_BODY, JUNK, ONEOF, FOOD_IDS, DRAIN_IDS,
     DISH_VALUE, DISHES, TRAVEL, BLUEPRINT, CORE, dishesFor, IDEAS, SLOTS, STEPS, isSlotDish, slotOf, entryName, extrasOf, addExtra, dropExtra, setExtraQ, xKey, entriesOf, filledOf, partsOf, stepsOf, SHORT, tileLabel, value, score, toggle, tally, tap, meterOf, dishOf, groupOf, pays, slotsUsed, dishMax, capOf, dishPay, dishStatus, tick, dishPaid, heldIds, pickOf, onMeal, setPick, AUTO_IDS, autoSync, handTap };
 })(typeof window !== "undefined" ? window : globalThis);

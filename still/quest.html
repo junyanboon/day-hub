@@ -643,7 +643,8 @@
   .mq-new { align-self:flex-start; border-style:dashed; }
   /* one dish per meal (2026-10-21): the choice cards, the kitchen buttons, the drains row and the Counted line */
   .mq-pick { margin:4px 0 6px; }
-  .mq-pks { display:grid; grid-template-columns:1fr 1fr; gap:6px; margin:2px 0 6px; } .mq-pks1 { grid-template-columns:1fr; margin-top:8px; }
+  .mq-pks { display:grid; grid-template-columns:1fr 1fr; gap:6px; margin:2px 0 6px; } .mq-pks1 { grid-template-columns:1fr; margin-top:8px; } .mq-pks2 { margin-top:8px; }
+  .sheet input.mq-tq.mq-place { width:100%; min-height:40px; padding:6px 10px; font-size:16px; text-align:left; margin:0 0 4px; }
   .mq-pk { display:flex; align-items:center; gap:8px; min-height:48px; padding:6px 10px; border-radius:12px; background:var(--glass); border:1px solid var(--glass-border);
     color:inherit; font:inherit; text-align:left; cursor:pointer; -webkit-tap-highlight-color:transparent; min-width:0; }
   .mq-pk .mq-de { font-size:19px; } .mq-pk .mq-dn b { font-size:13px; line-height:1.2; } .mq-pk .mq-dn small { font-size:10.5px; }
@@ -1023,7 +1024,7 @@
 <script src="quest-oura.js?v=20261019a"></script>
 <script src="quest-levels.js?v=20261016b"></script>
 <script src="quest-gymlog.js?v=20261019a"></script>
-<script src="quest-meals.js?v=20261022d90"></script>
+<script src="quest-meals.js?v=20261022o13"></script>
 <script src="quest-food-score.js?v=20261021d87t"></script>
 <script src="quest-kitchen.js?v=20261022k12"></script>
 <script src="quest-ideas.js?v=20261022d90"></script>
@@ -1888,7 +1889,7 @@
     const water = { ...TR.dayRow("wt", "Water", wh, { day:gameYmd(), wt:ws.total }), before4:ws.before4, aim:QW() ? QW().AIM : 8 };
     // d63: the drains and pranic foods by name, in the order he ate them
     const hit = Object.values(G.day.mealq || {}).flatMap(q => q && !q.kind && Array.isArray(q.sel) ? q.sel : []);
-    const drainNames = TR.namesOf(hit, QM.DRAINS).concat(G.day.lateBody ? ["Up past 11"] : []);
+    const drainNames = TR.namesOf(hit, QM.DRAINS.concat([QM.EAT_OUT[0]])).concat(G.day.lateBody ? ["Up past 11"] : []);
     rows.find(r => r.k === "dr").names = drainNames;
     rows.find(r => r.k === "pf").names = TR.namesOf(hit, QM.PRANA_FOODS);
     // d65 and d66: tomorrow's tip from his weakest area today, and one line on what went better than his week
@@ -2161,7 +2162,13 @@
     (G.days = G.days || {})[G.day.date] = { place:placeNow(), prana:G.day.prana, body:bd ?? G.day.body, ...(bd != null ? { bk:1 } : {}), level:lvl(), ...foodStamp(), ...gymDayStamp(), ...waterStamp(), ...gutStamp() };
   }
   // drains: the meal quiz ones, and staying up past 11 (it took body: G.day.lateBody)
-  function foodStamp(){ const t = window.QuestMeals.tally(G.day.mealq); return { pf:t.foods, dr:t.drains + (G.day.lateBody ? 1 : 0) }; }
+  // out: meals eaten out today (d13), for the week's count
+  function foodStamp(){ const t = window.QuestMeals.tally(G.day.mealq); return { pf:t.foods, dr:t.drains + (G.day.lateBody ? 1 : 0), ...(t.out ? { out:t.out } : {}) }; }
+  // meals eaten out this week, Monday to today (d13): the day history, today from today's meals
+  function outThisWeek(){
+    const days = Object.entries(G.days || {}).filter(([k]) => k !== G.day.date).map(([k, v]) => { const d = new Date(k); return isNaN(d) || !v ? null : { day:ymd(d), out:v.out }; }).filter(Boolean);
+    return window.QuestMeals.outWeek(days.concat([{ day:gameYmd(), out:foodStamp().out || 0 }]), gameYmd());
+  }
   // how many gym sessions today ended "wiped out", and last night's sleep, kept per day for the recovery advice
   function wipedToday(){ return GL.wipedCount(G.day.mealq); }
   function gymDayStamp(){ const n = wipedToday(); return n ? { wiped:n, sleep:G.day.sleepScore ?? null } : {}; }
@@ -2815,6 +2822,11 @@
        dish points; the foods count toward the food tiles (d83). "Save as a dish" opens the dish editor with these foods.
        A meal ticked in "Anything else from the kitchen" (d47) still shows those ticks here, untickable. */
     const MEAL = { id:"meal", name:"Something else", icon:"🍽️", items:[] };
+    /* "Ate out" (Junyan, 2026-10-22, d13): a meal from a restaurant or takeout. Picking it takes prana and body
+       (QuestMeals.EAT_OUT), and the card has the old tap buttons: what helped (pranic and body foods) and what hurt
+       (fried, the drains), each paying as he taps it. The place is optional (rec.place). */
+    const OUT = { id:"out", name:"Ate out", icon:"🍴", items:[] };
+    const outN = outThisWeek();
     const kPre = QK() ? kitEatKey(k, "kitchen", "") : "";
     const oldEat = QK() ? Object.keys((G.kitchen && G.kitchen.used) || {}).filter(x => x.startsWith(kPre) && QK().taken(G.kitchen, x))
       .map(x => ({ id:x.slice(kPre.length), it:QK().item(G.kitchen, x.slice(kPre.length)) })).filter(x => x.it) : [];
@@ -2931,20 +2943,29 @@
        cards, no ingredients: the Blueprint dishes (the travel versions on a trip), his own dishes, the recipe cards (or
        tonight's ideas when the recipe book did not load), then Something else. A tap makes it this meal (rec.m). */
     const choices = () => [[bpNow === QM.DISHES ? "Blueprint dishes" : "Blueprint dishes · travel versions", bpNow], ["Your dishes", QK() ? own.filter(d => !d.del) : []], [RL ? "Recipes · for 2 people" : `Tonight's ideas · for 2 people${kn ? ` · from ${esc(kn.icon)} ${esc(kn.name)}` : ""}`, RL || IT.list]];
-    const pickSub = d => d === MEAL ? "from your kitchen" : d.own ? "your dish" : QM.isSlotDish(d) ? `${QM.partsOf(d)} parts` : RL && RL.includes(d) ? (trip && QR().isTravel(d, rule) ? "travel" : d.time || "") : d.time || "";
+    const pickSub = d => d === MEAL ? "from your kitchen" : d === OUT ? `${outN} this week` : d.own ? "your dish" : QM.isSlotDish(d) ? `${QM.partsOf(d)} parts` : RL && RL.includes(d) ? (trip && QR().isTravel(d, rule) ? "travel" : d.time || "") : d.time || "";
     const pickCard = (d, cur) => `<button type="button" class="mq-pk${cur ? " on" : ""}" data-mpick="${esc(d.id)}" aria-pressed="${cur}"><span class="mq-de">${esc(d.icon)}</span>` +
       `<span class="mq-dn"><b>${esc(d.name)}</b>${pickSub(d) ? `<small>${esc(pickSub(d))}</small>` : ""}</span></button>`;
     // t: the group's heading (already escaped)
     const picker = cur => choices().filter(([, l]) => l.length).map(([t, l]) => `<p class="kt-gh">${t}</p><div class="mq-pks">${l.map(d => pickCard(d, d.id === cur)).join("")}</div>`).join("") +
       (IT.note ? `<p class="mq-serves mq-inote">${esc(IT.note)}</p>` : "") +
-      `<div class="mq-pks mq-pks1">${pickCard(MEAL, cur === MEAL.id)}</div>` +
+      `<div class="mq-pks mq-pks2">${pickCard(MEAL, cur === MEAL.id)}${pickCard(OUT, cur === OUT.id)}</div>` +
       (QK() || window.QuestLibrary ? `<div class="mq-drow">${QK() ? `<button type="button" class="mq-mini mq-new" data-dnew>+ New dish</button>` : ""}` +
         `${window.QuestLibrary ? `<button type="button" class="mq-mini" data-rbook>📖 Recipe book</button>` : ""}</div>` : "") +
       (RL && trip ? `<p class="mq-serves mq-inote">On a trip: travel-friendly recipes first.</p>` : "");
     // the dishes on this meal (rec.m first; a meal from before shows all it holds), and old "From your kitchen" ticks
     const onIds = QM.onMeal(rec).concat(oldEat.length && !QM.onMeal(rec).includes(MEAL.id) ? [MEAL.id] : []);
     const mainId = onIds[0] || null;
+    const outCard = () => {
+      const hb = QM.BODY.map(id => { const h = HABITS.find(x => x[0] === id) || []; return [id, h[4] || "🥗", h[5] || id]; });
+      return `<div class="mq-dish open"><div class="mq-dbtn"><span class="mq-de">${OUT.icon}</span><span class="mq-dn"><b>${OUT.name}</b>` +
+        `<small>${outN === 1 ? "1 meal out this week" : `${outN} meals out this week`} · prana ${QM.EAT_OUT[0][3]}, body ${QM.EAT_OUT[1][3]}</small></span></div>` +
+        `<div class="mq-dlist"><input class="mq-tq mq-place" data-mplace value="${esc((rec && rec.place) || "")}" placeholder="Where? (optional)" maxlength="60" autocomplete="off" aria-label="Where you ate">` +
+        `${lb("What helped", "mb", got(QM.FOOD_IDS.concat(QM.BODY)))}<div class="mq-drs">${QM.PRANA_FOODS.concat(hb).map(drain).join("")}</div>` +
+        `${lb("What hurt", "mp", got([QM.JUNK[0]].concat(QM.DRAIN_IDS)))}<div class="mq-drs">${[QM.JUNK].concat(QM.DRAINS).map(drain).join("")}</div></div></div>`;
+    };
     const mealCard = (id, tail) => {
+      if (id === OUT.id) return outCard();
       if (id === MEAL.id) return `<div class="mq-dish open"><div class="mq-dbtn"><span class="mq-de">${MEAL.icon}</span><span class="mq-dn"><b>${MEAL.name}</b><small>pick foods from your kitchen</small></span></div>` +
         `<div class="mq-dlist">${elseRows()}${tail || ""}</div></div>`;
       const d = dishById(id); if (!d) return "";
@@ -2971,11 +2992,11 @@
       ${mainId ? `<div class="mq-mhd">${lb("This meal", "mb", 0)}${soloBtn()}<button type="button" class="mq-mini mq-howbtn" data-mchange aria-expanded="${chg}">Change meal <span aria-hidden="true">${chg ? "▴" : "▾"}</span></button></div>
       ${chg ? `<div class="mq-pick">${picker(mainId)}</div>` : ""}
       ${counted()}
-      <div class="mq-dishes">${onIds.map(id => mealCard(id, id === mainId ? kitPanel(id === MEAL.id ? MEAL : dishById(id) || MEAL) : "")).join("")}</div>`
+      <div class="mq-dishes">${onIds.map(id => mealCard(id, id === mainId && id !== OUT.id ? kitPanel(id === MEAL.id ? MEAL : dishById(id) || MEAL) : "")).join("")}</div>`
       : `${lb("What's this meal?", "mb", 0)}<div class="mq-pick">${picker(null)}</div>
       ${counted()}`}
-      ${lb("Drains · lower prana", "mp", got(QM.DRAIN_IDS))}
-      <div class="mq-drs">${QM.DRAINS.map(drain).join("")}</div>
+      ${mainId === OUT.id ? "" : `${lb("Drains · lower prana", "mp", got(QM.DRAIN_IDS))}
+      <div class="mq-drs">${QM.DRAINS.map(drain).join("")}</div>`}
       ${wts ? `<div class="mq-share">Shared meals: you <input class="mq-tq" type="text" inputmode="decimal" data-mwt="me" value="${wts.me}" aria-label="Your weight in lb"> lb · Caney <input class="mq-tq" type="text" inputmode="decimal" data-mwt="other" value="${wts.other}" aria-label="Caney's weight in lb"> lb</div>` : ""}
       <div class="actions"><button class="btn ghost" id="mEdit">Change time or name</button></div>`, true);
     const sh = $("sheet");
@@ -2991,7 +3012,7 @@
           if (op.on) G.day.habits[op.id] = (G.day.habits[op.id] || 0) + 1;
           else (G.day.voided = G.day.voided || {})[op.id] = ((G.day.voided || {})[op.id] || 0) + 1;
         }
-        const label = (QM.PRANA_FOODS.concat(QM.PRANA_WAYS, QM.DRAINS, [QM.JUNK]).find(x => x[0] === op.id) || [, , (HABITS.find(x => x[0] === op.id) || [])[5] || op.id])[2];
+        const label = (QM.PRANA_FOODS.concat(QM.PRANA_WAYS, QM.DRAINS, [QM.JUNK], QM.EAT_OUT).find(x => x[0] === op.id) || [, , (HABITS.find(x => x[0] === op.id) || [])[5] || op.id])[2];
         if (op.d) addEnergy(op.m, op.d, `${name}: ${label}${op.on ? "" : " (taken back)"}`, label, !!fx);
         else log(`${name}: ${label}${op.on ? "" : " (taken back)"}`);
       });
@@ -3104,7 +3125,7 @@
       if (r0.K !== G.kitchen) { G.kitchen = r0.K; if (r0.id) kitEatToast(r0.K, [r0.id]); }
       putRec(QM.dropExtra(mealRec(), d.id, n));
     }
-    const xDish = id => id === MEAL.id ? MEAL : dishById(id);   // Something else is a dish of its own here
+    const xDish = id => id === MEAL.id ? MEAL : id === OUT.id ? OUT : dishById(id);   // Something else is a dish of its own here
     sh.querySelectorAll("[data-xs]").forEach(inp => {
       const d = xDish(inp.dataset.xs), box = d && sh.querySelector(`[data-xres="${d.id}"]`), fw = d && sh.querySelector(`[data-xfw="${d.id}"]`); if (!box) return;
       /* typing narrows the kitchen buttons to what matches (QuestKitchen.search) and offers the words as typed; in place,
@@ -3213,8 +3234,16 @@
         } else if (dishOn(d).length) tickDish(d, "none", undefined, fx);
       });
       putRec(QM.setPick(mealRec(), id));
+      // Ate out (d13): its cost goes on with the pick and comes off when the meal changes to something else
+      QM.OUT_IDS.forEach(x => { const r0 = mealRec(), on = !!r0 && Array.isArray(r0.sel) && r0.sel.includes(x);
+        if (on !== (id === OUT.id)) { const t = QM.handTap(r0, x, mqOpt()); applyOps(t.ops, fx); putRec(t.rec); } });
       syncFoods();
       redraw();
+    });
+    sh.querySelectorAll("[data-mplace]").forEach(inp => inp.onchange = () => {
+      const r0 = mealRec(); if (!r0) return;
+      const v = inp.value.trim().slice(0, 60), r = { ...r0 }; if (v) r.place = v; else delete r.place;
+      putRec(r);
     });
     // his own dishes (d48): New dish and Edit open the dish editor, which comes back here
     sh.querySelectorAll("[data-dnew]").forEach(bn => bn.onclick = () => openDishEdit(b, dishNew()));
