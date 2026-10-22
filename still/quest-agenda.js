@@ -135,7 +135,8 @@
   /* Sleep (Junyan, 2026-10-22: "Between wind down and the 1st thing in the morning I want the Sleep with the amount in
      the same shape and colour and automatic adjustment that Your move used to have"). Worked out each time the column
      is drawn, never stored, so it follows Wind down and the morning's first block wherever they move: from the end of
-     the evening's Wind down (else the evening's last block, ending 5 PM to 4 AM) to the start of the first block after
+     the evening's Wind down, or of a later evening block that ends after it (d95), else the evening's last block (ending
+     5 PM to 4 AM) to the start of the first block after
      that and after midnight, before 2 PM. None when the next morning has nothing, or when the night already has a Sleep
      event of its own. nights: [[the evening day's midnight, the next midnight]] in ms. Free time and bookings are not
      blocks here. Returns [{ s, e, min }]. */
@@ -148,8 +149,9 @@
     for (const [m0, m1] of nights || []) {
       const eve = rest.filter(st => +st.e > m0 + 17 * HR && +st.e <= m1 + 4 * HR && +st.s < m1 + 4 * HR);
       if (!eve.length) continue;
-      const wd = eve.filter(st => isWindDown(st.blocks[0]));
-      const from = Math.max(...(wd.length ? wd : eve).map(st => +st.e));
+      // from the end of Wind down, or of the latest evening block that ends after it (d95, 2026-10-22: Work 10:45 to
+      // 11:45 PM after Wind down had Sleep from 10:45 PM beside it). That is the latest end of the evening either way.
+      const from = Math.max(...eve.map(st => +st.e));
       const next = rest.filter(st => +st.s >= Math.max(from, m1) && +st.s < m1 + 14 * HR).map(st => +st.s);
       if (!next.length) continue;
       const to = Math.min(...next);
@@ -311,8 +313,46 @@
     return x && y && x[1] === y[1] ? `${a.replace(m, "")} to ${b}` : `${a} to ${b}`;
   }
 
+  /* Google Calendar busy (d94, 2026-10-22). Junyan dragged Work, Google answered 403 rateLimitExceeded and the page showed
+     "Could not save the move (Calendar PATCH: HTTP 403 { "error": ... })". still-api now waits that out and tries again
+     (about 1 s, 2 s, 4 s); when it is still busy it answers 503 with busy: true and plain words. An older still-api passes
+     Google's raw answer through, so the phone does the waiting then: retryBusy tries again after about 2 s and 4 s. While
+     it waits, the block stays where he put it (PEND). */
+  const BUSY_RE = /rateLimitExceeded|userRateLimitExceeded|HTTP 429\b/;
+  const calBusy = e => !!e && (!!e.busy || e.status === 429 || BUSY_RE.test(String(e.message || "")));
+  // the reason a save failed, in a few plain words: never JSON, never an HTTP code; still-api's own short words stay
+  function plainWhy(e){
+    if (calBusy(e)) return "Google Calendar is busy";
+    const m = String((e && e.message) || "").trim();
+    if (e && e.name === "AbortError") return "no answer in time";
+    if (e && e.name === "TypeError" || /failed to fetch|load failed|networkerror|network request failed/i.test(m)) return "no connection";
+    if (!m || m.length > 80 || /HTTP|[{}[\]<>]|\b\d{3}\b|error|undefined|null/i.test(m)) return "it did not go through";
+    return m;
+  }
+  // "Couldn't <did>, so <after>." with the reason; busy reads the way Junyan asked (d94)
+  const failSay = (e, did, after) => calBusy(e)
+    ? `Google Calendar is busy. Couldn't ${did}, so ${after}. Try again in a minute.`
+    : `Couldn't ${did} (${plainWhy(e)}), so ${after}.`;
+  // run(): one try. A busy answer still-api did not already wait out is tried again: 3 tries, about 2 s then 4 s apart.
+  async function retryBusy(run, { waits = [2000, 4000], sleep = ms => new Promise(r => setTimeout(r, ms)), random = Math.random, onBusy } = {}){
+    for (let i = 0; ; i++) {
+      try { return await run(); }
+      catch (e) {
+        if (!calBusy(e) || e.busy || i >= waits.length) throw e;
+        if (onBusy) try { onBusy(i + 1); } catch {}
+        await sleep(Math.round(waits[i] * (0.75 + 0.5 * random())));
+      }
+    }
+  }
+  /* The agenda's other days (yesterday, and 1 to 3 days ahead) are each a /plan that costs still-api two Google Calendar
+     reads when its 5-minute copy has run out. They are read every 10 minutes, not on every 2-minute pull, and at once
+     after a calendar write from this page (AG_AT = 0) or when a day is missing (d94: fewer Calendar calls). */
+  const AGENDA_EVERY = 10 * MIN;
+  const agendaDue = (at, nowMs, days, ag) => !at || nowMs - at >= AGENDA_EVERY || (days || []).some(d => !(ag && ag[d]));
+
   root.QuestAgenda = { addDays, agendaDays, mergeAgenda, snap, dragResult, dragKind, lanes, isLong, timelineLanes, applyPending,
     pickSpan, blankTap, calItems, sleepSpans, sleepText,
     addKey, samePick, placePick, undoPick, carveFree, rangeText, overlaps, freeSlot, clampEdge,
-    JOINT, JUNYAN, ADD_CALS, onJoint, inRoom, GESTURE, pressStep, hitBox, edgeHandles, withGhosts };
+    JOINT, JUNYAN, ADD_CALS, onJoint, inRoom, GESTURE, pressStep, hitBox, edgeHandles, withGhosts,
+    calBusy, plainWhy, failSay, retryBusy, agendaDue };
 })(typeof window !== "undefined" ? window : globalThis);
