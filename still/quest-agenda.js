@@ -106,9 +106,11 @@
     const st = isToday ? (stops || []).find(x => x.free && x.blocks && x.blocks[0] && x.blocks[0].game && +x.s <= +at && +at < +x.e) : null;
     return { from, stretch: st && +st.e - +from >= 5 * MIN ? st : null };
   }
-  // what the calendar column draws: every stop but free time, clipped to the days shown, with its index into the stops
-  function calItems(stops, a0, z0){
-    return timelineLanes((stops || []).map((st, i) => ({ st, i, s:Math.max(+st.s, a0), e:Math.min(+st.e, z0) })).filter(x => x.e > x.s && !x.st.free));
+  // what the calendar column draws: every stop but free time, clipped to the days shown, with its index into the stops.
+  // keepFree (the Plan your day stretch, where a tap on open space fills it, d2): free time of 15 minutes or more stays
+  function calItems(stops, a0, z0, keepFree){
+    return timelineLanes((stops || []).map((st, i) => ({ st, i, s:Math.max(+st.s, a0), e:Math.min(+st.e, z0) }))
+      .filter(x => x.e > x.s && (!x.st.free || keepFree && x.e - x.s >= 15 * MIN)));
   }
 
   // a key no other block has, even one added at the same minute ("x<start ms>" alone collided)

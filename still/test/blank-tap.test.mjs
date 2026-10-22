@@ -23,14 +23,14 @@ test("the calendar draws no Your move blocks: free stretches stay empty calendar
   assert.deepEqual(drawn.map(x => x.i), [0, 2], "each keeps its index into the stops, so a tap opens the right one");
   // the column is clipped to the days shown
   assert.deepEqual(A.calItems(stops, +at(12, 30), +at(17, 30)).map(x => [x.s, x.e]), [[+at(12, 30), +at(13)], [+at(17), +at(17, 30)]]);
+  // the Plan your day stretch keeps open space of 15 minutes or more, so its tap still fills it (d2)
+  assert.deepEqual(A.calItems(stops, +at(0), +at(23, 59), true).map(x => x.i), [0, 1, 2]);
 });
 
 test("quest.html draws only what calItems keeps and no longer opens a Your move sheet", () => {
   const cal = fn("calendarHTML");
-  assert.match(cal, /AGD\(\)\.calItems\(stops,/);
-  assert.doesNotMatch(cal, /gaps \+=/, "no dashed free blocks are drawn");
+  assert.match(cal, /AGD\(\)\.calItems\(stops, a0, z0, !!win\)/, "free time is kept only in the Plan your day stretch");
   assert.doesNotMatch(html, /function openMove\(/);
-  assert.doesNotMatch(html, /\.cal-ev\.free/, "the dashed free style is gone");
   // the top card still names free time Your move (only the calendar drawing went)
   assert.match(html, /cur\.kind === "open" \? "Your move"/);
 });

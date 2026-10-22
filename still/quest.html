@@ -460,6 +460,9 @@
   .cal-ic { flex:none; }
   .cal-ev .cal-t { font-size:11.5px; color:var(--ink-soft); white-space:nowrap; }
   .cal-ev.one { flex-direction:row; align-items:center; gap:6px; padding-block:0; }
+  /* open space, drawn only in the Plan your day stretch now (the main calendar leaves free time empty, 2026-10-22) */
+  .cal-ev.free { --c:rgba(255,255,255,.28); border-left-style:dashed; background:rgba(255,255,255,.035); color:var(--ink-soft); }
+  .cal-ev.free b { font-weight:500; }
   .cal-ev.past { opacity:.62; }
   .cal-ev.now { opacity:1; box-shadow:0 0 0 1.5px var(--c), 0 6px 18px rgba(0,0,0,.28); }
   .cal-ev.gone b > span { text-decoration:line-through; }
@@ -1040,7 +1043,7 @@
 <script src="quest-library.js?v=20261022b1"></script>
 <script src="quest-gym.js?v=20261019x"></script>
 <script src="quest-morning.js?v=20261019a"></script>
-<script src="quest-agenda.js?v=20261022a"></script>
+<script src="quest-agenda.js?v=20261022b"></script>
 <script src="quest-offline.js?v=20261017a"></script>
 <script src="quest-nearby.js?v=20261016k"></script>
 </head>
@@ -4406,11 +4409,12 @@
     if (!r) return;
     const f = addForm(r.from); if (!f) return;
     const p = r.stretch && !f.other ? movePicks(r.stretch, r.from) : null;
-    if (!p) return openAdd(r.from);
-    // no keyboard at once here: on a phone it would cover the picks
-    openSheet(f.html + p.html, true); f.wire(); p.wire();
+    // no keyboard at once with picks: on a phone it would cover them
+    openSheet(f.html + (p ? p.html : ""), !!p); f.wire();
+    if (p) p.wire(); else setTimeout(() => $("aT").focus(), 300);
   }
-  // the Add to today form: { html, wire, other }, or null when it cannot add there (a toast says why)
+  // the Add to today form as markup plus a wire() to call once it is on the sheet (so openSpace can put picks under it):
+  // { html, wire, other }, or null when it cannot add there (a toast says why)
   function addForm(from){
     const t0 = new Date(Math.ceil(Math.max(now().getTime(), from ? from.getTime() : 0) / 300000) * 300000);
     let dur = 30;
@@ -6261,9 +6265,10 @@
     if (win) for (let h = a0 + HR; h < z0 - 5 * 60000; h += HR)
       out += `<div class="cal-hr" style="top:${y(h)}px">${Math.abs(h - t) < 15 * 60000 ? "" : `<span>${fmtT(new Date(h)).replace(":00", "")}</span>`}</div>`;
     const ctx = dragCtx();
-    let hits = "", body = "";
-    // free time is not drawn (Junyan, 2026-10-22: "Drop the your move"): it is empty calendar, and a tap there opens openSpace
-    const ev = AGD() ? AGD().calItems(stops, a0, z0) : [];
+    let hits = "", body = "", gaps = "";
+    // free time is not drawn (Junyan, 2026-10-22: "Drop the your move"): it is empty calendar, and a tap there opens openSpace.
+    // The Plan your day stretch (win) still draws open space of 15 minutes or more, which its tap fills (d2)
+    const ev = AGD() ? AGD().calItems(stops, a0, z0, !!win) : [];
     for (const { st, i, s, e, lane, n } of ev) {
       const b0 = st.blocks[0], isCur = cur && st.blocks.some(b => b.key === cur.key) && (!st.free || (t >= st.s && t < st.e)), past = st.e <= t && !isCur, game = !!b0.game;
       const c = st.free ? "" : calColor(b0), top = y(s) + 1, h = Math.max(18, y(e) - y(s) - 2);
@@ -6284,10 +6289,10 @@
       const html = `<button class="${cls}" data-stop="${i}" style="${c ? `--c:${c};` : ""}${eh.on ? `--hz:${eh.zone}px;` : ""}top:${top}px;height:${h}px;${lr}" aria-label="${esc(st.t)}, ${time}">` +
         `<b>${calIcon(b0, c || "rgba(255,255,255,.45)")}<span>${tick}${esc(st.t)}</span></b><span class="cal-t">${h < 36 ? fmtT(st.s) : time}</span>${ask ? `<i class="cal-tap" title="Tap to open" aria-hidden="true"></i>` : pts ? `<span class="cal-pts${pts < 0 ? " neg" : ""}">${pts > 0 ? "+" : ""}${pts}</span>` : ""}` +
         `${eh.on ? `<i class="cal-h top" data-h="top"></i><i class="cal-h bot" data-h="bottom"></i>` : ""}</button>`;
-      body += html;
+      if (st.free) gaps += html; else body += html;
     }
-    // the short blocks' tap areas first, then the blocks: a block always wins a press over a tap area
-    out += hits + body;
+    // open space first (Plan your day only), then the short blocks' tap areas, then the blocks: a block always wins a press over a tap area
+    out += gaps + hits + body;
     if (t >= a0 && t <= z0) out += `<div class="cal-now" style="top:${y(+t)}px"><span>${fmtT(t).replace(/\s?[AP]M$/i, "")}</span></div>`;
     return out + `</div>`;
   }
