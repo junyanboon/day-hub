@@ -43,7 +43,7 @@ test("a calendar event on another day opens with name, Start, End, the chips and
   assert.match(f, /ed = dk\.kind === "cal"/);
   for (const id of ["agT", "agS", "agE", "agLen", "agSave"]) assert.ok(f.includes(`id="${id}"`), id);
   assert.match(f, /data-len=/);
-  assert.match(f, /A\.endFor\(sf\.value, \+c\.dataset\.len\)/, "a chip sets End from Start");
+  assert.match(f, /len = \+c\.dataset\.len; ef\.value = A\.endFor\(sf\.value, len\)/, "a chip sets End from Start, and a later Start keeps that length");
   // Save goes the drag's way: same calendar event, the change shown at once, Google Calendar after
   assert.match(f, /commitDrag\(b, dk, s, e, mode \|\| "move", t\)/);
   assert.match(f, /if \(e <= s\) e = new Date\(e\.getTime\(\) \+ 86400000\)/);
@@ -67,6 +67,8 @@ test("commitDrag takes a new name and sends it as the event title; a drag sends 
   assert.match(f, /mode = "move", t = b\.t\)/);
   assert.match(f, /renamed = t !== b\.t/);
   assert.match(f, /title:renamed \? t : ""/);
+  assert.match(f, /const pend = \{ s:\+s, e:\+e, \.\.\.\(renamed \? \{ t \} : \{\}\), at:Date\.now\(\) \}/);
+  assert.match(f, /PEND\[k\] = pend; show\(\);/);
   // a name alone does not move the event to a free slot
   assert.match(f, /!timeMoved\(b, s, e\) \? \{ s, e, hit:null \}/);
 });

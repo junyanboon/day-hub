@@ -6401,7 +6401,8 @@
     const snapped = r.hit ? (edge ? edgeSay(b, r, mode) : snapSay(b, r)) + " " : "";
     ({ s, e } = r);
     const when = `${tzYmd(s) !== tzYmd(b.s) ? shortDay(tzYmd(s), tzYmd(now())) + " " : ""}${fmtT(s)} to ${fmtT(e)}`;
-    if (dk.dry) { PEND[k] = { s:+s, e:+e, at:Date.now() }; show(); calToast(`${snapped}Test mode: ${what} now ${when}, on this screen only. Nothing is saved.`); return; }
+    const pend = { s:+s, e:+e, ...(renamed ? { t } : {}), at:Date.now() };   // t: the new name, for an agenda that draws a pending name
+    if (dk.dry) { PEND[k] = pend; show(); calToast(`${snapped}Test mode: ${what} now ${when}, on this screen only. Nothing is saved.`); return; }
     if (dk.kind === "day") {
       // a block added in Quest lives in today's plan, which has no other days
       if (gameDayOf(s) !== gameYmd() || gameDayOf(e - 60000) !== gameYmd()) { show(); calToast(`${what} was added in Quest, so it lives in today's plan only. It can move within its day, not to another day.`, 6000); return; }
@@ -6409,7 +6410,7 @@
       calToast(`${snapped}${what}: ${when}. Saved in today's plan.`);
       return;
     }
-    PEND[k] = { s:+s, e:+e, at:Date.now() }; show();
+    PEND[k] = pend; show();
     try {
       await qfetch("/cal/event", { method:"POST", body:JSON.stringify({ id:b.id, calId:b.calId, raw:b.raw, s:s.toISOString(), e:e.toISOString(), title:renamed ? t : "" }) });
     } catch (err) {
@@ -6449,11 +6450,12 @@
       <div class="actions"><button class="btn ghost" id="agClose">${ed ? "Cancel" : "Close"}</button>${ed ? `<button class="btn primary" id="agSave">Save</button>` : ""}</div>`);
     $("agClose").onclick = closeSheet;
     if (ed) {
-      const sf = $("agS"), ef = $("agE"), marks = () => { const n = A.lenOf(sf.value, ef.value);
+      const sf = $("agS"), ef = $("agE");
+      let len = A.lenOf(sf.value, ef.value);   // the length a new Start keeps: the event's, a chip's or a typed End's
+      const marks = () => { const n = A.lenOf(sf.value, ef.value);
         $("agLen").querySelectorAll("[data-len]").forEach(c => c.classList.toggle("sel", +c.dataset.len === n)); };
       // a chip sets End from Start; a new Start keeps the length, as Google Calendar does
-      $("agLen").querySelectorAll("[data-len]").forEach(c => c.onclick = () => { if (sf.value) { ef.value = A.endFor(sf.value, +c.dataset.len); marks(); } });
-      let len = A.lenOf(sf.value, ef.value);
+      $("agLen").querySelectorAll("[data-len]").forEach(c => c.onclick = () => { if (sf.value) { len = +c.dataset.len; ef.value = A.endFor(sf.value, len); marks(); } });
       sf.onchange = () => { if (sf.value && ef.value) ef.value = A.endFor(sf.value, len); marks(); };
       ef.onchange = () => { if (sf.value && ef.value) len = A.lenOf(sf.value, ef.value); marks(); };
       $("agSave").onclick = () => {
