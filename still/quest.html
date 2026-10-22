@@ -225,6 +225,16 @@
   .wq-it .e { font-size:20px; line-height:1; } .wq-it b { font-size:12px; font-weight:600; }
   .wq-it small { font-size:10.5px; line-height:1.2; color:var(--ink-soft); text-align:center; font-variant-numeric:tabular-nums; }
   .wq-it.met { border-color:rgba(143,227,176,.75); } .wq-it.met small { color:#8fe3b0; font-weight:600; }
+  /* the gut log (2026-10-22, d2): count, Bristol type, sticky, blood, urgency (quest-gut.js) */
+  .gq { flex-direction:column; align-items:stretch; gap:8px; }
+  .gq-row { display:flex; align-items:center; gap:6px; flex-wrap:wrap; font-size:12px; color:var(--ink-soft); }
+  .gq-row > span:first-child { width:62px; flex:none; }
+  .gq button { min-width:34px; height:32px; padding:0 8px; border-radius:10px; background:var(--glass); border:1px solid var(--glass-border);
+    color:var(--ink); font:inherit; font-size:13px; cursor:pointer; touch-action:manipulation; -webkit-tap-highlight-color:transparent; }
+  .gq button.on { border-color:#8fe3b0; background:rgba(143,227,176,.22); font-weight:600; }
+  .gq button.bad.on { border-color:#ff8f8f; background:rgba(255,143,143,.22); }
+  .gq-n { min-width:22px; text-align:center; font-weight:600; color:var(--ink); font-size:14px; }
+  .gq-warn { font-size:12px; color:#ffb3b3; }
   .sugw { margin:14px 0 4px; padding:10px 12px; border-radius:14px; background:var(--glass); border:1px solid var(--glass-border); }
   .sugr { display:flex; align-items:center; gap:6px; padding:8px 0; border-top:1px solid var(--glass-border); }
   .sugr:first-of-type { border-top:0; }
@@ -992,7 +1002,7 @@
 </style>
 <script src="keeps.js?v=20261009k"></script>
 <script src="bag.js?v=20261019a"></script>
-<script src="quest-merge.js?v=20261021d87s"></script>
+<script src="quest-merge.js?v=20261022g1"></script>
 <script src="quest-oura.js?v=20261019a"></script>
 <script src="quest-levels.js?v=20261016b"></script>
 <script src="quest-gymlog.js?v=20261019a"></script>
@@ -1009,6 +1019,7 @@
 <script src="quest-basics.js?v=20261020a"></script>
 <script src="quest-suggest.js?v=20261019a"></script>
 <script src="quest-water.js?v=20261020p"></script>
+<script src="quest-gut.js?v=20261022g1"></script>
 <script src="quest-gym.js?v=20261019x"></script>
 <script src="quest-morning.js?v=20261019a"></script>
 <script src="quest-agenda.js?v=20261020c"></script>
@@ -1748,6 +1759,28 @@
     addHabit(x.kind, -(x.d || 0), `${row ? row[2] : x.kind}: taken back (tapped by mistake)`, "undo", true);
     render();
   }
+  /* ---------- Gut log (Junyan, 2026-10-22, d2; quest-gut.js) ----------
+     Under the water card: count, Bristol type 1 to 7 (aim 3 to 4), sticky, blood, urgency 0 to 3. No points: it is a
+     log, not a habit. Saved in G.day.gut and copied into G.days[date].gut at the day's end (gutStamp). */
+  const QGut = () => window.QuestGut;
+  function gutHTML(){
+    if (!QGut() || !G.day) return "";
+    const g = G.day.gut || {}, Q = QGut(), on = (c) => c ? " on" : "";
+    const bt = (f, v, label, extra) => `<button type="button" class="${extra || ""}${on(f === "sticky" || f === "blood" ? g[f] : g[f] === v)}" data-gut="${f}" data-v="${v}">${label}</button>`;
+    return `<div class="sq gq"><span class="sq-t">🚽 Gut today<small>${esc(Q.line(g))}</small></span>` +
+      `<div class="gq-row"><span>Times</span><button type="button" data-gut="n" data-v="${(g.n || 0) - 1}" aria-label="One less">−</button>` +
+      `<span class="gq-n">${g.n != null ? g.n : "–"}</span><button type="button" data-gut="n" data-v="${(g.n || 0) + 1}" aria-label="One more">+</button></div>` +
+      `<div class="gq-row"><span>Type</span>${Q.BRISTOL.map(([v, nm]) => bt("b", v, v, "").replace("<button ", `<button title="${esc(nm)}" `)).join("")}</div>` +
+      `<div class="gq-row"><span>Urgency</span>${Q.URG.map((nm, v) => bt("urg", v, v).replace("<button ", `<button title="${esc(nm)}" `)).join("")}</div>` +
+      `<div class="gq-row"><span></span>${bt("sticky", 1, "Sticky")}${bt("blood", 1, "Blood", "bad")}</div>` +
+      (Q.warn(g) ? `<div class="gq-warn">${esc(Q.warn(g))}</div>` : "") + `</div>`;
+  }
+  function tapGut(bn){
+    if (!QGut() || !G.day) return;
+    G.day.gut = QGut().set(G.day.gut, bn.dataset.gut, +bn.dataset.v, now().toISOString());
+    render();
+  }
+  function gutStamp(){ return QGut() && G.day ? QGut().stamp(G.day.gut) : {}; }
   // after a tap redraws the card: the drop bounces with a splash ring, "+1" floats off the count, the bar fills
   function waterCheer(focused){
     const card = document.querySelector(".wq"); if (!card) return;
@@ -2105,7 +2138,7 @@
   function stampDay(){
     // bk:1 marks a Body worked out from the day's logged lines (d68), the only kind the trends trust for 2026-10-19
     const bd = QuestMerge.bodyOf ? QuestMerge.bodyOf(G.day) : null;
-    (G.days = G.days || {})[G.day.date] = { place:placeNow(), prana:G.day.prana, body:bd ?? G.day.body, ...(bd != null ? { bk:1 } : {}), level:lvl(), ...foodStamp(), ...gymDayStamp(), ...waterStamp() };
+    (G.days = G.days || {})[G.day.date] = { place:placeNow(), prana:G.day.prana, body:bd ?? G.day.body, ...(bd != null ? { bk:1 } : {}), level:lvl(), ...foodStamp(), ...gymDayStamp(), ...waterStamp(), ...gutStamp() };
   }
   // drains: the meal quiz ones, and staying up past 11 (it took body: G.day.lateBody)
   function foodStamp(){ const t = window.QuestMeals.tally(G.day.mealq); return { pf:t.foods, dr:t.drains + (G.day.lateBody ? 1 : 0) }; }
@@ -2828,8 +2861,8 @@
     const plainRows = (d, on, fit) => {
       const xs = d.own || d.recipe ? QM.extrasOf(rec, d.id) : [];   // other plain dishes keep "Also went in" (extrasBlock)
       return `<div class="mq-rows">${d.items.map(([n, amt], i) => kitTakeWrap(on.has(n) ? kitEatKey(k, d.id, n) : null,
-          `<button type="button" class="mq-ing" data-ding="${esc(d.id)}" data-i="${i}" aria-pressed="${on.has(n)}">` +
-          `<span class="bx"></span><span class="n">${esc(n)}${fit && !on.has(n) && fit.rows[i] ? `<small class="mq-hv ${fit.rows[i].st}">${esc(fit.rows[i].word)}</small>` : ""}` +
+          `<button type="button" class="mq-ing${!on.has(n) && !kitHas(d, n) ? " none nokit" : ""}" data-ding="${esc(d.id)}" data-i="${i}" aria-pressed="${on.has(n)}">` +
+          `<span class="bx"></span><span class="n">${esc(n)}${!on.has(n) && !kitHas(d, n) ? `<small class="mq-hv none">not in your kitchen</small>` : fit && !on.has(n) && fit.rows[i] ? `<small class="mq-hv ${fit.rows[i].st}">${esc(fit.rows[i].word)}</small>` : ""}` +
           `${on.has(n) ? `<small class="mq-hv mq-ra">${esc(QR() ? QR().amtText(amt) : amt)}</small>` : ""}</span><span class="qty">${esc(QR() ? QR().amtText(amt) : amt)}</span></button>`)).join("")}` +
         (d.own ? [...on].filter(n => !d.items.some(x => x[0] === n)).map(n => kitTakeWrap(kitEatKey(k, d.id, n),
           `<button type="button" class="mq-ing" data-dname="${esc(n)}" data-did="${esc(d.id)}" aria-pressed="true">` +
@@ -2989,6 +3022,7 @@
     };
     sh.querySelectorAll("[data-ding]").forEach(bn => bn.onclick = () => {
       const d = dishById(bn.dataset.ding), it = d && d.items[+bn.dataset.i]; if (!it) return;
+      if (bn.classList.contains("nokit") && !kitHaveIt(bn, d, it[0])) return;
       dishTap(bn, d.id, it[0], `[data-ding="${d.id}"][data-i="${bn.dataset.i}"]`);
     });
     // a part dish (d51): a row ticks what it shows; Use something else ticks a pick
@@ -3112,7 +3146,7 @@
     });
     // d79: Cook this ticks the recipe's ingredients (not the optional ones)
     sh.querySelectorAll("[data-rcook]").forEach(bn => bn.onclick = () => {
-      const d = QR() && QR().byId(bn.dataset.rcook); if (d) dishTap(bn, d.id, QR().cookTicks(d));
+      const d = QR() && QR().byId(bn.dataset.rcook); if (d) dishTap(bn, d.id, QR().cookTicks(d).filter(n => kitHas(d, n)));
     });
     // d78: Save as a dish from What did you eat? (and old "From your kitchen" ticks), in the dish editor, which asks for a name
     sh.querySelectorAll("[data-msave]").forEach(bn => bn.onclick = () => {
@@ -3804,6 +3838,23 @@
      the matching kitchen item (the kitchen in use today), and an untick puts it back. Only items with an amount are
      touched (d46). The take-off is a record per tick in G.kitchen.used (QuestKitchen.eat), so a redraw or a sync never
      takes it twice; a tick from before amounts shipped takes nothing. before and after: the dish's ticked names. */
+  /* Not in your kitchen (Junyan, 2026-10-22, d5: "I shouldn't be able to tick things that don't exist in my fridge"): a dish
+     ingredient with no match in the kitchen in use shows greyed, "not in your kitchen", and does not tick. His list can be
+     incomplete, so a first tap asks "Tap again: I have it" and a second tap (within 4 s) adds it to the kitchen, then ticks.
+     Cook this ticks only what the kitchen has. No kitchen set up yet: nothing is greyed. */
+  function kitHas(d, n){
+    if (!QK() || !G.kitchen) return true;
+    const k = kitToday(); if (!QK().items(G.kitchen, k).length) return true;
+    return !!QK().match(G.kitchen, k, QM ? QM.entryName(d, n) : n);
+  }
+  function kitHaveIt(bn, d, n){
+    const t = Date.now(), armed = +(bn.dataset.armed || 0);
+    if (t - armed > 4000) { bn.dataset.armed = t; const s = bn.querySelector(".mq-hv"); if (s) s.textContent = "tap again: I have it, add to kitchen"; return false; }
+    const k = kitToday(), nm = QK().splitName(QM ? QM.entryName(d, n) : n).name, g = QK().guessGroup(nm);
+    const r = QK().add(G.kitchen, k, QK().guessShelf(k, g), nm, now(), g); kitSave(r.K);
+    log(`Kitchen: ${nm} added (ticked in ${d.name})`);
+    return true;
+  }
   const kitEatKey = (mealKey, part, name) => `${G.day.date}|${mealKey}|${part}|${name}`;
   /* A part dish (d51): a tick is "<part>:<food>" (its key the same), the food is what comes off, and amts gives its
      amount (the real ingredient's); a tick from before parts is the recipe name, as before. */
@@ -6423,8 +6474,9 @@
     // phone and desktop alike: the steps card, three picks for right now, then the full list one tap away (2026-10-09)
     const endAt = lastItemEnd(all), nightNow = PLAN && endAt && +t >= endAt;
     if (nightNow && !G.day.nightShown && !$("sheet").classList.contains("open") && !$("night")) { G.day.nightShown = true; saveG(); openNight(); }
-    put("habits", PLAN ? (nightNow ? `<button class="pa-all nt-open" data-night>🌙 Day's end<span>tomorrow, deathbed, reflection ›</span></button>` : "") + stepsHTML() + waterHTML() + kitchenHTML() + suggestHTML() + sugHTML() : ""); bindHabits($("habits")); bindSug($("habits"));
+    put("habits", PLAN ? (nightNow ? `<button class="pa-all nt-open" data-night>🌙 Day's end<span>tomorrow, deathbed, reflection ›</span></button>` : "") + stepsHTML() + waterHTML() + gutHTML() + kitchenHTML() + suggestHTML() + sugHTML() : ""); bindHabits($("habits")); bindSug($("habits"));
     $("habits").querySelectorAll("[data-glass]").forEach(bn => bn.onclick = () => addGlass(bn));
+    $("habits").querySelectorAll("[data-gut]").forEach(bn => bn.onclick = () => tapGut(bn));
     $("habits").querySelectorAll("[data-kitchen]").forEach(bn => bn.onclick = () => openKitchen({}));
     $("habits").querySelectorAll("[data-day]").forEach(bn => bn.onclick = () => addDayItem(bn.dataset.day, bn));
     $("habits").querySelectorAll("[data-night]").forEach(bn => bn.onclick = openNight);

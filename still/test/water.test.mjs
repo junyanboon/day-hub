@@ -57,7 +57,7 @@ test("the day-end screen shows water after the sleep score, and each day saves i
   const night = fs.readFileSync(fileURLToPath(new URL("../quest-night.js", import.meta.url)), "utf8");
   assert.match(night, /Last night<\/div>\$\{nights\.join\(""\)\}` : ""\}\$\{water\}/);
   assert.match(night, /before 4 PM/);
-  assert.match(html, /\.\.\.waterStamp\(\) \}/);
+  assert.match(html, /\.\.\.waterStamp\(\)(, \.\.\.gutStamp\(\))? \}/);
   assert.match(html, /TR\.dayRow\("wt", "Water"/);
 });
 

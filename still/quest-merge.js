@@ -121,6 +121,8 @@
       for (const [k, v] of Object.entries(obj(n.glasses))) g[k] = g[k] && (g[k].off || (v && v.off)) ? { ...g[k], ...v, off: true } : { ...(g[k] || {}), ...v };
       out.glasses = g;
     }
+    // gut log (2026-10-22, d2): the later change wins (quest-gut.js stamps at)
+    if (o.gut || n.gut) out.gut = String(obj(n.gut).at || "") >= String(obj(o.gut).at || "") ? (n.gut || o.gut) : o.gut;
     // ouraReady (2026-10-19, d58): today's Oura readiness is in; sticks like slept
     for (const k of ["slept", "ouraTried", "ouraReady", "briefDone"]) if (o[k] || n[k]) out[k] = true;
     out.xp = Math.max(+o.xp || 0, +n.xp || 0);
