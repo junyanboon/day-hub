@@ -67,16 +67,18 @@
   /* d89: a step in parts: { text } and { name, tech } for each wiki link, tech { id, name, how: [steps] } or null when the
      data has no such technique. data: the export (default the loaded one). */
   const LINK = /\[\[([^\]]*)\]\]/g;
+  // "techniques/soft-broccoli" reads "soft broccoli" (a link inside a technique's own steps reads the same way)
+  const readable = (ref) => str(ref).split("/").pop().replace(/[-_]+/g, " ").trim();
   function technique(ref, data) {
     const id = str(ref).split("/").pop().trim(), t = arr((data || root.QuestRecipeData || {}).techniques).find((x) => x && x.id === id);
-    const how = t ? str(t.how).split(/\n+/).map((l) => l.replace(/^\s*(\d+[.)]|[-*])\s*/, "").trim()).filter(Boolean) : [];
+    const how = t ? str(t.how).split(/\n+/).map((l) => l.replace(/^\s*(\d+[.)]|[-*])\s*/, "").replace(LINK, (m, r) => readable(r)).trim()).filter(Boolean) : [];
     return how.length ? { id, name: str(t.name) || id, how } : null;
   }
   function stepParts(s, data) {
     const out = [], txt = str(s); let at = 0;
     for (const m of txt.matchAll(LINK)) {
       if (m.index > at) out.push({ text: txt.slice(at, m.index) });
-      const name = str(m[1]).split("/").pop().replace(/[-_]+/g, " ").trim();
+      const name = readable(m[1]);
       if (name) out.push({ name, tech: technique(m[1], data) });
       at = m.index + m[0].length;
     }

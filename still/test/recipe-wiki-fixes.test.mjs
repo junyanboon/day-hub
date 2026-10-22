@@ -22,12 +22,12 @@ const K = ctx.QuestKitchen, QM = ctx.QuestMeals, QI = ctx.QuestIdeas, QR = ctx.Q
 const html = fs.readFileSync(here("../quest.html"), "utf8");
 const J = (x) => JSON.parse(JSON.stringify(x));
 const R = (id, o = {}) => ({ id, name: id, icon: "🍲", time: "20 min", meal: "dinner", tags: [], items: [["Rice", "100 g"]], steps: ["Cook it."], ...o });
-const TECH = [{ id: "soft-broccoli", name: "Soft broccoli", how: "1. Cut small florets.\n2. Steam 8 minutes.\n" }];
+const TECH = [{ id: "soft-broccoli", name: "Soft broccoli", how: "1. Cut small florets.\n2. Steam 8 minutes ([[techniques/blended-soup]]).\n" }];
 
 test("d89: a step's technique link is a readable name with the technique's how steps; no [[ ]] left", () => {
   const data = { recipes: [], techniques: TECH };
   const parts = J(QR.stepParts("Simmer until soft. [[techniques/soft-broccoli]]", data));
-  assert.deepEqual(parts, [{ text: "Simmer until soft. " }, { name: "soft broccoli", tech: { id: "soft-broccoli", name: "Soft broccoli", how: ["Cut small florets.", "Steam 8 minutes."] } }]);
+  assert.deepEqual(parts, [{ text: "Simmer until soft. " }, { name: "soft broccoli", tech: { id: "soft-broccoli", name: "Soft broccoli", how: ["Cut small florets.", "Steam 8 minutes (blended soup)."] } }]);
   // a technique the data does not have: just the readable name
   assert.deepEqual(J(QR.stepParts("Blend smooth. [[techniques/blended-soup]]", data)), [{ text: "Blend smooth. " }, { name: "blended soup", tech: null }]);
   assert.equal(QR.stepText("Blend. [[techniques/blended-soup]] then [[soft-broccoli]]", data), "Blend. blended soup then soft broccoli");
@@ -38,7 +38,10 @@ test("d89: every step in the pulled data has its techniques, and the card render
   const steps = QR.list().flatMap((d) => d.steps);
   const linked = steps.filter((s) => /\[\[/.test(s));
   assert.ok(linked.length >= 1, "the wiki links techniques in its steps");
-  for (const s of linked) for (const p of QR.stepParts(s)) if (p.name) assert.ok(p.tech && p.tech.how.length, `technique for ${p.name}`);
+  for (const s of linked) for (const p of QR.stepParts(s)) if (p.name) {
+    assert.ok(p.tech && p.tech.how.length, `technique for ${p.name}`);
+    assert.ok(!p.tech.how.some((h) => /\[\[|\]\]/.test(h)), `no [[ ]] inside ${p.name}'s how steps`);
+  }
   // the card's steps go through the technique renderer, never the raw text
   const card = html.slice(html.indexOf("const recipeCard = "), html.indexOf("const choices = "));
   assert.match(card, /stepHTML\(x\)/);
