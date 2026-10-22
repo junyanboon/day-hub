@@ -95,7 +95,7 @@ test("d79: a meal logged against an old idea still reads and keeps its points", 
 test("d78 as Something else (one dish per meal, 2026-10-21): no What did you eat? box; Something else is a choice, its rows ticked with took, Save as a dish", () => {
   assert.ok(!sheet.includes("const eatBox") && !/>What did you eat\?</.test(html) && !html.includes('lb("What did you eat?"'), "the box is gone");
   const top = sheet.slice(sheet.indexOf("openSheet(`${winHead(b)}"));
-  assert.ok(top.indexOf("What's this meal?") > 0 && top.indexOf("What's this meal?") < top.indexOf('<div class="mq-tips">'), "the choices come first");
+  assert.ok(top.indexOf("What's this meal?") > 0 && top.indexOf("What's this meal?") < top.indexOf("Drains · lower prana"), "the choices come first");
   assert.ok(sheet.includes("${pickCard(MEAL, cur === MEAL.id)}"), "Something else is the last choice");
   const box = sheet.slice(sheet.indexOf("const elseRows = () =>"), sheet.indexOf("const slotCard ="));
   assert.match(box, /xRow\(MEAL, x, ""\)/, "a ticked row with took, no 'added' word");

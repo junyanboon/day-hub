@@ -256,6 +256,10 @@
   .fx-tag { position:absolute; font-weight:800; font-size:17px; color:var(--gold); text-shadow:0 2px 8px rgba(0,0,0,.45); white-space:nowrap; }
   .fx-tag.combo { color:#ff9ad5; font-size:14px; } .fx-tag.full { color:#fff; font-size:12px; } .fx-tag.back { color:#ff9b8a; }
   .warnline { margin-top:10px; font-size:13px; color:#ffcf8a; }
+  /* d88: the one How to eat tip on a meal that is on now (or starts within 10 minutes), one line */
+  .mealtip { margin-top:8px; font-size:13px; color:var(--ink-soft); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .mealtip span { margin-right:6px; }
+  .next + .mealtip { padding:0 4px; margin-top:4px; }
   .gear { flex:none; width:36px; height:36px; border-radius:50%; background:var(--glass); font-size:17px; }
   .gear.warn { box-shadow:0 0 0 2px var(--warn); }
   .combo { flex:none; text-align:center; min-width:52px; }
@@ -559,9 +563,6 @@
   .mq-lb > span { min-width:0; overflow:hidden; text-overflow:ellipsis; }
   .mq-lb > b, .mq-subl > b { flex:none; letter-spacing:0; font-variant-numeric:tabular-nums; }
   .mq-subl { display:flex; justify-content:space-between; gap:8px; } .mq-subl > b { color:#5fd3c4; }
-  .mq-tips { margin:10px 0 2px; padding:9px 12px; border-radius:14px; background:rgba(0,0,0,.22); font-size:13px; line-height:1.35; }
-  .mq-tips p { margin:4px 0 0; display:flex; gap:8px; align-items:flex-start; } .mq-tips p span { flex:none; width:18px; text-align:center; }
-  .mq-tl { font-size:10.5px; letter-spacing:.12em; text-transform:uppercase; color:var(--ink-faint); font-weight:700; }
   .mq-dishes { display:flex; flex-direction:column; gap:6px; margin:6px 0 4px; }
   .mq-dish { border-radius:14px; background:var(--glass); border:1px solid var(--glass-border); overflow:hidden; transition:border-color .25s; }
   .mq-dish.open { border-color:rgba(95,211,196,.7); } .mq-dish.done { border-color:rgba(143,227,176,.8); }
@@ -995,7 +996,7 @@
 <script src="quest-oura.js?v=20261019a"></script>
 <script src="quest-levels.js?v=20261016b"></script>
 <script src="quest-gymlog.js?v=20261019a"></script>
-<script src="quest-meals.js?v=20261021d87"></script>
+<script src="quest-meals.js?v=20261021d88b"></script>
 <script src="quest-food-score.js?v=20261021d87t"></script>
 <script src="quest-kitchen.js?v=20261021h81b"></script>
 <script src="quest-ideas.js?v=20261021d76"></script>
@@ -2206,6 +2207,16 @@
     log(`Added Shambhavi at ${fmtT(S)}`);
     return writeOps(o => o.adds.push({ key, s:S.toISOString(), e:E.toISOString(), t:"Shambhavi", type:"task", cal:"you" }));
   }
+  /* d88 (Junyan, 2026-10-21): one How to eat tip on the meal block itself, only while it is on or in the 10 minutes
+     before it starts (QuestMeals.tipShows), never on past or future meals. It turns by date and by which meal of the
+     day this is (tipFor). A line to read, no points. */
+  function mealTip(b, all, t, named){
+    if (!b || !isMeal(b) || !QM.tipOn) return "";
+    const tp = QM.tipOn(b, all.filter(isMeal), t, gameDayOf); if (!tp) return "";
+    // the cards already name the meal in their title; the Next line names it ("Dinner · sit two minutes first")
+    const line = named ? `${esc(shortName(b))} · ${esc(tp[2])}` : esc(tp[2].replace(/^./, c => c.toUpperCase()));
+    return `<div class="mealtip"><span aria-hidden="true">${tp[0]}</span>${line}</div>`;
+  }
   // d78: a meal that ends less than 3 hr before bed or practice
   function mealWarn(b, all){
     if (!isMeal(b)) return "";
@@ -2595,7 +2606,8 @@
      pop; a second tap takes it back. No plate checklist, no separate rating step, no Confirm.
      Eating within 3 hours of bed and staying up past 11 stay automatic.
      2026-10-20 ("Fill the Plate", d12 to d16):
-     - How he ate is a "How to eat" tip box at the top, no points (d15). A meal rated before keeps what it paid.
+     - How he ate is tips, no points (d15). A meal rated before keeps what it paid. Since d88 (2026-10-21) the tips are
+       not on this sheet: one shows on the meal block on the Right now card (mealTip).
      - Blueprint dishes first (d13): Super Veggie and Nutty Pudding, then tonight's three ideas for 2 people, each a card
        that opens its ingredient checklist with amounts. A dish pays body as its ingredients are ticked, up to the
        Blueprint meal's value (+9 at level 1), each dish on its own; an untick or Clear takes its share back
@@ -2897,7 +2909,6 @@
       ${counted()}`}
       ${lb("Drains · lower prana", "mp", got(QM.DRAIN_IDS))}
       <div class="mq-drs">${QM.DRAINS.map(drain).join("")}</div>
-      <div class="mq-tips"><div class="mq-tl">How to eat</div>${QM.TIPS.map(([i, t]) => `<p><span>${i}</span>${esc(t)}</p>`).join("")}</div>
       ${wts ? `<div class="mq-share">Shared meals: you <input class="mq-tq" type="text" inputmode="decimal" data-mwt="me" value="${wts.me}" aria-label="Your weight in lb"> lb · Caney <input class="mq-tq" type="text" inputmode="decimal" data-mwt="other" value="${wts.other}" aria-label="Caney's weight in lb"> lb</div>` : ""}
       <div class="actions"><button class="btn ghost" id="mEdit">Change time or name</button></div>`, true);
     const sh = $("sheet");
@@ -6445,7 +6456,7 @@
       } else {
         html = `<div class="card"><div class="eyebrow">Between quests</div>
           <div class="quest-title">${badge(nxt)}<span>${esc(shortName(nxt))}</span></div>
-          <div class="quest-time">Starts ${fmtT(nxt.s)} · in <span data-until="${nxt.s.toISOString()}"></span></div></div>`;
+          <div class="quest-time">Starts ${fmtT(nxt.s)} · in <span data-until="${nxt.s.toISOString()}"></span></div>${mealTip(nxt, all, t)}</div>`;
       }
     } else {
       const K = KINDS[cur.kind], st = G.day.checks[gk(cur)];
@@ -6454,7 +6465,7 @@
           ${cur.kind === "open" || !GROUPS[groupOf(cur)].name ? "" : `<span class="tag" style="color:${GROUPS[groupOf(cur)].ring}">${GROUPS[groupOf(cur)].name}</span>`}${energyTag(cur) ? `<span class="tag" style="text-transform:none">${energyTag(cur)}</span>` : ""}${isHealth(cur) ? `<span class="tag x2">🔥 campfire</span>` : ""}</div>
         <div class="quest-title">${badge(cur, 34, st && st !== "skip")}<span>${esc(shortName(cur))}</span></div>
         <div class="quest-time">${fmtT(cur.s)} to ${fmtT(cur.e)}${shortName(cur) !== cur.t && cur.kind !== "open" ? ` · ${esc(cur.t)}` : ""}</div>
-        ${mealWarn(cur, all) ? `<div class="warnline">${esc(mealWarn(cur, all))}</div>` : ""}
+        ${mealWarn(cur, all) ? `<div class="warnline">${esc(mealWarn(cur, all))}</div>` : ""}${mealTip(cur, all, t)}
         <div class="count"><svg class="ring" viewBox="0 0 74 74"><circle class="bg" cx="37" cy="37" r="30"/>
           <circle class="fg" cx="37" cy="37" r="30" stroke-dasharray="${C}" data-ring-s="${cur.s.toISOString()}" data-ring-e="${cur.e.toISOString()}"/></svg>
           <div><div class="big" data-until="${cur.e.toISOString()}"></div><div class="sub">left in this block</div></div></div>`;
@@ -6498,7 +6509,7 @@
     const qt = $("main").querySelector(".quest-title"), tb = cur || nxt;
     if (qt && tb && !z && tb.kind !== "open") qt.onclick = () => openStop(tb);
 
-    put("nextLine", cur && nxt && !z ? `<div class="next"><span>Next: <b>${esc(shortName(nxt))}</b></span><span>${fmtT(nxt.s)}</span></div>` : "");
+    put("nextLine", cur && nxt && !z ? `<div class="next"><span>Next: <b>${esc(shortName(nxt))}</b></span><span>${fmtT(nxt.s)}</span></div>${isMeal(cur) ? "" : mealTip(nxt, all, t, true)}` : "");
 
     // Change course is gone (2026-10-14): the calendar below is changed in place. The button only shows during a logged interruption
     $("zap").hidden = !z;
