@@ -15,7 +15,7 @@ test("count, Bristol type, sticky, blood and urgency 0 to 3 are logged", () => {
   let g = G.set({}, "n", 2, "t1");
   g = G.set(g, "b", 5, "t2"); g = G.set(g, "sticky", 1, "t3"); g = G.set(g, "urg", 0, "t4");
   assert.deepEqual(J(g), { n: 2, b: 5, sticky: true, urg: 0, at: "t4" });
-  assert.equal(G.line(g), "2× · type 5 · sticky · urgency 0");
+  assert.equal(G.line(g), "2× · type 5 soft blobs · sticky · urgency 0");
   assert.equal(G.warn(g), "");
   g = G.set(g, "blood", 1, "t5");
   assert.match(G.warn(g), /doctor/);

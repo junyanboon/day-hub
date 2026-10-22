@@ -30,7 +30,7 @@
     if (!logged(x)) return "Not logged yet · about 30 seconds";
     const out = [];
     if (x.n != null) out.push(`${x.n}×`);
-    if (x.b != null) out.push(`type ${x.b}`);
+    if (x.b != null) out.push(`type ${x.b} ${(BRISTOL[x.b - 1] || [])[1] || ""}`.trim());
     if (x.sticky) out.push("sticky");
     if (x.blood) out.push("blood");
     if (x.urg != null) out.push(`urgency ${x.urg}`);
