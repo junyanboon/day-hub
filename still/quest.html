@@ -6389,14 +6389,15 @@
     m.addEventListener("click", e => { if (Date.now() - dragEnded < 450 || e.target.closest(".cal-ev, .cal-hit")) return;
       const c = e.target.closest("#calBody .cal"); if (c && CAL.days.length) openSpace(new Date(CAL.a0 + (e.clientY - c.getBoundingClientRect().top) / CAL_PX * 3600000)); });
   }
-  async function commitDrag(b, dk, s, e, mode = "move"){
-    const k = b.id ? "id:" + b.id : b.key, what = shortName(b);
+  // t: a new name from the event's sheet (openAgendaItem); a drag keeps the name
+  async function commitDrag(b, dk, s, e, mode = "move", t = b.t){
+    const k = b.id ? "id:" + b.id : b.key, what = shortName({ ...b, t }), renamed = t !== b.t;
     const show = () => { $("calBody")._h = ""; render(); };
     if (+s < CAL.a0 || +e > CAL.z0) { show(); calToast("That is past the days shown here, so it stayed where it was."); return; }
     // landed on another Joint Plans or Quest block: this one goes to the next free 15-minute slot, nothing else moves;
     // an edge drag only stops at the next block (d51)
     const own = b.game ? b : { ...b, key:"new" }, edge = mode === "top" || mode === "bottom";
-    const r = edge ? placeEdge(own, s, e, mode) : placeOwn(own, s, e, true);
+    const r = !timeMoved(b, s, e) ? { s, e, hit:null } : edge ? placeEdge(own, s, e, mode) : placeOwn(own, s, e, true);
     const snapped = r.hit ? (edge ? edgeSay(b, r, mode) : snapSay(b, r)) + " " : "";
     ({ s, e } = r);
     const when = `${tzYmd(s) !== tzYmd(b.s) ? shortDay(tzYmd(s), tzYmd(now())) + " " : ""}${fmtT(s)} to ${fmtT(e)}`;
@@ -6410,10 +6411,10 @@
     }
     PEND[k] = { s:+s, e:+e, at:Date.now() }; show();
     try {
-      await qfetch("/cal/event", { method:"POST", body:JSON.stringify({ id:b.id, calId:b.calId, raw:b.raw, s:s.toISOString(), e:e.toISOString(), title:"" }) });
+      await qfetch("/cal/event", { method:"POST", body:JSON.stringify({ id:b.id, calId:b.calId, raw:b.raw, s:s.toISOString(), e:e.toISOString(), title:renamed ? t : "" }) });
     } catch (err) {
       delete PEND[k]; show();
-      calToast(`Could not save the move (${err.message}). ${what} is back where it was.`, 7000);
+      calToast(`Could not save the ${renamed ? "change" : "move"} (${err.message}). ${shortName(b)} is back where it was.`, 7000);
       return;
     }
     calToast(`${snapped}${what}: ${when}. Saved to Google Calendar${b.cal ? ` (${b.cal})` : ""}.`);
@@ -6432,15 +6433,57 @@
        yesterday's and got this sheet. One that is over opens "What did you buy?" (once per block), one to come just the list.
        Dragging it on the calendar still moves it. */
     if (blockList(b) === "kitchen") return openKitchen({ block:{ ...b, s:new Date(b.s), e:new Date(b.e) }, view:"shop" });
-    const dk = AGD().dragKind(b, dragCtx());
+    const dk = AGD().dragKind(b, dragCtx()), ed = dk.kind === "cal", A = AGLEN;
+    /* a calendar event: its name, Start and End, and length chips that set End from Start, saved to Google Calendar the way a
+       drag saves it (Junyan, 2026-10-22, d93: he tapped tomorrow's 15 min Hotel shuttle to MAD and could not change its length) */
+    const lenChips = len => A.LENS.map(m => `<button class="chip${m === len ? " sel" : ""}" data-len="${m}" style="text-align:center">${m < 60 ? m + "m" : m / 60 + "h"}</button>`).join("");
     openSheet(`${winHead(b)}
       <p>${esc(dayLabel(tzYmd(b.s), tzYmd(now())))}${b.cal ? ` · ${esc(b.cal)}` : ""}${b.loc ? ` · 📍 ${esc(b.loc)}` : ""}</p>
-      <p style="font-size:12.5px">${dk.kind === "cal" ? "Drag it on the calendar to move it, to another day too. Drag its top or bottom edge to change how long it is. It saves to Google Calendar." : esc(dk.why || "")}</p>
+      ${ed ? `<input id="agT" value="${esc(b.t)}" maxlength="80" aria-label="Name">
+      <div class="row"><label>Start<input id="agS" type="time" value="${toField(b.s)}"></label>
+        <label>End<input id="agE" type="time" value="${toField(b.e)}"></label></div>
+      <div class="chips" id="agLen" style="grid-template-columns:repeat(4,1fr)">${lenChips(Math.round((b.e - b.s) / 60000))}</div>
+      <p style="font-size:12.5px">${dk.dry ? "Test mode: a change shows on this screen only." : `It saves to Google Calendar${b.cal ? ` (${esc(b.cal)})` : ""}.`} You can also drag it on the calendar, to another day too.</p>`
+      : `<p style="font-size:12.5px">${esc(dk.why || "")}</p>`}
       ${gymMoveHTML(b)}
-      <div class="actions"><button class="btn ghost" id="agClose">Close</button></div>`);
+      <div class="actions"><button class="btn ghost" id="agClose">${ed ? "Cancel" : "Close"}</button>${ed ? `<button class="btn primary" id="agSave">Save</button>` : ""}</div>`);
     $("agClose").onclick = closeSheet;
+    if (ed) {
+      const sf = $("agS"), ef = $("agE"), marks = () => { const n = A.lenOf(sf.value, ef.value);
+        $("agLen").querySelectorAll("[data-len]").forEach(c => c.classList.toggle("sel", +c.dataset.len === n)); };
+      // a chip sets End from Start; a new Start keeps the length, as Google Calendar does
+      $("agLen").querySelectorAll("[data-len]").forEach(c => c.onclick = () => { if (sf.value) { ef.value = A.endFor(sf.value, +c.dataset.len); marks(); } });
+      let len = A.lenOf(sf.value, ef.value);
+      sf.onchange = () => { if (sf.value && ef.value) ef.value = A.endFor(sf.value, len); marks(); };
+      ef.onchange = () => { if (sf.value && ef.value) len = A.lenOf(sf.value, ef.value); marks(); };
+      $("agSave").onclick = () => {
+        const t = $("agT").value.trim() || b.t;
+        if (!sf.value || !ef.value) return (sf.value ? ef : sf).focus();
+        const s = fromField(sf.value, b.s);
+        let e = fromField(ef.value, b.s);
+        if (e <= s) e = new Date(e.getTime() + 86400000);   // runs past midnight
+        const mode = A.editMode(b, s, e);
+        closeSheet();
+        if (!mode && t === b.t) return;   // nothing changed
+        commitDrag(b, dk, s, e, mode || "move", t);
+      };
+    }
     bindGymMove($("sheet"), () => { if ($("agClose")) openAgendaItem(b); });
   }
+  /* The sheet of a calendar event on another day (Junyan, 2026-10-22, d93: the edges of a 15-minute block are too thin to drag
+     on a phone, so the sheet takes Start and End, and a length chip sets End from Start). Times are "HH:MM" fields. */
+  const AGLEN = (() => {
+    const LENS = [15, 30, 60, 90];
+    const fieldMin = v => { const [h, m] = String(v).split(":").map(Number); return h * 60 + m; };
+    const endFor = (start, mins) => { const t = ((fieldMin(start) + mins) % 1440 + 1440) % 1440;
+      return String(Math.floor(t / 60)).padStart(2, "0") + ":" + String(t % 60).padStart(2, "0"); };
+    // minutes from start to end; an end at or before the start runs past midnight
+    const lenOf = (start, end) => { const d = fieldMin(end) - fieldMin(start); return d > 0 ? d : d + 1440; };
+    // what the save changes: "move" (the start, the end following or not), "top" (the start only), "bottom" (the end
+    // only), or null when the times are as they were (a new name alone)
+    const editMode = (b, s, e) => { const ss = +s === +b.s, se = +e === +b.e; return ss && se ? null : ss ? "bottom" : se ? "top" : "move"; };
+    return { LENS, endFor, lenOf, editMode };
+  })();
   let calScrolled = "";
   // Days saved before Altitude (2026-10-05) lack its fields; the season starts at 0 m
   function ensureDay(){
