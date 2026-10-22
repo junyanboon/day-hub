@@ -188,3 +188,9 @@ test("d79: the page loads the recipe data before quest-recipes.js, both stamped;
   assert.ok(sc.includes("quest-recipe-data.js") && sc.includes("QuestRecipeData"));
   assert.ok(!/[—–]/.test(sheet.slice(sheet.indexOf("const plainRows"), sheet.indexOf("openSheet(`${winHead(b)}"))), "no dashes in the new words");
 });
+
+test("an ingredient already added as a food shows once; a used-up one is greyed none left", () => {
+  assert.match(html, /d\.items\.map\(\(\[n, amt\], i\) => \{ if \(!on\.has\(n\) && dupe\(n\)\) return "";/);
+  assert.match(html, /return !!m && !\(QK\(\)\.hasQ\(m\) && m\.lv === 0\);/);
+  assert.match(html, /kitFind\(d, n\) \? "none left" : "not in your kitchen"/);
+});
