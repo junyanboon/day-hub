@@ -116,28 +116,31 @@
     }
     return m;
   }
+  // d90 (2026-10-22): an extra the recipe can do without ("1 tbsp (optional)") is never missing, to buy or decisive
+  const OPTIONAL = /\(optional\)\s*$/i;
   function read(d, kit) {
-    return d.items.map(([name, amt]) => {
-      const it = kit.get(QK().keyOf(name)) || null, sp = staple(name);
-      if (!it) return { name, amt, st: "none", word: "not in the kitchen", staple: sp, it: null };
-      /* no number (levels retired, 2026-10-21): never marked, or left at an old Out, is not known ("how many?"); one he
-         once marked as there still counts as had, so the ideas keep following his kitchen */
-      if (!QK().hasQ(it) && (it.lv == null || it.lv === 0)) return { name, amt, st: "unchecked", word: QK().ASK, staple: sp, it };
-      if (it.lv === 0) return { name, amt, st: "out", word: "none left", staple: sp, it };
-      if (QK().hasQ(it)) {
-        const need = QK().recipeIn(amt, it.u);
-        if (need != null && it.left < need) return { name, amt, st: "short", word: `only ${it.amt}`, staple: sp, it };
-        return { name, amt, st: "have", word: `have ${it.amt}`, staple: sp, it };
-      }
-      return { name, amt, st: "have", word: QK().ASK, staple: sp, it };
-    });
+    return d.items.map(([name, amt]) => ({ ...row(name, amt, kit), opt: OPTIONAL.test(String(amt || "")) }));
+  }
+  function row(name, amt, kit) {
+    const it = kit.get(QK().keyOf(name)) || null, sp = staple(name);
+    if (!it) return { name, amt, st: "none", word: "not in the kitchen", staple: sp, it: null };
+    /* no number (levels retired, 2026-10-21): never marked, or left at an old Out, is not known ("how many?"); one he
+       once marked as there still counts as had, so the ideas keep following his kitchen */
+    if (!QK().hasQ(it) && (it.lv == null || it.lv === 0)) return { name, amt, st: "unchecked", word: QK().ASK, staple: sp, it };
+    if (it.lv === 0) return { name, amt, st: "out", word: "none left", staple: sp, it };
+    if (QK().hasQ(it)) {
+      const need = QK().recipeIn(amt, it.u);
+      if (need != null && it.left < need) return { name, amt, st: "short", word: `only ${it.amt}`, staple: sp, it };
+      return { name, amt, st: "have", word: `have ${it.amt}`, staple: sp, it };
+    }
+    return { name, amt, st: "have", word: QK().ASK, staple: sp, it };
   }
   /* An idea against the kitchen now: what it uses and has, what to buy, what to check. buy: main ingredients short, out
      or not in the kitchen, and staples that are Out or short. check: main ingredients not checked yet. */
   function status(K, k, d) {
     const rows = read(d, byKey(K, k));
-    const main = rows.filter((r) => !r.staple);
-    const buy = rows.filter((r) => (!r.staple && (r.st === "none" || r.st === "out" || r.st === "short")) || (r.staple && (r.st === "out" || r.st === "short")));
+    const main = rows.filter((r) => !r.staple && !r.opt);
+    const buy = rows.filter((r) => !r.opt).filter((r) => (!r.staple && (r.st === "none" || r.st === "out" || r.st === "short")) || (r.staple && (r.st === "out" || r.st === "short")));
     const check = main.filter((r) => r.st === "unchecked");
     const have = main.filter((r) => r.st === "have").length;
     const text = !buy.length && !check.length ? "All in your kitchen"
@@ -159,7 +162,7 @@
   }
   // how well an idea fits the kitchen: { fit (the share of main ingredients had), score }
   function rate(d, kit, first, day) {
-    const rows = read(d, kit), main = rows.filter((r) => !r.staple);
+    const rows = read(d, kit), main = rows.filter((r) => !r.staple && !r.opt);
     let got = 0, extra = 0;
     for (const r of main) {
       if (r.st === "have") got += 1; else if (r.st === "short") got += 0.5; else continue;
@@ -191,7 +194,7 @@
     // he has said something about the kitchen: a number on anything, or an item he once marked (stored levels, read only)
     const known = [...kit.values()].some((it) => QK().hasQ(it) || it.lv != null);
     // ready: every main ingredient had in full (short counts as missing here, so the note never says too much)
-    const ready = out.filter((c) => read(c.d, kit).every((r) => r.staple || r.st === "have")).length;
+    const ready = out.filter((c) => read(c.d, kit).every((r) => r.staple || r.opt || r.st === "have")).length;
     const where = k === "travel" ? "travel fridge" : "kitchen";
     const note = !known ? `Nothing in the ${where} has a number yet, so these ideas show what to buy. Say how many you have and they follow it.`
       : ready === 0 && out[0].fit < 0.5 ? `Not much in the ${where} for dinner. These are the closest; each one says what to buy.`
