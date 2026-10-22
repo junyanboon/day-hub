@@ -129,8 +129,8 @@ test("a block that is already history (ended or checked in) stays put; the pick 
 // blocks are already history, so a re-pick never drags this morning's checked-in block to the evening
 test("quest.html calls placePick with pickId picks and a history check", () => {
   const html = fs.readFileSync(new URL("../quest.html", import.meta.url), "utf8");
-  const move = html.slice(html.indexOf("function openMove("), html.indexOf("function undoToast("));
-  assert.ok(move.length > 100, "openMove and pickMove are there");
+  const move = html.slice(html.indexOf("function movePicks("), html.indexOf("function undoToast("));
+  assert.ok(move.length > 100, "movePicks and pickMove are there");
   assert.doesNotMatch(move, /[{,]\s*pick:/, "no old pick: field");
   assert.match(move, /pickId:/);
   assert.match(move, /placePick\([^;]*newKey\([^)]*\),\s*\w+\)/, "placePick gets a fourth argument (done)");

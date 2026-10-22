@@ -50,7 +50,7 @@ test("any other block on another day still opens the agenda sheet with how to dr
 });
 
 test("the calendar sends a tap on another day's block through openAgendaItem; dragging is not touched", () => {
-  assert.match(html, /if \(!st\.blocks\[0\]\.game\) \{ if \(fixed\) return openAgendaItem\(fixed\);/);
+  assert.match(html, /if \(!fixed\) return;[^\n]*\n\s*if \(!st\.blocks\[0\]\.game\) return openAgendaItem\(fixed\);/);
 });
 
 test("the kitchen asks What did you buy? for a Groceries block that is over, today or an earlier day, once per block", () => {
