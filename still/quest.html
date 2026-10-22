@@ -463,6 +463,8 @@
   /* open space, drawn only in the Plan your day stretch now (the main calendar leaves free time empty, 2026-10-22) */
   .cal-ev.free { --c:rgba(255,255,255,.28); border-left-style:dashed; background:rgba(255,255,255,.035); color:var(--ink-soft); }
   .cal-ev.free b { font-weight:500; }
+  /* Sleep, worked out between Wind down and the morning's first block (2026-10-22): looks like open space, a tap goes through to the blank calendar */
+  .cal-ev.sleep { pointer-events:none; }
   .cal-ev.past { opacity:.62; }
   .cal-ev.now { opacity:1; box-shadow:0 0 0 1.5px var(--c), 0 6px 18px rgba(0,0,0,.28); }
   .cal-ev.gone b > span { text-decoration:line-through; }
@@ -1043,7 +1045,7 @@
 <script src="quest-library.js?v=20261022b1"></script>
 <script src="quest-gym.js?v=20261019x"></script>
 <script src="quest-morning.js?v=20261019a"></script>
-<script src="quest-agenda.js?v=20261022b"></script>
+<script src="quest-agenda.js?v=20261022s1"></script>
 <script src="quest-offline.js?v=20261017a"></script>
 <script src="quest-nearby.js?v=20261016k"></script>
 </head>
@@ -6268,8 +6270,19 @@
     let hits = "", body = "", gaps = "";
     // free time is not drawn (Junyan, 2026-10-22: "Drop the your move"): it is empty calendar, and a tap there opens openSpace.
     // The Plan your day stretch (win) still draws open space of 15 minutes or more, which its tap fills (d2)
-    const ev = AGD() ? AGD().calItems(stops, a0, z0, !!win) : [];
+    // Sleep between the evening's Wind down and the next morning's first block, worked out here only (Junyan, 2026-10-22):
+    // dashed like Your move was, with its length; it moves with them, never stored, and a tap on it is a blank tap
+    const night = win || !AGD() ? [] : AGD().sleepSpans(stops, days.map(d => [+dayStart(d), +dayStart(AGD().addDays(d, 1))]), isSleep)
+      .map(x => ({ st:{ sleep:true, ...x }, i:-1, s:Math.max(+x.s, a0), e:Math.min(+x.e, z0) }));
+    const ev = AGD() ? AGD().calItems(stops, a0, z0, !!win, night) : [];
     for (const { st, i, s, e, lane, n } of ev) {
+      if (st.sleep) {
+        const top = y(s) + 1, h = Math.max(18, y(e) - y(s) - 2), time = `${fmtT(st.s)} to ${fmtT(st.e)}`, len = AGD().sleepText(st.min);
+        gaps += `<div class="cal-ev free sleep${st.e <= t ? " past" : ""}${t >= st.s && t < st.e ? " now" : ""}${h < 36 ? " one" : ""}" style="top:${top}px;height:${h}px;` +
+          `left:calc(var(--cal-l) + (100% - var(--cal-l)) * ${lane} / ${n});width:calc((100% - var(--cal-l)) / ${n} - 3px)" aria-label="Sleep, ${len}, ${time}">` +
+          `<b>${calIcon({ t:"Sleep", kind:"rest" }, "rgba(255,255,255,.45)")}<span>Sleep · ${len}</span></b><span class="cal-t">${h < 36 ? fmtT(st.s) : time}</span></div>`;
+        continue;
+      }
       const b0 = st.blocks[0], isCur = cur && st.blocks.some(b => b.key === cur.key) && (!st.free || (t >= st.s && t < st.e)), past = st.e <= t && !isCur, game = !!b0.game;
       const c = st.free ? "" : calColor(b0), top = y(s) + 1, h = Math.max(18, y(e) - y(s) - 2);
       const rq = st.free || !game ? null : (G.day.mealq || {})[gk(b0)];

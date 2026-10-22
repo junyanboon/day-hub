@@ -29,7 +29,7 @@ test("the calendar draws no Your move blocks: free stretches stay empty calendar
 
 test("quest.html draws only what calItems keeps and no longer opens a Your move sheet", () => {
   const cal = fn("calendarHTML");
-  assert.match(cal, /AGD\(\)\.calItems\(stops, a0, z0, !!win\)/, "free time is kept only in the Plan your day stretch");
+  assert.match(cal, /AGD\(\)\.calItems\(stops, a0, z0, !!win[,)]/, "free time is kept only in the Plan your day stretch");
   assert.doesNotMatch(html, /function openMove\(/);
   // the top card still names free time Your move (only the calendar drawing went)
   assert.match(html, /cur\.kind === "open" \? "Your move"/);
