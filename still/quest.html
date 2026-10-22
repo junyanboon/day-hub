@@ -230,6 +230,7 @@
   .gq-row { display:flex; align-items:center; gap:4px; font-size:12px; color:var(--ink-soft); }
   .gq-row > span:first-child { width:54px; flex:none; }
   .gq-row > button { flex:1 1 0; max-width:44px; } .gq-row > button[data-gut="sticky"], .gq-row > button[data-gut="blood"] { max-width:none; }
+  .gq-scale { margin-top:-2px; font-size:10px; } .gq-scale em { flex:1; font-style:normal; text-align:center; } .gq-scale em:first-of-type { text-align:left; } .gq-scale em:last-child { text-align:right; }
   .gq button { min-width:0; height:32px; padding:0 4px; border-radius:10px; background:var(--glass); border:1px solid var(--glass-border);
     color:var(--ink); font:inherit; font-size:13px; cursor:pointer; touch-action:manipulation; -webkit-tap-highlight-color:transparent; }
   .gq button.on { border-color:#8fe3b0; background:rgba(143,227,176,.22); font-weight:600; }
@@ -1031,7 +1032,7 @@
 <script src="quest-basics.js?v=20261020a"></script>
 <script src="quest-suggest.js?v=20261019a"></script>
 <script src="quest-water.js?v=20261022c1"></script>
-<script src="quest-gut.js?v=20261022g1"></script>
+<script src="quest-gut.js?v=20261022g2"></script>
 <script src="quest-library.js?v=20261022b1"></script>
 <script src="quest-gym.js?v=20261019x"></script>
 <script src="quest-morning.js?v=20261019a"></script>
@@ -1784,6 +1785,8 @@
       `<div class="gq-row"><span>Times</span><button type="button" data-gut="n" data-v="${(g.n || 0) - 1}" aria-label="One less">−</button>` +
       `<span class="gq-n">${g.n != null ? g.n : "–"}</span><button type="button" data-gut="n" data-v="${(g.n || 0) + 1}" aria-label="One more">+</button></div>` +
       `<div class="gq-row"><span>Type</span>${Q.BRISTOL.map(([v, nm]) => bt("b", v, v, "").replace("<button ", `<button title="${esc(nm)}" `)).join("")}</div>` +
+      /* Bristol stool scale, 1 to 7 (Junyan, 2026-10-22: "What is type?"): the two ends named under the numbers */
+      `<div class="gq-row gq-scale"><span></span><em>hard</em><em>normal</em><em>watery</em></div>` +
       `<div class="gq-row"><span>Urgency</span>${Q.URG.map((nm, v) => bt("urg", v, v).replace("<button ", `<button title="${esc(nm)}" `)).join("")}</div>` +
       `<div class="gq-row"><span></span>${bt("sticky", 1, "Sticky")}${bt("blood", 1, "Blood", "bad")}</div>` +
       (Q.warn(g) ? `<div class="gq-warn">${esc(Q.warn(g))}</div>` : "") + `</div>`;
@@ -3435,11 +3438,11 @@
     if (!QK() || !G.day) return "";
     const k = kitToday(), noted = QK().noteActive(G.kitchen, gameYmd(), k);
     if (noted) kitSave(noted);   // once a day on a travel-fridge day, so the trip's end can be seen
-    const kn = QK().KITCHENS[k], c = QK().counts(G.kitchen, k, now(), kitShop(k).at), end = kitTripEnd();
-    /* one plain line (Junyan, 2026-10-22: "Kitchen travel fridge is too confusing"): Kitchen, and what to buy. On a trip
-       the icon is the van, with no kitchen name; running low, unchecked and which kitchen are inside the sheet */
-    const line = end.ask ? "Trip over: bring food home?" : !c.total ? "Empty" : c.low ? `${c.low} to buy` : "All stocked";
-    return `<button type="button" class="sq kq${end.ask ? " ask" : ""}" data-kitchen aria-label="Kitchen, ${esc(kn.name)}: ${esc(line)}"><span class="sq-i">${k === "travel" ? kn.icon : "🧺"}</span>` +
+    const kn = QK().KITCHENS[k], end = kitTripEnd();
+    /* one plain line: which kitchen today, Home or Travel (Junyan, 2026-10-22: "drop the 13 to buy and add the Travel vs
+       Home indicator"); what to buy is inside the sheet */
+    const line = end.ask ? "Trip over: bring food home?" : k === "travel" ? "Travel" : "Home";
+    return `<button type="button" class="sq kq${end.ask ? " ask" : ""}" data-kitchen aria-label="Kitchen, ${esc(kn.name)}: ${esc(line)}"><span class="sq-i">🧺</span>` +
       `<span class="sq-t">Kitchen<small>${esc(line)}</small></span><span class="kq-go">›</span></button>`;
   }
   /* The kitchen sheet. KS keeps what he chose while it is open (the sheet redraws on every tap): which kitchen he is
