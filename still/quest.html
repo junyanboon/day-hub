@@ -2882,10 +2882,16 @@
        dish each added food has "Keep X in the dish", which puts it in the dish and makes it an ingredient tick. */
     const plainRows = (d, on, fit) => {
       const xs = d.own || d.recipe ? QM.extrasOf(rec, d.id) : [];   // other plain dishes keep "Also went in" (extrasBlock)
+      /* an ingredient he already added as a food this time is shown once, as that added row (Junyan, 2026-10-22: "Why is
+         there two cavatappi"): an unticked ingredient whose name, or kitchen item, is an added food's is left out */
+      const kOf = n => { const m = QK() && G.kitchen && QK().match(G.kitchen, kitToday(), n); return m ? m.id : null; };
+      const xNames = new Set(xs.map(x => QM.xKey(x.n))), xIds = new Set(xs.map(x => kOf(x.n)).filter(Boolean));
+      const dupe = n => xNames.has(QM.xKey(QM.entryName(d, n))) || xIds.has(kOf(QM.entryName(d, n)));
       // d90: an optional extra is greyed with its label, never styled missing; not in the kitchen it still does not tick (d5)
-      return `<div class="mq-rows">${d.items.map(([n, amt], i) => { const op = !!(QR() && QR().optional(amt)), out = !on.has(n) && !kitHas(d, n); return kitTakeWrap(on.has(n) ? kitEatKey(k, d.id, n) : null,
+      return `<div class="mq-rows">${d.items.map(([n, amt], i) => { if (!on.has(n) && dupe(n)) return "";
+          const op = !!(QR() && QR().optional(amt)), out = !on.has(n) && !kitHas(d, n); return kitTakeWrap(on.has(n) ? kitEatKey(k, d.id, n) : null,
           `<button type="button" class="mq-ing${out ? (op ? " opt nokit" : " none nokit") : op && !on.has(n) ? " opt" : ""}" data-ding="${esc(d.id)}" data-i="${i}" aria-pressed="${on.has(n)}">` +
-          `<span class="bx"></span><span class="n">${esc(n)}${op && !on.has(n) ? `<small class="mq-hv">optional</small>` : out ? `<small class="mq-hv none">not in your kitchen</small>` : fit && !on.has(n) && fit.rows[i] ? `<small class="mq-hv ${fit.rows[i].st}">${esc(fit.rows[i].word)}</small>` : ""}` +
+          `<span class="bx"></span><span class="n">${esc(n)}${op && !on.has(n) ? `<small class="mq-hv">optional</small>` : out ? `<small class="mq-hv none">${kitOutWord(d, n)}</small>` : fit && !on.has(n) && fit.rows[i] ? `<small class="mq-hv ${fit.rows[i].st}">${esc(fit.rows[i].word)}</small>` : ""}` +
           `${on.has(n) ? `<small class="mq-hv mq-ra">${esc(QR() ? QR().amtText(amt) : amt)}</small>` : ""}</span><span class="qty">${esc(QR() ? QR().amtText(amt) : amt)}</span></button>`); }).join("")}` +
         (d.own ? [...on].filter(n => !d.items.some(x => x[0] === n)).map(n => kitTakeWrap(kitEatKey(k, d.id, n),
           `<button type="button" class="mq-ing" data-dname="${esc(n)}" data-did="${esc(d.id)}" aria-pressed="true">` +
@@ -3886,11 +3892,16 @@
      ingredient with no match in the kitchen in use shows greyed, "not in your kitchen", and does not tick. His list can be
      incomplete, so a first tap asks "Tap again: I have it" and a second tap (within 4 s) adds it to the kitchen, then ticks.
      Cook this ticks only what the kitchen has. No kitchen set up yet: nothing is greyed. */
+  /* An item he has used up counts as not there (Junyan, 2026-10-22: "There are no more artichoke"): greyed, "none left",
+     and a second tap says he has it again (QuestKitchen.add restocks the item, no new one). */
+  const kitFind = (d, n) => QK().match(G.kitchen, kitToday(), QM ? QM.entryName(d, n) : n);
   function kitHas(d, n){
     if (!QK() || !G.kitchen) return true;
     const k = kitToday(); if (!QK().items(G.kitchen, k).length) return true;
-    return !!QK().match(G.kitchen, k, QM ? QM.entryName(d, n) : n);
+    const m = kitFind(d, n);
+    return !!m && !(QK().hasQ(m) && m.lv === 0);
   }
+  const kitOutWord = (d, n) => QK() && G.kitchen && kitFind(d, n) ? "none left" : "not in your kitchen";
   function kitHaveIt(bn, d, n){
     const t = Date.now(), armed = +(bn.dataset.armed || 0);
     if (t - armed > 4000) { bn.dataset.armed = t; const s = bn.querySelector(".mq-hv"); if (s) s.textContent = "tap again: I have it, add to kitchen"; return false; }
