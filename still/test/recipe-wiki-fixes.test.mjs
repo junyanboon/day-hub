@@ -22,12 +22,12 @@ const K = ctx.QuestKitchen, QM = ctx.QuestMeals, QI = ctx.QuestIdeas, QR = ctx.Q
 const html = fs.readFileSync(here("../quest.html"), "utf8");
 const J = (x) => JSON.parse(JSON.stringify(x));
 const R = (id, o = {}) => ({ id, name: id, icon: "🍲", time: "20 min", meal: "dinner", tags: [], items: [["Rice", "100 g"]], steps: ["Cook it."], ...o });
-const TECH = [{ id: "soft-broccoli", name: "Soft broccoli", how: "1. Cut small florets.\n2. Steam 8 minutes ([[techniques/blended-soup]]).\n" }];
+const TECH = [{ id: "soft-broccoli", name: "Soft broccoli", how: "1. Cut small florets.\n2. Steam 8 minutes ([[techniques/blended-soup]]),\n   longer for big ones.\n" }];
 
 test("d89: a step's technique link is a readable name with the technique's how steps; no [[ ]] left", () => {
   const data = { recipes: [], techniques: TECH };
   const parts = J(QR.stepParts("Simmer until soft. [[techniques/soft-broccoli]]", data));
-  assert.deepEqual(parts, [{ text: "Simmer until soft. " }, { name: "soft broccoli", tech: { id: "soft-broccoli", name: "Soft broccoli", how: ["Cut small florets.", "Steam 8 minutes (blended soup)."] } }]);
+  assert.deepEqual(parts, [{ text: "Simmer until soft. " }, { name: "soft broccoli", tech: { id: "soft-broccoli", name: "Soft broccoli", how: ["Cut small florets.", "Steam 8 minutes (blended soup), longer for big ones."] } }]);
   // a technique the data does not have: just the readable name
   assert.deepEqual(J(QR.stepParts("Blend smooth. [[techniques/blended-soup]]", data)), [{ text: "Blend smooth. " }, { name: "blended soup", tech: null }]);
   assert.equal(QR.stepText("Blend. [[techniques/blended-soup]] then [[soft-broccoli]]", data), "Blend. blended soup then soft broccoli");
@@ -115,7 +115,9 @@ test("d91: the pulled data has the latest run, and the cavatappi card shows its 
   assert.ok(data.run && /^\d{4}-\d{2}-\d{2}$/.test(data.run.day) && data.run.ideas.length, "a run is in the data");
   const cav = QR.byId("rc-cavatappi-soft-broccoli");
   const idea = data.run.ideas.find((i) => i.from === "cavatappi-soft-broccoli");
-  if (idea) { assert.equal(cav.name, idea.name); assert.equal(cav.run, data.run.day); }
+  assert.ok(idea, "the 2026-10-21 run adapted the cavatappi");
+  assert.equal(cav.name, idea.name);
+  assert.equal(cav.run, data.run.day);
 });
 
 test("d91: the pull picks the newest run file (by date, then run number) and carries it into the data", () => {

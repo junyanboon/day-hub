@@ -71,7 +71,8 @@
   const readable = (ref) => str(ref).split("/").pop().replace(/[-_]+/g, " ").trim();
   function technique(ref, data) {
     const id = str(ref).split("/").pop().trim(), t = arr((data || root.QuestRecipeData || {}).techniques).find((x) => x && x.id === id);
-    const how = t ? str(t.how).split(/\n+/).map((l) => l.replace(/^\s*(\d+[.)]|[-*])\s*/, "").replace(LINK, (m, r) => readable(r)).trim()).filter(Boolean) : [];
+    // a line that does not start a new numbered or bulleted step carries on the one before it
+    const how = t ? str(t.how).split(/\n(?=\s*(?:\d+[.)]|[-*])\s)/).map((l) => l.replace(/^\s*(\d+[.)]|[-*])\s*/, "").replace(LINK, (m, r) => readable(r)).replace(/\s+/g, " ").trim()).filter(Boolean) : [];
     return how.length ? { id, name: str(t.name) || id, how } : null;
   }
   function stepParts(s, data) {
