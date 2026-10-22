@@ -622,6 +622,9 @@
   .mq-xfree { margin:4px 0 2px; }
   .mq-full { margin-top:6px; }
   .mq-steps ol { margin:6px 0 0; padding-left:20px; font-size:13px; line-height:1.5; } .mq-steps li { margin:3px 0; }
+  .mq-tq { display:inline; } .mq-tq summary { display:inline; cursor:pointer; color:#8fe3b0; text-decoration:underline; list-style:none; }
+  .mq-tq summary::-webkit-details-marker { display:none; } .mq-tq[open] ol { display:block; margin:4px 0 6px; padding-left:18px; font-size:12px; color:var(--ink-soft); }
+  .mq-rcl li.opt, .mq-ing.opt .n { opacity:.55; }
   .mq-howbtn { font-size:12px; padding:5px 10px; }
   .de-steps { width:100%; box-sizing:border-box; resize:vertical; min-height:80px; font:inherit; font-size:14px; line-height:1.4; }
   .mq-hv { display:block; font-size:11px; color:var(--ink-soft); } .mq-hv.have { color:#8fe3b0; } .mq-hv.short, .mq-hv.out, .mq-hv.none { color:#ffc27a; }
@@ -1019,12 +1022,12 @@
 <script src="quest-oura.js?v=20261019a"></script>
 <script src="quest-levels.js?v=20261016b"></script>
 <script src="quest-gymlog.js?v=20261019a"></script>
-<script src="quest-meals.js?v=20261021d88b"></script>
+<script src="quest-meals.js?v=20261022d90"></script>
 <script src="quest-food-score.js?v=20261021d87t"></script>
 <script src="quest-kitchen.js?v=20261021h81b"></script>
-<script src="quest-ideas.js?v=20261021d76"></script>
-<script src="quest-recipe-data.js?v=202610211914"></script>
-<script src="quest-recipes.js?v=20261021d79"></script>
+<script src="quest-ideas.js?v=20261022d90"></script>
+<script src="quest-recipe-data.js?v=202610221019"></script>
+<script src="quest-recipes.js?v=20261022d91c"></script>
 <script src="quest-trends.js?v=20261019end3"></script>
 <script src="nvc-words.js?v=20261010a"></script>
 <script src="quest-fx.js?v=20261019x"></script>
@@ -2876,10 +2879,11 @@
        dish each added food has "Keep X in the dish", which puts it in the dish and makes it an ingredient tick. */
     const plainRows = (d, on, fit) => {
       const xs = d.own || d.recipe ? QM.extrasOf(rec, d.id) : [];   // other plain dishes keep "Also went in" (extrasBlock)
-      return `<div class="mq-rows">${d.items.map(([n, amt], i) => kitTakeWrap(on.has(n) ? kitEatKey(k, d.id, n) : null,
-          `<button type="button" class="mq-ing${!on.has(n) && !kitHas(d, n) ? " none nokit" : ""}" data-ding="${esc(d.id)}" data-i="${i}" aria-pressed="${on.has(n)}">` +
-          `<span class="bx"></span><span class="n">${esc(n)}${!on.has(n) && !kitHas(d, n) ? `<small class="mq-hv none">not in your kitchen</small>` : fit && !on.has(n) && fit.rows[i] ? `<small class="mq-hv ${fit.rows[i].st}">${esc(fit.rows[i].word)}</small>` : ""}` +
-          `${on.has(n) ? `<small class="mq-hv mq-ra">${esc(QR() ? QR().amtText(amt) : amt)}</small>` : ""}</span><span class="qty">${esc(QR() ? QR().amtText(amt) : amt)}</span></button>`)).join("")}` +
+      // d90: an optional extra is greyed with its label, never styled missing; not in the kitchen it still does not tick (d5)
+      return `<div class="mq-rows">${d.items.map(([n, amt], i) => { const op = !!(QR() && QR().optional(amt)), out = !on.has(n) && !kitHas(d, n); return kitTakeWrap(on.has(n) ? kitEatKey(k, d.id, n) : null,
+          `<button type="button" class="mq-ing${out ? (op ? " opt nokit" : " none nokit") : op && !on.has(n) ? " opt" : ""}" data-ding="${esc(d.id)}" data-i="${i}" aria-pressed="${on.has(n)}">` +
+          `<span class="bx"></span><span class="n">${esc(n)}${op && !on.has(n) ? `<small class="mq-hv">optional</small>` : out ? `<small class="mq-hv none">not in your kitchen</small>` : fit && !on.has(n) && fit.rows[i] ? `<small class="mq-hv ${fit.rows[i].st}">${esc(fit.rows[i].word)}</small>` : ""}` +
+          `${on.has(n) ? `<small class="mq-hv mq-ra">${esc(QR() ? QR().amtText(amt) : amt)}</small>` : ""}</span><span class="qty">${esc(QR() ? QR().amtText(amt) : amt)}</span></button>`); }).join("")}` +
         (d.own ? [...on].filter(n => !d.items.some(x => x[0] === n)).map(n => kitTakeWrap(kitEatKey(k, d.id, n),
           `<button type="button" class="mq-ing" data-dname="${esc(n)}" data-did="${esc(d.id)}" aria-pressed="true">` +
           `<span class="bx"></span><span class="n">${esc(n)}<small class="mq-hv">not in the dish now</small></span></button>`)).join("") : "") +
@@ -2892,11 +2896,14 @@
        he unticks what he did not have. Once cooked it is a dish card's tick list (with the search box) above the steps.
        Unticking everything takes it back to the shut recipe. No points of its own (d81, "they are just recommendations for
        me to make meals"): the food tiles score the meal; a meal that paid on a recipe before d81 keeps it and shows it. */
+    /* d89 (2026-10-22): a step's wiki link is its readable name; tapping it opens the technique's how steps. A technique
+       the data does not have is just the name. */
+    const stepHTML = x => QR().stepParts(x).map(p => p.text != null ? esc(p.text) : p.tech ? `<details class="mq-tq"><summary>${esc(p.name)}</summary><ol>${p.tech.how.map(h => `<li>${esc(h)}</li>`).join("")}</ol></details>` : esc(p.name)).join("");
     const recipeCard = (d, tail) => {
       const on = new Set(dishOn(d)), xs = QM.extrasOf(rec, d.id), cooked = on.size > 0 || xs.length > 0, pd = QM.dishPaid(rec, d);
       const sub = [d.time, QR().tagLine(d)].filter(Boolean).join(" · ");
       const have = !cooked && QI() && QK() ? QI().status(G.kitchen, kitToday(), d).rows : [];
-      const steps = d.steps.length ? `<div class="mq-steps"><p class="kt-gh">Steps</p><ol>${d.steps.map(x => `<li>${esc(x)}</li>`).join("")}</ol></div>` : "";
+      const steps = d.steps.length ? `<div class="mq-steps"><p class="kt-gh">Steps</p><ol>${d.steps.map(x => `<li>${stepHTML(x)}</li>`).join("")}</ol></div>` : "";
       const swaps = Object.entries(d.swaps || {}).filter(([, l]) => l.length);
       return `<div class="mq-dish open">` +
         `<div class="mq-dbtn"><span class="mq-de">${esc(d.icon)}</span>` +
@@ -2904,7 +2911,8 @@
         `<span class="mq-dp">${pd ? sign(pd) : cooked ? "<small>cooked</small>" : ""}</span></div>` +
         `<div class="mq-dlist">` + (cooked ? plainRows(d, on) + steps
           : `<ul class="mq-rcl">${d.items.map(([n, amt], i) => { const h = have[i], got = h && h.st === "have", short = h && h.st === "short";
-              return `<li><span class="n">${esc(n)}${QR().optional(amt) ? ` <small>optional</small>` : ""}${got ? ` <small class="have">${esc(h.word)}</small>` : short ? ` <small>${esc(h.word)}</small>` : ""}</span><span class="qty">${esc(QR().amtText(amt))}</span></li>`; }).join("")}</ul>` +
+              const op = QR().optional(amt);
+              return `<li${op ? ` class="opt"` : ""}><span class="n">${esc(n)}${op ? ` <small>optional</small>` : ""}${got ? ` <small class="have">${esc(h.word)}</small>` : short ? ` <small>${esc(h.word)}</small>` : ""}</span><span class="qty">${esc(QR().amtText(amt))}</span></li>`; }).join("")}</ul>` +
             steps +
             (swaps.length ? `<p class="mq-how"><b>Swaps:</b> ${esc(swaps.map(([n, l]) => `${n}: ${l.join(", ")}`).join("; "))}</p>` : "") +
             `<div class="mq-drow"><button type="button" class="mq-mini go mq-cook" data-rcook="${esc(d.id)}">Cook this</button><span class="mq-dst">Untick what you did not have.</span></div>`) +

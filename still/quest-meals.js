@@ -387,8 +387,10 @@
       const text = all ? "All in. Full points." : n ? `Missing: ${missing.slice(0, 2).join(", ")}${missing.length > 2 ? ` and ${missing.length - 2} more` : ""}` : "";
       return { n, m, all, missing, pct: Math.round((n / m) * 100), text };
     }
-    const got = gotOf(rec, d), m = d.items.length, n = got.length;
-    const missing = d.items.map((x) => x[0]).filter((x) => !got.includes(x));
+    // d90 (2026-10-22): an optional extra ("1 tbsp (optional)") left unticked is not missing and not in the count
+    const got = gotOf(rec, d), want = d.items.filter((x) => got.includes(x[0]) || !/\(optional\)\s*$/i.test(String(x[1] || "")));
+    const m = want.length, n = got.length;
+    const missing = want.map((x) => x[0]).filter((x) => !got.includes(x));
     const all = n === m && m > 0;
     const text = all ? (pays(d) ? "All in. Full points." : "All in.") : n ? `Missing: ${missing.slice(0, 2).join(", ")}${missing.length > 2 ? ` and ${missing.length - 2} more` : ""}` : "";
     return { n, m, all, missing, pct: m ? Math.round((n / m) * 100) : 0, text };
