@@ -96,6 +96,21 @@
     return { s:new Date(s), e:new Date(Math.min(s + Math.max(+est || 0, 15) * MIN, +ge)) };
   }
 
+  /* A tap on the empty calendar (Junyan, 2026-10-22: "Drop the your move and instead when I click on blank space give me
+     options on things i can add there along with the add to today"). Free time is no longer drawn; a tap there opens Add
+     to today at the tapped time (rounded up to 5 minutes, never before now) and, in today's free time, the quick picks for
+     the free stretch under the tap. A tap on a day that is over gives nothing (null). */
+  function blankTap(at, stops, t, isToday){
+    if (!isToday && +at < +t) return null;
+    const from = new Date(Math.ceil(Math.max(+at, +t) / (5 * MIN)) * 5 * MIN);
+    const st = isToday ? (stops || []).find(x => x.free && x.blocks && x.blocks[0] && x.blocks[0].game && +x.s <= +at && +at < +x.e) : null;
+    return { from, stretch: st && +st.e - +from >= 5 * MIN ? st : null };
+  }
+  // what the calendar column draws: every stop but free time, clipped to the days shown, with its index into the stops
+  function calItems(stops, a0, z0){
+    return timelineLanes((stops || []).map((st, i) => ({ st, i, s:Math.max(+st.s, a0), e:Math.min(+st.e, z0) })).filter(x => x.e > x.s && !x.st.free));
+  }
+
   // a key no other block has, even one added at the same minute ("x<start ms>" alone collided)
   let seq = 0;
   const addKey = s => "x" + (+s) + "-" + (Date.now() % 1e6).toString(36) + (++seq).toString(36) + Math.random().toString(36).slice(2, 6);
@@ -247,6 +262,6 @@
   }
 
   root.QuestAgenda = { addDays, agendaDays, mergeAgenda, snap, dragResult, dragKind, lanes, isLong, timelineLanes, applyPending,
-    pickSpan, addKey, samePick, placePick, undoPick, carveFree, rangeText, overlaps, freeSlot, clampEdge,
+    pickSpan, blankTap, calItems, addKey, samePick, placePick, undoPick, carveFree, rangeText, overlaps, freeSlot, clampEdge,
     JOINT, JUNYAN, ADD_CALS, onJoint, inRoom, GESTURE, pressStep, hitBox, edgeHandles };
 })(typeof window !== "undefined" ? window : globalThis);

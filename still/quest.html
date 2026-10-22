@@ -460,8 +460,6 @@
   .cal-ic { flex:none; }
   .cal-ev .cal-t { font-size:11.5px; color:var(--ink-soft); white-space:nowrap; }
   .cal-ev.one { flex-direction:row; align-items:center; gap:6px; padding-block:0; }
-  .cal-ev.free { --c:rgba(255,255,255,.28); border-left-style:dashed; background:rgba(255,255,255,.035); color:var(--ink-soft); }
-  .cal-ev.free b { font-weight:500; }
   .cal-ev.past { opacity:.62; }
   .cal-ev.now { opacity:1; box-shadow:0 0 0 1.5px var(--c), 0 6px 18px rgba(0,0,0,.28); }
   .cal-ev.gone b > span { text-decoration:line-through; }
@@ -525,6 +523,8 @@
   .node { cursor:pointer; border-radius:14px; }
   .node:active { background:rgba(255,255,255,.08); }
   .node.past { opacity:.62; }
+  .mv-or { font-size:12px; font-weight:600; letter-spacing:.06em; opacity:.8; margin:18px 0 0; padding-top:12px; border-top:1px solid rgba(255,255,255,.12); }
+  .mv-or small { font-weight:400; letter-spacing:0; opacity:.8; margin-left:6px; }
   .mv-lb { font-size:11px; letter-spacing:.14em; text-transform:uppercase; opacity:.7; margin:14px 0 6px; }
   .mv-opt { display:flex; align-items:center; gap:10px; width:100%; text-align:left; padding:10px 12px; margin:0 0 6px; border-radius:14px; background:rgba(255,255,255,.1); color:inherit; }
   .mv-opt b { display:block; font-size:15px; font-weight:600; line-height:1.25; } .mv-opt small { display:block; font-size:12px; opacity:.75; margin-top:2px; }
@@ -1040,7 +1040,7 @@
 <script src="quest-library.js?v=20261022b1"></script>
 <script src="quest-gym.js?v=20261019x"></script>
 <script src="quest-morning.js?v=20261019a"></script>
-<script src="quest-agenda.js?v=20261020c"></script>
+<script src="quest-agenda.js?v=20261022a"></script>
 <script src="quest-offline.js?v=20261017a"></script>
 <script src="quest-nearby.js?v=20261016k"></script>
 </head>
@@ -4339,10 +4339,12 @@
      per task per day (d7): a task already on today's plan says "Move here" and picking it moves that
      block. The new block glows, drags and stretches like any other, and a toast offers Undo. */
   let FRESH = { key:"", at:0 };
-  function openMove(st){
-    const t = now(), S = new Date(+t > +st.s ? Math.ceil(+t / 300000) * 300000 : +st.s), room = Math.round((st.e - S) / 60000);
-    if (room < 5 || !AGD()) return openAdd(st.s);
-    const span = est => AGD().pickSpan(st.s, st.e, t, est), when = sp => AGD().rangeText(fmtT(sp.s), fmtT(sp.e));
+  // the quick picks for today's free stretch st, landing from S (the tapped time, never before now): what goes under the
+  // Add to today form when he taps blank calendar space (Junyan, 2026-10-22). null when under 5 minutes are left.
+  function movePicks(st, S){
+    const t = now(), room = Math.round((st.e - S) / 60000);
+    if (room < 5 || !AGD()) return null;
+    const span = est => AGD().pickSpan(S, st.e, t, est), when = sp => AGD().rangeText(fmtT(sp.s), fmtT(sp.e));
     const D = MO_CTX.data(), tasks = window.QuestMorning ? QuestMorning.rankTasks(D).slice(0, 4) : [];
     const h = MO_CTX.hour(S), meal = h < 11 ? "Breakfast" : h < 16 ? "Lunch" : h < 18 ? "Snack" : "Dinner";
     const next = blocks().find(b => +b.s >= +st.e - 60000 && b.kind !== "open" && b.kind !== "break");
@@ -4359,20 +4361,20 @@
       const on = (OPS.adds || []).some(a => AGD().samePick(a, { ...p, t:o[1] }) && !pickDone(a));
       return { o, p, sp:span(o[3]), on }; });
     let i = 0;
-    openSheet(`<h3>Your move</h3><p>${fmtT(S)} to ${fmtT(st.e)} · ${fmtHM(room)} free. Pick what goes here.</p>
+    // no separate name-it pick: the form above names anything else
+    const html = `<div class="mv-or">Or pick one <small>${fmtT(S)} to ${fmtT(st.e)} · ${fmtHM(room)} free</small></div>
       ${groups.filter(g => g[1].length).map(([lb, xs]) => `<div class="mv-lb">${lb}</div>${xs.map(() => { const x = opts[i];
         return `<button class="mv-opt" data-mv="${i++}"><span class="i">${x.o[0]}</span><span><b>${esc(x.o[1])}</b><small>${esc(when(x.sp))}${x.o[2] ? " · " + esc(x.o[2]) : ""}</small></span>${x.on ? `<span class="mv-tag">Move here</span>` : ""}</button>`; }).join("")}`).join("")}
-      <div class="mv-lb">Change the plan</div>
+      ${pull || window.QuestMorning ? `<div class="mv-lb">Change the plan</div>` : ""}
       ${pull ? `<button class="mv-opt" id="mvPull"><span class="i">⏩</span><span><b>Start ${esc(shortName(next))} at ${fmtT(S)}</b><small>Pulls it earlier, today only</small></span></button>` : ""}
-      <button class="mv-opt" id="mvOther"><span class="i">✏️</span><span><b>Something else</b><small>Name it and pick a length</small></span></button>
-      ${window.QuestMorning ? `<button class="mv-opt" id="mvPlan"><span class="i">☀️</span><span><b>Plan the whole day</b><small>Check the day, tasks and practices step by step</small></span></button>` : ""}
-      <div class="actions"><button class="btn ghost" id="mvCancel">Close</button></div>`, true);
-    $("sheet").querySelectorAll("[data-mv]").forEach(bn => bn.onclick = () => { const x = opts[+bn.dataset.mv]; closeSheet();
-      pickMove({ t:x.o[1], s:x.sp.s, e:x.sp.e, ...x.p }); });
-    if ($("mvPull")) $("mvPull").onclick = () => { closeSheet(); log(`Pulled ${next.t} to ${fmtT(S)}`); saveBlock(next, S, new Date(+S + (next.e - next.s)), next.t); };
-    $("mvOther").onclick = () => { closeSheet(); setTimeout(() => openAdd(S), 50); };
-    if ($("mvPlan")) $("mvPlan").onclick = () => { closeSheet(); openMorning(); };
-    $("mvCancel").onclick = closeSheet;
+      ${window.QuestMorning ? `<button class="mv-opt" id="mvPlan"><span class="i">☀️</span><span><b>Plan the whole day</b><small>Check the day, tasks and practices step by step</small></span></button>` : ""}`;
+    const wire = () => {
+      $("sheet").querySelectorAll("[data-mv]").forEach(bn => bn.onclick = () => { const x = opts[+bn.dataset.mv]; closeSheet();
+        pickMove({ t:x.o[1], s:x.sp.s, e:x.sp.e, ...x.p }); });
+      if ($("mvPull")) $("mvPull").onclick = () => { closeSheet(); log(`Pulled ${next.t} to ${fmtT(S)}`); saveBlock(next, S, new Date(+S + (next.e - next.s)), next.t); };
+      if ($("mvPlan")) $("mvPlan").onclick = () => { closeSheet(); openMorning(); };
+    };
+    return { html, wire };
   }
   // a block that is already history (checked in or closed) stays where it happened: a re-pick adds a new one.
   // One that only ended, never started, is moved like any other (d7: one block per task per day)
@@ -4391,37 +4393,56 @@
     });
   }
   function undoToast(msg, onUndo, ms = 5000){ return calToast(msg, ms, onUndo); }
+  // Add to today (or another day's calendar): the form alone
   function openAdd(from){
+    const f = addForm(from); if (!f) return;
+    openSheet(f.html); f.wire();
+    setTimeout(() => $("aT").focus(), 300);
+  }
+  /* A tap on blank calendar space (Junyan, 2026-10-22): one sheet, the Add to today form first at the tapped time, and
+     under it the quick picks for today's free stretch around the tap. Elsewhere, or on another day, the form alone. */
+  function openSpace(at){
+    const r = AGD() ? AGD().blankTap(at, CAL.stops, now(), gameDayOf(at) === gameYmd()) : { from:at, stretch:null };
+    if (!r) return;
+    const f = addForm(r.from); if (!f) return;
+    const p = r.stretch && !f.other ? movePicks(r.stretch, r.from) : null;
+    if (!p) return openAdd(r.from);
+    // no keyboard at once here: on a phone it would cover the picks
+    openSheet(f.html + p.html, true); f.wire(); p.wire();
+  }
+  // the Add to today form: { html, wire, other }, or null when it cannot add there (a toast says why)
+  function addForm(from){
     const t0 = new Date(Math.ceil(Math.max(now().getTime(), from ? from.getTime() : 0) / 300000) * 300000);
     let dur = 30;
     // open space on another day of the agenda: it can only go in the calendar (today's plan has no other days)
     const other = gameDayOf(t0) !== gameYmd(), canAdd = questKey() && !DRY;
-    if (other && !canAdd) return calToast(DRY ? "Test mode: nothing can be added here." : "Pair this device in ⚙️ to add to other days.");
-    openSheet(`<h3>Add to ${other ? esc(shortDay(tzYmd(t0), tzYmd(now()))) : "today"}</h3>
+    if (other && !canAdd) { calToast(DRY ? "Test mode: nothing can be added here." : "Pair this device in ⚙️ to add to other days."); return null; }
+    const html = `<h3>Add to ${other ? esc(shortDay(tzYmd(t0), tzYmd(now()))) : "today"}</h3>
       <input id="aT" placeholder="What is it?" maxlength="80">
       <div class="row"><label>Start<input id="aS" type="time" value="${toField(t0)}"></label></div>
       <div class="chips" style="grid-template-columns:repeat(4,1fr)">${[15,30,60,90].map(m =>
         `<button class="chip ${m === dur ? "sel" : ""}" data-d="${m}" style="text-align:center">${m < 60 ? m + "m" : m/60 + "h"}</button>`).join("")}</div>
       ${canAdd && AGD() ? `<div class="row"><label>Goes on<select id="aWhere" class="awhere">${AGD().ADD_CALS.map(c => `<option value="${c.id}">${esc(c.name)} calendar</option>`).join("")}${other ? "" : `<option value="">Today only (not in Google Calendar)</option>`}</select></label></div>` : ""}
-      <div class="actions"><button class="btn ghost" id="aCancel">Cancel</button><button class="btn primary" id="aGo">Add</button></div>`);
-    $("sheet").querySelectorAll("[data-d]").forEach(c => c.onclick = () => {
-      $("sheet").querySelectorAll("[data-d]").forEach(x => x.classList.remove("sel"));
-      c.classList.add("sel"); dur = +c.dataset.d;
-    });
-    $("aCancel").onclick = closeSheet;
-    $("aGo").onclick = () => {
-      const t = $("aT").value.trim(); if (!t) { $("aT").focus(); return; }
-      const s = fromField($("aS").value, other ? t0 : now()), e = new Date(s.getTime() + dur * 60000);
-      // Joint Plans unless he picks another (d41). A gym session always goes on Google Calendar (later 2026-10-16: no
-      // more plan-only gym blocks), on Joint Plans if he picked Today only.
-      const where = $("aWhere") ? $("aWhere").value : "", calId = where || jointId();
-      const cal = other || isGym({ t }) && questKey() && !DRY || !!where;
-      closeSheet();
-      if (cal) addBlockCal(t, s, e, calId); else addBlock(t, s, e);
+      <div class="actions"><button class="btn ghost" id="aCancel">Cancel</button><button class="btn primary" id="aGo">Add</button></div>`;
+    const wire = () => {
+      $("sheet").querySelectorAll("[data-d]").forEach(c => c.onclick = () => {
+        $("sheet").querySelectorAll("[data-d]").forEach(x => x.classList.remove("sel"));
+        c.classList.add("sel"); dur = +c.dataset.d;
+      });
+      $("aCancel").onclick = closeSheet;
+      $("aGo").onclick = () => {
+        const t = $("aT").value.trim(); if (!t) { $("aT").focus(); return; }
+        const s = fromField($("aS").value, other ? t0 : now()), e = new Date(s.getTime() + dur * 60000);
+        // Joint Plans unless he picks another (d41). A gym session always goes on Google Calendar (later 2026-10-16: no
+        // more plan-only gym blocks), on Joint Plans if he picked Today only.
+        const where = $("aWhere") ? $("aWhere").value : "", calId = where || jointId();
+        const cal = other || isGym({ t }) && questKey() && !DRY || !!where;
+        closeSheet();
+        if (cal) addBlockCal(t, s, e, calId); else addBlock(t, s, e);
+      };
     };
-    setTimeout(() => $("aT").focus(), 300);
+    return { html, wire, other };
   }
-
 
   /* ---------- gym log (2026-10-05; by levels 2026-10-16) ----------
      Tapping a gym block opens a logger for Junyan's two programs, from his
@@ -6240,9 +6261,9 @@
     if (win) for (let h = a0 + HR; h < z0 - 5 * 60000; h += HR)
       out += `<div class="cal-hr" style="top:${y(h)}px">${Math.abs(h - t) < 15 * 60000 ? "" : `<span>${fmtT(new Date(h)).replace(":00", "")}</span>`}</div>`;
     const ctx = dragCtx();
-    // open space under 15 minutes is left off: drawn at its minimum height it spilled over the block below (Junyan, 2026-10-16)
-    let hits = "", body = "", gaps = "";
-    const ev = AGD() ? AGD().timelineLanes(stops.map((st, i) => ({ st, i, s:Math.max(+st.s, a0), e:Math.min(+st.e, z0) })).filter(x => x.e > x.s && !(x.st.free && x.e - x.s < 15 * 60000))) : [];
+    let hits = "", body = "";
+    // free time is not drawn (Junyan, 2026-10-22: "Drop the your move"): it is empty calendar, and a tap there opens openSpace
+    const ev = AGD() ? AGD().calItems(stops, a0, z0) : [];
     for (const { st, i, s, e, lane, n } of ev) {
       const b0 = st.blocks[0], isCur = cur && st.blocks.some(b => b.key === cur.key) && (!st.free || (t >= st.s && t < st.e)), past = st.e <= t && !isCur, game = !!b0.game;
       const c = st.free ? "" : calColor(b0), top = y(s) + 1, h = Math.max(18, y(e) - y(s) - 2);
@@ -6263,10 +6284,10 @@
       const html = `<button class="${cls}" data-stop="${i}" style="${c ? `--c:${c};` : ""}${eh.on ? `--hz:${eh.zone}px;` : ""}top:${top}px;height:${h}px;${lr}" aria-label="${esc(st.t)}, ${time}">` +
         `<b>${calIcon(b0, c || "rgba(255,255,255,.45)")}<span>${tick}${esc(st.t)}</span></b><span class="cal-t">${h < 36 ? fmtT(st.s) : time}</span>${ask ? `<i class="cal-tap" title="Tap to open" aria-hidden="true"></i>` : pts ? `<span class="cal-pts${pts < 0 ? " neg" : ""}">${pts > 0 ? "+" : ""}${pts}</span>` : ""}` +
         `${eh.on ? `<i class="cal-h top" data-h="top"></i><i class="cal-h bot" data-h="bottom"></i>` : ""}</button>`;
-      if (st.free) gaps += html; else body += html;
+      body += html;
     }
-    // open space first, then the short blocks' tap areas, then the blocks: a block always wins a press over a tap area
-    out += gaps + hits + body;
+    // the short blocks' tap areas first, then the blocks: a block always wins a press over a tap area
+    out += hits + body;
     if (t >= a0 && t <= z0) out += `<div class="cal-now" style="top:${y(+t)}px"><span>${fmtT(t).replace(/\s?[AP]M$/i, "")}</span></div>`;
     return out + `</div>`;
   }
@@ -6359,6 +6380,9 @@
     m.addEventListener("contextmenu", e => { if (DRAG) e.preventDefault(); });
     // the click that ends a drag is not a tap
     m.addEventListener("click", e => { if (Date.now() - dragEnded < 450) { e.stopPropagation(); e.preventDefault(); } }, true);
+    // a tap on blank calendar space: Add to today there, with the quick picks in today's free time (Junyan, 2026-10-22)
+    m.addEventListener("click", e => { if (Date.now() - dragEnded < 450 || e.target.closest(".cal-ev, .cal-hit")) return;
+      const c = e.target.closest("#calBody .cal"); if (c && CAL.days.length) openSpace(new Date(CAL.a0 + (e.clientY - c.getBoundingClientRect().top) / CAL_PX * 3600000)); });
   }
   async function commitDrag(b, dk, s, e, mode = "move"){
     const k = b.id ? "id:" + b.id : b.key, what = shortName(b);
@@ -6681,8 +6705,8 @@
       const st = CAL.stops[+n.dataset.stop]; if (!st) return;   // the stops the column on screen was drawn from
       const fixed = st.blocks.find(b => b.kind !== "open" && b.kind !== "break");
       // another day of the agenda: what it is and how to change it; open space there takes a new calendar event
-      if (!st.blocks[0].game) { if (fixed) return openAgendaItem(fixed); if (st.e > now()) openAdd(new Date(Math.max(+st.s, +now()))); return; }
-      if (!fixed) return openMove(st);
+      if (!fixed) return;   // free time is not drawn; a tap on it is a blank tap (openSpace)
+      if (!st.blocks[0].game) return openAgendaItem(fixed);
       const b = blocks().find(x => x.key === fixed.key) || fixed;
       if (isGym(b) && b.s - now() < 3 * 3600000) { markOpened(b); return openGym(b); }
       openStop(b);
