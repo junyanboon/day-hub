@@ -133,7 +133,9 @@ test("quest.html calls placePick with pickId picks and a history check", () => {
   assert.ok(move.length > 100, "movePicks and pickMove are there");
   assert.doesNotMatch(move, /[{,]\s*pick:/, "no old pick: field");
   assert.match(move, /pickId:/);
-  assert.match(move, /placePick\([^;]*newKey\([^)]*\),\s*\w+\)/, "placePick gets a fourth argument (done)");
+  // the key is made once before writeOps, which runs the change on screen first and again on the pulled copy (2026-10-22)
+  assert.match(move, /const key = newKey\(p\.s\)/);
+  assert.match(move, /placePick\([^;]*\bkey,\s*\w+\)/, "placePick gets a fourth argument (done)");
   assert.match(move, /samePick\([^)]*\)\s*&&\s*!\w+\(a\)/, "the Move here tag skips blocks that are history");
 });
 

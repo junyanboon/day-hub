@@ -49,6 +49,7 @@
      ctx: { paired, dry }. */
   function dragKind(b, ctx){
     if (!b || b.kind === "open" || b.kind === "break" || b.type === "break" || b.type === "focus") return { kind:"free" };
+    if (b.ghost) return { kind:"lock", why:"Still saving it to Google Calendar. It can move in a moment." };
     if (ctx.dry) return { kind: b.id && b.calId ? "cal" : "day", dry:true };
     if (b.id && b.calId) return ctx.paired ? { kind:"cal" } : { kind:"lock", why:"Pair this device in ⚙️ to change the calendar from here." };
     if (b.game) return { kind:"day" };
@@ -76,13 +77,29 @@
 
   /* A change waiting for the calendar to agree: shown at its new place until the plan read back has
      it there, or for 3 minutes (the plan is cached for one), whichever comes first. */
+  // p.t: a new name saved with the times (the edit box), shown at once too
   function applyPending(list, pend, t){
     return list.map(b => {
       const p = pend[b.id ? "id:" + b.id : b.key];
       if (!p || t - p.at > 3 * MIN) return b;
-      if (+b.s === +p.s && +b.e === +p.e) return b;
-      return { ...b, s:new Date(p.s), e:new Date(p.e), pending:true };
+      if (+b.s === +p.s && +b.e === +p.e && (p.t == null || p.t === b.t)) return b;
+      return { ...b, s:new Date(p.s), e:new Date(p.e), ...(p.t != null ? { t:p.t } : {}), pending:true };
     });
+  }
+
+  /* An add on its way to Google Calendar (Junyan, 2026-10-22: "adding and moving things is really slow and glitchy"): it
+     shows where he put it at once, while the calendar saves it and the plan is read back. ghosts: key -> { key, s, e, t,
+     calId, cal, at, id? } (id once the calendar has answered). A ghost goes when the plan read back holds its event (by
+     id, or by name and start before the answer), or after 3 minutes. Returns the list with the ghosts still waiting. */
+  function withGhosts(list, ghosts, t){
+    const out = list.slice();
+    for (const k in ghosts) {
+      const g = ghosts[k];
+      if (t - g.at > 3 * MIN) continue;
+      if (list.some(b => g.id ? b.id === g.id : b.t === g.t && +new Date(b.s) === +g.s)) continue;
+      out.push({ key:g.key, s:new Date(g.s), e:new Date(g.e), t:g.t, calId:g.calId, cal:g.cal, type:"task", ghost:true, pending:true, game:false });
+    }
+    return out.length === list.length ? out : out.sort((x, y) => x.s - y.s || x.e - y.e);
   }
 
   /* ---------- Your move: pick from a list (Junyan, 2026-10-14, d10 "A", d7 and d8) ----------
@@ -297,5 +314,5 @@
   root.QuestAgenda = { addDays, agendaDays, mergeAgenda, snap, dragResult, dragKind, lanes, isLong, timelineLanes, applyPending,
     pickSpan, blankTap, calItems, sleepSpans, sleepText,
     addKey, samePick, placePick, undoPick, carveFree, rangeText, overlaps, freeSlot, clampEdge,
-    JOINT, JUNYAN, ADD_CALS, onJoint, inRoom, GESTURE, pressStep, hitBox, edgeHandles };
+    JOINT, JUNYAN, ADD_CALS, onJoint, inRoom, GESTURE, pressStep, hitBox, edgeHandles, withGhosts };
 })(typeof window !== "undefined" ? window : globalThis);
