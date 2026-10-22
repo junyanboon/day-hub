@@ -174,7 +174,7 @@ test("d79: the recipe card: shut shows time and tags; open shows ingredients, st
   assert.match(rc, /data-rcook="\$\{esc\(d\.id\)\}">Cook this</);
   assert.match(rc, /got = h && h\.st === "have", short = h && h\.st === "short"/, "only what the kitchen has, softly; short is not green");
   assert.ok(!/you have|buy \$|To buy/.test(rc), "no scoring of what he has");
-  assert.match(sheet, /dishTap\(bn, d\.id, QR\(\)\.cookTicks\(d\)\)/);
+  assert.match(sheet, /dishTap\(bn, d\.id, QR\(\)\.cookTicks\(d\)\.filter\(n => kitHas\(d, n\)\)\)/);
   // the old ideas only when the book did not load; the trip line says how travel-friendly is decided
   assert.ok(sheet.includes('[RL ? "Recipes · for 2 people" : `Tonight\'s ideas · for 2 people'), "the ideas heading is the fallback branch");
   assert.ok(sheet.includes("On a trip: travel-friendly recipes first"));
