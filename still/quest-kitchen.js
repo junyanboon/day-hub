@@ -1198,7 +1198,9 @@
   /* the sheet's filters (d34): "all", "buy" (what the shopping list holds: low, out, or low before the next shop), "new"
      (no number yet: the way through setting up, since the levels were retired) */
   const shows = (it, f, now, shopAt) => f === "buy" ? !!it && (needsBuy(it) || lowSoon(it, now, shopAt))
-    : f === "new" ? !!it && !hasQ(it) : !!it;
+    : f === "new" ? !!it && !hasQ(it)
+    // All hides what is used up (Junyan, 2026-10-22, d12: "11 yes 12 yes"): it stays on the To buy filter and the Shopping list
+    : f === "all" ? !!it && !(hasQ(it) && it.lv === 0) : !!it;
   // counts for the kitchen card: { low (on the list: low or out), soon, unchecked (no number yet), total }
   function counts(K, k, now, shopAt) {
     const list = items(K, k);

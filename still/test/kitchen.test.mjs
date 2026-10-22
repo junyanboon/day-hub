@@ -378,3 +378,11 @@ test("a bad level in synced state reads as not checked, never throws", () => {
   assert.equal(K.item(k, "h:kale").lv, null);
   assert.equal(K.items(k, "home").length, K.SEED.length);   // a nameless item is skipped
 });
+
+test("d12: All hides what is used up; To buy still shows it", () => {
+  const T = Date.parse("2026-10-22T12:00:00Z");
+  const out = { id: "x", name: "Navy beans", q: 0, u: "g", lv: 0, amt: "0 g" }, some = { id: "y", name: "Pasta", q: 20, u: "g", lv: 1, amt: "20 g" };
+  assert.ok(K.hasQ(out)); assert.ok(!K.shows(out, "all", T, T)); assert.ok(K.shows(out, "buy", T, T));
+  assert.ok(K.shows(some, "all", T, T));
+  assert.ok(K.shows(out, "any", T, T));
+});
