@@ -108,10 +108,41 @@
   }
   // what the calendar column draws: every stop but free time, clipped to the days shown, with its index into the stops.
   // keepFree (the Plan your day stretch, where a tap on open space fills it, d2): free time of 15 minutes or more stays
-  function calItems(stops, a0, z0, keepFree){
-    return timelineLanes((stops || []).map((st, i) => ({ st, i, s:Math.max(+st.s, a0), e:Math.min(+st.e, z0) }))
-      .filter(x => x.e > x.s && (!x.st.free || keepFree && x.e - x.s >= 15 * MIN)));
+  // extra: items drawn beside them that are not stops (the Sleep stretch), kept in the lanes even past 12 hours
+  function calItems(stops, a0, z0, keepFree, extra){
+    return lanes((stops || []).map((st, i) => ({ st, i, s:Math.max(+st.s, a0), e:Math.min(+st.e, z0) }))
+      .filter(x => x.e > x.s && (!x.st.free || keepFree && x.e - x.s >= 15 * MIN) && !isLong(x.st))
+      .concat((extra || []).filter(x => x.e > x.s)));
   }
+
+  /* Sleep (Junyan, 2026-10-22: "Between wind down and the 1st thing in the morning I want the Sleep with the amount in
+     the same shape and colour and automatic adjustment that Your move used to have"). Worked out each time the column
+     is drawn, never stored, so it follows Wind down and the morning's first block wherever they move: from the end of
+     the evening's Wind down (else the evening's last block, ending 5 PM to 4 AM) to the start of the first block after
+     that and after midnight, before 2 PM. None when the next morning has nothing, or when the night already has a Sleep
+     event of its own. nights: [[the evening day's midnight, the next midnight]] in ms. Free time and bookings are not
+     blocks here. Returns [{ s, e, min }]. */
+  const isWindDown = b => !!b && (b.basic === "winddown" || /wind.?down/i.test(b.t || ""));
+  const isSleepBlock = b => !!b && !isWindDown(b) && /sleep(?!er)|\bbed\b/i.test(b.t || "");   // not "Sleeper Train"
+  function sleepSpans(stops, nights, isSleep = isSleepBlock){
+    const real = (stops || []).filter(st => !st.free && st.blocks && st.blocks[0] && !isLong(st));
+    const beds = real.filter(st => isSleep(st.blocks[0])), rest = real.filter(st => !isSleep(st.blocks[0]));
+    const out = [];
+    for (const [m0, m1] of nights || []) {
+      const eve = rest.filter(st => +st.e > m0 + 17 * HR && +st.e <= m1 + 4 * HR && +st.s < m1 + 4 * HR);
+      if (!eve.length) continue;
+      const wd = eve.filter(st => isWindDown(st.blocks[0]));
+      const from = Math.max(...(wd.length ? wd : eve).map(st => +st.e));
+      const next = rest.filter(st => +st.s >= Math.max(from, m1) && +st.s < m1 + 14 * HR).map(st => +st.s);
+      if (!next.length) continue;
+      const to = Math.min(...next);
+      if (to <= from || beds.some(st => +st.s < to && +st.e > from)) continue;
+      out.push({ s:new Date(from), e:new Date(to), min:Math.round((to - from) / MIN) });
+    }
+    return out;
+  }
+  // its length the way he wrote it: "8h 15m", "8h", "45m"
+  const sleepText = min => { const h = Math.floor(min / 60), m = min % 60; return h ? (m ? `${h}h ${m}m` : `${h}h`) : `${m}m`; };
 
   // a key no other block has, even one added at the same minute ("x<start ms>" alone collided)
   let seq = 0;
@@ -264,6 +295,6 @@
   }
 
   root.QuestAgenda = { addDays, agendaDays, mergeAgenda, snap, dragResult, dragKind, lanes, isLong, timelineLanes, applyPending,
-    pickSpan, blankTap, calItems, addKey, samePick, placePick, undoPick, carveFree, rangeText, overlaps, freeSlot, clampEdge,
+    pickSpan, blankTap, calItems, sleepSpans, sleepText, addKey, samePick, placePick, undoPick, carveFree, rangeText, overlaps, freeSlot, clampEdge,
     JOINT, JUNYAN, ADD_CALS, onJoint, inRoom, GESTURE, pressStep, hitBox, edgeHandles };
 })(typeof window !== "undefined" ? window : globalThis);
