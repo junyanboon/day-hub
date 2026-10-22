@@ -295,6 +295,7 @@
   }
 
   root.QuestAgenda = { addDays, agendaDays, mergeAgenda, snap, dragResult, dragKind, lanes, isLong, timelineLanes, applyPending,
-    pickSpan, blankTap, calItems, sleepSpans, sleepText, addKey, samePick, placePick, undoPick, carveFree, rangeText, overlaps, freeSlot, clampEdge,
+    pickSpan, blankTap, calItems, sleepSpans, sleepText,
+    addKey, samePick, placePick, undoPick, carveFree, rangeText, overlaps, freeSlot, clampEdge,
     JOINT, JUNYAN, ADD_CALS, onJoint, inRoom, GESTURE, pressStep, hitBox, edgeHandles };
 })(typeof window !== "undefined" ? window : globalThis);
