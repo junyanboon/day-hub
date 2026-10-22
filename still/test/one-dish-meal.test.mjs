@@ -23,7 +23,7 @@ test("the choices: Blueprint, his dishes, recipes (or ideas), then Something els
   assert.ok(b > 0 && o > b && r > o, "Blueprint, his dishes, then recipes or ideas");
   assert.ok(sheet.includes("${pickCard(MEAL, cur === MEAL.id)}"), "Something else last");
   // no meal yet: only the choices; a meal: its card open, Change meal folds the choices
-  assert.ok(sheet.includes('${mainId ? `<div class="mq-mhd">${lb("This meal", "mb", 0)}<button type="button" class="mq-mini mq-howbtn" data-mchange'), "Change meal sits on the heading");
+  assert.ok(sheet.includes('${mainId ? `<div class="mq-mhd">${lb("This meal", "mb", 0)}${soloBtn()}<button type="button" class="mq-mini mq-howbtn" data-mchange'), "Change meal sits on the heading");
   assert.ok(sheet.includes("data-mchange") && sheet.includes('${chg ? `<div class="mq-pick">${picker(mainId)}</div>` : ""}'));
 });
 
@@ -58,7 +58,7 @@ test("no 'full for today': a capped Blueprint dish logs in full and says so soft
 });
 
 test("d83, d84: Counted line; drains as small buttons; the tiles are synced after a change, never on opening", () => {
-  assert.ok(sheet.includes("`Counted: ${esc([...new Set(words)].join(\", \"))} · ${sign(tot)}`"));
+  assert.ok(sheet.includes('"Counted"}: ${esc([...new Set(words)].join(", "))} · ${sign(tot)}`'));   // d87: "Counted (your 59%):" on a shared meal
   assert.ok(sheet.includes('<div class="mq-drs">${QM.DRAINS.map(drain).join("")}</div>'));
   const top = sheet.slice(0, sheet.indexOf("const sh = $(\"sheet\")"));
   assert.ok(!top.includes("syncFoods("), "opening a meal pays nothing new");

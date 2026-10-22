@@ -646,6 +646,10 @@
     font:inherit; font-size:12.5px; cursor:pointer; -webkit-tap-highlight-color:transparent; }
   .mq-dr b { color:var(--gold); font-size:11px; margin-left:2px; } .mq-dr.on { border-color:rgba(255,155,138,.75); background:rgba(255,155,138,.16); }
   .mq-count { margin:8px 2px 10px; font-size:13px; color:var(--ink); font-variant-numeric:tabular-nums; }
+  /* shared meals (d87): Just me on the This meal heading, the two weights at the foot of the sheet */
+  .mq-solo.on { border-color:rgba(95,211,196,.8); background:rgba(95,211,196,.14); }
+  .mq-share { display:flex; flex-wrap:wrap; align-items:center; gap:4px 6px; margin:10px 2px 0; font-size:12.5px; color:var(--ink-soft); }
+  .sheet .mq-share input.mq-tq { width:56px; min-height:36px; padding:4px 6px; font-size:16px; }
   .mq-cap { color:var(--ink-faint); }
   .mq-kb:focus-visible, .mq-pk:focus-visible, .mq-dr:focus-visible { outline:2px solid #5fd3c4; outline-offset:2px; }
   .de-top { display:flex; gap:10px; align-items:center; margin:10px 0 4px; }
@@ -987,12 +991,12 @@
 </style>
 <script src="keeps.js?v=20261009k"></script>
 <script src="bag.js?v=20261019a"></script>
-<script src="quest-merge.js?v=20261021d48"></script>
+<script src="quest-merge.js?v=20261021d87s"></script>
 <script src="quest-oura.js?v=20261019a"></script>
 <script src="quest-levels.js?v=20261016b"></script>
 <script src="quest-gymlog.js?v=20261019a"></script>
 <script src="quest-meals.js?v=20261021d87"></script>
-<script src="quest-food-score.js?v=20261021d87b"></script>
+<script src="quest-food-score.js?v=20261021d87t"></script>
 <script src="quest-kitchen.js?v=20261021h81b"></script>
 <script src="quest-ideas.js?v=20261021d76"></script>
 <script src="quest-recipe-data.js?v=202610211914"></script>
@@ -2610,6 +2614,11 @@
      the note on the automatic drains are gone. */
   const QM = window.QuestMeals;
   const FSC = () => window.QuestFoodScore;   // what a meal's logged foods earn (d83); the meal still opens without it
+  /* Shared meals (Junyan, 2026-10-21, d87: "it's divided by our weight differential. Caney weighs 100 lbs and me 145 so
+     we divide the food accordingly"): the amount tiles count his share of what a meal logged, the kitchen still loses
+     the whole amount. The two weights are G.kitchen.share ({ me, other, at }, merged by its later change); a meal
+     keeps the share it was first scored with (rec.sh), and Just me (rec.solo) makes it all his. */
+  const mealWeights = () => (G.kitchen && G.kitchen.share) || null;
   /* Every food logged on meal k (d83), as { n, q, u } (what a tick took off the kitchen, or what was typed) or { n, amt }
      (a tick's recipe amount, when nothing came off): the ticks of every dish it holds, the foods added to any of them
      (Something else too), and old "From your kitchen" ticks. */
@@ -2864,17 +2873,23 @@
       return dishCard(d, !RL && !d.own && !QM.pays(d) && QI() && QK() ? QI().status(G.kitchen, kitToday(), d) : null, tail);
     };
     /* "Counted:" (d83): what this meal's points came from, in one line, and the meal's total (prana and body together) */
+    // d87: "Counted (your 59%):" when a food tile counted on a shared meal (dish part points are not shared)
     const counted = (r0 = rec) => {
       const r = r0 || {}, v = r.v || {}, words = [];
       onIds.forEach(id => { const d = id !== MEAL.id && dishById(id); if (d && QM.dishPaid(r, d) > 0) words.push(d.name); });
-      (Array.isArray(r.sel) ? r.sel : []).forEach(id => { if (v[id] && +v[id][1] > 0 && FSC() && FSC().WORD[id]) words.push(FSC().WORD[id]); });
+      let tiles = false;
+      (Array.isArray(r.sel) ? r.sel : []).forEach(id => { if (v[id] && +v[id][1] > 0 && FSC() && FSC().WORD[id]) { words.push(FSC().WORD[id]); tiles = true; } });
       const tot = Math.round(((+r.p || 0) + (+r.b || 0)) * 10) / 10;
-      return `<p class="mq-count" data-mcount>${words.length ? `Counted: ${esc([...new Set(words)].join(", "))} · ${sign(tot)}` : tot ? `This meal: ${sign(tot)}` : "Nothing counted yet."}</p>`;
+      const sw = FSC() ? FSC().shareOf(r, mealWeights()) : 1, pct = Math.round(sw * 100);
+      return `<p class="mq-count" data-mcount>${words.length ? `${tiles && sw < 1 ? `Counted (your ${pct}%)` : "Counted"}: ${esc([...new Set(words)].join(", "))} · ${sign(tot)}` : tot ? `This meal: ${sign(tot)}` : "Nothing counted yet."}</p>`;
     };
+    // Just me (d87): a meal he ate alone counts the whole amount; shared (off) is the default
+    const soloBtn = () => FSC() && rec ? `<button type="button" class="mq-mini mq-solo${rec.solo ? " on" : ""}" data-msolo aria-pressed="${!!rec.solo}">Just me</button>` : "";
+    const wts = FSC() ? FSC().weightsOf(mealWeights()) : null;
     openSheet(`${winHead(b)}
       ${warn ? `<div class="warnline">${esc(warn)}</div>` : ""}
       ${lastFood ? `<p>Last food ended ${fmtT(lastFood)} (${fmtHM(Math.round((b.s - lastFood) / 60000))} before this).</p>` : ""}
-      ${mainId ? `<div class="mq-mhd">${lb("This meal", "mb", 0)}<button type="button" class="mq-mini mq-howbtn" data-mchange aria-expanded="${chg}">Change meal <span aria-hidden="true">${chg ? "▴" : "▾"}</span></button></div>
+      ${mainId ? `<div class="mq-mhd">${lb("This meal", "mb", 0)}${soloBtn()}<button type="button" class="mq-mini mq-howbtn" data-mchange aria-expanded="${chg}">Change meal <span aria-hidden="true">${chg ? "▴" : "▾"}</span></button></div>
       ${chg ? `<div class="mq-pick">${picker(mainId)}</div>` : ""}
       ${counted()}
       <div class="mq-dishes">${onIds.map(id => mealCard(id, id === mainId ? kitPanel(id === MEAL.id ? MEAL : dishById(id) || MEAL) : "")).join("")}</div>`
@@ -2883,6 +2898,7 @@
       ${lb("Drains · lower prana", "mp", got(QM.DRAIN_IDS))}
       <div class="mq-drs">${QM.DRAINS.map(drain).join("")}</div>
       <div class="mq-tips"><div class="mq-tl">How to eat</div>${QM.TIPS.map(([i, t]) => `<p><span>${i}</span>${esc(t)}</p>`).join("")}</div>
+      ${wts ? `<div class="mq-share">Shared meals: you <input class="mq-tq" type="text" inputmode="decimal" data-mwt="me" value="${wts.me}" aria-label="Your weight in lb"> lb · Caney <input class="mq-tq" type="text" inputmode="decimal" data-mwt="other" value="${wts.other}" aria-label="Caney's weight in lb"> lb</div>` : ""}
       <div class="actions"><button class="btn ghost" id="mEdit">Change time or name</button></div>`, true);
     const sh = $("sheet");
     // the sheet redraws on every tap and keeps its scroll
@@ -2910,8 +2926,10 @@
     function syncFoods(){
       const cur = mealRec(); if (!cur || !FSC()) return;
       const foods = mealFoods(k, cur);
-      const r = QM.autoSync(cur, FSC().earn(foods, { morning }).ids, mqOpt(), id => !mqCounted(id) || habitGain(id) > 0);
-      if (!r.ops.length && JSON.stringify(r.rec.auto || null) === JSON.stringify(cur.auto || null)) return;
+      // d87: the share this meal is first scored with stays with it (rec.sh), so new weights never move what it paid
+      const base = FSC().stampShare(cur, foods.length, mealWeights()), stamp = base !== cur;
+      const r = QM.autoSync(base, FSC().earn(foods, { morning, share:FSC().shareOf(base, mealWeights()) }).ids, mqOpt(), id => !mqCounted(id) || habitGain(id) > 0);
+      if (!stamp && !r.ops.length && JSON.stringify(r.rec.auto || null) === JSON.stringify(cur.auto || null)) return;
       applyOps(r.ops, window.QuestFx);
       putRec(r.rec);
     }
@@ -3035,6 +3053,25 @@
     });
     // the Counted line, redrawn in place after a change that does not redraw the sheet
     const recount = () => { const c = sh.querySelector("[data-mcount]"); if (c) c.outerHTML = counted(mealRec()); };
+    // Just me (d87): the meal's tiles are scored again with the whole amount (or his share)
+    const sb = sh.querySelector("[data-msolo]");
+    if (sb) sb.onclick = () => {
+      const cur = mealRec(); if (!cur || !FSC()) return;
+      const r = { ...cur };
+      if (r.solo) delete r.solo; else r.solo = true;
+      putRec(r);
+      syncFoods();
+      redraw();
+    };
+    // the shared-meal weights (d87): saved with the game; new scoring only (a scored meal keeps its rec.sh)
+    sh.querySelectorAll("[data-mwt]").forEach(inp => inp.onchange = () => {
+      const w = FSC().weightsOf(mealWeights()), key = inp.dataset.mwt, v = FSC().readLb(inp.value);
+      if (!["me", "other"].includes(key)) return;
+      if (v == null) { inp.value = w[key]; return; }
+      kitSave({ ...(G.kitchen || {}), share:{ ...w, [key]:v, at:now().toISOString() } });
+      inp.value = v;
+      recount();   // no redraw: it would swallow the next tap (the other weight)
+    });
     sh.querySelectorAll("[data-xq]").forEach(inp => inp.onchange = () => {
       const d = xDish(inp.dataset.xq); if (!d) return;
       const raw = String(inp.value).trim(), v = QK().numOf(raw), q = raw === "" || isNaN(v) ? null : Math.max(0, v);

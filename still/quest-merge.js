@@ -195,7 +195,8 @@
      change different items both keep theirs and a deleted item never comes back. Each item's level history (hist, which
      teaches his pace) is kept from both. Shelf checks: the later time. Shopping ticks, dinner records (used) and the
      kitchen picked for a day: per key, the later change. His own dishes (d48): per dish, the later change, a
-     delete being a mark (del) that wins the same way. The trip marks: the later day. */
+     delete being a mark (del) that wins the same way. The trip marks: the later day. The shared-meal weights (d87):
+     the later change. */
   function mergeKitchen(o, n) {
     if (!o || typeof o !== "object") return n;
     if (!n || typeof n !== "object") return o;
@@ -216,7 +217,10 @@
     for (const [k, v] of Object.entries(obj(n.shelves))) if (!shelves[k] || ms(v) > ms(shelves[k])) shelves[k] = v;
     const trip = { ...obj(o.trip) };
     for (const [k, v] of Object.entries(obj(n.trip))) if (!trip[k] || String(v) > String(trip[k])) trip[k] = v;
-    return { ...o, ...n, items, shelves, shop: perKey(o.shop, n.shop), used: perKey(o.used, n.used), dishes: perKey(o.dishes, n.dishes), pick: later(o.pick, n.pick) || null, trip };
+    const out = { ...o, ...n, items, shelves, shop: perKey(o.shop, n.shop), used: perKey(o.used, n.used), dishes: perKey(o.dishes, n.dishes), pick: later(o.pick, n.pick) || null, trip };
+    // the two weights for shared meals (d87, { me, other, at }): the later change
+    if (o.share || n.share) out.share = later(o.share, n.share);
+    return out;
   }
 
   function mergeQuest(a, b) {
