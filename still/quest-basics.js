@@ -51,7 +51,9 @@
   /* What each practice pays, exactly (Junyan, 2026-10-19, d25 and d26). No level multiplier and no smaller second
      tick: the number on the tile is the number he gets. Tuned so a strong day (Shambhavi, one long practice, Bhuta
      Shuddhi, the lamp, neem, and some pranic food) lands at about 71. */
-  const PRACTICE_PAY = { angam:25, yogasana:25, shambhavi:20, surya:20, kriya:10, bhuta:8, upa:5, nadi:4, lamp:3, neem:3 };
+  // 2026-10-22 (Junyan: "I also want to get a lot more prana for the yoga actions"): the yoga practices pay double; the lamp
+  // and neem stay as they were. Shambhavi and one long practice now take prana to about 90.
+  const PRACTICE_PAY = { angam:50, yogasana:50, shambhavi:40, surya:40, kriya:20, bhuta:16, upa:10, nadi:8, lamp:3, neem:3 };
   // n: how many already counted today, max: the daily limit. null: not a practice (the page's own rule applies)
   const practicePay = (id, n, max) => (id in PRACTICE_PAY ? (n >= max ? 0 : PRACTICE_PAY[id]) : null);
   // the supplements moved to the meal quiz (Junyan, 2026-10-19: "I actually take these after my meal usually as my

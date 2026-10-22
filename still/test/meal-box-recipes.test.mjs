@@ -102,7 +102,7 @@ test("d78 as Something else (one dish per meal, 2026-10-21): no What did you eat
   assert.match(box, /data-msave>Save as a dish</);
   assert.ok(!/function kitMealCard\(|<b>Anything else from the kitchen<\/b>|data-ksave/.test(html), "the old card is gone");
   // the handlers treat Something else as a dish of its own, keyed "meal"
-  assert.match(sheet, /const xDish = id => id === MEAL\.id \? MEAL : dishById\(id\);/);
+  assert.match(sheet, /const xDish = id => id === MEAL\.id \? MEAL : id === OUT\.id \? OUT : dishById\(id\);/);
   for (const a of ["inp.dataset.xs", "bn.dataset.xoff", "inp.dataset.xq"]) assert.ok(sheet.includes(`xDish(${a})`), a);
   // Save as a dish takes both its foods and old From your kitchen ticks
   assert.match(sheet, /QK\(\)\.kitchenFoods\(G\.kitchen, kPre\)/);

@@ -43,7 +43,7 @@ test("the open meal ends with the kitchen buttons: a search field, the kitchen i
   assert.ok(kp.includes('<input type="search" class="mq-xs" data-xs="${esc(d.id)}"'));
   assert.ok(kp.includes("QK().mealList(G.kitchen, kitToday())"), "what the kitchen in use has");
   assert.ok(kp.includes("QK().hasQ(x) ? x.amt : QK().ASK"), "the amount, or how many?");
-  assert.ok(sheet.includes("mealCard(id, id === mainId ? kitPanel("), "on the meal's own dish only");
+  assert.ok(sheet.includes("mealCard(id, id === mainId && id !== OUT.id ? kitPanel("), "on the meal's own dish only");
   // typing narrows the buttons in place (a redraw would drop the keyboard)
   const xs = sheet.slice(sheet.indexOf('querySelectorAll("[data-xs]")'), sheet.indexOf('querySelectorAll("[data-xoff]")'));
   assert.ok(xs.includes("x.hidden = !!hit && !hit.has(x.dataset.xit)") && !xs.includes("redraw("));
