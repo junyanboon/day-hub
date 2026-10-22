@@ -20,8 +20,10 @@ function agenda(){
     ${groc}
     const openKitchen = o => calls.kitchen.push(o), openSheet = h => calls.sheet.push(h);
     const AGD = () => ({ dragKind:() => ({ kind:"cal" }) }), dragCtx = () => ({}), winHead = b => b.t, esc = x => String(x);
+    const AGLEN = { LENS:[15, 30, 60, 90], lenOf:() => 60, endFor:() => "10:00", editMode:() => null };
+    const toField = () => "09:00", fromField = () => new Date(), commitDrag = () => {};
     const dayLabel = () => "Yesterday", tzYmd = () => "2026-10-20", now = () => new Date("2026-10-21T14:00:00Z");
-    const gymMoveHTML = () => "", $ = () => ({}), closeSheet = () => {}, bindGymMove = () => {};
+    const gymMoveHTML = () => "", $ = () => ({ value:"09:00", querySelectorAll:() => [] }), closeSheet = () => {}, bindGymMove = () => {};
     ${fn("blockList")}
     ${fn("openAgendaItem")}
     return openAgendaItem;`);
@@ -41,12 +43,13 @@ test("a tap on a Groceries block on another day opens the kitchen on its shoppin
   assert.equal(+o.block.s, Date.parse(yday.s));
 });
 
-test("any other block on another day still opens the agenda sheet with how to drag it", () => {
+test("any other block on another day still opens the agenda sheet, with its times to change and how to drag it", () => {
   const { open, calls } = agenda();
   open({ t:"Dentist", s:"2026-10-22T18:30:00.000Z", e:"2026-10-22T19:30:00.000Z", key:"d1", cal:"Joint Plans" });
   assert.equal(calls.kitchen.length, 0);
   assert.equal(calls.sheet.length, 1);
-  assert.match(calls.sheet[0], /Drag it on the calendar to move it/);
+  assert.match(calls.sheet[0], /drag it on the calendar/);
+  assert.match(calls.sheet[0], /id="agS"[\s\S]*id="agE"[\s\S]*id="agSave"/);   // d93: Start, End and Save
 });
 
 test("the calendar sends a tap on another day's block through openAgendaItem; dragging is not touched", () => {
