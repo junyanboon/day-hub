@@ -19,7 +19,7 @@ test("Google busy is told apart from other failures, from the new still-api and 
   assert.equal(A.calBusy(err("Google Calendar is busy. Try again in a minute.", { status:503, busy:true })), true);
   assert.equal(A.calBusy(err(OLD_403, { status:502 })), true, "the old still-api's raw answer");
   assert.equal(A.calBusy(err("Calendar PATCH: HTTP 429 ", { status:502 })), true);
-  assert.equal(A.calBusy(err("x", { status:429 })), true);
+  assert.equal(A.calBusy(err("more than 40 calendar moves today, nothing moved", { status:429 })), false, "still-api's own cap is not Google busy");
   assert.equal(A.calBusy(err("Calendar PATCH: HTTP 403 forbidden", { status:502 })), false);
   assert.equal(A.calBusy(new TypeError("Failed to fetch")), false);
   assert.equal(A.calBusy(null), false);
@@ -35,6 +35,7 @@ test("the reason a save failed, in plain words: never JSON, never an HTTP code",
   assert.equal(A.plainWhy(err("refused: it has other guests")), "refused: it has other guests", "still-api's own plain words stay");
   assert.equal(A.plainWhy(err("calendar not in Still's list")), "calendar not in Still's list");
   assert.equal(A.plainWhy(undefined), "it did not go through");
+  assert.equal(A.plainWhy(new TypeError("Cannot read properties of undefined (reading 'x')")), "it did not go through", "a bug is not a lost connection");
 });
 
 test("the failed drag says it like Junyan asked", () => {

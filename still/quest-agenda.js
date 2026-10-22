@@ -135,8 +135,8 @@
   /* Sleep (Junyan, 2026-10-22: "Between wind down and the 1st thing in the morning I want the Sleep with the amount in
      the same shape and colour and automatic adjustment that Your move used to have"). Worked out each time the column
      is drawn, never stored, so it follows Wind down and the morning's first block wherever they move: from the end of
-     the evening's Wind down, or of a later evening block that ends after it (d95), else the evening's last block (ending
-     5 PM to 4 AM) to the start of the first block after
+     the evening's last block (ending 5 PM to 4 AM), which is Wind down unless something ends after it (d95), to the
+     start of the first block after
      that and after midnight, before 2 PM. None when the next morning has nothing, or when the night already has a Sleep
      event of its own. nights: [[the evening day's midnight, the next midnight]] in ms. Free time and bookings are not
      blocks here. Returns [{ s, e, min }]. */
@@ -319,14 +319,15 @@
      Google's raw answer through, so the phone does the waiting then: retryBusy tries again after about 2 s and 4 s. While
      it waits, the block stays where he put it (PEND). */
   const BUSY_RE = /rateLimitExceeded|userRateLimitExceeded|HTTP 429\b/;
-  const calBusy = e => !!e && (!!e.busy || e.status === 429 || BUSY_RE.test(String(e.message || "")));
+  // busy: still-api's flag, or Google's own words passed through by an older still-api (not still-api's own 429 caps)
+  const calBusy = e => !!e && (!!e.busy || BUSY_RE.test(String(e.message || "")));
   // the reason a save failed, in a few plain words: never JSON, never an HTTP code; still-api's own short words stay
   function plainWhy(e){
     if (calBusy(e)) return "Google Calendar is busy";
     const m = String((e && e.message) || "").trim();
     if (e && e.name === "AbortError") return "no answer in time";
-    if (e && e.name === "TypeError" || /failed to fetch|load failed|networkerror|network request failed/i.test(m)) return "no connection";
-    if (!m || m.length > 80 || /HTTP|[{}[\]<>]|\b\d{3}\b|error|undefined|null/i.test(m)) return "it did not go through";
+    if (/failed to fetch|load failed|networkerror|network request failed/i.test(m)) return "no connection";
+    if (!m || m.length > 80 || /HTTP|[{}[\]<>]|\b\d{3}\b|\b(error|undefined|null|typeerror)\b/i.test(m)) return "it did not go through";
     return m;
   }
   // "Couldn't <did>, so <after>." with the reason; busy reads the way Junyan asked (d94)

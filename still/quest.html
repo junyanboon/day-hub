@@ -1106,6 +1106,7 @@
   const GYM_AT = "quest-gym-at2", GYM_WK = "quest-gym-wk2";
   /* A calendar write (/cal/...) that Google calls busy is tried again, and onBusy() hears each wait (d94, quest-agenda.js
      retryBusy); a done one makes the next read-back fetch the agenda's other days too (AG_AT). */
+  let AG_AT = 0;   // when the agenda's other days were last read (pullAgenda); 0 reads them on the next pull
   async function qfetch(path, opts = {}){
     const { onBusy, ...o } = opts;
     const once = async () => {
@@ -1210,7 +1211,6 @@
   let PLAN = null, OPS = { edits:{}, drops:[], adds:[], ts:0 }, TASKS = [], lastPull = null, pullErr = null, INSIGHTS = {};
   // the agenda's other days (yesterday to 3 ahead, not the game's own day): date -> that day's plan blocks
   let AG = {};
-  let AG_AT = 0;   // when those days were last read (pullAgenda); 0 reads them on the next pull
   /* Open with the last day this device saw (Junyan, 2026-10-11, slow internet in Egypt: "it takes way too long
      for my app to load"): the saved day shows at once and the fresh one replaces it when pullAll finishes. Not with
      a test clock (?at=); a test server (?api=) keeps its own saved day.
@@ -6521,7 +6521,7 @@
       // Google busy: it stays where he put it while the save is tried again (d94); was: only the days it touched are read again
       await qfetch("/cal/event", { method:"POST", body:JSON.stringify({ id:b.id, calId:b.calId, raw:b.raw, s:s.toISOString(), e:e.toISOString(),
         title:renamed ? t : "", was:new Date(b.s).toISOString() }),
-        onBusy: () => calToast(`Google Calendar is busy. Trying again to save ${what}...`, 5000) });
+        onBusy: () => calToast(`Google Calendar is busy. Trying again to save ${what}…`, 5000) });
     } catch (err) {
       delete PEND[k]; show();
       calToast(failSay(err, `save the ${renamed ? "change" : "move"}`, `${shortName(b)} is back where it was`), 8000);
