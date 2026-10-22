@@ -609,6 +609,7 @@
   .sheet input.mq-tq { width:62px; flex:none; margin:0; padding:3px 6px; border-radius:8px; font-size:15px; text-align:right; font-variant-numeric:tabular-nums; }
   .sheet .mq-row input.mq-tq { width:52px; padding:2px 5px; }
   .mq-take small { max-width:110px; font-size:10.5px; line-height:1.2; text-align:right; overflow-wrap:anywhere; }
+  .mq-all { margin-left:4px; padding:1px 8px; border:1px solid rgba(95,211,196,.8); border-radius:999px; background:transparent; color:var(--ink); font:inherit; font-size:11px; cursor:pointer; }
   .mq-sw { flex:none; width:44px; min-height:44px; padding:0; border:0; border-left:1px solid var(--glass-border); border-radius:0 10px 10px 0; background:transparent; color:var(--ink); font:inherit; font-size:17px; cursor:pointer; }
   .mq-sw[aria-expanded="true"] { background:rgba(95,211,196,.18); }
   span.mq-sw { visibility:hidden; }
@@ -1024,7 +1025,7 @@
 <script src="quest-gymlog.js?v=20261019a"></script>
 <script src="quest-meals.js?v=20261022d90"></script>
 <script src="quest-food-score.js?v=20261021d87t"></script>
-<script src="quest-kitchen.js?v=20261021h81b"></script>
+<script src="quest-kitchen.js?v=20261022k12"></script>
 <script src="quest-ideas.js?v=20261022d90"></script>
 <script src="quest-recipe-data.js?v=202610221019"></script>
 <script src="quest-recipes.js?v=20261022d91c"></script>
@@ -2781,10 +2782,12 @@
     const xKeyOf = (d, n) => kitEatKey(k, d.id + "+", QM.xKey(n));
     const xWord = (d, x) => { const tk = QK() && QK().taken(G.kitchen, xKeyOf(d, x.n)), it = tk && QK().item(G.kitchen, tk.id);
       return !it || it.del ? "not in the kitchen, nothing taken off" : kitLeftWord(it, tk); };
+    const xLeft = (d, x) => { const tk = QK() && QK().taken(G.kitchen, xKeyOf(d, x.n)), it = tk && QK().item(G.kitchen, tk.id);
+      return tk && !tk.nq ? kitLeftQ(it, x.u) : 0; };
     // tag: the small word under the food ("added" on a part dish, "added this time" in a plain dish's list, none in What did you eat?)
     const xRow = (d, x, tag = "added") => `<div class="mq-row tk"><button type="button" class="mq-ing" data-xoff="${esc(d.id)}" data-xn="${esc(x.n)}" aria-pressed="true">` +
       `<span class="bx"></span><span class="n">${esc(x.n)}${tag ? `<small class="mq-hv">${tag}</small>` : ""}</span></button>` +
-      `${tookLabel(`data-xq="${esc(d.id)}" data-xn="${esc(x.n)}"`, x.q, x.u, xWord(d, x), `How much ${x.n} went in`)}</div>`;
+      `${tookLabel(`data-xq="${esc(d.id)}" data-xn="${esc(x.n)}"`, x.q, x.u, xWord(d, x), `How much ${x.n} went in`, xLeft(d, x))}</div>`;
     /* The kitchen buttons (Junyan, 2026-10-21: "I only need ingredients when I expand something like Super veggie"; d86: he
        would rather tap kitchen foods than type, and the What did you eat? box sat in the wrong place). Inside the open meal:
        a search field, then what the kitchen in use has (an amount above 0, or no number) as small buttons in food groups
@@ -3223,19 +3226,31 @@
   function kitTakeWrap(key, btn, side){
     const tk = key && QK() && QK().taken(G.kitchen, key), it = tk && QK().item(G.kitchen, tk.id);
     if (!tk || !it || it.del) return `<div class="mq-row">${btn}${side || ""}</div>`;
-    return `<div class="mq-row tk">${btn}${tookLabel(`data-take="${esc(key)}"`, tk.q, tk.u, kitLeftWord(it, tk), `How much ${it.name} this meal took`)}${side || ""}</div>`;
+    return `<div class="mq-row tk">${btn}${tookLabel(`data-take="${esc(key)}"`, tk.q, tk.u, kitLeftWord(it, tk), `How much ${it.name} this meal took`, tk.nq ? 0 : kitLeftQ(it, tk.u))}${side || ""}</div>`;
   }
   /* the "took [30] g" field over its words (what is left), for a dish tick and an extra; attrs: the data-* the handler reads
      (already escaped). The words are the label's only small: the change handlers update them in place. */
-  const tookLabel = (attrs, q, u, word, aria) => `<label class="mq-take"><span class="mq-tqw"><span>took</span>` +
+  /* left: what the kitchen still has, in the same unit; above 0 it puts an All button beside the words, which adds it to
+     what this meal took (Junyan, 2026-10-22, d11: he used the whole pack and the guessed portion left some behind) */
+  const tookLabel = (attrs, q, u, word, aria, left) => `<label class="mq-take"><span class="mq-tqw"><span>took</span>` +
     `<input class="mq-tq" type="number" inputmode="decimal" min="0" step="any" ${attrs} value="${q == null ? "" : esc(String(q))}" placeholder="?" aria-label="${esc(aria)}">` +
-    `<span>${kitUnit(u)}</span></span><small>${esc(word)}</small></label>`;
+    `<span>${kitUnit(u)}</span></span><small>${esc(word)}${left > 0 ? ` <button type="button" class="mq-all" data-tall="${left}" aria-label="Took all of it">All</button>` : ""}</small></label>`;
+  // what is left of a kitchen item for that All button, when it is kept in the unit the meal takes it in, else 0
+  const kitLeftQ = (it, u) => it && !it.del && QK().hasQ(it) && it.left > 0 && kitUnit(it.u) === kitUnit(u) ? it.left : 0;
   // what the kitchen has of an item, in a list: "have 300 g", "none left", or "how many?" when it has no number (levels retired, 2026-10-21)
   const kitHaveWord = x => QK().hasQ(x) ? (x.lv === 0 ? "none left" : `have ${x.amt}`) : QK().ASK;
   // beside a "took": what is left of an amount item; an item with no number (d70) had nothing taken off
   const kitLeftWord = (it, tk) => tk && tk.nq ? "nothing taken off" : it.lv === 0 ? "none left" : `${it.amt} left`;
   function kitMealBind(sh, mk, redraw, b, after){
     if (!QK()) return;
+    // d11: All (dish ticks and added foods alike) adds what is left to the box, then saves it the way a typed amount is saved
+    sh.querySelectorAll("[data-tall]").forEach(bn => bn.onclick = e => {
+      e.preventDefault();   // inside the label: no focus on the box, so no keyboard
+      const inp = bn.closest(".mq-take") && bn.closest(".mq-take").querySelector("input");
+      if (!inp || !inp.onchange) return;
+      inp.value = Math.round(((+QK().numOf(inp.value) || 0) + +bn.dataset.tall) * 10) / 10;
+      inp.onchange(); bn.remove();
+    });
     sh.querySelectorAll("[data-take]").forEach(inp => inp.onchange = () => {
       const v = QK().numOf(inp.value);   // ".5" and "½" are half (2026-10-21)
       const K2 = QK().setTake(G.kitchen, inp.dataset.take, isNaN(v) ? 0 : v, now());
@@ -3499,7 +3514,7 @@
         (k === "travel" ? `<button type="button" class="kt-chip" id="kBring">Add from Home</button>` : "") + `</div>` +
         /* the filters (d34): All, To buy, and (since the levels were retired, 2026-10-21) the items with no number yet, the
            way through setting up. No level key and no tap-to-step hint any more. */
-        `<div class="kt-tools" role="group" aria-label="Show">${[["all", "All", all.length], ["buy", "To buy", all.filter(x => QK().shows(x, "buy", t, shop.at)).length],
+        `<div class="kt-tools" role="group" aria-label="Show">${[["all", "All", all.filter(x => QK().shows(x, "all", t, shop.at)).length], ["buy", "To buy", all.filter(x => QK().shows(x, "buy", t, shop.at)).length],
           ["new", "No number yet", all.filter(x => QK().shows(x, "new", t, shop.at)).length]].map(([f, n, c]) =>
           `<button type="button" class="kt-chip" data-kf="${f}" aria-pressed="${S.f === f}">${n} ${c}</button>`).join("")}</div>` +
         (S.edit ? `<div class="kt-editbar" role="status"><span>Editing: tap an item to change or delete it</span><button type="button" id="kEditDone">Done</button></div>`
@@ -3690,17 +3705,20 @@
      a place a held tile can be dropped (data-kdrop: "shelf|group"; an empty group keeps the item's own). */
   function kitShelves(S, K, k, shop, t){
     const q = S.q.trim().toLowerCase(), tz = TZ();
-    const all = QK().items(K, k), shown_ = x => S.keep.has(x.id) || ((!q || x.name.toLowerCase().includes(q)) && QK().shows(x, S.f, t, shop.at));
+    // d12: All hides what is used up, but a search or Edit still finds it (to set a number or delete it)
+    const f = S.f === "all" && (q || S.edit) ? "any" : S.f;
+    const all = QK().items(K, k), shown_ = x => S.keep.has(x.id) || ((!q || x.name.toLowerCase().includes(q)) && QK().shows(x, f, t, shop.at));
     const html = QK().KITCHENS[k].shelves.map(sh => {
       const mine = all.filter(x => x.shelf === sh.id), shown = mine.filter(shown_);
       if (!shown.length && (q || S.f !== "all")) return "";
-      const buy = mine.filter(x => QK().shows(x, "buy", t, shop.at)).length, grey = mine.filter(x => !QK().hasQ(x)).length;
+      const buy = mine.filter(x => QK().shows(x, "buy", t, shop.at)).length, grey = mine.filter(x => !QK().hasQ(x)).length,
+        have = mine.filter(x => QK().shows(x, "all", t, shop.at)).length;
       return `<div class="kt-shelf" data-ksh="${sh.id}"><div class="kt-sh" data-kdrop="${sh.id}|"><div class="kt-lb ${sh.cls}"><span>${esc(sh.name)}</span>` +
-        `<small>${mine.length} item${mine.length === 1 ? "" : "s"}${buy ? `, ${buy} to buy` : ""}${grey ? `, ${grey} with no number` : ""}</small></div>` +
+        `<small>${have} item${have === 1 ? "" : "s"}${buy ? `, ${buy} to buy` : ""}${grey ? `, ${grey} with no number` : ""}</small></div>` +
         `<button type="button" class="kt-pen" data-kedit aria-pressed="${S.edit}" aria-label="${S.edit ? "Stop editing" : "Edit items"}">✏️</button></div>` +
         (shown.length ? QK().grouped(shown).map(g => `<div class="kt-grp" data-kdrop="${sh.id}|${esc(g.group)}"><p class="kt-gh">${esc(g.group)}</p>` +
           `<div class="kt-items">${g.list.map(x => kitTile(x, S, t, shop, tz)).join("")}</div></div>`).join("")
-          : `<p class="kt-hint" data-kdrop="${sh.id}|">Nothing here yet.</p>`) + `</div>`;
+          : `<p class="kt-hint" data-kdrop="${sh.id}|">${mine.length ? "All used up. It is on the Shopping list." : "Nothing here yet."}</p>`) + `</div>`;
     }).join("");
     return html || `<p class="kt-hint">${q ? "Nothing matches." : S.f === "buy" ? "Nothing to buy." : "Everything has a number."}</p>`;
   }

@@ -34,7 +34,7 @@ test("d71: every row (part dishes, plain dishes, his own, extras, From your kitc
   const wrap = html.slice(html.indexOf("function kitTakeWrap("), html.indexOf("const kitHaveWord"));
   assert.match(wrap, /return `<div class="mq-row">\$\{btn\}\$\{side \|\| ""\}<\/div>`/);
   assert.match(wrap, /<div class="mq-row tk">\$\{btn\}\$\{tookLabel\(`data-take=/);
-  assert.match(html, /const tookLabel = \(attrs, q, u, word, aria\) => `<label class="mq-take"><span class="mq-tqw"><span>took<\/span>`/);
+  assert.match(html, /const tookLabel = \(attrs, q, u, word, aria, left\) => `<label class="mq-take"><span class="mq-tqw"><span>took<\/span>`/);
   const x = sheet.slice(sheet.indexOf("const xRow ="), sheet.indexOf("const xResults"));
   assert.match(x, /<div class="mq-row tk"><button type="button" class="mq-ing" data-xoff=/);
   assert.match(x, /\$\{tookLabel\(`data-xq=/);
