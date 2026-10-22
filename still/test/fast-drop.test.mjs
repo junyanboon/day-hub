@@ -158,5 +158,13 @@ test("the agenda draws ghosts, and the once-a-second redraw waits while a block 
   assert.match(fn("function agendaBlocks("), /withGhosts\(merged, GHOST, Date\.now\(\)\)/);
   assert.match(html, /setInterval\(\(\) => \{ tick\(\); if \(!\$\("sheet"\)\.classList\.contains\("open"\) && !\(DRAG && DRAG\.live\)\) render\(\); \}, 1000\);/);
   // a pull in between keeps his changes still on their way
-  assert.match(fn("async function pullAll("), /if \(OPS !== opsWas\) OPS_WAIT\.forEach\(m => m\(OPS\)\)/);
+  // only when this pull's own copy replaced the edit layer, so a save's turn that already put them back is not doubled
+  assert.match(fn("async function pullAll("), /pullOps\(\)\.then\(got => \{ if \(got\) OPS_WAIT\.forEach\(m => m\(OPS\)\); \}\)/);
+  assert.match(fn("async function pullOps("), /const late = QuestOffline\.pendingOps/);
+});
+
+test("a gym reschedule lands at once and the sheet closes before the calendar answers; a failure puts it back", () => {
+  const f = fn("async function moveGymNow(");
+  assert.ok(f.indexOf("closeSheet(); redrawCal();") < f.indexOf('"/cal/event"'));
+  assert.match(f, /catch \(err\) \{ delete PEND\[k\]; redrawCal\(\); calToast\(/);
 });

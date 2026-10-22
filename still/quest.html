@@ -1318,11 +1318,15 @@
     await flushOps();
     // an edit made on this phone that has not gone up yet stands over the server's copy and the saved one
     const out = QuestOffline.pendingOps(readJSON(OPS_OUT, {}), dayKey());
-    if (out) { OPS = out; return; }
+    if (out) { OPS = out; return true; }
     const r = await fetch(API + "/ops?d=" + encodeURIComponent(dayKey()), { cache:"no-store", signal:quick() });
-    if (!r.ok) return;
+    if (!r.ok) return false;
     const d = await r.json();
-    if (d && d.date === dayKey()) OPS = { edits:d.edits||{}, drops:d.drops||[], adds:d.adds||[], ts:d.ts||0 };
+    // a change queued on this phone while the server answered still stands over the answer (2026-10-22)
+    const late = QuestOffline.pendingOps(readJSON(OPS_OUT, {}), dayKey());
+    if (late) { OPS = late; return true; }
+    if (d && d.date === dayKey()) { OPS = { edits:d.edits||{}, drops:d.drops||[], adds:d.adds||[], ts:d.ts||0 }; return true; }
+    return false;
   }
   /* Notion task ticks made offline (done, undo, note) wait here in order and go up on the next pull (2026-10-17).
      Only a network failure queues; an answer from still-api that says no is shown as before. */
@@ -1373,9 +1377,8 @@
       }
       pullAgenda().then(() => { saveSnap(); if (!$("sheet").classList.contains("open")) render(); }).catch(() => {});
       // one answer missing offline no longer blanks the rest (2026-10-17)
-      const opsWas = OPS;
-      await Promise.all([pullOps().catch(() => {}), pullTasks().catch(() => {}), pullState()]);
-      if (OPS !== opsWas) OPS_WAIT.forEach(m => m(OPS));   // his changes still on their way stay where he put them
+      // his changes still on their way stay where he put them, put back right after this pull's own copy lands
+      await Promise.all([pullOps().then(got => { if (got) OPS_WAIT.forEach(m => m(OPS)); }).catch(() => {}), pullTasks().catch(() => {}), pullState()]);
       seedFromOura();
       undoTimedPay();
       settleTicks();
@@ -5144,11 +5147,12 @@
   async function moveGymNow(b, o, what, from, k){
     const r = placeOwn(b.game ? b : { ...b, key:"new" }, new Date(o.s), new Date(o.e), true);   // only this one moves
     if (r.hit) o = { ...o, s:+r.s, e:+r.e, label:QG().label(+r.s, TZ()) };
+    // it lands on the new day at once and the sheet closes; the calendar saves behind it (2026-10-22, "slow and glitchy")
+    PEND[k] = { s:+o.s, e:+o.e, at:Date.now() }; closeSheet(); redrawCal();
     try {
-      PEND[k] = { s:+o.s, e:+o.e, at:Date.now() };
       await qfetch("/cal/event", { method:"POST", body:JSON.stringify({ id:b.id, calId:b.calId, raw:b.raw, s:new Date(o.s).toISOString(),
         e:new Date(o.e).toISOString(), title:"", note:`moved by Junyan from ${from}` }) });
-    } catch (err) { delete PEND[k]; calToast(`Could not move it (${err.message}). It is still at ${from}.`, 7000); return; }
+    } catch (err) { delete PEND[k]; redrawCal(); calToast(`Could not move it (${err.message}). It is still at ${from}.`, 7000); return; }
     const prev = (G.gymMoves = G.gymMoves || {})[b.id], iso = new Date(+b.s).toISOString();
     // a session the planner placed keeps its slot key, so its old week is not filled again either way
     const key = (prev && prev.key) || (Object.entries(G.gymPlan || {}).find(([, v]) => v && !v.failed && Math.abs(Date.parse(v.s) - +b.s) < 60000) || [])[0] || null;
@@ -5157,7 +5161,6 @@
     clearMoveOpts();
     for (const d in PLANS) delete PLANS[d];
     store.set(GYM_AT, "");
-    closeSheet();
     calToast(`${r.hit ? snapSay(b, r) + " " : ""}${what}: ${o.label}. Saved to Google Calendar${b.cal ? ` (${b.cal})` : ""}.`);
     try { if (b.game && OPS.edits[b.key]) await writeOps(x => { delete x.edits[b.key]; }); await pushG(); await pullAll(); } catch {}
     if (window.QuestMorning && QuestMorning.isOpen()) QuestMorning.redraw();
