@@ -106,11 +106,11 @@ test("the small line names the block a glass counts toward, and reads thirsty? a
 
 // ---- through the day (Junyan, 2026-10-20, d16): supplements, fermented food and xylitol on the water card ----
 test("three through-the-day buttons: aims, hints and a green done", () => {
-  assert.deepEqual(J(W.DAY3.map(r => [r[0], r[2], r[3], r[4]])), [["supps", "Supplements", 1, ""], ["ferment", "Fermented", 1, ""], ["xylitol", "Xylitol", 6, "g"]]);
-  assert.equal(W.itemLine(W.DAY3[0], 0), "0 / 1 · after a meal");
-  assert.equal(W.itemLine(W.DAY3[1], 0), "0 / 1 · 100 g yogurt, kefir or kraut");
-  assert.equal(W.itemLine(W.DAY3[2], 3), "3 / 6g · 1 g after eating");
-  assert.equal(W.itemLine(W.DAY3[2], 6), "✓ done"); assert.equal(W.itemLine(W.DAY3[0], 2), "✓ done");
+  assert.deepEqual(J(W.DAY3.map(r => [r[0], r[2], r[3], r[4]])), [["supps", "Supps", 1, ""], ["ferment", "Ferment", 1, ""], ["xylitol", "Xylitol", 6, "g"]]);
+  assert.equal(W.itemLine(W.DAY3[0], 0), "0/1");
+  assert.equal(W.hintLine(W.DAY3[1]), "100 g yogurt, kefir or kraut");
+  assert.equal(W.itemLine(W.DAY3[2], 3), "3/6 g");
+  assert.equal(W.itemLine(W.DAY3[2], 6), "✓"); assert.equal(W.itemLine(W.DAY3[0], 2), "✓");
   assert.doesNotMatch(W.DAY3.flat().join(" "), /[–—]/);
 });
 

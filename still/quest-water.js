@@ -41,8 +41,8 @@
   }
   // [habit id, icon, name, aim, unit, hint] (2026-10-20, d16)
   const DAY3 = [
-    ["supps", "💊", "Supplements", 1, "", "after a meal"],
-    ["ferment", "🥛", "Fermented", 1, "", "100 g yogurt, kefir or kraut"],
+    ["supps", "💊", "Supps", 1, "", "after a meal"],
+    ["ferment", "🥛", "Ferment", 1, "", "100 g yogurt, kefir or kraut"],
     ["xylitol", "🍬", "Xylitol", 6, "g", "1 g after eating"],
   ];
   // every entry still counted, oldest first; kind picks the through-the-day taps, none the glasses
@@ -56,11 +56,13 @@
   function addItem(g, o) {
     return { ...obj(g), [o.id]: { at: o.at, kind: o.kind, hour: o.hour, d: o.d || 0, ...(o.c ? { c: 1 } : {}) } };
   }
-  // the small line under a through-the-day button: n is how many times the habit counts today
+  // the small line under a through-the-day button: n is how many times the habit counts today. Just the count, so
+  // the three fit a phone (Junyan, 2026-10-22: "drop words so things fit"); the hint is the button's label (hintLine)
   function itemLine(row, n) {
-    const [, , , aim, unit, hint] = row;
-    return n >= aim ? "✓ done" : `${n} / ${aim}${unit} · ${hint}`;
+    const [, , , aim, unit] = row;
+    return n >= aim ? "✓" : `${n}/${aim}${unit ? " " + unit : ""}`;
   }
+  const hintLine = (row) => row[5];
   function add(g, o) {
     return { ...obj(g), [o.id]: { at: o.at, blk: o.blk || "none", name: o.name || "", hour: o.hour, d: o.d || 0 } };
   }
@@ -81,5 +83,5 @@
   // what the next glass pays: water's old value per cup, nothing past the old daily limit
   const pay = (g, value, cap) => (active(g).length >= cap ? 0 : value);
 
-  root.QuestWater = { AIM, BY4, ML, CUT, DAY3, markerPct, late, button, tail, active, entries, add, addItem, itemLine, undo, summary, byBlock, pay };
+  root.QuestWater = { AIM, BY4, ML, CUT, DAY3, markerPct, late, button, tail, active, entries, add, addItem, itemLine, hintLine, undo, summary, byBlock, pay };
 })(typeof window !== "undefined" ? window : globalThis);

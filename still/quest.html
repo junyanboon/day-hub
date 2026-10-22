@@ -227,9 +227,10 @@
   .wq-it.met { border-color:rgba(143,227,176,.75); } .wq-it.met small { color:#8fe3b0; font-weight:600; }
   /* the gut log (2026-10-22, d2): count, Bristol type, sticky, blood, urgency (quest-gut.js) */
   .gq { flex-direction:column; align-items:stretch; gap:8px; }
-  .gq-row { display:flex; align-items:center; gap:6px; flex-wrap:wrap; font-size:12px; color:var(--ink-soft); }
-  .gq-row > span:first-child { width:62px; flex:none; }
-  .gq button { min-width:34px; height:32px; padding:0 8px; border-radius:10px; background:var(--glass); border:1px solid var(--glass-border);
+  .gq-row { display:flex; align-items:center; gap:4px; font-size:12px; color:var(--ink-soft); }
+  .gq-row > span:first-child { width:54px; flex:none; }
+  .gq-row > button { flex:1 1 0; max-width:44px; } .gq-row > button[data-gut="sticky"], .gq-row > button[data-gut="blood"] { max-width:none; }
+  .gq button { min-width:0; height:32px; padding:0 4px; border-radius:10px; background:var(--glass); border:1px solid var(--glass-border);
     color:var(--ink); font:inherit; font-size:13px; cursor:pointer; touch-action:manipulation; -webkit-tap-highlight-color:transparent; }
   .gq button.on { border-color:#8fe3b0; background:rgba(143,227,176,.22); font-weight:600; }
   .gq button.bad.on { border-color:#ff8f8f; background:rgba(255,143,143,.22); }
@@ -1029,7 +1030,7 @@
 <script src="quest-night.js?v=20261020end2"></script>
 <script src="quest-basics.js?v=20261020a"></script>
 <script src="quest-suggest.js?v=20261019a"></script>
-<script src="quest-water.js?v=20261020p"></script>
+<script src="quest-water.js?v=20261022c1"></script>
 <script src="quest-gut.js?v=20261022g1"></script>
 <script src="quest-library.js?v=20261022b1"></script>
 <script src="quest-gym.js?v=20261019x"></script>
@@ -1741,7 +1742,7 @@
   function dayItemsHTML(){
     if (!QW().DAY3) return "";   // an older cached quest-water.js: the glasses still work
     return `<div class="wq-day">${QW().DAY3.map(row => { const [id, icon, nm, aim] = row, n = habitN(id), met = n >= aim;
-      return `<button type="button" class="wq-it${met ? " met" : ""}" data-day="${id}" data-icon="${esc(icon)}" aria-label="${esc(nm)}: ${esc(QW().itemLine(row, n))}">` +
+      return `<button type="button" class="wq-it${met ? " met" : ""}" data-day="${id}" data-icon="${esc(icon)}" aria-label="${esc(nm)}: ${esc(QW().itemLine(row, n))}, ${esc(QW().hintLine ? QW().hintLine(row) : "")}" title="${esc(QW().hintLine ? QW().hintLine(row) : "")}">` +
         `<span class="e">${icon}</span><b>${esc(nm)}</b><small>${esc(QW().itemLine(row, n))}</small></button>`; }).join("")}</div>`;
   }
   /* One tap pays the habit's own value (habitGain: same value, meter and daily limit as before). It is saved like a glass,
@@ -3435,11 +3436,11 @@
     const k = kitToday(), noted = QK().noteActive(G.kitchen, gameYmd(), k);
     if (noted) kitSave(noted);   // once a day on a travel-fridge day, so the trip's end can be seen
     const kn = QK().KITCHENS[k], c = QK().counts(G.kitchen, k, now(), kitShop(k).at), end = kitTripEnd();
-    const bits = end.ask ? ["Trip over: bring any of this home?"]
-      : [c.low ? `${c.low} to buy` : "", c.soon ? `${c.soon} running low soon` : "", c.unchecked ? `${c.unchecked} with no number yet` : "",
-        !c.total ? "empty" : ""].filter(Boolean);
-    return `<button type="button" class="sq kq${end.ask ? " ask" : ""}" data-kitchen><span class="sq-i">🧺</span>` +
-      `<span class="sq-t">Kitchen · ${kn.icon} ${esc(kn.name)}<small>${esc(bits.join(" · ") || "Nothing low")}</small></span><span class="kq-go">›</span></button>`;
+    /* one plain line (Junyan, 2026-10-22: "Kitchen travel fridge is too confusing"): Kitchen, and what to buy. On a trip
+       the icon is the van, with no kitchen name; running low, unchecked and which kitchen are inside the sheet */
+    const line = end.ask ? "Trip over: bring food home?" : !c.total ? "Empty" : c.low ? `${c.low} to buy` : "All stocked";
+    return `<button type="button" class="sq kq${end.ask ? " ask" : ""}" data-kitchen aria-label="Kitchen, ${esc(kn.name)}: ${esc(line)}"><span class="sq-i">${k === "travel" ? kn.icon : "🧺"}</span>` +
+      `<span class="sq-t">Kitchen<small>${esc(line)}</small></span><span class="kq-go">›</span></button>`;
   }
   /* The kitchen sheet. KS keeps what he chose while it is open (the sheet redraws on every tap): which kitchen he is
      looking at, the tab, the search, the filter (f: all, buy, new; d34), edit mode, the trip-end ticks, the add pickers
