@@ -1025,7 +1025,7 @@
     src:url(fonts/figtree-latin.woff2) format("woff2"); }
 </style>
 <script src="keeps.js?v=20261009k"></script>
-<script src="bag.js?v=20261019a"></script>
+<script src="bag.js?v=20261023a"></script>
 <script src="quest-merge.js?v=20261022g1"></script>
 <script src="quest-oura.js?v=20261019a"></script>
 <script src="quest-levels.js?v=20261016b"></script>
@@ -2369,9 +2369,6 @@
     G.day.checks[gk(b)] = late ? "late" : "in";
     G.day.started = G.day.started || {}; G.day.started[gk(b)] = now().toISOString();
     log(`Started ${shortName(b)}`); saveG();
-    // the bag hands out tools at real moments
-    if (isSadhana(b)) giveItem("breath", "After Shambhavi.");
-    if (isSleep(b) && !late) giveItem("lantern", "On-time bedtime.");
     G.day.onRun = late ? 0 : (G.day.onRun || 0) + 1;
     if (G.day.onRun >= 3) G.day.onRun = 0;   // the Buffer Stone it gave pushed the day (retired 2026-10-19, d50)
     render();
@@ -2497,7 +2494,6 @@
   function closeOut(b, how){
     G.day.closes[gk(b)] = how;
     if (G.day.checks[gk(b)] === "in" || G.day.checks[gk(b)] === "late") spend(b);
-    if (how === "done" && groupOf(b) === "work") giveItem("bell", `Closed ${shortName(b)}.`);
     if (how === "done") { log(`Closed ${shortName(b)}`); saveG(); }
     else if (how === "carried") { log(`Carried ${shortName(b)} forward`); saveG(); }
     render();
@@ -4356,7 +4352,7 @@
     $("sheet").querySelectorAll("[data-tick]").forEach(bn => bn.onclick = () => {
       const i = bn.dataset.tick; W.tick[i] = !W.tick[i]; (W.t = W.t || {})[i] = now().toISOString();   // W.t: merges per step
       const pop = prepFx(bn, W.tick[i], (I.items[i] || {}).t);
-      if (n && I.items.every((_, i) => W.tick[i]) && !W.scout) { W.scout = true; giveItem("scout", `Prepped ${shortName(b)}.`); }
+      if (n && I.items.every((_, i) => W.tick[i]) && !W.scout) W.scout = true;
       saveG();
       const top = $("sheet").scrollTop; openWork(b); $("sheet").scrollTop = top;
       if (pop) pop();
@@ -4864,36 +4860,18 @@
   }
   $("gear").onclick = openSettings;
 
-  /* ---------- the bag (d103, ticket 11): tools used in the moment, not rewards ----------
-     bag.js draws it (video-game grid, drag and drop, illustrated items); this
-     wires each item to what it does in the day and hands items out at real moments. */
+  /* ---------- the bag: keepsakes only ----------
+     Items are gone (Junyan, 2026-10-23: "Let's completely remove the items system"; a Recovery Lotus
+     kept coming). bag.js still draws the keepsake shelf; any item left in it is cleared. */
   const hasBag = () => typeof window.Bag !== "undefined";
-  function giveItem(id, why){
-    if (!hasBag()) return;
-    try { Bag.give(id, 1, why); } catch {}
-  }
+  const noItems = () => { const g = G.bag; if (!g) return;
+    for (const k of ["slots", "quick"]) if (Array.isArray(g[k])) g[k] = g[k].map(id => id && String(id).startsWith("k:") ? id : null);
+    g.counts = {}; delete g.timer; };
   const BAG_CTX = {
-    getState: () => G,
+    getState: () => (noItems(), G),
     save: () => saveG(),
     openBag: () => openBag(),
-    actions: {
-      // a water item still in the bag counts one glass on the water card (2026-10-19, d24: water lives only there)
-      water: async () => { addGlass(null); return `1 glass logged. ${QW().summary(G.day.glasses).ml.toLocaleString()} ml today.`; },
-      breath: async (item, o = {}) => { if (o.completed) { addPrana(Math.round(3 * gainMult()), "Breath reset", "breath"); render(); return "Reset done. Carry it into the next thing."; } return "Stopped early. That still counts as a pause."; },
-      // the Buffer Stone and the Trail Map pushed the rest of the day; nothing slides now (Junyan, 2026-10-19, d50), so they
-      // do nothing: one still in the bag says so and is not used up (bag.js keeps an item whose action throws)
-      buffer: async () => { throw new Error("the Buffer Stone is retired: Day Quest no longer moves your plan"); },
-      map: async () => { throw new Error("the Trail Map is retired: Day Quest no longer slides your day"); },
-      scout: async () => { const t = now(), n = blocks().find(b => b.s > t && ["work", "major", "travel"].includes(groupOf(b)) && !INSIGHTS[gk(b)]);
-        if (!n) return "Everything coming up already has a prep list.";
-        (G.research = G.research || []).push({ key:gk(n), title:n.t, s:n.s.toISOString() }); saveG();
-        return `The scout is on ${shortName(n)}. Its list lands on the next run (6 AM or 8 PM).`; },
-      lantern: async () => { G.day.windDown = now().toISOString(); saveG(); const sl = blocks().find(isSleep), wd = blocks().find(x => x.basic === "winddown" && x.e > now());
-        return `Wind-down started. Phone on the charger, lights low${sl ? `. Bed at ${fmtT(sl.s)}` : ""}${wd ? ". Your Wind-down list is on the plan" : ""}.`; },
-      lotus: async (item, o = {}) => { const r = RECOVER.find(x => x[0] === o.choice) || RECOVER[0]; startNow(r[0], r[1]); return `${r[0]} for ${r[1]} min. It's on your plan now.`; },
-      bell: async (item, o = {}) => `Focus until ${fmtT(new Date(o.endsAt || +now() + 50 * 60000))}.`,
-      relive: item => log(`Relived: ${item.name}`),
-    },
+    actions: { relive: item => log(`Relived: ${item.name}`) },
   };
   function openBag(){
     if (!hasBag()) return;
@@ -6743,7 +6721,6 @@
     $("habits").querySelectorAll("[data-kitchen]").forEach(bn => bn.onclick = () => openKitchen({}));
     $("habits").querySelectorAll("[data-day]").forEach(bn => bn.onclick = () => addDayItem(bn.dataset.day, bn));
     $("habits").querySelectorAll("[data-night]").forEach(bn => bn.onclick = openNight);
-    if (PLAN && !z && body() < 40 && !G.day.lotusGiven) { G.day.lotusGiven = true; giveItem("lotus", "Your energy is low today."); }
     if ($("bMorning")) $("bMorning").onclick = () => openMorning();
     // a ?morning=1 link opens the morning straight away, any time of day
     if ((qs.get("morning") || qs.get("brief")) && PLAN && !openMorning.auto) { openMorning.auto = true; setTimeout(() => openMorning(), 600); }
