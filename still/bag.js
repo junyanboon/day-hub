@@ -443,16 +443,10 @@ ${eye(47)}${eye(73)}
     return `<button class="bag-timer" data-bag-timer>${art('bell', 'bag-timer-ico')}<span data-bag-tleft>${mmss((b.timer.end - Date.now()) / 1000)}</span></button>`;
   }
   function bagHTML(b) {
-    const used = b.slots.filter(Boolean).length;
     return `<div class="bag-panel">
       <span class="bag-rivet tl"></span><span class="bag-rivet tr"></span><span class="bag-rivet bl"></span><span class="bag-rivet br"></span>
-      <div class="bag-head"><div class="bag-title">Bag</div><div class="bag-cap">${used} / ${GRID}</div></div>
-      <div class="bag-grid">${b.slots.map((_, i) => sockHTML(b, 's:' + i)).join('')}</div>
-      <div class="bag-qhead"><span class="bag-qlabel">Quick bar</span>${timerChip(b)}</div>
-      <div class="bag-quick">${b.quick.map((_, i) => sockHTML(b, 'q:' + i, i + 1)).join('')}</div>
-      <div class="bag-qhead"><span class="bag-qlabel">Keepsakes</span></div>
+      <div class="bag-head"><div class="bag-title">Keepsakes</div></div>
       <div class="bag-shelf">${shelfHTML()}</div>
-      <div class="bag-hint">Tap an item to look closer. Hold it to move it.</div>
     </div>`;
   }
   function shelfHTML() {

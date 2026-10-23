@@ -74,7 +74,6 @@ test("prep lists (the insight agent's) are tiles in the window and in the planne
   assert.ok(!/class="wck\$\{W\.tick\[i\]/.test(ow), "no checkbox rows in the window");
   assert.match(ow, /prepTile\(/);
   assert.match(ow, /data-tick/);
-  assert.match(ow, /giveItem\("scout"/, "finishing the list still gives the Scout Owl");
   const md = fn("function moDetail(");
   // only a hotel desk list (tick plus a typed answer) keeps its rows
   assert.match(md, /\$\{bk \? items\.map\(\(x, i\) => `<button class="mo-ck/, "no checkbox rows in the planner but the desk list");
@@ -90,8 +89,6 @@ test("no button or item pushes today's plan", () => {
     assert.ok(!html.includes(gone), gone);
   assert.ok(!/giveItem\("(buffer|map)"/.test(html), "the Buffer Stone and Trail Map are no longer handed out");
   const ctxSrc = html.slice(html.indexOf("const BAG_CTX"), html.indexOf("function openBag("));
-  assert.match(ctxSrc, /buffer: async \(\) => \{ throw /, "an old Buffer Stone moves nothing and stays in the bag");
-  assert.match(ctxSrc, /map: async \(\) => \{ throw /, "an old Trail Map moves nothing and stays in the bag");
   assert.ok(!/shiftFrom|openShiftMenu/.test(ctxSrc));
   assert.ok(!/Adds 15 minutes before your next block|Replans the rest of your day/.test(bag), "the bag says what they do now");
   assert.match(fn("function openRecover("), /rAbsorb/, "welcome back still offers Absorb it");
@@ -159,4 +156,13 @@ test("placeOwn can see adds placed earlier in the same batch", () => {
   const first = Q("caney", "09:00", "09:15", "Caney");
   const r = A.freeSlot([first], Q("dom", "09:00", "09:30", "Domestics"));
   assert.equal(at(r), "09:15-09:45");
+});
+
+/* ---------- 2026-10-23: the items system is gone ("Let's completely remove the items system") ---------- */
+test("no item is handed out, the bag keeps only keepsakes", () => {
+  assert.ok(!/giveItem|lotusGiven/.test(html), "nothing hands out items");
+  const ctxSrc = html.slice(html.indexOf("const BAG_CTX"), html.indexOf("function openBag("));
+  assert.ok(!/lotus|water|breath|bell|lantern|scout/.test(ctxSrc), "no item actions left");
+  assert.match(html, /const noItems = /, "items already in the bag are cleared");
+  assert.ok(!/bag-grid|Quick bar/.test(bag.slice(bag.indexOf("function bagHTML("), bag.indexOf("function shelfHTML("))), "the bag sheet shows no item grid");
 });
