@@ -79,7 +79,7 @@ test("the drop is the button: one compact row, no big +1 glass button, undo kept
   assert.match(add, /blk:b \? gk\(b\) : "none"/);
   assert.match(add, /calToast\(`1 glass of water logged\$\{where\}\.`, 6000, \(\) => undoGlass\(id\)\)/);
   assert.match(add, /waterCheer\(focused\)/);
-  assert.match(html, /prefers-reduced-motion: reduce\) \{ \.wq-drop\.hit \{ animation:none; \} \.wq-drop\.hit::after, \.wq-plus \{ display:none; \} \}/);
+  assert.match(html, /prefers-reduced-motion: reduce\) \{ \.wq-drop\.hit \{ animation:none; \} \.wq-drop\.hit::after, \.wq-plus \{ display:none; \} \.pips i\.pop \{ animation:none; \} \}/);
   assert.match(html, /querySelectorAll\("\[data-glass\]"\)\.forEach\(bn => bn\.onclick = \(\) => addGlass\(bn\)\)/);
 });
 
@@ -161,4 +161,39 @@ test("supps, ferment and xylitol keep their values and limits; the cap pays noth
   assert.equal(run("supps", 0), 2); assert.equal(run("supps", 1), 0);
   assert.equal(run("ferment", 0), 3); assert.equal(run("ferment", 1), 0);
   assert.equal(run("xylitol", 0), 1); assert.equal(run("xylitol", 9), 1); assert.equal(run("xylitol", 10), 0);
+});
+
+// ---- Pips (Junyan, 2026-10-24, d77, design C): 8 boxes on the water and steps cards ----
+test("pips: 8 boxes, gold on the 4 PM box (6) for water, only boxes earned since the last count pop", () => {
+  const P = (...a) => J(W.pips(...a)).map(p => (p.on ? "#" : ".") + (p.pop ? "!" : "") + (p.mark ? "*" : "")).join(" ");
+  assert.equal(P(0, null, 6), ". . . . . .* . .");
+  assert.equal(P(3, 2, 6), "# # #! . . .* . .");
+  assert.equal(P(3, null, 6), "# # # . . .* . .");   // a plain redraw pops nothing
+  assert.equal(P(12, 0, 8).split(" ").length, 8);
+});
+
+test("steps: one box per 1,000, and the shoe says how far the next box is (about 100 steps a minute)", () => {
+  assert.equal(W.stepBoxes(556), 0); assert.equal(W.stepBoxes(3000), 3); assert.equal(W.stepBoxes(12000), 8);
+  assert.equal(W.stepsNext(556), "Next box: 444 steps, about 4 min walk");
+  assert.equal(W.stepsNext(3000), "Next box: 1,000 steps, about 10 min walk");
+  assert.equal(W.stepsNext(7990), "Next box: 10 steps, about 1 min walk");
+  assert.match(W.stepsNext(8000), /All 8 boxes/);
+  assert.doesNotMatch(W.stepsNext(10) + W.stepsNext(9000), /[–—]/);
+});
+
+test("both cards share the pips design: titles start Steps and Water, the shoe is a tap that logs nothing", () => {
+  const st = html.slice(html.indexOf("function stepsHTML()"), html.indexOf("/* ---------- Water ("));
+  assert.match(st, /Steps · \$\{STEPS\.toLocaleString\("en-US"\)\} \/ 8,000/);
+  assert.match(st, /W\.pips\(W\.stepBoxes\(STEPS\), from, 8\), "pz"/);
+  assert.match(st, /data-shoe/);
+  assert.doesNotMatch(html, /Side quest ·/);
+  const shoe = html.slice(html.indexOf("function tapShoe("), html.indexOf("/* ---------- Water ("));
+  assert.match(shoe, /calToast\(QW\(\)\.stepsNext\(STEPS\), 3500\)/);
+  assert.doesNotMatch(shoe, /addHabit|addBody|saveG/);
+  const fn = html.slice(html.indexOf("function waterHTML()"), html.indexOf("function waterStamp()"));
+  assert.match(fn, /Water · <span class="wq-n">\$\{s\.total\} \/ \$\{W\.AIM\}<\/span>`/);
+  assert.match(fn, /W\.pips\(s\.total, from, W\.BY4\), "mk"/);
+  assert.doesNotMatch(html, /wq-bar|sq-bar/);
+  assert.match(html, /querySelectorAll\("\[data-shoe\]"\)\.forEach\(bn => bn\.onclick = \(\) => tapShoe\(bn\)\)/);
+  assert.match(html, /\.pips i\.pop \{ animation:pip-pop/);
 });

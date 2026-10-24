@@ -83,5 +83,22 @@
   // what the next glass pays: water's old value per cup, nothing past the old daily limit
   const pay = (g, value, cap) => (active(g).length >= cap ? 0 : value);
 
-  root.QuestWater = { AIM, BY4, ML, CUT, DAY3, markerPct, late, button, tail, active, entries, add, addItem, itemLine, hintLine, undo, summary, byBlock, pay };
+  /* Pips (Junyan, 2026-10-24, d77, design C): both cards show 8 boxes. Water: one a glass, box 6 (BY4) has the gold
+     4 PM outline. Steps: one per 1,000 steps, the last box carries the prize mark (+prana at 8,000). from is the
+     count before a tap or a new Oura read, so only boxes earned since then pop. */
+  const STEP_BOX = 1000, STEP_GOAL = 8000, STEPS_PER_MIN = 100;
+  function pips(filled, from, mark) {
+    const n = Math.max(0, Math.min(AIM, filled | 0)), f = from == null ? n : Math.max(0, Math.min(AIM, from | 0));
+    return Array.from({ length: AIM }, (_, i) => ({ on: i < n, pop: i < n && i >= f, mark: i + 1 === mark }));
+  }
+  const stepBoxes = (steps) => Math.min(AIM, Math.floor(Math.max(0, steps || 0) / STEP_BOX));
+  // the shoe's pop: how far to the next box, at about 100 steps a minute
+  function stepsNext(steps) {
+    const s = Math.max(0, steps || 0);
+    if (s >= STEP_GOAL) return "All 8 boxes full. Nice walking!";
+    const left = STEP_BOX - (s % STEP_BOX), min = Math.max(1, Math.round(left / STEPS_PER_MIN));
+    return `Next box: ${left.toLocaleString("en-US")} steps, about ${min} min walk`;
+  }
+
+  root.QuestWater = { AIM, BY4, ML, CUT, DAY3, STEP_GOAL, pips, stepBoxes, stepsNext, markerPct, late, button, tail, active, entries, add, addItem, itemLine, hintLine, undo, summary, byBlock, pay };
 })(typeof window !== "undefined" ? window : globalThis);
