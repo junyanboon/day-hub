@@ -1047,7 +1047,7 @@
 <script src="quest-library.js?v=20261022b1"></script>
 <script src="quest-gym.js?v=20261019x"></script>
 <script src="quest-morning.js?v=20261019a"></script>
-<script src="quest-agenda.js?v=20261022t"></script>
+<script src="quest-agenda.js?v=20261023d94b"></script>
 <script src="quest-offline.js?v=20261017a"></script>
 <script src="quest-nearby.js?v=20261016k"></script>
 </head>
@@ -1104,13 +1104,26 @@
   // the gym plan's last run and counts on this device (planGym). "2" since the ill feature went (2026-10-16): the copy
   // saved before could still carry the ill line and would hold the planner off for 2 hours
   const GYM_AT = "quest-gym-at2", GYM_WK = "quest-gym-wk2";
+  /* A calendar write (/cal/...) that Google calls busy is tried again, and onBusy() hears each wait (d94, quest-agenda.js
+     retryBusy); a done one makes the next read-back fetch the agenda's other days too (AG_AT). */
+  let AG_AT = 0;   // when the agenda's other days were last read (pullAgenda); 0 reads them on the next pull
   async function qfetch(path, opts = {}){
-    const r = await fetch(API + path, { ...opts, signal:opts.signal || (opts.method ? undefined : quick()), cache:"no-store",
-      headers:{ "Content-Type":"application/json", "X-Quest-Key":questKey(), ...(opts.headers || {}) } });
-    const body = await r.json().catch(() => ({}));
-    if (!r.ok) { const err = new Error(body.error || "HTTP " + r.status); err.status = r.status; throw err; }
-    return body;
+    const { onBusy, ...o } = opts;
+    const once = async () => {
+      const r = await fetch(API + path, { ...o, signal:o.signal || (o.method ? undefined : quick()), cache:"no-store",
+        headers:{ "Content-Type":"application/json", "X-Quest-Key":questKey(), ...(o.headers || {}) } });
+      const body = await r.json().catch(() => ({}));
+      if (!r.ok) { const err = new Error(body.error || "HTTP " + r.status); err.status = r.status; err.busy = !!body.busy; throw err; }
+      return body;
+    };
+    if (!(o.method && path.startsWith("/cal/") && window.QuestAgenda)) return once();
+    const out = await QuestAgenda.retryBusy(once, { onBusy });
+    AG_AT = 0;
+    return out;
   }
+  // a failure in a few plain words (d94): "Couldn't <did>, so <after>." and the reason alone (quest-agenda.js)
+  const failSay = (e, did, after) => window.QuestAgenda ? QuestAgenda.failSay(e, did, after) : `Couldn't ${did}, so ${after}.`;
+  const plainWhy = e => window.QuestAgenda ? QuestAgenda.plainWhy(e) : "it did not go through";
   const qs = new URLSearchParams(location.search);
   const DRY = qs.get("dry") === "1";
   const AT = qs.get("at");
@@ -1177,7 +1190,7 @@
   }
   const pushG = (keepalive) => { clearTimeout(syncTimer); syncTimer = null;
     return qfetch("/quest/state", { method:"POST", body:JSON.stringify(G), keepalive:!!keepalive })
-      .then(r => { syncErr = null; adopt(r && r.state); }).catch(e => { syncErr = e.message; }); };
+      .then(r => { syncErr = null; adopt(r && r.state); }).catch(e => { syncErr = plainWhy(e); }); };
   const saveG = () => {
     G.ts = Date.now();
     try { localStorage.setItem(GKEY, JSON.stringify(G)); } catch {}
@@ -1191,7 +1204,7 @@
       const srv = await qfetch("/quest/state");
       syncErr = null;
       if (adopt(srv) && !DRY) saveG();   // this device has news: push it up (the server merges too)
-    } catch (e) { syncErr = e.message; }
+    } catch (e) { syncErr = plainWhy(e); }
   }
 
   /* ---------- live data: plan + edit layer + tasks ---------- */
@@ -1288,6 +1301,9 @@
   async function pullAgenda(){
     if (!window.QuestAgenda) return;
     const days = QuestAgenda.agendaDays(tzYmd(now())).filter(d => d !== GAME_YMD);
+    // every 10 minutes, not every 2-minute pull: each day read is two Google Calendar reads on still-api (d94)
+    if (!QuestAgenda.agendaDue(AG_AT, Date.now(), days, AG)) return;
+    AG_AT = Date.now();
     const got = await Promise.all(days.map(d => getPlan(d).then(p => [d, p.blocks]).catch(() => [d, AG[d] || null])));
     const next = {};
     for (const [d, b] of got) if (b) next[d] = b;
@@ -1404,7 +1420,7 @@
       }   // offline: both wait for a fresh calendar, so nothing is placed twice or against an old day
       saveSnap();
       setTimeout(openPending, 0);
-    } catch (e) { pullErr = String(e.message || e); }
+    } catch (e) { pullErr = plainWhy(e); }   // plain words on the status line (d94)
     render();
   }
   /* Same protocol as Stillness: the whole day's edit layer, last-write-wins on
@@ -2092,7 +2108,7 @@
       log(`Added ${x.t} to the calendar: ${x.day === gameYmd() ? "today" : "tomorrow"}, ${sugT(+p.s, x.tz)} to ${sugT(+p.e, x.tz)}`); saveG();
       calToast(`${p.hit ? snapSay({ t:x.t }, p) + " " : ""}${x.t} is on your calendar${calName(made.calId)}.`, p.hit ? 7000 : 4000);
       if (x.day === gameYmd()) await pullAll(); else { SUG_NEXT = null; pullNextPlan(); }
-    } catch (err) { delete SUG_BUSY[k]; calToast(`Could not add ${x.t} to the calendar (${err.message}). Nothing was added.`, 7000); }
+    } catch (err) { delete SUG_BUSY[k]; calToast(failSay(err, `add ${x.t} to the calendar`, "nothing was added"), 7000); }
     render();
   }
 
@@ -2519,7 +2535,7 @@
       try {
         const r = await taskPost("/tasks/done", { id:s.id, done:true });
         if (!r.queued && !r.ok) throw new Error("HTTP " + r.status);
-      } catch (e) { alert("Could not mark it done in Notion: " + e.message); return; }
+      } catch (e) { alert(`Couldn't mark it done in Notion (${plainWhy(e)}).`); return; }
     }
     TASKS = TASKS.filter(t => t.id !== s.id);
     G.day.side = null;
@@ -2594,10 +2610,10 @@
     PEND[k] = { s:+s, e:+e, ...(t !== b.t ? { t } : {}), at:Date.now() }; redrawCal();
     try {
       await qfetch("/cal/event", { method:"POST", body:JSON.stringify({
-        id:b.id, calId:b.calId, raw:b.raw, s:s.toISOString(), e:e.toISOString(), title: t !== b.t ? t : "" }) });
+        id:b.id, calId:b.calId, raw:b.raw, s:s.toISOString(), e:e.toISOString(), title: t !== b.t ? t : "", was:new Date(b.s).toISOString() }) });
     } catch (err) {
       delete PEND[k];
-      calToast(`Could not change the calendar (${err.message}). Saved for today only.`, 7000);
+      calToast(failSay(err, "change the calendar", "it is saved for today only"), 7000);
       return saveBlock(b, s, e, t, true);
     }
     log(`Changed ${b.t} in the calendar${t !== b.t ? ` to ${t}` : ""}: ${fmtT(s)} to ${fmtT(e)}`);
@@ -2621,8 +2637,8 @@
     catch (err) {
       delete GHOST[g]; redrawCal();
       // today's plan cannot hold another day, so a failed add there is only reported
-      if (gameDayOf(s) !== gameYmd()) return calToast(`Could not add ${t} to the calendar (${err.message}). Nothing was added.`, 7000);
-      calToast(`Could not add ${t} to the calendar (${err.message}). Added for today only.`, 7000); return addBlock(t, s, e); }
+      if (gameDayOf(s) !== gameYmd()) return calToast(failSay(err, `add ${t} to the calendar`, "nothing was added"), 7000);
+      calToast(failSay(err, `add ${t} to the calendar`, "it is added for today only"), 7000); return addBlock(t, s, e); }
     if (GHOST[g]) GHOST[g].id = made.id;   // it stays until the plan read back holds this event
     log(`Added ${t} to the calendar${calName(made.calId || calId)}: ${fmtT(s)} to ${fmtT(e)}`);
     await pullCal();
@@ -4684,7 +4700,7 @@
         if (entries.length) gymInfo.last = [...(gymInfo.last || []), { ...body, savedAt:now().toISOString() }];
         if (bw != null) gymInfo.body = LV.addReading(LV.readingsFrom(gymInfo.body, gymInfo.last), date, bw, now().toISOString());
         gymInfo.levels = LV.saveLevels(gymInfo.levels || {}, entries, date);   // only a passed Test moves a level, as on the server
-      } catch (e) { $("gSave").disabled = false; $("gMsg").textContent = "Could not save: " + e.message + ". Your log is still here."; return; }
+      } catch (e) { $("gSave").disabled = false; $("gMsg").textContent = `Couldn't save (${plainWhy(e)}). Your log is still here.`; return; }
     }
     const tested = entries.reduce((a, x) => a + (x.tests ? x.tests.length : 0), 0);
     log(`Gym log: ${GYM.program}, ${entries.length} moves${tested ? `, ${tested} tests` : ""}${bw != null ? `, body weight ${bw} lbs` : ""}`); saveG();
@@ -4845,17 +4861,17 @@
       if (!v || v.startsWith("•")) { $("pCode").focus(); return; }
       store.set("quest-key", v);
       try { await qfetch("/quest/state"); await pullAll(); closeSheet(); log("Paired this device"); saveG(); }
-      catch (e) { store.set("quest-key", null); alert("That code did not work: " + e.message); }
+      catch (e) { store.set("quest-key", null); alert(`That code did not work (${plainWhy(e)}).`); }
     };
     if ($("pForget")) $("pForget").onclick = () => { store.set("quest-key", null); store.set("quest-push", null); closeSheet(); render(); };
     $("pushOn").onclick = async () => {
       $("pushMsg").textContent = "Connecting…";
       try { await enablePush(); $("pushMsg").textContent = "Pings are on for this device."; }
-      catch (e) { $("pushMsg").textContent = e.message; }
+      catch (e) { $("pushMsg").textContent = `Couldn't do it (${plainWhy(e)}).`; }
     };
     if ($("pushTest")) $("pushTest").onclick = async () => {
       try { const r = await qfetch("/push/test", { method:"POST" }); $("pushMsg").textContent = `Sent to ${r.sent} of ${r.devices} device(s).`; }
-      catch (e) { $("pushMsg").textContent = e.message; }
+      catch (e) { $("pushMsg").textContent = `Couldn't do it (${plainWhy(e)}).`; }
     };
   }
   $("gear").onclick = openSettings;
@@ -5112,7 +5128,7 @@
       if (!moveOpt(k) && !GMVASK.has(k) && b.id && b.calId) {
         GMVASK.add(k); const gen = MOVEGEN;
         gymMoveChoices(b).then(r => ({ options:r.options, note:r.note }), e => { console.warn("gym move", e);
-          return { options:[], note:`Could not read the calendar (${e.message}).` }; })
+          return { options:[], note:`Couldn't read the calendar (${plainWhy(e)}).` }; })
           .then(r => { if (gen !== MOVEGEN) return; GMVASK.delete(k); MOVEOPT[k] = { at:Date.now(), r }; if (el.isConnected) redraw(); });
       }
       el.querySelectorAll("[data-gmvgo]").forEach(bt => bt.onclick = e => { e.stopPropagation();
@@ -5135,7 +5151,7 @@
     if (DRY) { await dropBlock(b); return "dry"; }
     if (!questKey()) { await dropBlock(b); calToast(`Pair this device in ⚙️ to delete it from Google Calendar. ${shortName(b)} is off today's plan.`, 6000); return false; }
     try { await qfetch("/cal/delete", { method:"POST", body:JSON.stringify({ id:b.id, calId:b.calId }) }); }
-    catch (err) { await dropBlock(b); calToast(`Could not delete it from Google Calendar (${err.message}). It is off today's plan; the event stays.`, 8000); return false; }
+    catch (err) { await dropBlock(b); calToast(failSay(err, "delete it from Google Calendar", "it is off today's plan and the event stays"), 8000); return false; }
     log(`Deleted ${b.t} from Google Calendar: ${fmtT(b.s)}`);
     await dropBlock(b);
     for (const d in PLANS) delete PLANS[d];
@@ -5159,8 +5175,8 @@
     PEND[k] = { s:+o.s, e:+o.e, at:Date.now() }; closeSheet(); redrawCal();
     try {
       await qfetch("/cal/event", { method:"POST", body:JSON.stringify({ id:b.id, calId:b.calId, raw:b.raw, s:new Date(o.s).toISOString(),
-        e:new Date(o.e).toISOString(), title:"", note:`moved by Junyan from ${from}` }) });
-    } catch (err) { delete PEND[k]; redrawCal(); calToast(`Could not move it (${err.message}). It is still at ${from}.`, 7000); return; }
+        e:new Date(o.e).toISOString(), title:"", note:`moved by Junyan from ${from}`, was:new Date(b.s).toISOString() }) });
+    } catch (err) { delete PEND[k]; redrawCal(); calToast(failSay(err, "move it", `it is still at ${from}`), 7000); return; }
     const prev = (G.gymMoves = G.gymMoves || {})[b.id], iso = new Date(+b.s).toISOString();
     // a session the planner placed keeps its slot key, so its old week is not filled again either way
     const key = (prev && prev.key) || (Object.entries(G.gymPlan || {}).find(([, v]) => v && !v.failed && Math.abs(Date.parse(v.s) - +b.s) < 60000) || [])[0] || null;
@@ -5632,7 +5648,7 @@
     if (!questKey()) { st.msg[id] = "Pair this device in ⚙️ to put the gym on your calendar."; return drawNearby(); }
     st.msg[id] = "Putting it on your calendar…"; drawNearby();
     try { await qfetch("/cal/event", { method:"POST", body:JSON.stringify(body) }); }
-    catch (err) { st.msg[id] = `Could not put it on the calendar (${err.message}). Nothing was added.`; return drawNearby(); }
+    catch (err) { st.msg[id] = failSay(err, "put it on the calendar", "nothing was added"); return drawNearby(); }
     log(`Planned Gym · Jack Woods (${p.name}) on the calendar: ${fmtT(slot.s)} to ${fmtT(slot.e)}`); saveG();
     st.msg[id] = `On your calendar at ${fmtT(slot.s)}: Gym · Jack Woods, 1 h.`;
     for (const d in PLANS) delete PLANS[d];
@@ -5676,20 +5692,20 @@
     taskDone: async id => {
       let was = "";
       if (!DRY) { const r = await taskPost("/tasks/done", { id, done:true });
-        if (!r.queued && !r.ok) { alert("Could not mark it done in Notion: HTTP " + r.status); return null; }
+        if (!r.queued && !r.ok) { alert("Couldn't mark it done in Notion. Try again in a minute."); return null; }
         was = r.queued ? "" : ((await r.json().catch(() => ({}))).was) || ""; }
       const x = TASKS.find(y => y.id === id); TASKS = TASKS.filter(y => y.id !== id); if (x) log(`Done: ${x.task}`); saveG();
       return { was };
     },
     taskUndo: async (task, was) => {
       if (!DRY) { const r = await taskPost("/tasks/done", { id:task.id, done:false, status:was || "" });
-        if (!r.queued && !r.ok) { alert("Could not reopen it in Notion: HTTP " + r.status); return false; } }
+        if (!r.queued && !r.ok) { alert("Couldn't reopen it in Notion. Try again in a minute."); return false; } }
       if (!TASKS.some(y => y.id === task.id)) TASKS.push(task);
       log(`Undone, open again: ${task.task}`); saveG(); return true;
     },
     taskNote: async (task, note) => {
       if (!DRY) { const r = await taskPost("/tasks/note", { id:task.id, note });
-        if (!r.queued && !r.ok) { alert("Could not save the note in Notion: HTTP " + r.status); return false; } }
+        if (!r.queued && !r.ok) { alert("Couldn't save the note in Notion. Try again in a minute."); return false; } }
       log(`Note on ${task.task}: ${note}`); saveG(); return true;
     },
     habit: id => { logHabit(id, true); saveG(); },
@@ -6031,7 +6047,7 @@
         const s = r ? r.skill : { id:name.toLowerCase().replace(/[^a-z0-9]+/g, "-"), name, focus, status:"active" };
         SKILLS = SKILLS.filter(x => x.id !== s.id).concat(s);
         log(`Added the skill ${name}`); saveG(); openSkills();
-      } catch (e) { $("skMsg").textContent = "Could not add it: " + e.message; }
+      } catch (e) { $("skMsg").textContent = `Couldn't add it (${plainWhy(e)}).`; }
     };
   }
 
@@ -6169,7 +6185,7 @@
         if (today) await (cal ? addBlockCal : addBlock)(title, s, e);
         else {   // another day: only the calendar can hold it (today's edit layer is today only)
           try { await qfetch("/cal/event", { method:"POST", body:JSON.stringify({ s:s.toISOString(), e:e.toISOString(), title, calId:jointId() }) }); }
-          catch (err) { alert(`Could not add it to the calendar (${err.message}). Nothing was added.`); return back(); }
+          catch (err) { alert(failSay(err, "add it to the calendar", "nothing was added")); return back(); }
           log(`Added ${title} to the calendar: tomorrow ${fmtT(s)}`);
         }
         (it.scheduled = it.scheduled || []).push({ title, s:s.toISOString(), e:e.toISOString(), idea:idea.t });
@@ -6184,7 +6200,7 @@
   async function openWikiPage(path, back){
     openSheet(`<p>Opening ${esc(path)}…</p>`, true);
     let pg;
-    try { pg = await qfetch("/quest/wiki/" + path); } catch (e) { openSheet(`<p>Could not open it: ${esc(e.message)}</p><div class="actions"><button class="btn ghost" id="wkB">Back</button></div>`); $("wkB").onclick = back || closeSheet; return; }
+    try { pg = await qfetch("/quest/wiki/" + path); } catch (e) { openSheet(`<p>Couldn't open it (${esc(plainWhy(e))}).</p><div class="actions"><button class="btn ghost" id="wkB">Back</button></div>`); $("wkB").onclick = back || closeSheet; return; }
     const inline = s => esc(s).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>")
       .replace(/\[\[([^\]|#]+)(?:\|([^\]]+))?\]\]/g, (m, p, l) => { const k = p.trim().replace(/\.md$/, ""), label = l || (k.split("/").pop().match(/^\d{4}-\d{2}-\d{2}$/) ? k.split("/").pop() : k.split("/").pop().replace(/-/g, " "));
         return WIKI.includes(k) ? `<button class="wlink" data-wk="${k}">${label}</button>` : `<span style="color:var(--ink-faint)">${label}</span>`; })
@@ -6480,10 +6496,13 @@
     }
     PEND[k] = pend; show();
     try {
-      await qfetch("/cal/event", { method:"POST", body:JSON.stringify({ id:b.id, calId:b.calId, raw:b.raw, s:s.toISOString(), e:e.toISOString(), title:renamed ? t : "" }) });
+      // Google busy: it stays where he put it while the save is tried again (d94); was: only the days it touched are read again
+      await qfetch("/cal/event", { method:"POST", body:JSON.stringify({ id:b.id, calId:b.calId, raw:b.raw, s:s.toISOString(), e:e.toISOString(),
+        title:renamed ? t : "", was:new Date(b.s).toISOString() }),
+        onBusy: () => calToast(`Google Calendar is busy. Trying again to save ${what}…`, 5000) });
     } catch (err) {
       delete PEND[k]; show();
-      calToast(`Could not save the ${renamed ? "change" : "move"} (${err.message}). ${shortName(b)} is back where it was.`, 7000);
+      calToast(failSay(err, `save the ${renamed ? "change" : "move"}`, `${shortName(b)} is back where it was`), 8000);
       return;
     }
     calToast(`${snapped}${what}: ${when}. Saved to Google Calendar${b.cal ? ` (${b.cal})` : ""}.`);
@@ -6876,7 +6895,7 @@
   addEventListener("focus", wake);
   addEventListener("pagehide", () => { if (syncTimer) pushG(true); });
   // the internet is back: pull at once, which also sends what waited (edits, ticks, the game) (2026-10-17)
-  addEventListener("online", () => { lastWake = 0; wake(); });
+  addEventListener("online", () => { lastWake = 0; AG_AT = 0; wake(); });
   render();   // the saved day, if there is one, before the network answers
   checkFresh();
   pullAll();
