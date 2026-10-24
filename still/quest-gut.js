@@ -42,7 +42,11 @@
     if (!a) return b; if (!b) return a;
     return String(obj(b).at || "") >= String(obj(a).at || "") ? b : a;
   }
+  /* Collapsed card (Junyan, 2026-10-24: "for gut I want this to be collapsible"). The device keeps the date the card
+     was opened; it shows open only on that same day, so each new day starts closed. */
+  const isOpen = (stored, date) => !!date && stored === date;
+  const toggle = (stored, date) => (isOpen(stored, date) ? "" : date);
   const stamp = (g) => (logged(g) ? { gut: { ...obj(g) } } : {});
 
-  root.QuestGut = { BRISTOL, URG, set, logged, line, warn, merge, stamp };
+  root.QuestGut = { BRISTOL, URG, set, logged, line, warn, merge, stamp, isOpen, toggle, OPEN_KEY: "dq-gut-open" };
 })(typeof window !== "undefined" ? window : globalThis);
