@@ -236,6 +236,9 @@
   .wq-it.met { border-color:rgba(143,227,176,.75); } .wq-it.met small { color:#8fe3b0; font-weight:600; }
   /* the gut log (2026-10-22, d2): count, Bristol type, sticky, blood, urgency (quest-gut.js) */
   .gq { flex-direction:column; align-items:stretch; gap:8px; }
+  .gq .gq-head { all:unset; display:flex; align-items:center; gap:12px; width:100%; cursor:pointer; -webkit-tap-highlight-color:transparent; }
+  .gq .gq-head .sq-t { flex:1; min-width:0; } .gq-chev { flex:none; font-size:22px; color:var(--ink-soft); transition:transform .2s; } .gq-head[aria-expanded="true"] .gq-chev { transform:rotate(90deg); }
+  .gq .gq-head:focus-visible { outline:2px solid #8fe3b0; outline-offset:2px; border-radius:10px; }
   .gq-row { display:flex; align-items:center; gap:4px; font-size:12px; color:var(--ink-soft); }
   .gq-row > span:first-child { width:54px; flex:none; }
   .gq-row > button { flex:1 1 0; max-width:44px; } .gq-row > button[data-gut="sticky"], .gq-row > button[data-gut="blood"] { max-width:none; }
@@ -1052,7 +1055,7 @@
 <script src="quest-basics.js?v=20261022y2"></script>
 <script src="quest-suggest.js?v=20261024a"></script>
 <script src="quest-water.js?v=20261024p1"></script>
-<script src="quest-gut.js?v=20261022g2"></script>
+<script src="quest-gut.js?v=20261024g3"></script>
 <script src="quest-library.js?v=20261022b1"></script>
 <script src="quest-gym.js?v=20261019x"></script>
 <script src="quest-morning.js?v=20261024a"></script>
@@ -1833,7 +1836,11 @@
     if (!QGut() || !G.day) return "";
     const g = G.day.gut || {}, Q = QGut(), on = (c) => c ? " on" : "";
     const bt = (f, v, label, extra) => `<button type="button" class="${extra || ""}${on(f === "sticky" || f === "blood" ? g[f] : g[f] === v)}" data-gut="${f}" data-v="${v}">${label}</button>`;
-    return `<div class="sq gq"><span class="sq-t">🚽 Gut today<small>${esc(Q.line(g))}</small></span>` +
+    const open = gutOpen();
+    const head = `<button type="button" class="gq-head" data-guttog aria-expanded="${open}"><span class="sq-i">🚽</span><span class="sq-t">Gut<small>${esc(Q.line(g))}</small></span>` +
+      `<span class="gq-chev" aria-hidden="true">›</span></button>`;
+    if (!open) return `<div class="sq gq gq-closed">${head}</div>`;
+    return `<div class="sq gq">${head}` +
       `<div class="gq-row"><span>Times</span><button type="button" data-gut="n" data-v="${(g.n || 0) - 1}" aria-label="One less">−</button>` +
       `<span class="gq-n">${g.n != null ? g.n : "–"}</span><button type="button" data-gut="n" data-v="${(g.n || 0) + 1}" aria-label="One more">+</button></div>` +
       `<div class="gq-row"><span>Type</span>${Q.BRISTOL.map(([v, nm]) => bt("b", v, v, "").replace("<button ", `<button title="${esc(nm)}" `)).join("")}</div>` +
@@ -1842,6 +1849,13 @@
       `<div class="gq-row"><span>Urgency</span>${Q.URG.map((nm, v) => bt("urg", v, v).replace("<button ", `<button title="${esc(nm)}" `)).join("")}</div>` +
       `<div class="gq-row"><span></span>${bt("sticky", 1, "Sticky")}${bt("blood", 1, "Blood", "bad")}</div>` +
       (Q.warn(g) ? `<div class="gq-warn">${esc(Q.warn(g))}</div>` : "") + `</div>`;
+  }
+  // open or closed per device, closed again each new day (Junyan, 2026-10-24); localStorage can throw, so try/catch
+  function gutOpen(){ try { return QGut().isOpen(localStorage.getItem(QGut().OPEN_KEY), G.day.date); } catch (e) { return false; } }
+  function tapGutHead(){
+    if (!QGut() || !G.day) return;
+    try { localStorage.setItem(QGut().OPEN_KEY, QGut().toggle(localStorage.getItem(QGut().OPEN_KEY), G.day.date)); } catch (e) {}
+    render();
   }
   function tapGut(bn){
     if (!QGut() || !G.day) return;
@@ -6741,6 +6755,7 @@
     $("habits").querySelectorAll("[data-glass]").forEach(bn => bn.onclick = () => addGlass(bn));
     $("habits").querySelectorAll("[data-shoe]").forEach(bn => bn.onclick = () => tapShoe(bn));
     $("habits").querySelectorAll("[data-gut]").forEach(bn => bn.onclick = () => tapGut(bn));
+    $("habits").querySelectorAll("[data-guttog]").forEach(bn => bn.onclick = () => tapGutHead());
     $("habits").querySelectorAll("[data-kitchen]").forEach(bn => bn.onclick = () => openKitchen({}));
     $("habits").querySelectorAll("[data-day]").forEach(bn => bn.onclick = () => addDayItem(bn.dataset.day, bn));
     $("habits").querySelectorAll("[data-night]").forEach(bn => bn.onclick = openNight);
