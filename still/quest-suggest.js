@@ -47,8 +47,9 @@
      Returns [{ id, t, s, e }] (ms), at most one of each. */
   function suggest(o) {
     const tz = o.tz, day = o.day, now = +o.now || 0, skip = o.skip || {};
-    // an event over 12 hours (a car rental, a stay) is a booking, not a block of his time
-    const blocks = o.blocks || [], busy = blocks.filter((b) => !b.free && b.e - b.s <= 12 * 60 * MIN);
+    // a booking (a car rental, a stay) is not a block of his time; booking comes from the page's shared rule
+    // (QuestAgenda.isBooking: over 12 hours by the calendar's own times, or all-day), else over 12 hours here
+    const blocks = o.blocks || [], busy = blocks.filter((b) => !b.free && !(b.booking ?? b.e - b.s > 12 * 60 * MIN));
     const have = new Set(blocks.map((b) => b.basic && covers(b.basic)).filter(Boolean));
     const meals = blocks.filter((b) => b.meal).sort((a, b) => a.s - b.s);
     const wake = at(day, WAKE[0], WAKE[1], tz), bed = at(day, BED[0], BED[1], tz);

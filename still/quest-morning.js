@@ -39,7 +39,16 @@
   const hm = (m) => { m = Math.round(m); const h = Math.floor(m / 60), r = m % 60; return h ? `${h} h${r ? ` ${r}` : ""}` : `${r} min`; };
 
   /* ---------- reading the day ---------- */
-  const upcoming = (D) => D.items.filter((i) => i.e > D.now && !i.brk);
+  /* Bookings and clashes: one rule for the whole page, in quest-agenda.js (2026-10-20). A booking (a car rental, a
+     stay: over 12 hours by the calendar's own times, or all-day) is not a block of his time, so no check counts it,
+     ends it, cuts it or drops it. Only Joint Plans events and blocks added in Quest can clash (d40: "the other
+     calendars don't conflict with this one"). */
+  const QA = () => root.QuestAgenda;
+  // a flight is never a booking, however long: its airport check must still run. The fallback covers a cached older
+  // quest-agenda.js without isBooking.
+  const isBooking = (i) => !i.flight && (QA() && QA().isBooking ? QA().isBooking(i) : !!i.allDay || +i.e - +i.s > 12 * HR);
+  const canClash = (i) => (QA() ? QA().inRoom(i) : !isBooking(i));
+  const upcoming = (D) => D.items.filter((i) => i.e > D.now && !i.brk && !isBooking(i));
   const fixedOf = (D) => upcoming(D).filter((i) => !i.open);
   const isAirport = (i) => /airport/i.test(i.name);
   // time he cannot use: every fixed item, plus the run-up to a flight nobody has planned yet
@@ -82,7 +91,7 @@
     const fs = [...f].sort((a, b) => a.s - b.s);
     for (let i = 0; i < fs.length; i++) for (let j = i + 1; j < fs.length; j++) {
       const a = fs[i], b = fs[j];
-      if (b.s >= a.e || a.sleep || b.sleep) continue;
+      if (b.s >= a.e || a.sleep || b.sleep || !canClash(a) || !canClash(b)) continue;
       const over = (Math.min(+a.e, +b.e) - +b.s) / MIN;
       out.push({ id: `clash:${a.key}:${b.key}`, warn: true, icon: "⚠️", text: `${a.name} and ${b.name} overlap by ${hm(over)}.`,
         why: `${a.name} runs ${span(a.s, a.e)}, ${b.name} starts ${T(b.s)}.`,
