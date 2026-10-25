@@ -183,7 +183,9 @@
     if (memo.K === K && memo.k === k && memo.day === day && memo.since === since && memo.out) return memo.out;
     const K0 = since ? atStart(K, since) : K, kit = byKey(K0, k);
     // use first as it read when the day began, so a pick holds all day (now only when no start is given)
-    const first = new Set(QK().useFirst(K0, k, since || opt.now || Date.now()).map((x) => x.it.id));
+    const t0 = since || opt.now || Date.now();
+    // d71 (2026-10-25): long-life food at "use soon" or "getting old" counts as use first too, so the old food gets eaten
+    const first = new Set(QK().useFirst(K0, k, t0).map((x) => x.it.id).concat(QK().useUp ? QK().useUp(K0, k, t0, 99).map((x) => x.it.id) : []));
     const own = QK().ownDishes(K).filter((d) => d.items.length >= 3 && !d.items.some((x) => banned(x[0])) &&
       read(d, kit).every((r) => r.st === "have"));
     const cands = POOL().concat(own).map((d) => ({ d, ...rate(d, kit, first, day) }))

@@ -715,6 +715,13 @@
   .kt-seg button[aria-pressed="true"], .kt-seg button[aria-selected="true"] { background:rgba(255,255,255,.2); color:#fff; }
   .kt-first { margin-top:10px; padding:9px 12px; border-radius:14px; background:rgba(0,0,0,.22); border:1px solid rgba(255,194,122,.7); font-size:13.5px; }
   .kt-first b { color:var(--warn); }
+  /* Use it up and the age colours (d70) */
+  .kt-up { display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
+  .kt-upi { font:inherit; font-size:13px; color:inherit; padding:4px 10px; border-radius:999px; background:rgba(255,212,121,.12); border:1px solid rgba(255,212,121,.6); cursor:pointer; }
+  .kt-upi.old { background:rgba(255,120,120,.14); border-color:rgba(255,130,130,.75); }
+  .kt-upi small { opacity:.75; }
+  .ki.age-soon { border-color:rgba(255,212,121,.75); } .ki.age-soon .st { color:var(--gold); }
+  .ki.age-old { border-color:rgba(255,130,130,.8); } .ki.age-old .st { color:#ff9c9c; }
   .kt-tools { display:flex; gap:6px; flex-wrap:wrap; align-items:center; margin-top:10px; }
   /* the recipe book (2026-10-22, d9): all of Paprika, loaded when it opens (quest-library.js) */
   .rb-list { display:flex; flex-direction:column; gap:4px; margin-top:8px; }
@@ -3618,7 +3625,10 @@
     let body;
     if (S.view === "have") {
       const first = QK().useFirst(K, k, t);
+      // Use it up (d70, 2026-10-25): the five oldest long-life items, by how much of their shelf life is gone
+      const up = QK().useUp(K, k, t, 5);
       body = (first.length ? `<div class="kt-first"><b>Use first:</b> ${first.map(x => `${esc(x.it.name)} (${x.at <= +t ? "check it" : QK().dayWord(x.at, t, TZ())})`).join(", ")}</div>` : "") +
+        (up.length ? `<div class="kt-first kt-up"><b>Use it up:</b> ${up.map(x => `<button type="button" class="kt-upi ${x.a.word}" data-kit="${esc(x.it.id)}">${esc(x.it.em)} ${esc(x.it.name)} <small>${kitAgeWord(x.a)}</small></button>`).join("")}</div>` : "") +
         `<div class="kt-tools"><input class="kt-q" id="kQ" type="search" placeholder="Find an item" autocomplete="off" value="${esc(S.q)}">` +
         `<button type="button" class="kt-chip" id="kEdit" aria-pressed="${S.edit}">Edit</button>` +
         (k === "travel" ? `<button type="button" class="kt-chip" id="kBring">Add from Home</button>` : "") + `</div>` +
@@ -3717,6 +3727,8 @@
            food, the amount box for grams or ml. Nothing steps a level any more. */
         return openKitchenItem(bn.dataset.kit);
       });
+      // the Use it up strip (d70): a tap opens that item's page, like its tile
+      sh.querySelectorAll(".kt-upi[data-kit]").forEach(bn => bn.onclick = () => openKitchenItem(bn.dataset.kit));
     }
   }
   /* ---------- the fill-in picker (Junyan, 2026-10-20, d35: "35 yes also I bought groceries today so what happens in that
@@ -3835,9 +3847,11 @@
   // one tile (d34): icon, name on one line, the status line, and the 3-bar meter. The same size whatever it says.
   /* The status line is what is left ("350 g", "4"), or "how many?" in a soft colour for an item with no number; the meter
      fills only for an item with a number (what is left of what he last bought). Levels retired, 2026-10-21. */
+  // how old, in his words: "3 weeks", "4 months" (d70)
+  const kitAgeWord = a => a.days < 14 ? `${Math.round(a.days)} days` : a.days < 60 ? `${Math.round(a.days / 7)} weeks` : `${Math.round(a.days / 30)} months`;
   function kitTile(x, S, t, shop, tz){
-    const st = QK().tileLine(x, t, shop.at, tz), soon = QK().lowSoon(x, t, shop.at), n = QK().hasQ(x);
-    return `<button type="button" class="ki L${n ? x.lv : "q"}${soon ? " soon" : ""}${!n && QK().needsBuy(x) ? " buy" : ""}" data-kit="${esc(x.id)}" ` +
+    const st = QK().tileLine(x, t, shop.at, tz), soon = QK().lowSoon(x, t, shop.at), n = QK().hasQ(x), a = QK().age(x, t);
+    return `<button type="button" class="ki L${n ? x.lv : "q"}${soon ? " soon" : ""}${!n && QK().needsBuy(x) ? " buy" : ""}${a && a.word !== "ok" ? " age-" + a.word : ""}" data-kit="${esc(x.id)}" ` +
       `aria-label="${esc(x.name)}, ${esc(st)}. ${S.edit ? "Tap to edit." : "Tap to say how many, hold to move."}">` +
       `<span class="e">${esc(x.em)}</span><span class="tx"><span class="nm">${esc(x.name)}</span><span class="st">${esc(st)}</span></span>` +
       `<span class="pips" aria-hidden="true"><i></i><i></i><i></i></span></button>`;
@@ -3956,11 +3970,16 @@
         : typeof it.q === "number" ? `<div class="win-lb">Amount now <small>(meals take it down by themselves; fix it here)</small></div>`
         : `<div class="win-lb">How much <small>(e.g. 400 g; with a number, meals take it down)</small></div>`}
       <div class="ki-step"><button type="button" class="mq-mini" id="kiMinus" aria-label="One less"${piece ? "" : " hidden"}>−</button><input id="kiAmt" value="${esc(it.amt || "")}" maxlength="20" autocomplete="off" placeholder="${piece ? "How many?" : "Amount"}" aria-label="${piece ? "How many" : "How much"} ${esc(it.name)}"><button type="button" class="mq-mini" id="kiPlus" aria-label="One more"${piece ? "" : " hidden"}>+</button></div>
+      <div class="win-lb">Bought <small>(${it.fresh ? `${kitAgeWord(QK().age(it, now()) || { days: 0 })} ago, keeps about ${QK().lifeOf(it) >= 60 ? Math.round(QK().lifeOf(it) / 30) + " months" : QK().lifeOf(it) + " days"}` : "when? Then it says when to use it up"})</small></div>
+      <div class="kt-tools">${[[0, "This month"], [1, "1 month ago"], [2, "2 months"], [3, "3 months"], [6, "6+ months"]].map(([m, w]) => `<button type="button" class="kt-chip" data-kib="${m}" aria-pressed="${QK().boughtAgo(it, now()) === m}">${w}</button>`).join("")}</div>
       <div class="win-lb">Group</div><div class="kt-tools">${QK().GROUP_NAMES.map(g => `<button type="button" class="kt-chip" data-kig="${esc(g)}" aria-pressed="${g === it.group}">${esc(g)}</button>`).join("")}</div>
       <div class="win-lb">Shelf</div><div class="kt-tools">${kn.shelves.map(s => `<button type="button" class="kt-chip" data-kish="${s.id}" aria-pressed="${s.id === it.shelf}">${esc(s.name)}</button>`).join("")}</div>
       <div class="actions"><button class="btn danger" id="kiDel">Delete this item</button></div>
       <div class="actions"><button class="btn ghost" id="kiBack">Back</button><button class="btn primary" id="kiSave">Save</button></div>`, true);
-    let shelf = it.shelf, group = it.group;
+    let shelf = it.shelf, group = it.group, ago = null;
+    // d70: the month he bought it (saved with Save; a pick he does not change leaves the date as it is)
+    $("sheet").querySelectorAll("[data-kib]").forEach(bn => bn.onclick = () => { ago = +bn.dataset.kib;
+      $("sheet").querySelectorAll("[data-kib]").forEach(x => x.setAttribute("aria-pressed", +x.dataset.kib === ago)); });
     $("sheet").querySelectorAll("[data-kish]").forEach(bn => bn.onclick = () => { shelf = bn.dataset.kish;
       $("sheet").querySelectorAll("[data-kish]").forEach(x => x.setAttribute("aria-pressed", x.dataset.kish === shelf)); });
     $("sheet").querySelectorAll("[data-kig]").forEach(bn => bn.onclick = () => { group = bn.dataset.kig;
@@ -3976,6 +3995,7 @@
       const amt = $("kiAmt").value.trim();
       if (nm && (nm !== it.name || QK().amtOf(amt) !== (it.amt || ""))) K = QK().rename(K, id, nm, now(), amt);
       K = QK().place(K, id, shelf, group, now());
+      if (ago != null && ago !== QK().boughtAgo(it, now())) K = QK().bought(K, id, ago, now());
       if (K !== G.kitchen) kitSave(K);
       openKitchen(); render(); };
     // the second tap counts from 0.3 s to 4 s after the first (a double tap is not a yes); the timer resets this button only
