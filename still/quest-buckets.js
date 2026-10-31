@@ -8,6 +8,10 @@
              and "Not this time" (stays for the next one).
      editor  rename, move (day, start, length, weekly or first-of-month), add, remove. Saved with the rev it was
              read at; another device's newer save comes back and is shown, never overwritten.
+     approve  (Junyan, 2026-10-30: "I don't want the bucket blocks on my calendar yet. I want it to show on the
+             planner in Day Quest for me to approve.") A bucket not yet approved is a proposal: dashed in the week,
+             with Approve (POST /quest/buckets/approve: its series goes on Joint Plans), Change (the editor) and
+             Not now (hidden from the proposals until tomorrow, on this device). Tasks collect in it either way.
    api: { get(path), post(path, body) } -> JSON (throws Error with .status). redraw(): draw the host again. */
 (function (root) {
   "use strict";
@@ -15,7 +19,7 @@
   const DAYS = ["MO", "TU", "WE", "TH", "FR", "SA", "SU"];
   const SHORT = { MO: "Mon", TU: "Tue", WE: "Wed", TH: "Thu", FR: "Fri", SA: "Sat", SU: "Sun" };
   const JS_DAY = ["SU", "MO", "TU", "WE", "TH", "FR", "SA"];
-  const S = { rev: 0, buckets: [], tasks: [], today: "", loaded: false, loading: null, err: "", open: null, edit: null, msg: "", busy: "" };
+  const S = { notNow: {}, rev: 0, buckets: [], tasks: [], today: "", loaded: false, loading: null, err: "", open: null, edit: null, msg: "", busy: "" };
 
   const addDays = (ymd, n) => new Date(Date.parse(ymd + "T12:00:00Z") + n * 86400000).toISOString().slice(0, 10);
   const dowOf = (ymd) => JS_DAY[new Date(ymd + "T12:00:00Z").getUTCDay()];
@@ -37,6 +41,7 @@
     if (S.loaded && !force) return;
     S.loading = api.get("/quest/buckets").then((d) => {
       S.rev = d.rev; S.buckets = d.buckets || []; S.tasks = d.tasks || []; S.today = d.today || ""; S.loaded = true;
+      S.notNow = notNowLoad();
       S.err = d.taskError ? "The tasks did not load: " + d.taskError : "";
     }).catch((e) => { S.err = "The buckets did not load: " + (e.message || e); }).finally(() => { S.loading = null; });
     return S.loading;
@@ -55,6 +60,20 @@
     }).join("")}</div>`;
   }
 
+  /* ---------- proposals ---------- */
+  const NN_KEY = "quest-bk-notnow";
+  function notNowLoad() { try { return JSON.parse(root.localStorage && root.localStorage.getItem(NN_KEY) || "{}") || {}; } catch { return {}; } }
+  function notNowSave() { try { root.localStorage && root.localStorage.setItem(NN_KEY, JSON.stringify(S.notNow)); } catch {} }
+  const proposalsOf = (today, buckets = S.buckets) => buckets.filter((b) => !b.approved && S.notNow[b.id] !== today);
+  function proposalsHTML(today) {
+    const ps = proposalsOf(today);
+    if (!ps.length) return "";
+    return `<div class="bk-props"><div class="bk-oh">Waiting for your OK <small>not on your calendar yet</small></div>
+      ${ps.map((b) => { const n = waitingOf(b).length;
+        return `<div class="bk-prop"><b>${esc(titleOf(b))}</b><small>${b.cycle === "monthly" ? "First" : "Every"} ${SHORT[b.day]}, ${clock(b.start)}, ${b.min} min${n ? ` · ${n} task${n > 1 ? "s" : ""} waiting` : ""}</small>
+        <span class="bk-btns"><button data-bk-ok="${esc(b.id)}"${S.busy ? " disabled" : ""}>Approve</button><button data-bk-change="${esc(b.id)}">Change</button><button data-bk-later="${esc(b.id)}">Not now</button></span></div>`; }).join("")}</div>`;
+  }
+
   /* ---------- the week ---------- */
   function weekHTML(today) {
     today = today || S.today;
@@ -65,11 +84,11 @@
       const isToday = d === today, past = d < today;
       return `<div class="bk-day${isToday ? " today" : ""}${past ? " past" : ""}"><div class="bk-dn">${SHORT[dowOf(d)]} ${+d.slice(8)}</div>
         ${bs.length ? bs.map((b) => { const n = waitingOf(b).length;
-          return `<button class="bk-chip${S.open === b.id ? " on" : ""}" data-bk-open="${esc(b.id)}"><span>${esc(b.emoji || "•")}</span><span class="bk-cn">${esc(b.name)}</span>${n ? `<i>${n}</i>` : ""}</button>`; }).join("")
+          return `<button class="bk-chip${S.open === b.id ? " on" : ""}${b.approved ? "" : " prop"}" data-bk-open="${esc(b.id)}"><span>${esc(b.emoji || "•")}</span><span class="bk-cn">${esc(b.name)}</span>${n ? `<i>${n}</i>` : ""}</button>`; }).join("")
           : `<span class="bk-free">free</span>`}</div>`;
     }).join("");
     const shown = S.buckets.filter((b) => S.open ? b.id === S.open : fallsOn(b, today));
-    return `${S.err ? `<p class="bk-err">${esc(S.err)}</p>` : ""}<div class="bk-week">${strip}</div>
+    return `${S.err ? `<p class="bk-err">${esc(S.err)}</p>` : ""}<div class="bk-week">${strip}</div>${proposalsHTML(today)}
       ${shown.map((b) => `<div class="bk-open"><div class="bk-oh">${esc(titleOf(b))} <small>${clock(b.start)}, ${b.min} min</small></div>${listHTML(b)}</div>`).join("")}
       ${!shown.length ? `<p class="bk-none">No bucket today. Tap a day's bucket to see what is waiting in it.</p>` : ""}
       ${S.msg ? `<p class="bk-msg">${esc(S.msg)}</p>` : ""}
@@ -86,7 +105,7 @@
       <input type="time" value="${esc(b.start)}" data-f="start" step="900" aria-label="Start">
       <select data-f="min">${[30, 45, 60, 90, 120, 180].concat([+b.min]).filter((v, j, a) => a.indexOf(v) === j).sort((x, y) => x - y).map((m) => `<option value="${m}"${+b.min === m ? " selected" : ""}>${m} min</option>`).join("")}</select>
       <button class="bk-rm" data-bk-rm="${i}" aria-label="Remove">✕</button></div>`;
-    return `<div class="bk-ed"><p class="bk-hint">Each bucket is one repeating event on Joint Plans. Saving moves it there too.</p>
+    return `<div class="bk-ed"><p class="bk-hint">An approved bucket is one repeating event on Joint Plans, and saving moves it there too. One you have not approved stays off the calendar.</p>
       ${S.edit.map(row).join("")}
       <div class="bk-btns"><button data-bk-add="1">+ Add a bucket</button><button class="bk-save" data-bk-save="1"${S.busy ? " disabled" : ""}>${S.busy === "save" ? "Saving…" : "Save buckets"}</button></div></div>`;
   }
@@ -115,6 +134,15 @@
       const t = S.tasks.find((x) => x.id === d.bkSkip);
       S.msg = `Kept for next time: ${t ? t.task : "task"}.`;
     }));
+    on("[data-bk-ok]", (d) => act("approve", async () => {
+      const b = S.buckets.find((x) => x.id === d.bkOk);
+      const r = await api.post("/quest/buckets/approve", { id: d.bkOk });
+      const failed = (r.sync || []).filter((x) => /^failed/.test(x.did) && (!b || x.name === b.name));
+      await load(api, true);
+      S.msg = failed.length ? `Approved ${b ? b.name : "it"}. The calendar did not take yet; it tries again within 15 minutes.` : `Approved: ${b ? titleOf(b) : "bucket"} is on your calendar now.`;
+    }));
+    on("[data-bk-later]", (d) => { S.notNow[d.bkLater] = S.today; notNowSave(); redraw(); });
+    on("[data-bk-change]", () => { if (!S.edit) S.edit = S.buckets.map((b) => ({ id: b.id, name: b.name, emoji: b.emoji, cycle: b.cycle, day: b.day, start: b.start, min: b.min })); redraw(); });
     on("[data-bk-edit]", () => { S.edit = S.edit ? null : S.buckets.map((b) => ({ id: b.id, name: b.name, emoji: b.emoji, cycle: b.cycle, day: b.day, start: b.start, min: b.min })); redraw(); });
     if (S.edit) {
       box.querySelectorAll(".bk-ed input, .bk-ed select").forEach((x) => x.onchange = () => readEditor(box));
@@ -139,6 +167,9 @@
     .bk-day.today{background:rgba(255,255,255,.22);outline:2px solid rgba(255,255,255,.6)}.bk-day.past{opacity:.55}
     .bk-dn{font-size:11px;font-weight:700;text-align:center;opacity:.9}.bk-free{font-size:10px;opacity:.5;text-align:center}
     .bk-chip{display:flex;flex-direction:column;align-items:center;border:0;border-radius:8px;background:rgba(0,0,0,.18);color:inherit;padding:4px 2px;font-size:10px;position:relative;cursor:pointer}
+    .bk-chip.prop{background:transparent;border:1.5px dashed rgba(255,255,255,.7)}
+    .bk-props{background:rgba(0,0,0,.12);border:1.5px dashed rgba(255,255,255,.55);border-radius:12px;padding:10px;margin:8px 0}
+    .bk-prop{padding:8px 0;border-top:1px solid rgba(255,255,255,.12);display:flex;flex-direction:column;gap:4px}.bk-prop:nth-child(2){border-top:0}.bk-prop small{opacity:.8;font-size:12px}
     .bk-chip.on{background:rgba(0,0,0,.4)}.bk-chip .bk-cn{line-height:1.1;word-break:break-word}
     .bk-chip i{position:absolute;top:-4px;right:-3px;background:#ffd166;color:#222;border-radius:9px;font-style:normal;font-weight:700;font-size:10px;padding:0 5px}
     .bk-open{background:rgba(0,0,0,.18);border-radius:12px;padding:10px;margin:8px 0}.bk-oh{font-weight:700;margin-bottom:6px}.bk-oh small{font-weight:400;opacity:.75}
@@ -155,5 +186,5 @@
     const s = document.createElement("style"); s.id = "bk-css"; s.textContent = css; document.head.appendChild(s);
   }
 
-  root.QuestBuckets = { S, load, weekHTML, listHTML, bind, ensureCss, matchTitle, fallsOn, weekOf, tasksOf, waitingOf, titleOf };
+  root.QuestBuckets = { proposalsOf, S, load, weekHTML, listHTML, bind, ensureCss, matchTitle, fallsOn, weekOf, tasksOf, waitingOf, titleOf };
 })(typeof window !== "undefined" ? window : globalThis);

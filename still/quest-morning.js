@@ -421,7 +421,7 @@
     if (!QB || !C.buckets) return `<div class="mp-h">Your week</div><p class="mp-lead">The buckets are not loaded on this page yet.</p>`;
     QB.ensureCss();
     if (!QB.S.loaded && !QB.S.loading && !QB.S.err) QB.load(C.buckets).then(() => draw(true));   // a failed load waits for the next open, no retry loop
-    return `<div class="mp-h">Your week</div><p class="mp-lead">Your work buckets, Monday to Sunday. The number is how many tasks wait in each. Today's are open below.</p>
+    return `<div class="mp-h">Your week</div><p class="mp-lead">Your work buckets, Monday to Sunday. The number is how many tasks wait in each. Dashed ones are not on your calendar until you approve them.</p>
       <div id="mpWeek">${QB.weekHTML(D.today)}</div>`;
   }
 
