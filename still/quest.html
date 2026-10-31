@@ -1065,7 +1065,8 @@
 <script src="quest-gut.js?v=20261024g3"></script>
 <script src="quest-library.js?v=20261022b1"></script>
 <script src="quest-gym.js?v=20261019x"></script>
-<script src="quest-morning.js?v=20261024a"></script>
+<script src="quest-morning.js?v=20261030b"></script>
+<script src="quest-buckets.js?v=20261030b"></script>
 <script src="quest-agenda.js?v=20261024a"></script>
 <script src="quest-offline.js?v=20261017a"></script>
 <script src="quest-nearby.js?v=20261016k"></script>
@@ -2709,6 +2710,7 @@
     if (isGym(b)) return "gym";
     if (isGroceries(b)) return "kitchen";   // a Groceries block opens the kitchen on its shopping list (2026-10-20, d28)
     if (isMeal(b)) return "meal";
+    if (globalThis.QuestBuckets && globalThis.QuestBuckets.matchTitle(b.t)) return "bucket";   // a task bucket's block opens its tasks (2026-10-30)
     if (basicId(b)) return "basic";   // Morning Yoga, Domestics or Grooming, Wind-down from the calendar (2026-10-19)
     if (INSIGHTS[gk(b)]) return "work";   // the prep list the insight agent wrote (a hike's also carries its barefoot tile)
     if (QB() && QB().outdoorBlock(b.t)) return "outdoor";   // the barefoot walk (d27), on the walk or hike's own list
@@ -2728,8 +2730,26 @@
     if (l === "meal") return openMeal(b);
     if (l === "outdoor") return openOutdoor(b);
     if (l === "work") return openWork(b);
+    if (l === "bucket") return openBucket(b);
     return openNoTiles(b);
   }
+  // a task bucket's block (quest-buckets.js, 2026-10-30): its open tasks, Did it / Not this time
+  const BK_API = { get: p => qfetch(p),
+    post: (p, body) => DRY ? Promise.reject(new Error("dry run: nothing saved")) : qfetch(p, { method:"POST", body:JSON.stringify(body) }) };
+  function openBucket(b){
+    const QBk = window.QuestBuckets, bk = QBk.matchTitle(b.t);
+    if (!bk) return openNoTiles(b);
+    QBk.ensureCss();
+    const draw = () => {
+      const cur = QBk.matchTitle(b.t) || bk;
+      openSheet(`${winHead(b)}<div class="bk-sheet" style="background:linear-gradient(160deg,#6a8fd0,#26305e);color:#fff;border-radius:14px;padding:12px;margin-top:10px">
+        ${QBk.S.loaded ? QBk.listHTML(cur) : "<p>Loading…</p>"}${QBk.S.msg ? `<p class="bk-msg">${esc(QBk.S.msg)}</p>` : ""}</div>
+        <div class="actions"><button class="btn ghost" id="bkX">Close</button></div>`, true);
+      QBk.bind($("sheet"), BK_API, draw); $("bkX").onclick = closeSheet;
+    };
+    QBk.S.msg = ""; draw(); QBk.load(BK_API, true).then(draw);
+  }
+  setTimeout(() => { if (window.QuestBuckets && questKey()) QuestBuckets.load(BK_API); }, 1500);   // after the page has set up
   // no tiles yet (d33 d36: "let's just do them one at a time as they come up")
   function openNoTiles(b){
     openSheet(`${winHead(b)}<p class="hint" style="margin:10px 2px">Tiles for this block aren't set up yet.</p>
@@ -5745,6 +5765,7 @@
       log(`Note on ${task.task}: ${note}`); saveG(); return true;
     },
     habit: id => { logHabit(id, true); saveG(); },
+    buckets: BK_API,   // the "Your week" step (quest-buckets.js)
     practiceAction: id => { if (id === "nvc") { closeMorning(); openCheckin(); } },
     detail: key => { const b = blkByKey(key); return b && (!b.extra || b.basic) ? moDetail(b) : ""; },
     // the main page's calendar from this hour to the end of today's plan; keys[i] is the block behind data-stop i (null for open space), spans[i] its [start, end] ms
