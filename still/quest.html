@@ -1041,6 +1041,14 @@
   body.embed-cal #app { padding-top:6px; }
   body.embed-cal .cal-h { margin:0; padding:2px 2px 10px; position:relative; z-index:8; }
   body.embed-cal #mtn { max-height:calc(100vh - 54px); }
+  /* see-through widget (2026-10-30, Junyan: "a small seethrough calendar"): the Mac app paints its own
+     blur behind the page, so the page drops the sky and its opaque fills; cards keep their glass */
+  html:has(body.embed-cal), html[class]:has(body.embed-cal) { background:transparent !important; background-image:none !important; }
+  body.embed-cal #sky { display:none !important; }
+  body.embed-cal .cal-h { display:none; }
+  body.embed-cal #app { padding:4px 8px 8px; }
+  body.embed-cal #mtn { max-height:calc(100vh - 12px); background:transparent; }
+  body.embed-cal .cal-sticky { background:rgba(40,36,88,.55) !important; -webkit-backdrop-filter:blur(8px); backdrop-filter:blur(8px); }
 </style>
 <link rel="stylesheet" href="bag.css?v=20261011a">
 <style>
