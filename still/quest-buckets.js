@@ -47,7 +47,7 @@
     return `<div class="bk-tasks">${ts.map((t) => {
       const waiting = /^waiting/i.test(t.status);
       return `<div class="bk-t${waiting ? " wait" : ""}"><b>${esc(t.task)}</b>
-        ${t.notes ? `<small>${esc(t.notes.split("\n").filter((l) => l.trim().startsWith("- ")).slice(0, 6).join(" · ") || "")}</small>` : ""}
+        ${t.notes ? `<small>${esc(t.notes.split("\n").filter((l) => l.trim().startsWith("- ")).slice(0, 6).map((l) => l.trim().slice(2).replace(/\s*\(Deck Action \w+\)$/, "")).join(" · ") || "")}</small>` : ""}
         ${waiting ? `<small class="bk-w">Did it. Waiting for proof.</small>`
           : `<span class="bk-btns"><button data-bk-did="${esc(t.id)}">Did it</button><button data-bk-skip="${esc(t.id)}">Not this time</button></span>`}</div>`;
     }).join("")}</div>`;
