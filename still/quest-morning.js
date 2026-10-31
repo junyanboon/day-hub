@@ -8,7 +8,8 @@
    4. Tasks: his Notion list ranked by deadline and priority, a pick sized to his free time and
       how he feels; the ones he takes go into his free gaps.
    5. Practices, logged the same way as Prana actions.
-   6. The day as planned, anything still open, and Let's go.
+   6. Your week: the task buckets Mon to Sun, today's open to their tasks (2026-10-30).
+   7. The day as planned, anything still open, and Let's go.
    quest.html gathers the data and does the writes (today only, through /ops); this file decides
    and draws. Plan state lives on G.day.plan so another device opens on the same step.
    2026-10-16 (d1 to d7): the basics (Caney, Domestics, Wind-down) come in by themselves, step 1 has a
@@ -23,6 +24,7 @@
     ["Your schedule", ["#ffe1b0", "#c9786a", "#3a2c63"]],
     ["Tasks", ["#9fe3d0", "#3f8fa0", "#22305e"]],
     ["Practices and training", ["#fff1c9", "#f0a35e", "#7b3f61"]],
+    ["Your week", ["#d6e8ff", "#6a8fd0", "#26305e"]],   // task buckets (2026-10-30): the week's buckets, today's open to their tasks
     ["Your day", ["#ffc2d1", "#b8579a", "#2f2a66"]],
   ];
   const FEEL = [[1, "Wiped out"], [2, "Tired"], [3, "Okay"], [4, "Good"], [5, "Full of energy"]];
@@ -413,6 +415,16 @@
           <span class="mo-pr-g">${p.done ? "✓" : p.auto ? "auto" : p.gain ? `+${p.gain}` : ""}</span></div>`; }).join("")}</div>`).join("")}`;
   }
 
+  // Your week (Junyan, 2026-10-30: "I need to see it as part of my week planner that pops up every day"): quest-buckets.js
+  function stepWeek(D) {
+    const QB = root.QuestBuckets;
+    if (!QB || !C.buckets) return `<div class="mp-h">Your week</div><p class="mp-lead">The buckets are not loaded on this page yet.</p>`;
+    QB.ensureCss();
+    if (!QB.S.loaded && !QB.S.loading && !QB.S.err) QB.load(C.buckets).then(() => draw(true));   // a failed load waits for the next open, no retry loop
+    return `<div class="mp-h">Your week</div><p class="mp-lead">Your work buckets, Monday to Sunday. The number is how many tasks wait in each. Today's are open below.</p>
+      <div id="mpWeek">${QB.weekHTML(D.today)}</div>`;
+  }
+
   function stepDay(D) {
     const cs = checks(D), up = fixedOf(D), free = gapsOf(D).reduce((a, g) => a + g.min, 0);
     const use = Math.round(costLeft(D).reduce((a, x) => a + x.d, 0));
@@ -426,7 +438,7 @@
     if (!el) return;
     const D = P(), step = Math.max(0, Math.min(STEPS.length - 1, D.plan.step || 0)), [, pal] = STEPS[step];
     const sc = el.querySelector(".mp-scroll"), y = keep && sc ? sc.scrollTop : 0, typing = document.activeElement && document.activeElement.id === "mpQuick";
-    const body = [stepCheckIn, stepChecks, stepSchedule, stepTasks, stepPractices, stepDay][step](D);
+    const body = [stepCheckIn, stepChecks, stepSchedule, stepTasks, stepPractices, stepWeek, stepDay][step](D);
     const last = step === STEPS.length - 1;
     el.innerHTML = `<div class="mp"><div class="mo-bars">${STEPS.map((s, i) => `<i class="${i < step ? "done" : i === step ? "on" : ""}" data-go="${i}" title="${esc(s[0])}"></i>`).join("")}</div>
       <div class="mp-scroll" style="--g1:${pal[0]};--g2:${pal[1]};--g3:${pal[2]}"><div class="mp-c"><div class="mp-step">Step ${step + 1} of ${STEPS.length} · ${esc(STEPS[step][0])}</div>${body}</div></div>
@@ -448,6 +460,7 @@
   function wire(D) {
     const on = (sel, fn) => el.querySelectorAll(sel).forEach((b) => b.onclick = (e) => { e.stopPropagation(); fn(b.dataset, b); });
     on("[data-close]", () => close());
+    const wk = el.querySelector("#mpWeek"); if (wk && root.QuestBuckets && C.buckets) root.QuestBuckets.bind(wk, C.buckets, () => draw(true));
     on("[data-go]", (d) => { D.plan.step = +d.go; C.save(); draw(); });
     on("[data-begin]", () => { C.begin(); close(); });
     on("[data-mode]", (d) => { if (D.mode !== d.mode || !D.modeSet) act(() => C.setMode(d.mode)); });
