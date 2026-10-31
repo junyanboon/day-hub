@@ -6775,7 +6775,8 @@
     // once per day on this device too: a day copy swapped in by a sync or a zone flip lost nightShown and Day's end
     // kept popping up (2026-10-23, after the Madrid to Toronto flight)
     let nightSeen = ""; try { nightSeen = localStorage.getItem("quest-night-shown") || ""; } catch {}
-    if (nightNow && !G.day.nightShown && nightSeen !== gameYmd() && !$("sheet").classList.contains("open") && !$("night")) {
+    // the Mac orb's calendar panel (?embed=calendar) never pops Day's end up by itself (2026-10-30)
+    if (nightNow && !document.body.classList.contains("embed-cal") && !G.day.nightShown && nightSeen !== gameYmd() && !$("sheet").classList.contains("open") && !$("night")) {
       G.day.nightShown = true; try { localStorage.setItem("quest-night-shown", gameYmd()); } catch {} saveG(); openNight(); }
     put("habits", PLAN ? (nightNow ? `<button class="pa-all nt-open" data-night>🌙 Day's end<span>tomorrow, deathbed, reflection ›</span></button>` : "") + stepsHTML() + waterHTML() + gutHTML() + kitchenHTML() + suggestHTML() + sugHTML() : ""); bindHabits($("habits")); bindSug($("habits"));
     $("habits").querySelectorAll("[data-glass]").forEach(bn => bn.onclick = () => addGlass(bn));
