@@ -25,7 +25,9 @@
   const titleOf = (b) => `${b.emoji ? b.emoji + " " : ""}${b.name}`;
   const fold = (s) => String(s || "").replace(/[^\p{L}\p{N}]+/gu, " ").trim().toLowerCase();
   /** The bucket a calendar block stands for ("🛒 Supply run" -> Supply run), or null. */
-  function matchTitle(t, buckets = S.buckets) { const f = fold(t); return buckets.find((b) => fold(b.name) === f) || null; }
+  // only the series' own title ("🛒 Supply run"): a plain "Admin" block he made is not a bucket
+  function matchTitle(t, buckets = S.buckets) { const f = fold(t), raw = String(t || "").trim();
+    return buckets.find((b) => fold(b.name) === f && (!b.emoji || raw.startsWith(b.emoji))) || null; }
   const tasksOf = (b, tasks = S.tasks) => tasks.filter((t) => t.bucket === b.name);
   const waitingOf = (b, tasks = S.tasks) => tasksOf(b, tasks).filter((t) => !/^waiting/i.test(t.status));
   function clock(hm) { const [h, m] = hm.split(":").map(Number); return `${(h + 11) % 12 + 1}${m ? ":" + String(m).padStart(2, "0") : ""} ${h < 12 ? "AM" : "PM"}`; }

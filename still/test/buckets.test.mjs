@@ -36,7 +36,8 @@ test("week strip: Mon to Sun, first-Monday Admin only in the first week, counts 
 
 test("a calendar block title finds its bucket", () => {
   assert.equal(QB.matchTitle("🛒 Supply run").id, "supply");
-  assert.equal(QB.matchTitle("Supply Run"), QB.S.buckets[1]);
+  assert.equal(QB.matchTitle("Admin"), null, "a plain Admin block is his, not the bucket");
+  assert.equal(QB.matchTitle("📋 Admin").id, "admin");
   assert.equal(QB.matchTitle("🛒 Buy studio supplies"), null);
 });
 
