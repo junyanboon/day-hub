@@ -4,8 +4,8 @@ import assert from "node:assert/strict";
 import "../quest-buckets.js";
 const QB = globalThis.QuestBuckets;
 const SEED = [
-  { id: "money", name: "Money and bills", emoji: "💵", cycle: "weekly", day: "MO", start: "09:00", min: 90 },
-  { id: "supply", name: "Supply run", emoji: "🛒", cycle: "weekly", day: "TU", start: "09:00", min: 90 },
+  { id: "money", name: "Money and bills", emoji: "💵", cycle: "weekly", day: "MO", start: "09:00", min: 90, approved: true },
+  { id: "supply", name: "Supply run", emoji: "🛒", cycle: "weekly", day: "TU", start: "09:00", min: 90, approved: true },
   { id: "check", name: "Studio check", emoji: "🔑", cycle: "weekly", day: "TU", start: "12:30", min: 60 },
   { id: "admin", name: "Admin", emoji: "📋", cycle: "monthly", day: "MO", start: "16:00", min: 90 },
 ];
@@ -80,4 +80,34 @@ test("saving sends the rev it read; a 409 reloads the other device's copy and sa
   assert.equal(QB.S.edit, null);
   assert.match(QB.S.msg, /changed on another device/);
   assert.equal(api.calls.filter((c) => c[0] === "GET").length, 2, "the newer copy was read again");
+});
+
+test("approve: unapproved buckets are dashed proposals with Approve / Change / Not now; tasks still listed", async () => {
+  const api = fakeApi({ "/quest/buckets/approve": (b) => ({ ok: true, sync: [{ name: "Studio check", did: "made" }] }) });
+  TASKS[0].status = "Not Started"; await QB.load(api, true); QB.S.open = null; QB.S.notNow = {};
+  const html = QB.weekHTML("2026-11-03");
+  assert.match(html, /bk-chip prop" data-bk-open="check"/, "Studio check is dashed");
+  assert.match(html, /bk-chip" data-bk-open="supply"/, "Supply run is approved, solid");
+  assert.match(html, /Waiting for your OK/);
+  for (const k of ["ok", "change", "later"]) assert.match(html, new RegExp(`data-bk-${k}="check"`));
+  assert.ok(!/data-bk-ok="supply"/.test(html), "an approved bucket is not proposed");
+  assert.match(html, /data-bk-did="t1"/, "today's tasks are still listed");
+  let b = box(html); QB.bind(b, api, () => {});
+  b.querySelectorAll("[data-bk-ok]").find((x) => x.dataset.bkOk === "check").onclick({ stopPropagation() {} });
+  await new Promise((r) => setTimeout(r, 5));
+  assert.deepEqual(api.calls.find((c) => c[1] === "/quest/buckets/approve"), ["POST", "/quest/buckets/approve", { id: "check" }]);
+  assert.match(QB.S.msg, /Approved: 🔑 Studio check is on your calendar/);
+  // Not now hides it from the proposals for today only, saves nothing
+  const n = api.calls.length;
+  b = box(QB.weekHTML("2026-11-03")); QB.bind(b, api, () => {});
+  b.querySelectorAll("[data-bk-later]").find((x) => x.dataset.bkLater === "admin").onclick({ stopPropagation() {} });
+  assert.equal(api.calls.length, n, "Not now posts nothing");
+  assert.ok(!QB.proposalsOf("2026-11-03").some((x) => x.id === "admin"));
+  assert.ok(QB.proposalsOf("2026-11-04").some((x) => x.id === "admin"), "it comes back tomorrow");
+  // Change opens the editor
+  b = box(QB.weekHTML("2026-11-03")); QB.bind(b, api, () => {});
+  QB.S.edit = null;
+  b.querySelectorAll("[data-bk-change]")[0].onclick({ stopPropagation() {} });
+  assert.equal(QB.S.edit.length, 4);
+  QB.S.edit = null;
 });
