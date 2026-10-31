@@ -1039,7 +1039,7 @@
   /* ?embed=calendar (2026-10-30, d5): the Mac Day Quest orb's one-click popout shows only this calendar */
   body.embed-cal #app > :not(.cal-h):not(#mtn) { display:none !important; }
   body.embed-cal #app { padding-top:6px; }
-  body.embed-cal .cal-h { margin:0 0 8px; }
+  body.embed-cal .cal-h { margin:0; padding:2px 2px 10px; position:relative; z-index:8; }
   body.embed-cal #mtn { max-height:calc(100vh - 54px); }
 </style>
 <link rel="stylesheet" href="bag.css?v=20261011a">
