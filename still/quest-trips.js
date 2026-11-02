@@ -1,7 +1,8 @@
 /* Trips: Day Quest's desktop Trips section (Junyan, 2026-11-01; design "Layout A",
    artifact XGUE3DrhArW49V9nGJwQ4W).
    Desktop (768 px and wider): a left sidebar (Today, Calendar, Quests & XP, Skills,
-   then TRIPS with each trip and "+ New trip"). A trip page is the itinerary on the
+   then one "Trips" item that opens the Trips page: Upcoming and Past tabs of trip
+   cards and "+ New trip"; a card opens the trip page). A trip page is the itinerary on the
    left half (title, chips, tabs Itinerary / Bookings / Must-haves / Ideas, day chips,
    day rail of cards) and our own map on the right (Leaflet + OpenStreetMap
    tiles, no key needed). A card opens a side panel modelled on the Notion Travel Planner
@@ -135,7 +136,65 @@
     return rows;
   }
 
-  const api = { haversine, gpxPoints, gpxStats, dayIndex, pillOf, isStay, isHike, whenText, seedRows, SEED, fmtDur };
+
+  /* ── Trips home (Junyan 2026-11-01): one "Trips" item in the sidebar opens a page
+     with Upcoming and Past tabs. The two Notion databases can spell one trip two ways
+     ("2026 🇪🇬 Egypt" and "2026 Egypt"): those merge into one card here and Notion is
+     left as it is. ─────────────────────────────────────────────────────────── */
+  const tripKey = (name) => String(name || "").normalize("NFKD").replace(/[̀-ͯ]/g, "")
+    .replace(/\p{Extended_Pictographic}|\p{Regional_Indicator}|[️‍]/gu, " ")
+    .toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  function mergeTrips(list) {
+    const by = new Map();
+    for (const t of list || []) {
+      const k = tripKey(t.name) || t.name;
+      const g = by.get(k);
+      if (!g) { by.set(k, { ...t, aliases: [t.name] }); continue; }
+      if (!g.aliases.includes(t.name)) g.aliases.push(t.name);
+      if (t.start && (!g.start || t.start < g.start)) g.start = t.start;
+      if (t.end && (!g.end || t.end > g.end)) g.end = t.end;
+      for (const f of ["count", "bookings", "need", "booked"]) if (t[f] != null) g[f] = (+g[f] || 0) + (+t[f] || 0);
+      if (!g.place && t.place) g.place = t.place;
+      if ((!g.icon || g.icon === "🧳") && t.icon && t.icon !== "🧳") g.icon = t.icon;
+    }
+    return [...by.values()];
+  }
+  const dnum = (s) => Date.UTC(+s.slice(0, 4), +s.slice(5, 7) - 1, +s.slice(8, 10)) / 86400000;
+  function splitTrips(list, today) {
+    const t0 = dnum(today), upcoming = [], past = [];
+    for (const t of list || []) {
+      const s = (t.start || "").slice(0, 10), e = (t.end || t.start || "").slice(0, 10);
+      if (!s) { upcoming.push({ ...t, away: null, now: false }); continue; }
+      if (dnum(e) < t0) past.push({ ...t, ago: t0 - dnum(e) });
+      else upcoming.push({ ...t, away: Math.max(0, dnum(s) - t0), now: dnum(s) <= t0 });
+    }
+    upcoming.sort((a, b) => (a.start || "9").localeCompare(b.start || "9"));
+    past.sort((a, b) => (b.end || b.start || "").localeCompare(a.end || a.start || ""));
+    return { upcoming, past };
+  }
+  function whenLabel(t) {
+    if (t.now) return "Now";
+    if (t.ago != null) return t.ago === 1 ? "Yesterday" : `${t.ago} days ago`;
+    if (t.away == null) return "No dates yet";
+    return t.away === 0 ? "Today" : t.away === 1 ? "Tomorrow" : `${t.away} days away`;
+  }
+  // where a trip is, for centring the map before it has pins: its Location, else its name
+  // without the year, flags and words like "trip" ("2027 🇧🇷 Brazil Carnaval" → "Brazil Carnaval")
+  function destOf(name, location) {
+    if (location && String(location).trim()) return String(location).trim();
+    return String(name || "").replace(/\p{Extended_Pictographic}|\p{Regional_Indicator}|[️‍]/gu, " ")
+      .replace(/\b(19|20)\d\d\b/g, " ").replace(/\b(birthday|trip|vacation|holiday)\b/gi, " ")
+      .replace(/\s+/g, " ").trim();
+  }
+  // how the map starts: fit the trip's own pins; else the geocoded destination; else the world
+  function mapStart(places, dest, geo) {
+    const pins = (places || []).filter((p) => p && p.lat != null && p.lng != null).map((p) => [p.lat, p.lng]);
+    if (pins.length) return { pins };
+    if (dest && geo && geo.lat != null) return { center: [geo.lat, geo.lng], zoom: 5 };
+    return { world: true };
+  }
+
+  const api = { haversine, gpxPoints, gpxStats, dayIndex, pillOf, isStay, isHike, whenText, seedRows, SEED, fmtDur, tripKey, mergeTrips, splitTrips, whenLabel, destOf, mapStart };
   root.QuestTrips = api;
   if (typeof document === "undefined" || typeof window === "undefined") return;
 
@@ -237,6 +296,30 @@
   #tripView td{padding:9px 8px;border-bottom:1px solid rgba(255,255,255,.12)}
   #tripView .toast{position:absolute;left:24px;bottom:18px;z-index:950;background:#2a2f63;border:1px solid rgba(255,255,255,.2);border-radius:10px;padding:8px 12px;font-size:13px}
   #tripView .src{font-size:11px;color:var(--ink-faint);margin-top:18px}
+  body.trips-home #app{display:none}
+  #tripHome{position:fixed;left:210px;top:0;right:0;bottom:0;z-index:30;display:none;overflow:auto;padding:28px 32px;font-family:var(--font);color:var(--ink);background:rgba(0,0,0,.18)}
+  body.trips-home #tripHome{display:block}
+  #tripHome button{font:inherit;color:inherit;border:0;background:none;cursor:pointer}
+  #tripHome .hd{display:flex;align-items:center;gap:12px;margin-bottom:6px}
+  #tripHome h1{font-size:26px;font-weight:700;margin:0;flex:1}
+  #tripHome .btn{flex:none;width:auto;padding:8px 14px;border-radius:10px;background:var(--zap);color:#2a2453;font-weight:700;font-size:14px}
+  #tripHome .tabs{display:flex;gap:22px;border-bottom:1px solid rgba(255,255,255,.12);margin:10px 0 18px}
+  #tripHome .tabs button{padding:10px 0;font-size:14px;color:var(--ink-faint);border-bottom:2px solid transparent;margin-bottom:-1px}
+  #tripHome .tabs button.on{color:var(--ink);border-color:var(--zap);font-weight:600}
+  #tripHome .n{font-size:11px;color:var(--ink-faint);margin-left:4px}
+  #tripHome .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px}
+  #tripHome .card{width:auto;text-align:left;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);border-radius:16px;padding:16px 18px;display:flex;flex-direction:column;gap:6px}
+  #tripHome .card:hover{border-color:var(--zap)}
+  #tripHome .card .t{font-size:17px;font-weight:600}
+  #tripHome .card .s{font-size:13px;color:var(--ink-soft)}
+  #tripHome .card .row{display:flex;gap:6px;flex-wrap:wrap;margin-top:4px}
+  #tripHome .chip{padding:3px 9px;border-radius:999px;border:1px solid rgba(255,255,255,.12);font-size:12px;color:var(--ink-soft)}
+  #tripHome .chip.now{background:var(--good);color:#12321f;border:0;font-weight:700}
+  #tripHome .chip.need{border-color:rgba(255,194,122,.5);color:var(--warn)}
+  #tripHome .chip.paid{border-color:rgba(143,227,176,.5);color:var(--good)}
+  #tripHome .empty{color:var(--ink-faint);font-size:14px}
+  #tripView .back{display:inline-block;font-size:13px;color:var(--ink-faint);margin-bottom:10px}
+  #tripView .back:hover{color:var(--zap)}
   .trip-pin{width:26px;height:26px;border-radius:50%;background:#2a2f63;border:2px solid var(--zap);display:grid;place-items:center;font-size:13px;box-shadow:0 2px 8px rgba(0,0,0,.5)}
   .trip-pin.on{border-color:var(--gold);transform:scale(1.25)}`;
   document.head.appendChild(css);
@@ -250,9 +333,12 @@
     <div class="mapwrap"><div id="tripMap"></div><div id="tvHike"></div></div></div><div class="drawer" id="tvDrawer"></div><input type="file" id="tvFile" hidden>`;
   document.body.appendChild(side);
   document.body.appendChild(view);
+  const home = document.createElement("section");
+  home.id = "tripHome";
+  document.body.appendChild(home);
   document.body.classList.add("has-side");
 
-  const S = { trips: [], cur: null, tab: "Itinerary", day: -1, sel: null, mode: "map", live: false, note: "" };
+  const S = { trips: [], homeTab: "Upcoming", cur: null, tab: "Itinerary", day: -1, sel: null, mode: "map", live: false, note: "" };
   const extrasOf = (id) => (S.cur.extras[id] = S.cur.extras[id] || {});
 
   function toast(msg) {
@@ -260,24 +346,46 @@
     setTimeout(() => t.remove(), 3200);
   }
 
-  /* sidebar */
+  /* sidebar: Today, Calendar, Quests & XP, Skills, Trips (one item; the trips list lives on the Trips page) */
   function drawSide(active) {
-    const navs = [["today", "☀ Today"], ["cal", "▦ Calendar"], ["quests", "★ Quests &amp; XP"], ["skills", "◆ Skills"]];
+    const navs = [["today", "☀ Today"], ["cal", "▦ Calendar"], ["quests", "★ Quests &amp; XP"], ["skills", "◆ Skills"], ["trips", "✈ Trips"]];
     side.innerHTML = `<div class="brand"><div class="logo">★</div><div><b>DAY <span>QUEST</span></b><small>STILLNESS</small></div></div>` +
-      navs.map(([k, l]) => `<button class="nav ${active === k ? "on" : ""}" data-nav="${k}">${l}</button>`).join("") +
-      `<div class="sec">TRIPS</div>` +
-      S.trips.map((t) => `<button class="nav ${active === "trip:" + t.name ? "on" : ""}" data-trip="${esc(t.name)}">${esc(t.icon || "🧳")} ${esc(t.name.replace(/ trip$/i, ""))}</button>`).join("") +
-      `<button class="nav" data-nav="new" style="color:var(--ink-faint)">＋ New trip</button>`;
+      navs.map(([k, l]) => `<button class="nav ${active === k ? "on" : ""}" data-nav="${k}">${l}</button>`).join("");
     side.querySelectorAll("[data-nav]").forEach((b) => b.onclick = () => go(b.dataset.nav));
-    side.querySelectorAll("[data-trip]").forEach((b) => b.onclick = () => openTrip(b.dataset.trip));
   }
   function go(k) {
     if (k === "new") return newTrip();
-    document.body.classList.remove("trip-open");
+    if (k === "trips") return showHome();
+    document.body.classList.remove("trip-open", "trips-home");
     drawSide(k);
     const el = k === "cal" ? document.querySelector(".cal-h") : k === "quests" ? document.getElementById("main") : k === "skills" ? document.getElementById("skillsRow") : null;
     if (k === "skills") { const b = document.getElementById("skillsBtn"); if (b) b.click(); }
     if (el) el.scrollIntoView({ behavior: "smooth", block: "start" }); else window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+  /* Trips home: Upcoming (now and future, soonest first) and Past (newest first) */
+  const today = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
+  function showHome() {
+    document.body.classList.remove("trip-open");
+    document.body.classList.add("trips-home");
+    drawSide("trips");
+    const { upcoming, past } = splitTrips(S.trips, today());
+    const list = S.homeTab === "Past" ? past : upcoming;
+    const fmt = (x) => x ? new Date(x.slice(0, 10) + "T12:00:00").toLocaleDateString("en-CA", { month: "short", day: "numeric", year: "numeric" }) : "";
+    const card = (t) => {
+      const chips = [`<span class="chip ${t.now ? "now" : ""}">${esc(whenLabel(t))}</span>`];
+      if (t.need) chips.push(`<span class="chip need">${t.need} to book</span>`);
+      if (t.booked) chips.push(`<span class="chip paid">${t.booked} booked</span>`);
+      if (t.bookings != null) chips.push(`<span class="chip">${t.bookings} booking${t.bookings === 1 ? "" : "s"}</span>`);
+      return `<button class="card" data-trip="${esc(t.name)}"><div class="t">${esc(t.icon || "🧳")} ${esc(t.name)}</div>
+        <div class="s">${t.start ? `${fmt(t.start)}${t.end && t.end !== t.start ? " to " + fmt(t.end) : ""}` : "No dates yet"}</div><div class="row">${chips.join("")}</div></button>`;
+    };
+    home.innerHTML = `<div class="hd"><h1>✈ Trips</h1><button class="btn" id="thNew">＋ New trip</button></div>
+      <div class="tabs">${[["Upcoming", upcoming], ["Past", past]].map(([k, l]) => `<button class="${S.homeTab === k ? "on" : ""}" data-ht="${k}">${k}<span class="n">${l.length}</span></button>`).join("")}</div>
+      ${list.length ? `<div class="grid">${list.map(card).join("")}</div>` : `<div class="empty">${S.homeTab === "Past" ? "No past trips yet." : "Nothing coming up. Start one with + New trip."}</div>`}
+      ${S.live ? "" : `<div class="empty" style="margin-top:18px;font-size:12px">Notion is not reachable right now${S.note ? " (" + esc(S.note) + ")" : ""}, so only the saved copy shows.</div>`}`;
+    home.querySelectorAll("[data-ht]").forEach((b) => b.onclick = () => { S.homeTab = b.dataset.ht; showHome(); });
+    home.querySelectorAll("[data-trip]").forEach((b) => b.onclick = () => openTrip(b.dataset.trip));
+    home.querySelector("#thNew").onclick = newTrip;
   }
   async function newTrip() {
     const name = (prompt("Trip name (for example: Lisbon spring trip)") || "").trim();
@@ -286,7 +394,7 @@
     try {
       await call("/quest/trips/create", { db: "planner", trip: name, rows: [{ name: name + " (overview)", icon: "🧳",
         props: { "Date (Timezone)": dates[0] ? dates[0] + (dates[1] ? " → " + dates[1] : "") : "", Status: "Need to Book" } }] });
-      S.trips.unshift({ name, start: dates[0] || "", end: dates[1] || dates[0] || "", icon: "🧳" });
+      S.trips.unshift({ name, start: dates[0] || "", end: dates[1] || dates[0] || "", icon: "🧳", aliases: [name] });
       openTrip(name);
     } catch (e) { alert("Could not save the trip to Notion: " + e.message); }
   }
@@ -297,19 +405,25 @@
     try {
       const d = await call("/quest/trips");
       S.live = true;
-      for (const t of d.trips || []) if (!S.trips.some((x) => x.name === t.name)) S.trips.push({ ...t, icon: "🧳" });
-    } catch (e) { S.note = e.message; }
-    drawSide("today");
+      S.trips = mergeTrips([...S.trips, ...(d.trips || []).map((t) => ({ ...t, icon: "🧳" }))]);
+    } catch (e) { S.note = e.message; S.trips = mergeTrips(S.trips); }
+    drawSide(document.body.classList.contains("trips-home") ? "trips" : "today");
+    if (document.body.classList.contains("trips-home")) showHome();
   }
   async function openTrip(name) {
-    const meta = S.trips.find((t) => t.name === name) || { name };
-    S.cur = { name, start: meta.start, end: meta.end, icon: meta.icon || "🧳", who: "", items: [], extras: {}, places: [], seeded: false };
+    const meta = S.trips.find((t) => t.name === name || (t.aliases || []).includes(name)) || { name };
+    S.cur = { name, start: meta.start, end: meta.end, icon: meta.icon || "🧳", who: "", items: [], extras: {}, places: [], seeded: false,
+      place: meta.place || "", aliases: meta.aliases || [name] };
     S.tab = "Itinerary"; S.day = -1; S.sel = null; S.mode = "map";
+    document.body.classList.remove("trips-home");
     document.body.classList.add("trip-open");
-    drawSide("trip:" + name);
-    let d = null;
-    try { d = await call("/quest/trips/one?name=" + encodeURIComponent(name)); S.live = true; } catch (e) { S.note = e.message; }
-    if (d) { S.cur.items = d.items || []; S.cur.extras = d.extras || {}; S.cur.places = d.places || []; }
+    drawSide("trips");
+    // a trip spelled two ways in Notion ("2026 🇪🇬 Egypt", "2026 Egypt") reads both
+    for (const nm of S.cur.aliases) {
+      let d = null;
+      try { d = await call("/quest/trips/one?name=" + encodeURIComponent(nm)); S.live = true; } catch (e) { S.note = e.message; }
+      if (d) { S.cur.items.push(...(d.items || [])); Object.assign(S.cur.extras, d.extras || {}); S.cur.places.push(...(d.places || [])); }
+    }
     if (name === MTL) {
       S.cur.who = SEED.who; S.cur.start = S.cur.start || SEED.start; S.cur.end = SEED.end;
       // show the calendar copy for anything Notion does not have yet
@@ -355,7 +469,7 @@
     const ideas = c.items.filter((i) => pillOf(i.status) === "idea");
     const away = c.start ? Math.round((new Date(c.start + "T00:00:00") - new Date().setHours(0, 0, 0, 0)) / 86400000) : null;
     const fmt = (s) => s ? new Date(s + "T12:00:00").toLocaleDateString("en-CA", { weekday: "short", month: "short", day: "numeric" }) : "";
-    let h = `<h1>${esc(c.icon)} ${esc(c.name)}</h1><div class="meta">${c.start ? `<span class="chip">${fmt(c.start)} to ${fmt(c.end)}</span>` : ""}
+    let h = `<a href="#" class="back" id="tvBack">← All trips</a><h1>${esc(c.icon)} ${esc(c.name)}</h1><div class="meta">${c.start ? `<span class="chip">${fmt(c.start)} to ${fmt(c.end)}</span>` : ""}
       ${c.who ? `<span class="chip">${esc(c.who)}</span>` : ""}${away != null && away >= 0 ? `<span class="chip">${away} days away</span>` : ""}
       ${need.map((i) => `<span class="chip warn">${esc(isStay(i) ? "Hotel" : i.name.replace(/ Day$/, ""))} not booked</span>`).join("")}
       ${c.seeded ? `<span class="chip act" id="tvSync" title="Writes the calendar copy into your Notion Travel Planner and Travel Activities Planner">⇪ Create in Notion</span>` : ""}</div>
@@ -387,6 +501,7 @@
       <div class="day">Saved places<small>${c.places.length}</small></div><div class="rail">${c.places.map((p) => `<div class="item" data-place="${esc(p.id)}"><div class="ic">📍</div><div><div class="t">${esc(p.name)}</div><div class="s">${esc(p.category)}${p.address ? " · " + esc(p.address.split(",")[0]) : ""}</div></div><div class="r"><a href="${gdir(p)}" target="_blank" rel="noopener">Directions ↗</a></div></div>`).join("")}</div>`;
     h += `<div class="src">${S.live ? "Live from Notion through the Still server." : "Server not reachable (" + esc(S.note || "offline") + "): showing the calendar copy; changes stay on this screen."}</div>`;
     const L = document.getElementById("tvLeft"); L.innerHTML = h;
+    L.querySelector("#tvBack").onclick = (e) => { e.preventDefault(); closeDrawer(true); showHome(); };
     L.querySelectorAll("[data-t]").forEach((b) => b.onclick = () => { S.tab = b.dataset.t; drawLeft(); });
     L.querySelectorAll("[data-d]").forEach((b) => b.onclick = () => { S.day = +b.dataset.d; drawLeft(); });
     L.querySelectorAll(".item[data-id]").forEach((b) => b.onclick = () => openItem(b.dataset.id));
@@ -536,7 +651,7 @@
       map = L.map("tripMap", { zoomControl: true, attributionControl: true });
       L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png",
         { maxZoom: 19, attribution: "© OpenStreetMap contributors" }).addTo(map);
-      map.setView([45.52, -73.57], 12);
+      map.setView([20, 0], 2);   // never a default city (the Carnaval trip opened on Montreal)
     }
     setTimeout(() => map.invalidateSize(), 50);
     if (layer) layer.remove();
@@ -560,6 +675,24 @@
       if (on) map.setView([p.lat, p.lng], 15);
     }
     if (pts.length && !(it && selAddr && pts.length)) map.fitBounds(pts, { padding: [40, 40], maxZoom: 14 });
+    if (!pts.length) centreOnDest();
+  }
+  // no pins yet: centre on the trip's destination (its Location, else its name), else the world
+  const geoCache = {};
+  async function centreOnDest() {
+    const cur = S.cur, dest = destOf(cur.name, cur.place);
+    let geo = null;
+    if (dest) {
+      if (!(dest in geoCache)) {
+        geoCache[dest] = null;
+        try { const r = await fetch("https://nominatim.openstreetmap.org/search?format=json&limit=1&q=" + encodeURIComponent(dest));
+          const d = r.ok ? await r.json() : []; if (d[0]) geoCache[dest] = { lat: +d[0].lat, lng: +d[0].lon }; } catch {}
+      }
+      geo = geoCache[dest];
+    }
+    if (S.cur !== cur || !map) return;   // another trip opened meanwhile
+    const st = mapStart([], dest, geo);
+    if (st.center) map.setView(st.center, st.zoom); else map.setView([20, 0], 2);
   }
   async function drawHike(it, box) {
     const ex = extrasOf(it.id);
