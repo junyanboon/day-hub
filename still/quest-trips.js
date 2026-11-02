@@ -351,15 +351,16 @@
   #tripView .preview{background:rgba(255,255,255,.04);border:1px dashed rgba(255,255,255,.12);border-radius:10px;padding:10px;font-size:13px;color:var(--ink-faint)}
   #tripView .pbtn{font:inherit;font-size:13px;background:rgba(201,182,255,.18);color:var(--ink);border:1px solid rgba(201,182,255,.45);border-radius:8px;padding:6px 12px;cursor:pointer}
   #tripView .plan{background:rgba(156,200,255,.18);color:#9cc8ff}#tripView .idea{background:rgba(255,255,255,.1);color:var(--ink-soft)}
-  #tripView .right{flex:1;display:flex;flex-direction:column;border-left:1px solid rgba(255,255,255,.12);min-width:0;position:relative}
-  #tripView .mapbar{display:flex;gap:8px;align-items:center;padding:10px 12px;border-bottom:1px solid rgba(255,255,255,.12);background:rgba(10,12,32,.5)}
-  #tripView .seg{display:flex;background:rgba(255,255,255,.07);border-radius:10px;padding:3px}
+  #tripView .right{flex:1;display:flex;flex-direction:column;border-left:1px solid rgba(255,255,255,.12);min-width:0;position:relative;overflow:hidden}
+  #tripView .mapbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:10px 12px;border-bottom:1px solid rgba(255,255,255,.12);background:rgba(10,12,32,.5)}
+  #tripView .mapbar .btn{flex:none}
+  #tripView .seg{display:flex;flex:none;background:rgba(255,255,255,.07);border-radius:10px;padding:3px}
   #tripView .seg button{padding:6px 12px;border-radius:8px;font-size:13px;color:var(--ink-faint)}
   #tripView .seg button.on{background:rgba(255,255,255,.14);color:var(--ink);font-weight:600}
   #tripView .seg button:disabled{opacity:.35;cursor:not-allowed}
   #tripView .btn{padding:7px 12px;border-radius:9px;border:1px solid rgba(255,255,255,.12);font-size:13px;color:var(--ink-soft);white-space:nowrap}
   #tripView .btn.pri{background:var(--zap);color:#2a2453;border:0;font-weight:700}
-  #tripView .mapwrap{flex:1;position:relative;background:#151a40}
+  #tripView .mapwrap{flex:1;position:relative;overflow:hidden;background:#151a40}
   #tripMap{position:absolute;inset:0}
   #tripView .leaflet-container{background:#151a40;font-family:var(--font)}
   #tripView .hikebox{position:absolute;left:12px;right:12px;bottom:12px;z-index:500;background:rgba(23,48,31,.92);border-radius:14px;padding:14px 16px;border:1px solid rgba(255,255,255,.12)}
@@ -428,7 +429,7 @@
   const view = document.createElement("section");
   view.id = "tripView";
   view.innerHTML = `<div class="left" id="tvLeft"></div><div class="right"><div class="mapbar"><div class="seg"><button class="on" id="tvMapBtn">🗺 Map</button><button id="tvHikeBtn" disabled title="Pick a hike card">🥾 Hike map</button></div>
-    <span style="flex:1"></span><button class="btn" id="tvImport" title="Google Takeout, Saved, one CSV per list">⬆ Import Google list</button><button class="btn pri" id="tvAddPlace">＋ Add place</button></div>
+    <span style="flex:1 1 0"></span><button class="btn" id="tvImport" title="Import a Google list (Google Takeout, Saved, one CSV per list)">⬆ Import list</button><button class="btn pri" id="tvAddPlace">＋ Add place</button></div>
     <div class="mapwrap"><div id="tripMap"></div><div id="tvHike"></div></div></div><div class="drawer" id="tvDrawer"></div><input type="file" id="tvFile" hidden>`;
   document.body.appendChild(side);
   document.body.appendChild(view);
