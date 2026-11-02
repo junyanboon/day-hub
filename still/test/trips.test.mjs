@@ -90,7 +90,8 @@ test("Upcoming: now and future, soonest first; Past: ended, newest first", () =>
     { name: "2025 Lisbon", start: "2025-06-01", end: "2025-06-09" },
     { name: "No dates yet" },
   ], today);
-  assert.deepEqual(J(s.upcoming.map((t) => t.name)), J(["Here now", "Montreal", "Carnaval", "No dates yet"]));
+  assert.deepEqual(J(s.upcoming.map((t) => t.name)), J(["Here now", "Montreal", "Carnaval"]));
+  assert.deepEqual(J(s.needsDates.map((t) => t.name)), J(["No dates yet"]));
   assert.deepEqual(J(s.past.map((t) => t.name)), J(["Korea", "2025 Lisbon"]));
   assert.equal(s.upcoming[0].now, true);
   assert.equal(s.upcoming[1].away, 11);
@@ -111,4 +112,42 @@ test("map centre: the trip's own pins, else its destination, never Montreal by d
   assert.deepEqual(J(T.mapStart(mtl, "", null)), { pins: [[45.5, -73.5]] });
   assert.deepEqual(J(T.mapStart([], "Brazil", { lat: -10, lng: -55 })), { center: [-10, -55], zoom: 5 });
   assert.deepEqual(J(T.mapStart([{ lat: null }], "", null)), { world: true });
+});
+
+// Junyan 2026-11-01: Toronto is home (a Local list, never a trip), Home is never a trip,
+// undated trips never sit in Upcoming
+test("Toronto and Home are never trip cards and never Now", () => {
+  const s = T.splitTrips([
+    { name: "Toronto", start: "2026-10-01", end: "2026-11-30" },
+    { name: "🏠 Home" },
+    { name: "Montreal", start: "2026-11-12", end: "2026-11-17" },
+  ], "2026-11-01");
+  const all = [...s.upcoming, ...s.past, ...s.needsDates].map((t) => t.name);
+  assert.deepEqual(J(all), J(["Montreal"]));
+  assert.equal(T.isHomeTrip("toronto"), true);
+  assert.equal(T.isHomeTrip("Home"), true);
+  assert.equal(T.isHomeTrip("2026 Egypt"), false);
+});
+
+test("undated trips go to Past by the year in the name, else under Needs dates", () => {
+  const s = T.splitTrips([
+    { name: "2024 Japan" },
+    { name: "Someday Peru" },
+    { name: "Korea", start: "2026-05-01", end: "2026-05-10" },
+    { name: "2025 Lisbon", start: "2025-06-01", end: "2025-06-09" },
+    { name: "2027 Bali" },
+  ], "2026-11-01");
+  assert.deepEqual(J(s.upcoming.map((t) => t.name)), J([]));
+  assert.deepEqual(J(s.past.map((t) => t.name)), J(["2027 Bali", "Korea", "2025 Lisbon", "2024 Japan"]));
+  assert.deepEqual(J(s.needsDates.map((t) => t.name)), J(["Someday Peru"]));
+  assert.equal(T.whenLabel(s.past[3]), "No dates yet");
+});
+
+test("Local list: Toronto items, newest first, undated last", () => {
+  const l = T.localItems([
+    { name: "Old show", start: "2026-03-01" },
+    { name: "Undated cafe" },
+    { name: "New show", start: "2026-10-20T19:00:00-04:00" },
+  ]);
+  assert.deepEqual(J(l.map((i) => i.name)), J(["New show", "Old show", "Undated cafe"]));
 });
