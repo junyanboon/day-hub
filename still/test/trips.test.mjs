@@ -151,3 +151,28 @@ test("Local list: Toronto items, newest first, undated last", () => {
   ]);
   assert.deepEqual(J(l.map((i) => i.name)), J(["New show", "Old show", "Undated cafe"]));
 });
+
+// Junyan 2026-11-01: the Egypt page said "Nothing planned yet" on every day.
+// Rows from both spellings of the trip are read once each; a stay shows on its check-in
+// day and as "staying" until check-out; a UTC time with a time zone lands on the local day.
+test("dayPlan: Egypt-shaped rows land on their days, stays carry over, no doubles", () => {
+  const it = (id, name, start, end = "", extra = {}) => ({ id, name, start, end, tags: "", icon: "", ...extra });
+  const items = [
+    it("f1", "IB1903 [MAD → CAI]", "2026-09-28T14:35:00.000Z"),
+    it("h1", "Le Passage Cairo Hotel", "2026-09-29", "2026-10-04"),
+    it("h1", "Le Passage Cairo Hotel", "2026-09-29", "2026-10-04"),
+    it("e1", "AfroLatin Egypt Super 16", "2026-09-29", "2026-10-15"),
+    it("f2", "MS285", "2026-10-09T23:30:00.000Z", "", { tz: "Africa/Cairo" }),
+    it("x", "Visa", ""),
+  ];
+  const p = T.dayPlan(items, "2026-09-28", 26);
+  assert.equal(p.days.length, 26);
+  assert.deepEqual([...p.days[0].on.map((i) => i.id)], ["f1"]);
+  assert.deepEqual([...p.days[1].on.map((i) => i.id)], ["h1", "e1"]);
+  assert.deepEqual([...p.days[2].staying.map((i) => i.id)], ["h1", "e1"]);   // the festival pass runs on too
+  assert.deepEqual([...p.days[5].staying.map((i) => i.id)], ["h1", "e1"]);   // Oct 3, last night
+  assert.deepEqual([...p.days[6].staying.map((i) => i.id)], ["e1"]);       // Oct 4 is check-out
+  assert.deepEqual([...p.days[12].on.map((i) => i.id)], ["f2"]);       // 23:30Z on Oct 9 is Oct 10 in Cairo
+  assert.deepEqual([...p.undated.map((i) => i.id)], ["x"]);
+  assert.equal(p.items.length, 5);
+});
