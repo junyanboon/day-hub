@@ -73,6 +73,30 @@
     const t = Date.UTC(...tripStart.slice(0, 10).split("-").map((x, i) => +x - (i === 1 ? 1 : 0)));
     return Math.round((d - t) / 86400000);
   }
+  // the local calendar day of a row: a time in UTC (or another offset) with a time zone
+  // moves to that zone's day (23:30Z in Cairo is the next morning)
+  function localDay(it) {
+    const s = it.start || "";
+    if (it.tz && /T\d\d:\d\d.*(Z|[+-]\d\d:?\d\d)$/.test(s)) {
+      try { return new Date(s).toLocaleDateString("en-CA", { timeZone: it.tz }); } catch {}
+    }
+    return s.slice(0, 10);
+  }
+  // Itinerary days (Junyan 2026-11-01): each row once, on its (local) day; a stay or a
+  // multi-day pass also shows as "staying" on the days after, up to the check-out day
+  function dayPlan(list, tripStart, n) {
+    const seen = new Set(), items = [];
+    for (const it of list || []) { const k = it.id || it.name; if (seen.has(k)) continue; seen.add(k); items.push(it); }
+    const days = Array.from({ length: n }, () => ({ on: [], staying: [] })), undated = [];
+    for (const it of items) {
+      const d = dayIndex(localDay(it), tripStart);
+      if (d < 0 || d >= n) { undated.push(it); continue; }
+      days[d].on.push(it);
+      const last = it.end ? dayIndex(it.end, tripStart) : d;
+      if (last > d + 1 || (last > d && !/T/.test(it.end))) for (let i = d + 1; i < Math.min(last, n); i++) days[i].staying.push(it);
+    }
+    return { items, days, undated };
+  }
   function pillOf(status) {
     const s = String(status || "").toLowerCase();
     if (!s) return "plan";
@@ -208,7 +232,7 @@
     return { world: true };
   }
 
-  const api = { haversine, gpxPoints, gpxStats, dayIndex, pillOf, isStay, isHike, whenText, seedRows, SEED, fmtDur, tripKey, mergeTrips, splitTrips, isHomeTrip, localItems, whenLabel, destOf, mapStart };
+  const api = { haversine, gpxPoints, gpxStats, dayIndex, localDay, dayPlan, pillOf, isStay, isHike, whenText, seedRows, SEED, fmtDur, tripKey, mergeTrips, splitTrips, isHomeTrip, localItems, whenLabel, destOf, mapStart };
   root.QuestTrips = api;
   if (typeof document === "undefined" || typeof window === "undefined") return;
 
@@ -497,7 +521,7 @@
     for (const nm of S.cur.aliases) {
       let d = null;
       try { d = await call("/quest/trips/one?name=" + encodeURIComponent(nm)); S.live = true; } catch (e) { S.note = e.message; }
-      if (d) { S.cur.items.push(...(d.items || [])); Object.assign(S.cur.extras, d.extras || {}); S.cur.places.push(...(d.places || [])); }
+      if (d) { S.cur.items.push(...(d.items || []).filter((it) => !S.cur.items.some((x) => x.id === it.id))); Object.assign(S.cur.extras, d.extras || {}); S.cur.places.push(...(d.places || [])); }
     }
     if (name === MTL) {
       S.cur.who = SEED.who; S.cur.start = S.cur.start || SEED.start; S.cur.end = SEED.end;
@@ -552,10 +576,12 @@
         return `<button class="${t === S.tab ? "on" : ""}" data-t="${t}">${t}${n ? `<span class="n">${n}</span>` : ""}</button>`; }).join("")}</div>`;
     if (S.tab === "Itinerary") {
       h += `<div class="daychips"><button class="${S.day < 0 ? "on" : ""}" data-d="-1">All</button>${D.map((d, i) => `<button class="${S.day === i ? "on" : ""}" data-d="${i}">${d}</button>`).join("")}</div>`;
-      const undated = c.items.filter((i) => dayIndex(i.start, c.start) < 0 || dayIndex(i.start, c.start) >= D.length);
+      const plan = dayPlan(c.items, c.start, D.length), undated = plan.undated;
       (S.day < 0 ? D.map((_, i) => i) : [S.day]).forEach((d) => {
-        const its = c.items.filter((i) => dayIndex(i.start, c.start) === d);
-        h += `<div class="day">${D[d]}<small></small></div><div class="rail">${its.map(card).join("") || `<div class="log">Nothing planned yet.</div>`}</div>`;
+        const its = plan.days[d].on, stay = plan.days[d].staying;
+        const sl = (xs, w) => xs.length ? `<div class="log">${w}: ${xs.map((i) => esc(i.name)).join(", ")}</div>` : "";
+        const st = sl(stay.filter(isStay), "Staying") + sl(stay.filter((i) => !isStay(i)), "Still on");
+        h += `<div class="day">${D[d]}<small></small></div><div class="rail">${its.map(card).join("") || (st ? "" : `<div class="log">Nothing planned yet.</div>`)}${st}</div>`;
       });
       if (S.day < 0 && undated.length) h += `<div class="day">No date yet</div><div class="rail">${undated.map(card).join("")}</div>`;
     }
