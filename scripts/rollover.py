@@ -7,11 +7,12 @@ Pure rails, no AI. Once a day it:
      scripts/calfeed.py — Calendar API where configured, secret ICS URL otherwise.
   2. Builds the Day Hub #tab-today + #tab-meals timelines and splices them into
      index.html between the ROLLOVER:* markers (leaving the rest of the app alone).
-  3. Creates today's Notion "Day Plan" page in the Travel Activities Planner data
-     source — idempotently (skips if one dated today already exists).
+
+It no longer creates a Notion "Day Plan" page (Junyan, 2026-11-01: those pages
+were useless; that step was removed).
 
 The workflow commits index.html only when it changed, and pushes with the built-in
-GITHUB_TOKEN (no PAT). Notion writes use NOTION_TOKEN.
+GITHUB_TOKEN (no PAT).
 
 This mirrors the proven fbs-monitor / day-sheet cloud pattern. It replaces the local
 `day-hub-morning-rollover` scheduled task, which the local scheduler skips unattended.
@@ -28,7 +29,6 @@ import json
 from datetime import datetime, timedelta, date
 from zoneinfo import ZoneInfo
 
-import requests
 
 import calfeed
 
@@ -45,16 +45,6 @@ CALS = [
     {"key": "caney",  "name": "CANEY",  "label": "Caney"},
     {"key": "staff",  "name": "STAFF",  "label": "Staff"},
 ]
-
-# ── Notion ───────────────────────────────────────────────────────────────────
-NOTION_TOKEN = os.environ.get("NOTION_TOKEN", "").strip()
-# This integration is new (2026) → current data-source API. Pages are created
-# under a DATA SOURCE, and queried at /v1/data_sources/{id}/query.
-# NB: os.environ.get(key, default) returns "" when the workflow passes an empty
-# secret (key present but blank) — so fall back with `or`, not the get() default.
-NOTION_DS = os.environ.get("NOTION_DAYPLAN_DS", "").strip() or "b9b967bb-211e-42ee-b3c1-8ca3665d6414"
-NOTION_VER = "2025-09-03"
-DATE_PROP = "Scheduled Date"
 
 BRAZIL_DEPART = date(2026, 7, 27)
 
@@ -315,99 +305,11 @@ def update_hub(today_html, meal_html, flags_html, iso_day):
     return True
 
 
-# ── Notion ───────────────────────────────────────────────────────────────────
-def notion_headers():
-    return {
-        "Authorization": f"Bearer {NOTION_TOKEN}",
-        "Notion-Version": NOTION_VER,
-        "Content-Type": "application/json",
-    }
-
-
-def notion_day_exists(iso_day):
-    r = requests.post(
-        f"https://api.notion.com/v1/data_sources/{NOTION_DS}/query",
-        headers=notion_headers(),
-        json={"filter": {"property": DATE_PROP, "date": {"equals": iso_day}},
-              "page_size": 1},
-        timeout=30)
-    if r.status_code == 200:
-        return len(r.json().get("results", [])) > 0
-    print(f"WARN: Notion query returned {r.status_code}: {r.text[:300]}")
-    # Don't create a possible duplicate if we can't verify.
-    return True
-
-
-def notion_create_day(iso_day, weekday_title, plan_rows, headline):
-    icon = "🌅"
-    anchor = (f"Auto-rolled {datetime.now(TZ).strftime('%-I:%M %p ET')}. "
-              f"{headline or 'Home day.'} "
-              "Day Hub = today only; this page is the durable record + change log "
-              "+ meal log + review. Deep-work window 15:30–17:00 is the real focus slot.")
-    children = [
-        {"object": "block", "type": "callout",
-         "callout": {"icon": {"type": "emoji", "emoji": "🗓️"},
-                     "color": "orange_background",
-                     "rich_text": [{"type": "text", "text": {"content": anchor}}]}},
-        {"object": "block", "type": "heading_2",
-         "heading_2": {"rich_text": [{"type": "text",
-                       "text": {"content": "🗓️ Day Plan"}}]}},
-    ]
-    for tlabel, title, note in plan_rows:
-        line = f"{tlabel} — {title}" + (f" · {note}" if note else "")
-        children.append({"object": "block", "type": "bulleted_list_item",
-                         "bulleted_list_item": {"rich_text": [
-                             {"type": "text", "text": {"content": line}}]}})
-    children += [
-        {"object": "block", "type": "heading_2",
-         "heading_2": {"rich_text": [{"type": "text",
-                       "text": {"content": "📝 Change log"}}]}},
-        {"object": "block", "type": "bulleted_list_item",
-         "bulleted_list_item": {"rich_text": [{"type": "text", "text": {
-             "content": f"Rolled over automatically at "
-                        f"{datetime.now(TZ).strftime('%-I:%M %p')}."}}]}},
-        {"object": "block", "type": "heading_2",
-         "heading_2": {"rich_text": [{"type": "text",
-                       "text": {"content": "🍽️ Meal Log"}}]}},
-        {"object": "block", "type": "paragraph",
-         "paragraph": {"rich_text": [{"type": "text", "text": {
-             "content": "(Filled in live as portions are reported.)"}}]}},
-        {"object": "block", "type": "heading_2",
-         "heading_2": {"rich_text": [{"type": "text",
-                       "text": {"content": "📝 Post-Activity Review"}}]}},
-    ]
-    for q in ("Overall rating (1–5):", "What worked well:",
-              "What didn't work / would change:", "Standout moments:",
-              "Lessons learned:"):
-        children.append({"object": "block", "type": "bulleted_list_item",
-                         "bulleted_list_item": {"rich_text": [
-                             {"type": "text", "text": {"content": q}}]}})
-
-    payload = {
-        "parent": {"type": "data_source_id", "data_source_id": NOTION_DS},
-        "icon": {"type": "emoji", "emoji": icon},
-        "properties": {
-            "Name": {"title": [{"text": {"content": weekday_title}}]},
-            "Activity Type": {"select": {"name": "Main Focus"}},
-            "Status": {"status": {"name": "In progress"}},   # status-type, not select
-            "Trip": {"select": {"name": "Toronto"}},
-            DATE_PROP: {"date": {"start": iso_day}},
-        },
-        "children": children,
-    }
-    r = requests.post("https://api.notion.com/v1/pages",
-                      headers=notion_headers(), json=payload, timeout=30)
-    if r.status_code not in (200, 201):
-        die(f"Notion page create failed {r.status_code}: {r.text[:400]}")
-    return r.json().get("url", "(created)")
-
-
 def main():
     now = datetime.now(TZ)
     day_start = now.replace(hour=4, minute=0, second=0, microsecond=0)
     day_end = day_start + timedelta(hours=23, minutes=59)
     iso_day = now.date().isoformat()
-    weekday_title = f"🌅 {now.strftime('%A, %b %-d %Y')} — Day Plan"
 
     events = []
     for c in CALS:
@@ -420,23 +322,9 @@ def main():
         events.extend(evs)
 
     today_html, meal_html, flags_html, plan_rows = build_timelines(events)
-    headline = None
-    m = re.search(r"<b>TONIGHT:</b>\s*(.*?)\s*—", flags_html)
-    if m:
-        headline = f"Tonight: {m.group(1)}."
 
     if update_hub(today_html, meal_html, flags_html, iso_day):
         print(f"Hub rewritten for {iso_day} ({len(plan_rows)} blocks).")
-
-    if not NOTION_TOKEN:
-        print("NOTION_TOKEN absent — skipped Notion Day Plan (hub still updated).")
-        return
-    if notion_day_exists(iso_day):
-        print(f"Notion Day Plan for {iso_day} already exists — not duplicating.")
-        return
-    url = notion_create_day(iso_day, weekday_title, plan_rows, headline)
-    print(f"Notion Day Plan created: {url}")
-
 
 if __name__ == "__main__":
     main()
