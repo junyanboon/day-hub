@@ -232,7 +232,37 @@
     return { world: true };
   }
 
-  const api = { haversine, gpxPoints, gpxStats, dayIndex, localDay, dayPlan, pillOf, isStay, isHike, whenText, seedRows, SEED, fmtDur, tripKey, mergeTrips, splitTrips, isHomeTrip, localItems, whenLabel, destOf, mapStart };
+  /* day planner in trip cards (Junyan, d39, d40): the plan sits in the card's Notion
+     page body under "✨ Day plan"; still-api reads it back (GET/POST /quest/trips/plan).
+     Hikes and trip days get the full plan, small outings the short one. */
+  const SMALL = /dinner|lunch|brunch|breakfast|drinks?|coffee|caf[eé]|restaurant|movie|cinema|film|show|concert|bar\b/i;
+  function planKind(it, tripName) {
+    if (isHike(it)) return "full";
+    if (isHomeTrip(tripName) || SMALL.test(`${it.name} ${it.tags || ""}`)) return "short";
+    return "full";
+  }
+  function planTag(plan) {
+    if (!plan || !plan.checked) return "";
+    const d = new Date(plan.checked + "T12:00:00");
+    return "✨ Planned by day planner · checked " + d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  }
+  const cardLabel = (it, ex) => (ex && ex.plan ? "Planned" : it.status || "Planned");
+  const h = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const EMPTY = `<div class="log">Not filled yet.</div>`;
+  // done = must-dos ticked here (kept in our extras), on top of the ticks in Notion
+  function planHtml(plan, done) {
+    const S2 = plan.sections || {}, out = [], sec = (title, body, cls = "") => out.push(`<div class="psec"><h3 class="${cls}">${title}</h3>${body}</div>`);
+    const rows = (a) => a.length ? a.map((r) => `<div class="prow"><span>${h(r.t)}</span>${h(r.text)}</div>`).join("") : EMPTY;
+    if (S2.conditions) { const c = S2.conditions; sec("CONDITIONS", `<div class="pgrid"><div>Open<b>${h(c.open) || "?"}</b></div><div>Weather<b>${h(c.weather) || "?"}</b></div><div>Caney's mood<b>${h(c.mood) || "?"}</b></div></div>${c.note ? `<div class="log" style="margin-top:6px">${h(c.note)}</div>` : ""}`); }
+    if (S2.getting) sec("GETTING THERE", rows(S2.getting));
+    if (S2.day) sec("THE DAY", rows(S2.day));
+    if (S2.must) sec("MUST-DOS", S2.must.length ? S2.must.map((m, i) => `<div class="chk ${m.done || (done || {})[m.text] ? "y" : ""}" data-m="${i}"><i></i>${h(m.text)}</div>`).join("") : EMPTY);
+    if (S2.careful) sec("CAREFUL", S2.careful.length ? S2.careful.map((c) => `<div class="prow">${h(c)}</div>`).join("") : EMPTY, "pwarn");
+    if (S2.after) { const a = S2.after; sec("AFTER THE DAY", `<div class="preview">⭐ Rating ${h(a.rating) || "___"} · What worked ${h(a.worked) || "___"} · Caney's energy ${h(a.energy) || "___"}</div>`); }
+    return out.join("");
+  }
+
+  const api = { planKind, planTag, cardLabel, planHtml, haversine, gpxPoints, gpxStats, dayIndex, localDay, dayPlan, pillOf, isStay, isHike, whenText, seedRows, SEED, fmtDur, tripKey, mergeTrips, splitTrips, isHomeTrip, localItems, whenLabel, destOf, mapStart };
   root.QuestTrips = api;
   if (typeof document === "undefined" || typeof window === "undefined") return;
 
@@ -297,6 +327,15 @@
   #tripView .pill{display:inline-block;padding:2px 8px;border-radius:6px;font-size:11px;font-weight:600}
   #tripView .need{background:rgba(255,194,122,.18);color:var(--warn)}#tripView .paid{background:rgba(143,227,176,.18);color:var(--good)}
   #tripView .warn{background:rgba(255,156,156,.16);color:var(--bad)}
+  #tripView .planned{background:rgba(201,182,255,.2);color:#c9b6ff}
+  #tripView .ptag{font-size:11px;color:#c9b6ff;border:1px solid rgba(201,182,255,.4);border-radius:999px;padding:2px 8px;display:inline-block;margin:8px 0 2px}
+  #tripView .psec{border-top:1px solid rgba(255,255,255,.08);padding:9px 0}
+  #tripView .psec h3{font-size:12px;letter-spacing:.4px;color:var(--ink-soft);margin:0 0 6px}#tripView .psec h3.pwarn{color:var(--warn)}
+  #tripView .pgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+  #tripView .pgrid div{background:rgba(255,255,255,.07);border-radius:8px;padding:6px 8px;font-size:12px;color:var(--ink-faint)}#tripView .pgrid b{display:block;color:var(--ink);font-size:13px}
+  #tripView .prow{display:flex;gap:8px;font-size:13px;padding:3px 0;color:var(--ink-soft)}#tripView .prow span{min-width:52px;color:var(--ink-faint);flex:none}#tripView .prow span:empty{display:none}
+  #tripView .preview{background:rgba(255,255,255,.04);border:1px dashed rgba(255,255,255,.12);border-radius:10px;padding:10px;font-size:13px;color:var(--ink-faint)}
+  #tripView .pbtn{font:inherit;font-size:13px;background:rgba(201,182,255,.18);color:var(--ink);border:1px solid rgba(201,182,255,.45);border-radius:8px;padding:6px 12px;cursor:pointer}
   #tripView .plan{background:rgba(156,200,255,.18);color:#9cc8ff}#tripView .idea{background:rgba(255,255,255,.1);color:var(--ink-soft)}
   #tripView .right{flex:1;display:flex;flex-direction:column;border-left:1px solid rgba(255,255,255,.12);min-width:0;position:relative}
   #tripView .mapbar{display:flex;gap:8px;align-items:center;padding:10px 12px;border-bottom:1px solid rgba(255,255,255,.12);background:rgba(10,12,32,.5)}
@@ -554,13 +593,14 @@
     }
     return out;
   }
-  const label = (it) => it.status || "Planned";
+  const label = (it) => cardLabel(it, S.cur && S.cur.extras[it.id]);
+  const pillCls = (it) => (S.cur && (S.cur.extras[it.id] || {}).plan ? "planned" : pillOf(it.status));
   function card(it) {
     const where = it.address ? " · " + esc(it.address.split(",")[0]) : "";
     const w = whenText(it);
     return `<div class="item ${S.sel === it.id ? "sel" : ""}" data-id="${esc(it.id)}"><div class="ic">${esc(it.icon || (isStay(it) ? "🏨" : isHike(it) ? "🥾" : "📍"))}</div>
-      <div><div class="t">${esc(it.name)}</div><div class="s">${esc(w)}${where}</div></div>
-      <div class="r"><span class="pill ${pillOf(it.status)}">${esc(label(it))}</span>${it.seed ? `<div class="log" style="margin-top:4px">calendar copy</div>` : ""}</div></div>`;
+      <div><div class="t">${esc(it.name)}</div><div class="s">${esc(w)}${where}${(S.cur.extras[it.id] || {}).plan ? " · Planned by day planner" : ""}</div></div>
+      <div class="r"><span class="pill ${pillCls(it)}">${esc(label(it))}</span>${it.seed ? `<div class="log" style="margin-top:4px">calendar copy</div>` : ""}</div></div>`;
   }
   function drawLeft() {
     const c = S.cur, D = days();
@@ -590,7 +630,7 @@
       const cols = ["Booked Through", "Points / Cash", "Credit Card", "Cancellation Policy"];
       h += `<table><tr><th>Name</th><th>Dates</th><th>Status</th>${cols.map((k) => `<th>${k === "Cancellation Policy" ? "Cancel by" : k}</th>`).join("")}</tr>` +
         rows.map((it) => `<tr data-id="${esc(it.id)}"><td style="cursor:pointer" data-open>${esc(it.icon || "")} ${esc(it.name)}</td><td>${esc((it.start || "").slice(5, 10))}${it.end ? " to " + esc(it.end.slice(5, 10)) : ""}</td>
-          <td><span class="pill ${pillOf(it.status)}">${esc(label(it))}</span></td>${cols.map((k) => `<td contenteditable data-f="${esc(k)}">${esc(fieldVal(it, k))}</td>`).join("")}</tr>`).join("") +
+          <td><span class="pill ${pillCls(it)}">${esc(label(it))}</span></td>${cols.map((k) => `<td contenteditable data-f="${esc(k)}">${esc(fieldVal(it, k))}</td>`).join("")}</tr>`).join("") +
         `<tr><td colspan="7" style="color:var(--ink-faint);cursor:pointer" id="tvNewBooking">＋ New booking (saves to the Notion Travel Planner)</td></tr></table>`;
     }
     if (S.tab === "Must-haves") {
@@ -695,7 +735,7 @@
     const files = (ex.files || []).map((f, i) => `<div><a href="${esc(f)}" target="_blank" rel="noopener">${esc(f.replace(/^https?:\/\//, "").slice(0, 40))} ↗</a> <a href="#" data-rmf="${i}" style="color:var(--ink-faint)">×</a></div>`).join("");
     const D = document.getElementById("tvDrawer");
     D.innerHTML = `<button class="x" id="tvClose">×</button><div style="font-size:12px;color:var(--ink-faint)">${esc(d)} ${esc((it.start || "").slice(0, 4))}</div>
-      <h2>${esc(it.icon || "")} ${esc(it.name)}</h2><span class="pill ${pillOf(it.status)}">${esc(label(it))}</span>
+      <h2>${esc(it.icon || "")} ${esc(it.name)}</h2><span class="pill ${pillCls(it)}">${esc(label(it))}</span>
       <div class="kv"><span>When</span><div>${esc(whenText(it) || "No time yet")}</div>
       <span>Status</span><div><select id="tvStatus" style="font:inherit;background:#2a2f63;color:var(--ink);border:1px solid rgba(255,255,255,.2);border-radius:6px">
         ${["Need to Book", "Booked Unpaid", "Prepaid", "Planned", "Idea", "Maybe"].concat(it.status && !["Need to Book", "Booked Unpaid", "Prepaid", "Planned", "Idea", "Maybe"].includes(it.status) ? [it.status] : []).map((s) => `<option ${s === it.status ? "selected" : ""}>${esc(s)}</option>`).join("")}</select></div>
@@ -703,6 +743,7 @@
       ${kv("Booked Through")}${kv("Points / Cash")}${kv("Card")}${kv("Cancel by")}${kv("Confirmation #")}
       <span>Files</span><div>${files}<a href="#" id="tvAddFile">＋ add link</a></div></div>
       ${stay}${hike}
+      <div class="blk" id="tvPlan"><h3>✨ DAY PLAN</h3><div class="log">Checking Notion…</div></div>
       <div class="blk"><h3>NOTES</h3><div contenteditable class="log" data-x="notes" style="min-height:40px">${esc(ex.notes || "")}</div></div>
       <div class="blk">${it.url ? `<a href="${esc(it.url)}" target="_blank" rel="noopener">Open in Notion ↗</a>` : `<span class="log">Not in Notion yet: use "Create in Notion" at the top.</span>`}</div>`;
     D.classList.add("open");
@@ -718,6 +759,7 @@
       try { const d2 = await call("/quest/trips/item", { id, db: it.db, props: { Status: v } }); Object.assign(it, d2.item, { db: it.db }); toast("Saved to Notion"); drawLeft(); }
       catch (err) { toast("Not saved: " + err.message); }
     };
+    drawPlan(it);
     const g = document.getElementById("tvGpx");
     if (g) g.onclick = (e) => { e.preventDefault(); pickFile(".gpx,application/gpx+xml", async (name, text) => {
       if (!gpxStats(text)) return toast("That file has no track points");
@@ -725,6 +767,45 @@
       if (!String(it.id).startsWith("seed-")) { try { await call("/quest/trips/gpx", { id, gpx: text }); } catch (er) { return toast("Not saved: " + er.message); } }
       S.gpx = { id, text }; saveExtra(id); openItem(id); S.mode = "hike"; drawMap();
     }); };
+  }
+  /* day planner: "Plan this" writes the empty template into the card's own Notion page
+     (still-api never makes a new page); the Activity Day Planner skill or Junyan fills it. */
+  const plans = {};
+  async function drawPlan(it) {
+    const box = () => S.sel === it.id && document.getElementById("tvPlan");
+    const ex = extrasOf(it.id), kind = planKind(it, S.cur.name);
+    const paint = (plan, note = "") => {
+      const b = box(); if (!b) return;
+      if (!plan) {
+        b.innerHTML = `<h3>✨ DAY PLAN</h3>${note}<button class="pbtn" id="tvPlanGo">Plan this</button>
+          <div class="log" style="margin-top:6px">${kind === "full" ? "Full plan: conditions, getting there, the day, must-dos, careful, after the day." : "Short plan: getting there and must-dos."} Saved in this card's Notion page.</div>`;
+        document.getElementById("tvPlanGo").onclick = async (e) => {
+          e.target.disabled = true; e.target.textContent = "Writing to Notion…";
+          try { const d = await call("/quest/trips/plan", { id: it.id, kind, item: { name: it.name, start: it.start } }); keep(d.plan); toast(d.created ? "Plan added to the Notion page" : "This card already had a plan"); }
+          catch (err) { toast("Not saved: " + err.message); paint(null); }
+        };
+        return;
+      }
+      const empty = !JSON.stringify(plan.sections).match(/"(text|open|weather|mood|rating|worked|energy|note)":"[^"]/) && !(plan.sections.careful || []).length;
+      b.innerHTML = `<span class="ptag">${esc(planTag(plan))}</span>${planHtml(plan, ex.mustDone)}
+        <div class="log" style="margin-top:6px">${empty ? "Empty plan: ask the Activity Day Planner skill in Notion to fill it, or type in the Notion page. " : ""}<a href="#" id="tvPlanRe">↻ Refresh from Notion</a></div>`;
+      b.querySelectorAll("[data-m]").forEach((el) => el.onclick = () => {
+        const m = plan.sections.must[+el.dataset.m]; if (m.done) return;
+        ex.mustDone = { ...(ex.mustDone || {}), [m.text]: !(ex.mustDone || {})[m.text] }; el.classList.toggle("y"); saveExtra(it.id);
+      });
+      document.getElementById("tvPlanRe").onclick = (e) => { e.preventDefault(); load(); };
+    };
+    const keep = (plan) => {
+      plans[it.id] = plan;
+      const was = JSON.stringify(ex.plan || null), now = plan ? { checked: plan.checked, kind: plan.kind } : undefined;
+      if (now) ex.plan = now; else delete ex.plan;
+      if (was !== JSON.stringify(now || null)) { saveExtra(it.id); drawLeft(); }
+      paint(plan);
+    };
+    const load = async () => { try { keep((await call("/quest/trips/plan?id=" + encodeURIComponent(it.id))).plan); } catch (err) { paint(plans[it.id] || null, `<div class="log">Could not read Notion: ${esc(err.message)}</div>`); } };
+    if (it.seed || String(it.id).startsWith("seed-")) { const b = box(); if (b) b.innerHTML = `<h3>✨ DAY PLAN</h3><div class="log">Save this card in Notion first ("Create in Notion" at the top), then plan it.</div>`; return; }
+    if (plans[it.id]) paint(plans[it.id]);
+    load();
   }
   function closeDrawer(quiet) {
     document.getElementById("tvDrawer").classList.remove("open");

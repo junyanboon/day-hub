@@ -176,3 +176,28 @@ test("dayPlan: Egypt-shaped rows land on their days, stays carry over, no double
   assert.deepEqual([...p.undated.map((i) => i.id)], ["x"]);
   assert.equal(p.items.length, 5);
 });
+
+// day planner in trip cards (d39, d40)
+test("day plan: hikes and trip days get the full plan, small outings the short one", () => {
+  assert.equal(T.planKind({ name: "Mount Royal hike", tags: "" }, "Montreal birthday trip"), "full");
+  assert.equal(T.planKind({ name: "Spa & Recovery Day", tags: "" }, "Montreal birthday trip"), "full");
+  assert.equal(T.planKind({ name: "Dinner with friends", tags: "" }, "Montreal birthday trip"), "short");
+  assert.equal(T.planKind({ name: "Movie night", tags: "" }, "Montreal birthday trip"), "short");
+  assert.equal(T.planKind({ name: "Spa day", tags: "" }, "Toronto"), "short");
+  assert.equal(T.planKind({ name: "Rouge hike", tags: "" }, "Toronto"), "full");
+});
+test("day plan: tag line and Planned pill", () => {
+  assert.equal(T.planTag({ checked: "2026-11-14" }), "✨ Planned by day planner · checked Nov 14");
+  assert.equal(T.planTag(null), "");
+  assert.equal(T.cardLabel({ status: "Need to Book" }, { plan: { checked: "2026-11-14" } }), "Planned");
+  assert.equal(T.cardLabel({ status: "Need to Book" }, {}), "Need to Book");
+  assert.equal(T.cardLabel({ status: "" }, {}), "Planned");
+});
+test("day plan: panel shows only the sections the plan has, must-dos as checkboxes", () => {
+  const short = T.planHtml({ kind: "short", checked: "2026-11-14", sections: { getting: [{ t: "Walk", text: "10 min" }], must: [{ text: "Book a table", done: true }] } }, {});
+  assert.match(short, /GETTING THERE/); assert.match(short, /MUST-DOS/); assert.doesNotMatch(short, /CONDITIONS|CAREFUL/);
+  assert.match(short, /class="chk y" data-m="0"/);
+  const full = T.planHtml({ kind: "full", checked: "2026-11-14", sections: { conditions: { open: "", weather: "3°C", mood: "", note: "" }, getting: [], day: [], must: [], careful: ["<b>x</b>"], after: { rating: "", worked: "", energy: "" } } }, {});
+  for (const h of ["CONDITIONS", "GETTING THERE", "THE DAY", "MUST-DOS", "CAREFUL", "AFTER THE DAY"]) assert.match(full, new RegExp(h));
+  assert.match(full, /3°C/); assert.match(full, /&lt;b&gt;/);
+});
