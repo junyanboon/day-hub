@@ -353,7 +353,7 @@
   #tripView .plan{background:rgba(156,200,255,.18);color:#9cc8ff}#tripView .idea{background:rgba(255,255,255,.1);color:var(--ink-soft)}
   #tripView .right{flex:1;display:flex;flex-direction:column;border-left:1px solid rgba(255,255,255,.12);min-width:0;position:relative;overflow:hidden}
   #tripView .mapbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:10px 12px;border-bottom:1px solid rgba(255,255,255,.12);background:rgba(10,12,32,.5)}
-  #tripView .mapbar .btn{flex:none}
+  #tripView .mapbar .btn{flex:none}#tripView .mapbar .btn.pri{margin-left:auto}
   #tripView .seg{display:flex;flex:none;background:rgba(255,255,255,.07);border-radius:10px;padding:3px}
   #tripView .seg button{padding:6px 12px;border-radius:8px;font-size:13px;color:var(--ink-faint)}
   #tripView .seg button.on{background:rgba(255,255,255,.14);color:var(--ink);font-weight:600}
