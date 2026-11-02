@@ -106,7 +106,16 @@
     if (/idea|maybe|option|pick|check/.test(s)) return "idea";
     return "plan";
   }
-  const isStay = (it) => /stay|hotel|airbnb|check-?in|check-?out|lodg|hostel/i.test(`${it.name} ${it.tags} ${it.kind || ""}`);
+  // a hotel: its name, its Tags ("Accommodations" in Notion, which the old check missed and
+  // so the DC Residence Inn read "Still on"), the 🏨 icon, or a select column such as Type.
+  // Free-text columns are not read: a festival note saying "check-in" is not a stay.
+  const STAY_RE = /\bstay|hotel|airbnb|accommodation|check-?in|check-?out|lodg|hostel|motel|\binn\b|resort|🏨/i;
+  const isStay = (it) => {
+    const sel = Object.values(it.fields || {}).filter((f) => f && /^(select|multi_select)$/.test(f.type)).map((f) => f.value).join(" ");
+    return STAY_RE.test(`${it.name} ${it.tags || ""} ${it.kind || ""} ${it.icon || ""} ${sel}`);
+  };
+  // a day's "still going" list: hotels until check-out say Staying, other multi-day things Still on
+  const stayLines = (xs) => ({ staying: (xs || []).filter(isStay), stillOn: (xs || []).filter((i) => !isStay(i)) });
   const isHike = (it) => it.kind === "hike" || /hike|trail|trek|🥾/i.test(`${it.name} ${it.tags} ${it.icon}`);
   function timeOf(iso) {
     const m = /T(\d\d):(\d\d)/.exec(iso || "");
@@ -120,13 +129,14 @@
   }
 
   /* ── the first trip, from the Joint Plans calendar (Nov 12 to 17 2026) ───── */
-  const MTL = "Montreal birthday trip";
+  // Junyan's trip naming rule (2026-11-02): Year Flag Place, the same in Notion and here
+  const MTL = "2026 🇨🇦 Montreal Birthday";
   const P = { alliance: "Alliance Dance Company, 2529 Rue Ontario E, Montréal", piernas: "Las Piernas, 2019 Rue Moreau, Montréal",
     studio: "Studio 2790, 2790 Rue Hochelaga, Montréal" };
   const ev = (id, db, icon, name, start, end, status, address, extra = {}) => ({ id: "seed-" + id, db, icon, name, start, end,
     status, tags: "", address, fields: {}, seed: true, ...extra });
   const SEED = {
-    name: MTL, start: "2026-11-12", end: "2026-11-17", icon: "🎂", who: "You + Caney",
+    name: MTL, start: "2026-11-12", end: "2026-11-17", icon: "🧳", who: "You + Caney",
     items: [
       ev("preparty", "activities", "💃", "Pre-Party?", "2026-11-12T20:30:00-05:00", "2026-11-12T23:00:00-05:00", "Maybe", P.studio),
       ev("stay", "planner", "🏨", "Montreal stay", "2026-11-13T17:00:00-05:00", "2026-11-17T10:30:00-05:00", "Need to Book", "", { kind: "stay", tags: "Hotel" }),
@@ -262,7 +272,11 @@
     return out.join("");
   }
 
-  const api = { planKind, planTag, cardLabel, planHtml, haversine, gpxPoints, gpxStats, dayIndex, localDay, dayPlan, pillOf, isStay, isHike, whenText, seedRows, SEED, fmtDur, tripKey, mergeTrips, splitTrips, isHomeTrip, localItems, whenLabel, destOf, mapStart };
+  // Plan this needs the card's own Notion page; a calendar copy says how to get one
+  const planGate = (it) => it.seed || String(it.id).startsWith("seed-")
+    ? `Save this trip to Notion to plan days: press "⇪ Create in Notion" at the top of the trip.` : "";
+
+  const api = { MTL, stayLines, planGate, planKind, planTag, cardLabel, planHtml, haversine, gpxPoints, gpxStats, dayIndex, localDay, dayPlan, pillOf, isStay, isHike, whenText, seedRows, SEED, fmtDur, tripKey, mergeTrips, splitTrips, isHomeTrip, localItems, whenLabel, destOf, mapStart };
   root.QuestTrips = api;
   if (typeof document === "undefined" || typeof window === "undefined") return;
 
@@ -539,7 +553,7 @@
 
   /* loading */
   async function loadTrips() {
-    S.trips = [{ name: MTL, start: SEED.start, end: SEED.end, icon: "🎂" }];
+    S.trips = [{ name: MTL, start: SEED.start, end: SEED.end, icon: "🧳" }];
     try {
       const d = await call("/quest/trips");
       S.live = true;
@@ -620,7 +634,7 @@
       (S.day < 0 ? D.map((_, i) => i) : [S.day]).forEach((d) => {
         const its = plan.days[d].on, stay = plan.days[d].staying;
         const sl = (xs, w) => xs.length ? `<div class="log">${w}: ${xs.map((i) => esc(i.name)).join(", ")}</div>` : "";
-        const st = sl(stay.filter(isStay), "Staying") + sl(stay.filter((i) => !isStay(i)), "Still on");
+        const L = stayLines(stay), st = sl(L.staying, "Staying") + sl(L.stillOn, "Still on");
         h += `<div class="day">${D[d]}<small></small></div><div class="rail">${its.map(card).join("") || (st ? "" : `<div class="log">Nothing planned yet.</div>`)}${st}</div>`;
       });
       if (S.day < 0 && undated.length) h += `<div class="day">No date yet</div><div class="rail">${undated.map(card).join("")}</div>`;
@@ -803,7 +817,12 @@
       paint(plan);
     };
     const load = async () => { try { keep((await call("/quest/trips/plan?id=" + encodeURIComponent(it.id))).plan); } catch (err) { paint(plans[it.id] || null, `<div class="log">Could not read Notion: ${esc(err.message)}</div>`); } };
-    if (it.seed || String(it.id).startsWith("seed-")) { const b = box(); if (b) b.innerHTML = `<h3>✨ DAY PLAN</h3><div class="log">Save this card in Notion first ("Create in Notion" at the top), then plan it.</div>`; return; }
+    if (planGate(it)) {
+      const b = box(); if (!b) return;
+      b.innerHTML = `<h3>✨ DAY PLAN</h3><div class="log">${esc(planGate(it))}</div>${document.getElementById("tvSync") ? `<button class="pbtn" id="tvPlanSync" style="margin-top:6px">⇪ Create in Notion</button>` : ""}`;
+      const go = document.getElementById("tvPlanSync"); if (go) go.onclick = () => syncSeed();
+      return;
+    }
     if (plans[it.id]) paint(plans[it.id]);
     load();
   }
@@ -910,7 +929,7 @@
   document.getElementById("tvImport").onclick = () => pickFile(".csv,text/csv", async (name, csv) => {
     const list = name.replace(/\.csv$/i, "");
     toast(`Importing ${list}… (about a second per place without coordinates)`);
-    try { const d = await call("/quest/places/import", { trip: S.cur.name, list, csv, near: S.cur.name.replace(/ (birthday )?trip$/i, "") });
+    try { const d = await call("/quest/places/import", { trip: S.cur.name, list, csv, near: destOf(S.cur.name) });
       toast(`Added ${d.added} places, ${d.located} with a pin`); openTrip(S.cur.name); }
     catch (e) { toast("Import failed: " + e.message); }
   });

@@ -104,10 +104,10 @@ test("Upcoming: now and future, soonest first; Past: ended, newest first", () =>
 
 test("map centre: the trip's own pins, else its destination, never Montreal by default", () => {
   assert.equal(T.destOf("2027 🇧🇷 Brazil Carnaval"), "Brazil Carnaval");
-  assert.equal(T.destOf("Montreal birthday trip"), "Montreal");
+  assert.equal(T.destOf(T.MTL), "Montreal");
   assert.equal(T.destOf("2026 Brazilian Winter", "Rio de Janeiro"), "Rio de Janeiro");
   assert.equal(T.destOf("2026"), "");
-  const mtl = [{ lat: 45.5, lng: -73.5, trip: "Montreal birthday trip" }];
+  const mtl = [{ lat: 45.5, lng: -73.5, trip: T.MTL }];
   assert.deepEqual(J(T.mapStart([], "", null)), { world: true });
   assert.deepEqual(J(T.mapStart(mtl, "", null)), { pins: [[45.5, -73.5]] });
   assert.deepEqual(J(T.mapStart([], "Brazil", { lat: -10, lng: -55 })), { center: [-10, -55], zoom: 5 });
@@ -179,10 +179,10 @@ test("dayPlan: Egypt-shaped rows land on their days, stays carry over, no double
 
 // day planner in trip cards (d39, d40)
 test("day plan: hikes and trip days get the full plan, small outings the short one", () => {
-  assert.equal(T.planKind({ name: "Mount Royal hike", tags: "" }, "Montreal birthday trip"), "full");
-  assert.equal(T.planKind({ name: "Spa & Recovery Day", tags: "" }, "Montreal birthday trip"), "full");
-  assert.equal(T.planKind({ name: "Dinner with friends", tags: "" }, "Montreal birthday trip"), "short");
-  assert.equal(T.planKind({ name: "Movie night", tags: "" }, "Montreal birthday trip"), "short");
+  assert.equal(T.planKind({ name: "Mount Royal hike", tags: "" }, T.MTL), "full");
+  assert.equal(T.planKind({ name: "Spa & Recovery Day", tags: "" }, T.MTL), "full");
+  assert.equal(T.planKind({ name: "Dinner with friends", tags: "" }, T.MTL), "short");
+  assert.equal(T.planKind({ name: "Movie night", tags: "" }, T.MTL), "short");
   assert.equal(T.planKind({ name: "Spa day", tags: "" }, "Toronto"), "short");
   assert.equal(T.planKind({ name: "Rouge hike", tags: "" }, "Toronto"), "full");
 });
@@ -200,4 +200,34 @@ test("day plan: panel shows only the sections the plan has, must-dos as checkbox
   const full = T.planHtml({ kind: "full", checked: "2026-11-14", sections: { conditions: { open: "", weather: "3°C", mood: "", note: "" }, getting: [], day: [], must: [], careful: ["<b>x</b>"], after: { rating: "", worked: "", energy: "" } } }, {});
   for (const h of ["CONDITIONS", "GETTING THERE", "THE DAY", "MUST-DOS", "CAREFUL", "AFTER THE DAY"]) assert.match(full, new RegExp(h));
   assert.match(full, /3°C/); assert.match(full, /&lt;b&gt;/);
+});
+
+test("hotel nights say Staying, festivals say Still on (Junyan 2026-11-02, d54)", () => {
+  // the Egypt / DC stay: name has no "hotel", the Notion Tags say Accommodations
+  const inn = { name: "Residence Inn Washington DC", tags: "Accommodations", icon: "", fields: {} };
+  assert.ok(T.isStay(inn));
+  assert.ok(T.isStay({ name: "Marriott Cairo", tags: "", icon: "🏨", fields: {} }));
+  assert.ok(T.isStay({ name: "Cairo flat", tags: "", icon: "", fields: { Type: { type: "select", value: "Accommodation" } } }));
+  assert.ok(T.isStay({ name: "Lisbon Airbnb", tags: "", fields: {} }));
+  const fest = { name: "Zouk Festival", tags: "Event", icon: "💃", fields: { Notes: { type: "rich_text", value: "check-in at the hotel desk" } } };
+  assert.ok(!T.isStay(fest));
+  const L = T.stayLines([inn, fest]);
+  assert.deepEqual(L.staying.map((i) => i.name), ["Residence Inn Washington DC"]);
+  assert.deepEqual(L.stillOn.map((i) => i.name), ["Zouk Festival"]);
+});
+
+test("Montreal: named Year Flag Place, same as Notion, one card once Notion has it", () => {
+  assert.equal(T.MTL, "2026 🇨🇦 Montreal Birthday");
+  assert.equal(T.SEED.name, T.MTL);
+  assert.ok(T.SEED.places.every((p) => p.trip === T.MTL));
+  const merged = T.mergeTrips([{ name: T.MTL, start: "2026-11-12", end: "2026-11-17", icon: "🧳" },
+    { name: "2026 🇨🇦 Montreal Birthday", start: "2026-11-13", end: "2026-11-17", icon: "🧳", count: 3 }]);
+  assert.equal(merged.length, 1);
+  assert.equal(merged[0].name, T.MTL);
+  assert.equal(T.destOf(T.MTL), "Montreal");
+});
+
+test("Plan this: calendar copies get a pointer to Create in Notion, Notion cards get the button", () => {
+  assert.match(T.planGate({ id: "seed-spa", seed: true }), /Save this trip to Notion to plan days/);
+  assert.equal(T.planGate({ id: "2f0c1d2e-aaaa-bbbb-cccc-1234567890ab", db: "activities" }), "");
 });
