@@ -160,17 +160,31 @@
     return [...by.values()];
   }
   const dnum = (s) => Date.UTC(+s.slice(0, 4), +s.slice(5, 7) - 1, +s.slice(8, 10)) / 86400000;
+  // Toronto is home (its outings show on the Local tab) and "Home" is not a trip either
+  const isHomeTrip = (name) => ["toronto", "home"].includes(tripKey(name));
+  const yearOf = (name) => { const m = /\b(19|20)\d\d\b/.exec(String(name || "")); return m ? m[0] : ""; };
   function splitTrips(list, today) {
-    const t0 = dnum(today), upcoming = [], past = [];
+    const t0 = dnum(today), upcoming = [], past = [], needsDates = [];
     for (const t of list || []) {
+      if (isHomeTrip(t.name)) continue;
       const s = (t.start || "").slice(0, 10), e = (t.end || t.start || "").slice(0, 10);
-      if (!s) { upcoming.push({ ...t, away: null, now: false }); continue; }
-      if (dnum(e) < t0) past.push({ ...t, ago: t0 - dnum(e) });
+      if (!s) {
+        // undated: never Upcoming; placed in Past by the year in its name, else Needs dates
+        const y = yearOf(t.name);
+        (y ? past : needsDates).push({ ...t, away: null, now: false, sortKey: y ? y + "-12-31" : "" });
+        continue;
+      }
+      if (dnum(e) < t0) past.push({ ...t, ago: t0 - dnum(e), sortKey: e });
       else upcoming.push({ ...t, away: Math.max(0, dnum(s) - t0), now: dnum(s) <= t0 });
     }
     upcoming.sort((a, b) => (a.start || "9").localeCompare(b.start || "9"));
-    past.sort((a, b) => (b.end || b.start || "").localeCompare(a.end || a.start || ""));
-    return { upcoming, past };
+    past.sort((a, b) => b.sortKey.localeCompare(a.sortKey));
+    needsDates.sort((a, b) => a.name.localeCompare(b.name));
+    return { upcoming, past, needsDates };
+  }
+  // Local tab: Toronto-tagged outings and events from both databases, newest first, undated last
+  function localItems(items) {
+    return [...(items || [])].sort((a, b) => (b.start || "").slice(0, 16).localeCompare((a.start || "").slice(0, 16)));
   }
   function whenLabel(t) {
     if (t.now) return "Now";
@@ -194,7 +208,7 @@
     return { world: true };
   }
 
-  const api = { haversine, gpxPoints, gpxStats, dayIndex, pillOf, isStay, isHike, whenText, seedRows, SEED, fmtDur, tripKey, mergeTrips, splitTrips, whenLabel, destOf, mapStart };
+  const api = { haversine, gpxPoints, gpxStats, dayIndex, pillOf, isStay, isHike, whenText, seedRows, SEED, fmtDur, tripKey, mergeTrips, splitTrips, isHomeTrip, localItems, whenLabel, destOf, mapStart };
   root.QuestTrips = api;
   if (typeof document === "undefined" || typeof window === "undefined") return;
 
@@ -318,6 +332,14 @@
   #tripHome .chip.need{border-color:rgba(255,194,122,.5);color:var(--warn)}
   #tripHome .chip.paid{border-color:rgba(143,227,176,.5);color:var(--good)}
   #tripHome .empty{color:var(--ink-faint);font-size:14px}
+  #tripHome .sub{font-size:11px;letter-spacing:2px;color:var(--ink-faint);margin:24px 0 10px}
+  #tripHome .local{display:flex;gap:16px;align-items:flex-start}
+  #tripHome .llist{flex:1;min-width:0;display:flex;flex-direction:column;gap:8px}
+  #tripHome .lrow{width:100%;text-align:left;display:flex;gap:10px;align-items:baseline;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:10px 14px}
+  #tripHome .lrow:hover{border-color:var(--zap)}
+  #tripHome .lrow .d{flex:none;width:96px;font-size:12px;color:var(--ink-faint)}
+  #tripHome .lrow .w{font-size:12px;color:var(--ink-soft)}
+  #tripHome #thMap{flex:1;min-width:0;height:70vh;position:sticky;top:0;border-radius:14px;overflow:hidden;border:1px solid rgba(255,255,255,.12)}
   #tripView .back{display:inline-block;font-size:13px;color:var(--ink-faint);margin-bottom:10px}
   #tripView .back:hover{color:var(--zap)}
   .trip-pin{width:26px;height:26px;border-radius:50%;background:#2a2f63;border:2px solid var(--zap);display:grid;place-items:center;font-size:13px;box-shadow:0 2px 8px rgba(0,0,0,.5)}
@@ -338,7 +360,7 @@
   document.body.appendChild(home);
   document.body.classList.add("has-side");
 
-  const S = { trips: [], homeTab: "Upcoming", cur: null, tab: "Itinerary", day: -1, sel: null, mode: "map", live: false, note: "" };
+  const S = { trips: [], local: null, homeTab: "Upcoming", cur: null, tab: "Itinerary", day: -1, sel: null, mode: "map", live: false, note: "" };
   const extrasOf = (id) => (S.cur.extras[id] = S.cur.extras[id] || {});
 
   function toast(msg) {
@@ -368,24 +390,77 @@
     document.body.classList.remove("trip-open");
     document.body.classList.add("trips-home");
     drawSide("trips");
-    const { upcoming, past } = splitTrips(S.trips, today());
+    const { upcoming, past, needsDates } = splitTrips(S.trips, today());
     const list = S.homeTab === "Past" ? past : upcoming;
     const fmt = (x) => x ? new Date(x.slice(0, 10) + "T12:00:00").toLocaleDateString("en-CA", { month: "short", day: "numeric", year: "numeric" }) : "";
     const card = (t) => {
-      const chips = [`<span class="chip ${t.now ? "now" : ""}">${esc(whenLabel(t))}</span>`];
+      const chips = t.start ? [`<span class="chip ${t.now ? "now" : ""}">${esc(whenLabel(t))}</span>`] : [];
       if (t.need) chips.push(`<span class="chip need">${t.need} to book</span>`);
       if (t.booked) chips.push(`<span class="chip paid">${t.booked} booked</span>`);
       if (t.bookings != null) chips.push(`<span class="chip">${t.bookings} booking${t.bookings === 1 ? "" : "s"}</span>`);
       return `<button class="card" data-trip="${esc(t.name)}"><div class="t">${esc(t.icon || "🧳")} ${esc(t.name)}</div>
         <div class="s">${t.start ? `${fmt(t.start)}${t.end && t.end !== t.start ? " to " + fmt(t.end) : ""}` : "No dates yet"}</div><div class="row">${chips.join("")}</div></button>`;
     };
+    const tabs = [["Upcoming", upcoming.length], ["Past", past.length + needsDates.length], ["Local", S.local ? S.local.items.length : ""]];
+    let body;
+    if (S.homeTab === "Local") {
+      const L0 = S.local;
+      body = !L0 ? `<div class="empty">Loading Toronto outings…</div>` : !L0.items.length ? `<div class="empty">No Toronto outings yet. Tag a Notion row with the Toronto trip and it shows here.</div>` :
+        `<div class="local"><div class="llist">${L0.items.map((it) => `<button class="lrow" data-lurl="${esc(it.url || "")}"><span class="d">${esc(it.start ? fmt(it.start) : "No date")}</span>
+          <span style="flex:1;min-width:0"><b>${esc(it.icon || "📍")} ${esc(it.name)}</b>${localWhere(it) ? `<div class="w">${esc(localWhere(it))}</div>` : ""}</span></button>`).join("")}</div><div id="thMap"></div></div>`;
+    } else {
+      body = (list.length ? `<div class="grid">${list.map(card).join("")}</div>` : `<div class="empty">${S.homeTab === "Past" ? (needsDates.length ? "" : "No past trips yet.") : "Nothing coming up. Start one with + New trip."}</div>`) +
+        (S.homeTab === "Past" && needsDates.length ? `<div class="sub">NEEDS DATES</div><div class="grid">${needsDates.map(card).join("")}</div>` : "");
+    }
     home.innerHTML = `<div class="hd"><h1>✈ Trips</h1><button class="btn" id="thNew">＋ New trip</button></div>
-      <div class="tabs">${[["Upcoming", upcoming], ["Past", past]].map(([k, l]) => `<button class="${S.homeTab === k ? "on" : ""}" data-ht="${k}">${k}<span class="n">${l.length}</span></button>`).join("")}</div>
-      ${list.length ? `<div class="grid">${list.map(card).join("")}</div>` : `<div class="empty">${S.homeTab === "Past" ? "No past trips yet." : "Nothing coming up. Start one with + New trip."}</div>`}
+      <div class="tabs">${tabs.map(([k, n]) => `<button class="${S.homeTab === k ? "on" : ""}" data-ht="${k}">${k}<span class="n">${n}</span></button>`).join("")}</div>
+      ${body}
       ${S.live ? "" : `<div class="empty" style="margin-top:18px;font-size:12px">Notion is not reachable right now${S.note ? " (" + esc(S.note) + ")" : ""}, so only the saved copy shows.</div>`}`;
+    home.querySelectorAll("[data-lurl]").forEach((b) => b.onclick = () => b.dataset.lurl && window.open(b.dataset.lurl, "_blank", "noopener"));
+    if (S.homeTab === "Local") { if (!S.local) loadLocal(); else if (S.local.items.length || S.local.places.length) drawLocalMap(); }
     home.querySelectorAll("[data-ht]").forEach((b) => b.onclick = () => { S.homeTab = b.dataset.ht; showHome(); });
     home.querySelectorAll("[data-trip]").forEach((b) => b.onclick = () => openTrip(b.dataset.trip));
     home.querySelector("#thNew").onclick = newTrip;
+  }
+  /* Local tab: Toronto is home, so its rows are a list of outings with pins, not a trip */
+  const localWhere = (it) => ((it.fields || {}).Location || (it.fields || {}).Address || (it.fields || {}).Venue || {}).value || it.address || "";
+  async function loadLocal() {
+    const names = new Set(["Toronto"]);
+    for (const t of S.trips) if (tripKey(t.name) === "toronto") for (const a of t.aliases || [t.name]) names.add(a);
+    const items = [], places = [], seen = new Set();
+    for (const nm of names) {
+      try {
+        const d = await call("/quest/trips/one?name=" + encodeURIComponent(nm)); S.live = true;
+        for (const it of d.items || []) if (!seen.has(it.id)) { seen.add(it.id); items.push(it); }
+        places.push(...(d.places || []));
+      } catch (e) { S.note = e.message; }
+    }
+    S.local = { items: localItems(items), places };
+    if (S.homeTab === "Local" && document.body.classList.contains("trips-home")) showHome();
+  }
+  const GEO_KEY = "quest-local-geo";
+  async function drawLocalMap() {
+    let Lf; try { Lf = await leaflet(); } catch { return; }
+    const el = document.getElementById("thMap"); if (!el) return;
+    const m = Lf.map(el, { zoomControl: true }); Lf.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "© OpenStreetMap contributors" }).addTo(m);
+    m.setView([43.6532, -79.3832], 12);
+    const pts = [];
+    const pin = (lat, lng, html) => { Lf.marker([lat, lng], { icon: Lf.divIcon({ className: "", html: `<div class="trip-pin">📍</div>`, iconSize: [26, 26], iconAnchor: [13, 13] }) }).addTo(m).bindPopup(html); pts.push([lat, lng]); };
+    for (const p of S.local.places) if (p.lat != null) pin(p.lat, p.lng, `<b>${esc(p.name)}</b><br>${esc(p.address || "")}`);
+    // rows with a Location get a pin: geocoded once (about one a second) and remembered on this device
+    let geo = {}; try { geo = JSON.parse(localStorage.getItem(GEO_KEY) || "{}"); } catch {}
+    for (const it of S.local.items.slice(0, 40)) {
+      const q = localWhere(it); if (!q) continue;
+      if (!(q in geo)) {
+        if (!document.getElementById("thMap")) return;
+        try { const r = await fetch("https://nominatim.openstreetmap.org/search?format=json&limit=1&q=" + encodeURIComponent(q + ", Toronto"));
+          const d = await r.json(); geo[q] = d[0] ? [Number(d[0].lat), Number(d[0].lon)] : null; } catch { geo[q] = null; }
+        try { localStorage.setItem(GEO_KEY, JSON.stringify(geo)); } catch {}
+        await new Promise((r) => setTimeout(r, 1100));
+      }
+      if (geo[q]) { pin(geo[q][0], geo[q][1], `<b>${esc(it.name)}</b><br>${esc(q)}`); m.fitBounds(pts, { padding: [30, 30], maxZoom: 14 }); }
+    }
+    if (pts.length) m.fitBounds(pts, { padding: [30, 30], maxZoom: 14 });
   }
   async function newTrip() {
     const name = (prompt("Trip name (for example: Lisbon spring trip)") || "").trim();
