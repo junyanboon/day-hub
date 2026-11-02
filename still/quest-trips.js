@@ -394,7 +394,7 @@
     const list = S.homeTab === "Past" ? past : upcoming;
     const fmt = (x) => x ? new Date(x.slice(0, 10) + "T12:00:00").toLocaleDateString("en-CA", { month: "short", day: "numeric", year: "numeric" }) : "";
     const card = (t) => {
-      const chips = [`<span class="chip ${t.now ? "now" : ""}">${esc(whenLabel(t))}</span>`];
+      const chips = t.start ? [`<span class="chip ${t.now ? "now" : ""}">${esc(whenLabel(t))}</span>`] : [];
       if (t.need) chips.push(`<span class="chip need">${t.need} to book</span>`);
       if (t.booked) chips.push(`<span class="chip paid">${t.booked} booked</span>`);
       if (t.bookings != null) chips.push(`<span class="chip">${t.bookings} booking${t.bookings === 1 ? "" : "s"}</span>`);
@@ -458,7 +458,7 @@
         try { localStorage.setItem(GEO_KEY, JSON.stringify(geo)); } catch {}
         await new Promise((r) => setTimeout(r, 1100));
       }
-      if (geo[q]) pin(geo[q][0], geo[q][1], `<b>${esc(it.name)}</b><br>${esc(q)}`);
+      if (geo[q]) { pin(geo[q][0], geo[q][1], `<b>${esc(it.name)}</b><br>${esc(q)}`); m.fitBounds(pts, { padding: [30, 30], maxZoom: 14 }); }
     }
     if (pts.length) m.fitBounds(pts, { padding: [30, 30], maxZoom: 14 });
   }
