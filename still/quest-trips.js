@@ -106,6 +106,35 @@
     if (/idea|maybe|option|pick|check/.test(s)) return "idea";
     return "plan";
   }
+  /* how a card's status shows (Junyan 2026-11-02, replacing the faint pill): Booked or
+     Prepaid a solid card with a green edge and a check; Need to Book an amber edge and
+     a Book button; Unpaid a red edge; Maybe a dashed, dimmer card; else Planned. */
+  function statusLook(status, planned) {
+    if (planned) return { cls: "plan", icon: "•", label: "Planned", book: false };
+    const p = pillOf(status), s = String(status || "").trim();
+    if (p === "paid") return { cls: "paid", icon: "✓", label: s || "Booked", book: false };
+    if (p === "need") return { cls: "need", icon: "!", label: "Need to book", book: true };
+    if (p === "warn") return { cls: "warn", icon: "$", label: s, book: false };
+    if (p === "idea") return { cls: "idea", icon: "?", label: s || "Maybe", book: false };
+    return { cls: "plan", icon: "•", label: s || "Planned", book: false };
+  }
+  /* what a drag onto the timeline carries (Junyan d61): an image first, then a link
+     (text/uri-list, or plain text that is one URL), then plain text */
+  function dropPayload(d) {
+    if (!d) return null;
+    if (d.image) return { image: true };
+    const uri = String(d.uri || "").split(/\r?\n/).map((l) => l.trim()).find((l) => l && !l.startsWith("#"));
+    if (uri && /^https?:\/\//i.test(uri)) return { url: uri };
+    const t = String(d.text || "").trim();
+    if (!t) return null;
+    if (/^https?:\/\/\S+$/i.test(t)) return { url: t };
+    return { text: t };
+  }
+  // the calendar date of trip day i (0 = the first day)
+  function tripDate(start, i) {
+    const d = new Date(Date.UTC(+start.slice(0, 4), +start.slice(5, 7) - 1, +start.slice(8, 10) + i));
+    return d.toISOString().slice(0, 10);
+  }
   // a hotel: its name, its Tags ("Accommodations" in Notion, which the old check missed and
   // so the DC Residence Inn read "Still on"), the 🏨 icon, or a select column such as Type.
   // Free-text columns are not read: a festival note saying "check-in" is not a stay.
@@ -276,7 +305,7 @@
   const planGate = (it) => it.seed || String(it.id).startsWith("seed-")
     ? `Save this trip to Notion to plan days: press "⇪ Create in Notion" at the top of the trip.` : "";
 
-  const api = { MTL, stayLines, planGate, planKind, planTag, cardLabel, planHtml, haversine, gpxPoints, gpxStats, dayIndex, localDay, dayPlan, pillOf, isStay, isHike, whenText, seedRows, SEED, fmtDur, tripKey, mergeTrips, splitTrips, isHomeTrip, localItems, whenLabel, destOf, mapStart };
+  const api = { statusLook, dropPayload, tripDate, MTL, stayLines, planGate, planKind, planTag, cardLabel, planHtml, haversine, gpxPoints, gpxStats, dayIndex, localDay, dayPlan, pillOf, isStay, isHike, whenText, seedRows, SEED, fmtDur, tripKey, mergeTrips, splitTrips, isHomeTrip, localItems, whenLabel, destOf, mapStart };
   root.QuestTrips = api;
   if (typeof document === "undefined" || typeof window === "undefined") return;
 
@@ -420,6 +449,37 @@
   #tripHome #thMap{flex:1;min-width:0;height:70vh;position:sticky;top:0;border-radius:14px;overflow:hidden;border:1px solid rgba(255,255,255,.12)}
   #tripView .back{display:inline-block;font-size:13px;color:var(--ink-faint);margin-bottom:10px}
   #tripView .back:hover{color:var(--zap)}
+  /* status at a glance (2026-11-02) */
+  #tripView .item{border-left-width:5px}
+  #tripView .item .stl{font-size:11px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;display:flex;align-items:center;gap:5px;margin-bottom:2px}
+  #tripView .item .stl i{font-style:normal;width:16px;height:16px;border-radius:50%;display:inline-grid;place-items:center;font-size:10px;font-weight:900}
+  #tripView .item.st-paid{background:rgba(143,227,176,.13);border-color:rgba(143,227,176,.4);border-left-color:var(--good)}
+  #tripView .item.st-paid .stl{color:var(--good)}#tripView .item.st-paid .stl i{background:var(--good);color:#12321f}
+  #tripView .item.st-need{background:rgba(255,194,122,.09);border-color:rgba(255,194,122,.35);border-left-color:var(--warn)}
+  #tripView .item.st-need .stl{color:var(--warn)}#tripView .item.st-need .stl i{background:var(--warn);color:#3a2500}
+  #tripView .item.st-warn{border-left-color:var(--bad)}#tripView .item.st-warn .stl{color:var(--bad)}#tripView .item.st-warn .stl i{background:var(--bad);color:#3a0d0d}
+  #tripView .item.st-plan{border-left-color:#9cc8ff}#tripView .item.st-plan .stl{color:#9cc8ff}#tripView .item.st-plan .stl i{display:none}
+  #tripView .item.st-idea{border-style:dashed;border-left-width:2px;border-color:rgba(255,255,255,.3);background:rgba(255,255,255,.025);opacity:.72}
+  #tripView .item.st-idea:hover{opacity:1}#tripView .item.st-idea .stl{color:var(--ink-faint)}#tripView .item.st-idea .stl i{border:1.5px dashed var(--ink-faint)}
+  #tripView .bookbtn{background:var(--warn);color:#3a2500 !important;font-weight:800 !important;border-radius:9px;padding:7px 14px;font-size:13px}
+  #tripView .bookbtn:hover{filter:brightness(1.08)}
+  #tripView .item[draggable=true]{cursor:grab}#tripView .item.dragging{opacity:.35}
+  /* drag and drop onto days (d61) */
+  #tripView .maybe{border:1px dashed rgba(255,255,255,.22);border-radius:16px;padding:10px 12px 4px;margin:6px 0 4px;background:rgba(255,255,255,.03)}
+  #tripView .maybe .mh{display:flex;flex-wrap:wrap;align-items:baseline;gap:8px;font-weight:600;font-size:15px;margin-bottom:8px}
+  #tripView .maybe .mh small{font-weight:400;color:var(--ink-faint);font-size:12px}
+  #tripView .maybe .item{margin-left:0}#tripView .maybe .item .ic{position:static;flex:none}
+  #tripView .addbox{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 10px}
+  #tripView .addbox input{flex:1 1 150px;min-width:0;font:inherit;font-size:13px;color:var(--ink);background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:9px;padding:7px 10px}
+  #tripView .addbox .btn{flex:none;width:auto}
+  #tripView .addbox select{font:inherit;font-size:13px;color:var(--ink);background:#2a2f63;border:1px solid rgba(255,255,255,.15);border-radius:9px;padding:0 6px;max-width:110px}
+  #tripView .gap{height:0;overflow:hidden;border-radius:12px;transition:height .15s,margin .15s;font-size:12px;color:var(--ink-faint);display:grid;place-items:center}
+  body.trip-drag #tripView .gap{height:34px;margin:0 0 9px;border:2px dashed rgba(201,182,255,.45)}
+  body.trip-drag #tripView .gap:before{content:"Drop here"}
+  body.trip-drag #tripView [data-drop].over .gap{border-color:var(--zap);background:rgba(201,182,255,.14);color:var(--ink)}
+  body.trip-drag #tripView .maybe.over{border-color:var(--zap);background:rgba(201,182,255,.1)}
+  body.trip-drag #tripView .rail{padding-top:4px;padding-bottom:4px}
+  #tripView .shot{max-width:100%;border-radius:10px;margin:8px 0;border:1px solid rgba(255,255,255,.12)}
   .trip-pin{width:26px;height:26px;border-radius:50%;background:#2a2f63;border:2px solid var(--zap);display:grid;place-items:center;font-size:13px;box-shadow:0 2px 8px rgba(0,0,0,.5)}
   .trip-pin.on{border-color:var(--gold);transform:scale(1.25)}`;
   document.head.appendChild(css);
@@ -610,12 +670,21 @@
   }
   const label = (it) => cardLabel(it, S.cur && S.cur.extras[it.id]);
   const pillCls = (it) => (S.cur && (S.cur.extras[it.id] || {}).plan ? "planned" : pillOf(it.status));
+  const lookOf = (it) => statusLook(it.status, !!(S.cur && (S.cur.extras[it.id] || {}).plan));
   function card(it) {
     const where = it.address ? " · " + esc(it.address.split(",")[0]) : "";
-    const w = whenText(it);
-    return `<div class="item ${S.sel === it.id ? "sel" : ""}" data-id="${esc(it.id)}"><div class="ic">${esc(it.icon || (isStay(it) ? "🏨" : isHike(it) ? "🥾" : "📍"))}</div>
-      <div><div class="t">${esc(it.name)}</div><div class="s">${esc(w)}${where}${(S.cur.extras[it.id] || {}).plan ? " · Planned by day planner" : ""}</div></div>
-      <div class="r"><span class="pill ${pillCls(it)}">${esc(label(it))}</span>${it.seed ? `<div class="log" style="margin-top:4px">calendar copy</div>` : ""}</div></div>`;
+    const w = whenText(it), lk = lookOf(it);
+    return `<div class="item st-${lk.cls} ${S.sel === it.id ? "sel" : ""}" data-id="${esc(it.id)}" draggable="true"><div class="ic">${esc(it.icon || (isStay(it) ? "🏨" : isHike(it) ? "🥾" : "📍"))}</div>
+      <div style="min-width:0"><div class="stl"><i>${lk.icon}</i>${esc(lk.label)}</div><div class="t">${esc(it.name)}</div><div class="s">${esc(w)}${where}${(S.cur.extras[it.id] || {}).plan ? " · Planned by day planner" : ""}${it.seed ? " · calendar copy" : ""}</div></div>
+      <div class="r">${lk.book ? `<button class="bookbtn" data-book="${esc(it.id)}" title="Find where to book this">Book</button>` : ""}</div></div>`;
+  }
+  // where Book goes: the card's own link if it has one, else a search for it near the trip
+  function bookUrl(it) {
+    const link = Object.values(it.fields || {}).find((f) => f && f.type === "url" && f.value);
+    if (link) return link.value;
+    const f = (extrasOf(it.id).files || [])[0];
+    if (f) return f;
+    return "https://www.google.com/search?q=" + encodeURIComponent(`${it.name} ${destOf(S.cur.name, S.cur.place)} book`);
   }
   function drawLeft() {
     const c = S.cur, D = days();
@@ -631,14 +700,20 @@
         return `<button class="${t === S.tab ? "on" : ""}" data-t="${t}">${t}${n ? `<span class="n">${n}</span>` : ""}</button>`; }).join("")}</div>`;
     if (S.tab === "Itinerary") {
       h += `<div class="daychips"><button class="${S.day < 0 ? "on" : ""}" data-d="-1">All</button>${D.map((d, i) => `<button class="${S.day === i ? "on" : ""}" data-d="${i}">${d}</button>`).join("")}</div>`;
-      const plan = dayPlan(c.items, c.start, D.length), undated = plan.undated;
+      const plan = dayPlan(c.items, c.start, D.length);
+      // Maybe (d61): cards with no date sit above the days; a date outside the trip stays at the bottom
+      const maybe = plan.undated.filter((i) => !i.start), outside = plan.undated.filter((i) => i.start);
+      h += `<div class="maybe" data-drop="maybe"><div class="mh">💭 Maybe<small>${maybe.length ? maybe.length + " · drag one onto a day to give it a date" : "drop a link, text or screenshot here, or onto a day"}</small></div>
+        <form class="addbox" id="tvAdd"><input id="tvAddText" placeholder="Type a few words or paste a link" autocomplete="off">
+        <select id="tvAddDay"><option value="">Maybe</option>${D.map((d, i) => `<option value="${i}">${d}</option>`).join("")}</select><button class="btn" type="submit">Add</button></form>
+        ${maybe.map(card).join("")}<div class="gap"></div></div>`;
       (S.day < 0 ? D.map((_, i) => i) : [S.day]).forEach((d) => {
         const its = plan.days[d].on, stay = plan.days[d].staying;
         const sl = (xs, w) => xs.length ? `<div class="log">${w}: ${xs.map((i) => esc(i.name)).join(", ")}</div>` : "";
         const L = stayLines(stay), st = sl(L.staying, "Staying") + sl(L.stillOn, "Still on");
-        h += `<div class="day">${D[d]}<small></small></div><div class="rail">${its.map(card).join("") || (st ? "" : `<div class="log">Nothing planned yet.</div>`)}${st}</div>`;
+        h += `<div data-drop="${d}"><div class="day">${D[d]}<small></small></div><div class="rail"><div class="gap"></div>${its.map((it) => card(it) + `<div class="gap"></div>`).join("") || (st ? "" : `<div class="log nothing">Nothing planned yet.</div><div class="gap"></div>`)}${st}</div></div>`;
       });
-      if (S.day < 0 && undated.length) h += `<div class="day">No date yet</div><div class="rail">${undated.map(card).join("")}</div>`;
+      if (S.day < 0 && outside.length) h += `<div class="day">Outside the trip dates</div><div class="rail">${outside.map(card).join("")}</div>`;
     }
     if (S.tab === "Bookings") {
       const rows = c.items.filter((i) => i.db === "planner");
@@ -660,7 +735,16 @@
     L.querySelector("#tvBack").onclick = (e) => { e.preventDefault(); closeDrawer(true); showHome(); };
     L.querySelectorAll("[data-t]").forEach((b) => b.onclick = () => { S.tab = b.dataset.t; drawLeft(); });
     L.querySelectorAll("[data-d]").forEach((b) => b.onclick = () => { S.day = +b.dataset.d; drawLeft(); });
-    L.querySelectorAll(".item[data-id]").forEach((b) => b.onclick = () => openItem(b.dataset.id));
+    L.querySelectorAll(".item[data-id]").forEach((b) => b.onclick = (e) => { if (!e.target.closest("[data-book]")) openItem(b.dataset.id); });
+    L.querySelectorAll("[data-book]").forEach((b) => b.onclick = () => { const it = S.cur.items.find((i) => i.id === b.dataset.book); if (it) window.open(bookUrl(it), "_blank", "noopener"); });
+    const add = L.querySelector("#tvAdd");
+    if (add) add.onsubmit = (e) => {
+      e.preventDefault();
+      const v = L.querySelector("#tvAddText").value, d = L.querySelector("#tvAddDay").value;
+      const pl = dropPayload({ text: v });
+      if (pl) dropOn(d === "" ? "maybe" : d, pl);
+    };
+    wireDrag(L);
     L.querySelectorAll("[data-open]").forEach((b) => b.onclick = () => openItem(b.closest("tr").dataset.id));
     L.querySelectorAll(".item[data-place]").forEach((b) => b.onclick = (e) => { if (e.target.tagName !== "A") focusPlace(b.dataset.place); });
     L.querySelectorAll("td[data-f]").forEach((td) => td.onblur = () => saveField(td.closest("tr").dataset.id, td.dataset.f, td.textContent));
@@ -669,6 +753,93 @@
     const nm = document.getElementById("tvNewMust"); if (nm) nm.onclick = () => { saveMusts(true); };
     const mt = document.getElementById("tvMusts"); if (mt) mt.querySelectorAll("td[contenteditable]").forEach((td) => td.onblur = () => saveMusts(false));
   }
+  /* ── drag and drop onto the day timeline (Junyan d61, 2026-11-02) ──────────
+     While something is dragged over the trip, the days open drop gaps. A link, text or
+     screenshot dropped on a day becomes a Travel Planner card on that day (POST
+     /quest/trips/drop); on Maybe, an undated card. A card dragged onto a day takes that
+     date; onto Maybe, it loses its date. */
+  const CARD_MIME = "application/x-trip-card";
+  let dragDepth = 0;
+  const endDrag = () => { dragDepth = 0; document.body.classList.remove("trip-drag"); view.querySelectorAll(".over").forEach((x) => x.classList.remove("over")); };
+  const canDrop = () => document.body.classList.contains("trip-open") && S.tab === "Itinerary";
+  view.addEventListener("dragenter", (e) => { if (!canDrop()) return; dragDepth++; document.body.classList.add("trip-drag"); });
+  view.addEventListener("dragleave", () => { if (--dragDepth <= 0) endDrag(); });
+  // a drop that misses a day must not make the browser open the link or image in place of the app
+  addEventListener("dragover", (e) => { if (document.body.classList.contains("trip-open")) e.preventDefault(); });
+  addEventListener("drop", (e) => { if (document.body.classList.contains("trip-open")) { e.preventDefault(); endDrag(); } });
+  addEventListener("dragend", endDrag);
+  function wireDrag(L) {
+    L.querySelectorAll(".item[data-id][draggable]").forEach((el) => {
+      el.ondragstart = (e) => { e.dataTransfer.setData(CARD_MIME, el.dataset.id); e.dataTransfer.effectAllowed = "move"; el.classList.add("dragging"); };
+      el.ondragend = () => el.classList.remove("dragging");
+    });
+    L.querySelectorAll("[data-drop]").forEach((z) => {
+      z.ondragover = (e) => { e.preventDefault(); L.querySelectorAll(".over").forEach((x) => x !== z && x.classList.remove("over")); z.classList.add("over"); };
+      z.ondrop = (e) => {
+        e.preventDefault(); e.stopPropagation();
+        const dt = e.dataTransfer, where = z.dataset.drop;
+        endDrag();
+        const id = dt.getData(CARD_MIME);
+        if (id) return moveCard(id, where);
+        const file = [...(dt.files || [])].find((f) => /^image\//.test(f.type));
+        const pl = dropPayload({ image: !!file, uri: dt.getData("text/uri-list"), text: dt.getData("text/plain") });
+        if (pl) dropOn(where, pl, file);
+      };
+    });
+  }
+  // a screenshot is shrunk to at most 1400 px and saved as JPEG so it stays small on the server
+  async function shrink(file) {
+    const url = URL.createObjectURL(file);
+    try {
+      const img = await new Promise((ok, no) => { const i = new Image(); i.onload = () => ok(i); i.onerror = no; i.src = url; });
+      for (const [max, q] of [[1400, 0.78], [1000, 0.7], [700, 0.6]]) {
+        const k = Math.min(1, max / Math.max(img.naturalWidth, img.naturalHeight));
+        const c = document.createElement("canvas"); c.width = Math.round(img.naturalWidth * k); c.height = Math.round(img.naturalHeight * k);
+        c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+        const d = c.toDataURL("image/jpeg", q);
+        if (d.length < 880000) return d;
+      }
+      return "";
+    } finally { URL.revokeObjectURL(url); }
+  }
+  async function dropOn(where, pl, file) {
+    const date = where === "maybe" || !S.cur.start ? "" : tripDate(S.cur.start, +where);
+    const body = { trip: S.cur.name, date };
+    if (pl.image) { body.image = file ? await shrink(file).catch(() => "") : ""; if (!body.image) return toast("Could not read that image"); }
+    else if (pl.url) body.url = pl.url; else body.text = pl.text;
+    toast(date ? "Adding to " + days()[+where] + "…" : "Adding to Maybe…");
+    try {
+      const d = await call("/quest/trips/drop", body);
+      S.cur.items.push(d.item);
+      if (d.extra) S.cur.extras[d.item.id] = d.extra;
+      S.cur.items.sort((a, b) => (a.start || "9").localeCompare(b.start || "9"));
+      drawLeft(); toast(`Saved "${d.item.name}" to the Travel Planner`);
+    } catch (e) { toast("Not saved: " + e.message); }
+  }
+  async function moveCard(id, where) {
+    const it = S.cur.items.find((i) => i.id === id);
+    if (!it) return;
+    const date = where === "maybe" || !S.cur.start ? "" : tripDate(S.cur.start, +where);
+    // keep the time of day when a timed card moves to another day
+    const t = /T[\d:.]+([+-]\d\d:\d\d|Z)?$/.exec(it.start || "");
+    const val = date ? date + (t ? t[0] : "") : "";
+    if ((it.start || "") === val) return;
+    const before = { start: it.start, end: it.end };
+    // a stay keeps its length: the end moves by the same number of days
+    let end = "";
+    if (date && it.end && it.start) { const shift = dayIndex(date, it.start.slice(0, 10)); end = tripDate(it.end.slice(0, 10), shift) + it.end.slice(10); }
+    it.start = val; it.end = end;
+    drawLeft();
+    if (it.seed || String(id).startsWith("seed-")) return toast("Moved on this screen (calendar copy, not in Notion yet)");
+    const col = Object.keys(it.fields || {}).find((k) => /^(Date \(Timezone\)|Scheduled Date|Date)$/.test(k) && it.fields[k].type === "date")
+      || Object.keys(it.fields || {}).find((k) => it.fields[k].type === "date") || (it.db === "activities" ? "Scheduled Date" : "Date (Timezone)");
+    try {
+      const d = await call("/quest/trips/item", { id, db: it.db, props: { [col]: val ? val + (end ? " → " + end : "") : "" } });
+      Object.assign(it, d.item, { db: it.db });
+      drawLeft(); toast(date ? "Moved to " + days()[+where] : "Moved to Maybe");
+    } catch (e) { Object.assign(it, before); drawLeft(); toast("Not moved: " + e.message); }
+  }
+
   function saveMusts(addRow) {
     const rows = [...document.querySelectorAll("#tvMusts tr")].slice(1).filter((r) => r.querySelectorAll("td[contenteditable]").length)
       .map((r) => { const t = r.querySelectorAll("td"); return { name: t[0].textContent.trim(), notes: t[1].textContent.trim() }; }).filter((m) => m.name || m.notes);
@@ -757,12 +928,13 @@
       ${kv("Address")}<span>Google Maps</span><div>${addr ? `<a href="${gmaps(addr)}" target="_blank" rel="noopener">Open ↗</a> · <a href="${gdir({ address: addr })}" target="_blank" rel="noopener">Directions ↗</a>` : `<span style="color:var(--ink-faint)">add an address</span>`}</div>
       ${kv("Booked Through")}${kv("Points / Cash")}${kv("Card")}${kv("Cancel by")}${kv("Confirmation #")}
       <span>Files</span><div>${files}<a href="#" id="tvAddFile">＋ add link</a></div></div>
-      ${stay}${hike}
+      ${stay}${hike}${ex.img ? `<div class="blk"><h3>🖼 SCREENSHOT</h3><div class="log" id="tvShot">Loading…</div></div>` : ""}
       <div class="blk" id="tvPlan"><h3>✨ DAY PLAN</h3><div class="log">Checking Notion…</div></div>
       <div class="blk"><h3>NOTES</h3><div contenteditable class="log" data-x="notes" style="min-height:40px">${esc(ex.notes || "")}</div></div>
       <div class="blk">${it.url ? `<a href="${esc(it.url)}" target="_blank" rel="noopener">Open in Notion ↗</a>` : `<span class="log">Not in Notion yet: use "Create in Notion" at the top.</span>`}</div>`;
     D.classList.add("open");
     document.getElementById("tvClose").onclick = () => closeDrawer();
+    if (ex.img) call("/quest/trips/img?id=" + encodeURIComponent(id)).then((r) => { const el = document.getElementById("tvShot"); if (el && S.sel === id) el.innerHTML = r.image ? `<img class="shot" alt="Screenshot" src="${esc(r.image)}">` : "Not found on the server."; }).catch(() => {});
     D.querySelectorAll("[data-k]").forEach((el) => el.onblur = () => saveField(id, el.dataset.k, el.textContent));
     D.querySelectorAll("[data-x]").forEach((el) => el.onblur = () => { const v = el.textContent.trim(); if ((ex[el.dataset.x] || "") !== v) { ex[el.dataset.x] = v; saveExtra(id); } });
     D.querySelectorAll("[data-c]").forEach((el) => el.onclick = () => { ex.check = { ...(ex.check || {}), [el.dataset.c]: !(ex.check || {})[el.dataset.c] }; el.classList.toggle("y"); saveExtra(id); });

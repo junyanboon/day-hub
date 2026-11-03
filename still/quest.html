@@ -6935,25 +6935,37 @@
   setInterval(pullAll, 2 * 60 * 1000);
   /* A Home Screen app wakes with the page it had in memory, sometimes from
      before the last update, so the phone and the Mac ran different versions
-     (2026-10-08). On wake: send any unsaved change, reload if GitHub Pages has
-     a newer page, then pull. */
+     (2026-10-08). On wake: send any unsaved change, check whether GitHub Pages
+     has a newer page, then pull. A newer page never reloads by itself (Junyan,
+     2026-11-02, as the FBS Monitor does): a small "New version. Reload" banner
+     shows, with an x to hide it; the page reloads only on Reload. */
+  function versionBanner(lm){
+    if (document.getElementById("newVer") || sessionStorage.getItem("quest-ver-hidden") === String(lm)) return;
+    const b = document.createElement("div");
+    b.id = "newVer"; b.setAttribute("role", "status");
+    b.style.cssText = "position:fixed;left:50%;transform:translateX(-50%);top:calc(10px + env(safe-area-inset-top));z-index:2000;display:flex;align-items:center;gap:10px;"
+      + "padding:7px 8px 7px 14px;border-radius:999px;background:#2a2f63;color:#fff;border:1px solid rgba(201,182,255,.55);box-shadow:0 6px 20px rgba(0,0,0,.45);font:600 14px/1.2 var(--font,system-ui);white-space:nowrap";
+    b.innerHTML = `<span>New version.</span><button type="button" id="newVerGo" style="font:inherit;border:0;border-radius:999px;padding:6px 12px;background:var(--zap,#c9b6ff);color:#2a2453;cursor:pointer">Reload</button>`
+      + `<button type="button" id="newVerX" aria-label="Hide" style="font:inherit;font-size:18px;line-height:1;border:0;background:none;color:rgba(255,255,255,.7);cursor:pointer;padding:2px 6px">×</button>`;
+    document.body.appendChild(b);
+    b.querySelector("#newVerGo").onclick = async () => { try { if (syncTimer) await pushG(); } catch {} location.reload(); };
+    b.querySelector("#newVerX").onclick = () => { sessionStorage.setItem("quest-ver-hidden", String(lm)); b.remove(); };
+  }
   async function checkFresh(){
-    if ($("sheet").classList.contains("open")) return false;
     try {
       // at most 3 s: on a network that never answers, the pull after it must not wait (2026-10-17)
       const ac = new AbortController(); setTimeout(() => ac.abort(), 3000);
       const r = await fetch(location.pathname, { method:"HEAD", cache:"no-store", signal:ac.signal });
       const lm = Date.parse(r.headers.get("last-modified") || ""), mine = Date.parse(document.lastModified);
-      if (!(lm - mine > 5000) || sessionStorage.getItem("quest-reloaded") === String(lm)) return false;
-      // the service worker opens the saved copy, so fetch the new page into it first (2026-10-11)
+      if (!(lm - mine > 5000)) return false;
+      // the service worker opens the saved copy, so fetch the new page into it first (2026-10-11),
+      // then Reload opens the new one
       const fresh = await fetch(location.pathname, { cache:"no-store", headers:{ "x-dq-fresh":"1" } });
       if (!fresh.ok) return false;
       await fresh.text();
-      sessionStorage.setItem("quest-reloaded", String(lm));
-      if (syncTimer) await pushG();
-      location.reload();
-      return true;
-    } catch { return false; }
+      versionBanner(lm);
+    } catch {}
+    return false;
   }
   let lastWake = 0;
   async function wake(){
@@ -6973,6 +6985,6 @@
 })();
 </script>
 <script src="quest-dash.js?v=20261019z"></script>
-<script src="quest-trips.js?v=20261102b"></script>
+<script src="quest-trips.js?v=20261102c"></script>
 </body>
 </html>
