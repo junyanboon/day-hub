@@ -231,3 +231,24 @@ test("Plan this: calendar copies get a pointer to Create in Notion, Notion cards
   assert.match(T.planGate({ id: "seed-spa", seed: true }), /Save this trip to Notion to plan days/);
   assert.equal(T.planGate({ id: "2f0c1d2e-aaaa-bbbb-cccc-1234567890ab", db: "activities" }), "");
 });
+
+// Junyan 2026-11-02: status reads at a glance (Booked solid with a check, Need to Book amber with Book, Maybe dashed)
+test("status look: booked, need to book, unpaid, maybe, planned", () => {
+  assert.deepEqual({ ...T.statusLook("Prepaid") }, { cls: "paid", icon: "✓", label: "Prepaid", book: false });
+  assert.equal(T.statusLook("Booked Unpaid").cls, "warn");
+  assert.deepEqual({ ...T.statusLook("Need to Book") }, { cls: "need", icon: "!", label: "Need to book", book: true });
+  assert.equal(T.statusLook("Maybe").cls, "idea");
+  assert.equal(T.statusLook("").label, "Planned");
+  assert.equal(T.statusLook("Need to Book", true).cls, "plan");   // a day plan written: Planned
+});
+
+// Junyan d61: what a drag carries becomes one drop (image first, then a link, then text)
+test("drop payload and the date of a trip day", () => {
+  assert.deepEqual({ ...T.dropPayload({ uri: "#comment\nhttps://maps.app.goo.gl/x\n", text: "https://maps.app.goo.gl/x" }) }, { url: "https://maps.app.goo.gl/x" });
+  assert.deepEqual({ ...T.dropPayload({ text: " https://lemousso.com/ " }) }, { url: "https://lemousso.com/" });
+  assert.deepEqual({ ...T.dropPayload({ text: "Joe Beef dinner" }) }, { text: "Joe Beef dinner" });
+  assert.deepEqual({ ...T.dropPayload({ image: true, uri: "https://x.com/a.png" }) }, { image: true });
+  assert.equal(T.dropPayload({ text: "  " }), null);
+  assert.equal(T.tripDate("2026-11-12", 0), "2026-11-12");
+  assert.equal(T.tripDate("2026-11-28", 4), "2026-12-02");
+});
