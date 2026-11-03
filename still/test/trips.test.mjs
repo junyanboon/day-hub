@@ -296,3 +296,15 @@ test("pasted message becomes one log entry", () => {
   assert.equal(e.summary, "Check-in is now 3 pm, code 4411."); assert.equal(e.link, "https://mail.google.com/mail/u/0/#inbox/abc");
   assert.equal(T.pastedEntry("   "), null);
 });
+
+test("booked cards with no confirmation file warn; others do not (2026-11-02)", () => {
+  const base = { id: "n", db: "planner", name: "Flight YYZ to YUL", start: "2026-11-12T08:00:00-05:00", fields: { "Confirmation #": { type: "rich_text", value: "X1" } }, files: [] };
+  for (const status of ["Prepaid", "Booked Unpaid", "Taxes Still Owing", "Free"])
+    assert.deepEqual([...T.missingInfo({ ...base, status })], ["confirmation file"], status);
+  assert.deepEqual([...T.missingInfo({ ...base, status: "Prepaid", files: [{ name: "a.pdf", url: "u" }] })], []);
+  assert.deepEqual([...T.missingInfo({ ...base, status: "Need to Book" })], []);
+  assert.deepEqual([...T.missingInfo({ ...base, status: "Gas" })], []);
+  const { files, ...noCol } = base;   // a calendar copy or older server: no files list, no warning
+  assert.deepEqual([...T.missingInfo({ ...noCol, status: "Prepaid" })], []);
+  assert.equal(T.needsConfirmFile({ ...base, status: "Prepaid" }), true);
+});

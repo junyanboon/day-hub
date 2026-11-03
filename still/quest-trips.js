@@ -195,9 +195,19 @@
      a status that says paid or what is owed, cancellation policy. Restaurants and
      activities: address, time, booked or not. Flights and transport: times, confirmation #.
      Photos, benefits, credits and card never warn. */
+  /* a booked card (Prepaid, Booked Unpaid, Taxes Still Owing, Free) with nothing in its Notion
+     "Files & media" needs the confirmation dropped on it (2026-11-02). Only cards the server
+     sent a files list for: calendar copies have no Notion page to hold a file. */
+  const BOOKED_RE = /^(prepaid|booked unpaid|taxes still owing|free)$/i;
+  const needsConfirmFile = (it) => Array.isArray(it.files) && !it.files.length && !it.seed && BOOKED_RE.test(String(it.status || "").trim());
   function missingInfo(it, extra) {
     const st = String(it.status || "").trim();
     if (/cancel/i.test(st)) return [];
+    const out0 = missingFields(it, extra, st);
+    if (needsConfirmFile(it)) out0.push("confirmation file");
+    return out0;
+  }
+  function missingFields(it, extra, st) {
     const k = kindOf(it), v = (f) => String(fieldOf(it, f, extra) || "").trim(), out = [];
     if (k !== "transport" && !v("Address")) out.push("address");
     if (notBooked(st)) return out;
@@ -216,8 +226,14 @@
     }
     return out;
   }
+  // the amber Missing line, and the drop hint when the confirmation file is what is missing
+  function missLine(ms, style = "") {
+    const rest = ms.filter((m) => m !== "confirmation file");
+    return (rest.length ? `<div class="miss"${style}>Missing: ${esc(rest.join(", "))}</div>` : "") +
+      (ms.length > rest.length ? `<div class="miss nofile"${style}>No confirmation file. Drop it here.</div>` : "");
+  }
   // which panel field each warning points at
-  const MISSING_FIELD = { "address": "Address", "check-in": "Check-in", "check-out": "Check-out", "confirmation #": "Confirmation #",
+  const MISSING_FIELD = { "confirmation file": "Files", "address": "Address", "check-in": "Check-in", "check-out": "Check-out", "confirmation #": "Confirmation #",
     "cancellation policy": "Cancel by", "paid or owed": "Status", "booked or not": "Status", "time": "When", "times": "Check-in" };
   const dayOf = (s) => String(s || "").slice(0, 10);
   const overlaps = (a, b) => {
@@ -393,7 +409,7 @@
   const planGate = (it) => it.seed || String(it.id).startsWith("seed-")
     ? `Save this trip to Notion to plan days: press "⇪ Create in Notion" at the top of the trip.` : "";
 
-  const api = { pastedEntry, kindOf, missingInfo, hideCopies, fieldOf, MISSING_FIELD, statusLook, dropPayload, tripDate, MTL, stayLines, planGate, planKind, planTag, cardLabel, planHtml, haversine, gpxPoints, gpxStats, dayIndex, localDay, dayPlan, pillOf, isStay, isHike, whenText, seedRows, SEED, fmtDur, tripKey, mergeTrips, splitTrips, isHomeTrip, localItems, whenLabel, destOf, mapStart };
+  const api = { pastedEntry, kindOf, missingInfo, needsConfirmFile, missLine, hideCopies, fieldOf, MISSING_FIELD, statusLook, dropPayload, tripDate, MTL, stayLines, planGate, planKind, planTag, cardLabel, planHtml, haversine, gpxPoints, gpxStats, dayIndex, localDay, dayPlan, pillOf, isStay, isHike, whenText, seedRows, SEED, fmtDur, tripKey, mergeTrips, splitTrips, isHomeTrip, localItems, whenLabel, destOf, mapStart };
   root.QuestTrips = api;
   if (typeof document === "undefined" || typeof window === "undefined") return;
 
@@ -491,7 +507,7 @@
   #tripView .x{position:absolute;top:14px;right:14px;font-size:20px;color:var(--ink-faint)}
   #tripView .kv{display:grid;grid-template-columns:120px 1fr;gap:8px 12px;font-size:13px;margin:14px 0}
   #tripView .kv>span{color:var(--ink-faint)}
-  #tripView .item .miss{color:var(--warn);font-size:11.5px;margin-top:3px}#tripView .kv>.need{color:var(--warn);font-weight:700}#tripView .kv>div.need{outline:1px solid var(--warn);border-radius:5px;background:rgba(255,190,90,.08);min-height:18px}
+  #tripView .item .miss{color:var(--warn);font-size:11.5px;margin-top:3px}#tripView .item.fileover,#tvDrawer.fileover{outline:2px dashed var(--warn);outline-offset:-2px}#tripView .kv>.need{color:var(--warn);font-weight:700}#tripView .kv>div.need{outline:1px solid var(--warn);border-radius:5px;background:rgba(255,190,90,.08);min-height:18px}
   #tripView .msgs .m{font-size:12.5px;padding:6px 0;border-top:1px solid rgba(255,255,255,.08)}#tripView .msgs .m b{color:var(--ink)}#tripView .msgs .m small{color:var(--ink-faint)}#tripView .msgs textarea{width:100%;min-height:54px;font:inherit;font-size:12.5px;background:#2a2f63;color:var(--ink);border:1px solid rgba(255,255,255,.2);border-radius:6px;box-sizing:border-box}
   #tripView [contenteditable]{min-height:18px;border-radius:4px;padding:1px 3px;background:rgba(255,255,255,.04)}
   #tripView [contenteditable]:focus{outline:2px solid var(--zap)}
@@ -767,7 +783,7 @@
     const ad = fieldVal(it, "Address"), where = ad ? " · " + esc(ad.split(",")[0]) : "";
     const w = whenText(it), lk = lookOf(it);
     return `<div class="item st-${lk.cls} ${S.sel === it.id ? "sel" : ""}" data-id="${esc(it.id)}" draggable="true"><div class="ic">${esc(it.icon || (isStay(it) ? "🏨" : isHike(it) ? "🥾" : "📍"))}</div>
-      <div style="min-width:0"><div class="stl"><i>${lk.icon}</i>${esc(lk.label)}</div><div class="t">${esc(it.name)}</div><div class="s">${esc(w)}${where}${(S.cur.extras[it.id] || {}).plan ? " · Planned by day planner" : ""}${it.seed ? " · calendar copy" : ""}</div>${(() => { const ms = missingInfo(it, S.cur.extras[it.id]); return ms.length ? `<div class="miss">Missing: ${esc(ms.join(", "))}</div>` : ""; })()}</div>
+      <div style="min-width:0"><div class="stl"><i>${lk.icon}</i>${esc(lk.label)}</div><div class="t">${esc(it.name)}</div><div class="s">${esc(w)}${where}${(S.cur.extras[it.id] || {}).plan ? " · Planned by day planner" : ""}${it.seed ? " · calendar copy" : ""}</div>${missLine(missingInfo(it, S.cur.extras[it.id]))}</div>
       <div class="r">${lk.book ? `<button class="bookbtn" data-book="${esc(it.id)}" title="Find where to book this">Book</button>` : ""}</div></div>`;
   }
   // where Book goes: the card's own link if it has one, else a search for it near the trip
@@ -866,6 +882,7 @@
       el.ondragstart = (e) => { e.dataTransfer.setData(CARD_MIME, el.dataset.id); e.dataTransfer.effectAllowed = "move"; el.classList.add("dragging"); };
       el.ondragend = () => el.classList.remove("dragging");
     });
+    L.querySelectorAll(".item[data-id]").forEach((el) => fileTarget(el, () => el.dataset.id));
     L.querySelectorAll("[data-drop]").forEach((z) => {
       z.ondragover = (e) => { e.preventDefault(); L.querySelectorAll(".over").forEach((x) => x !== z && x.classList.remove("over")); z.classList.add("over"); };
       z.ondrop = (e) => {
@@ -879,6 +896,35 @@
         if (pl) dropOn(where, pl, file);
       };
     });
+  }
+  /* a confirmation PDF or image dropped on a card or its panel goes to that Notion page's
+     "Files & media", renamed by the server to Junyan's convention (2026-11-02) */
+  const CONF_FILE_RE = /^(application\/pdf|image\/(png|jpe?g|webp|gif|heic))$/i;
+  const fileOf = (dt) => [...((dt && dt.files) || [])].find((f) => CONF_FILE_RE.test(f.type));
+  const hasFiles = (dt) => !!dt && [...(dt.types || [])].includes("Files");
+  function fileTarget(el, idOf) {
+    const ok = () => { const it = S.cur && S.cur.items.find((i) => i.id === idOf()); return it && Array.isArray(it.files) && !it.seed ? it : null; };
+    el.addEventListener("dragover", (e) => { if (hasFiles(e.dataTransfer) && ok()) { e.preventDefault(); e.stopPropagation(); el.classList.add("fileover"); } });
+    el.addEventListener("dragleave", () => el.classList.remove("fileover"));
+    el.addEventListener("drop", (e) => {
+      el.classList.remove("fileover");
+      const it = ok(), file = fileOf(e.dataTransfer);
+      if (!it || !hasFiles(e.dataTransfer)) return;
+      e.preventDefault(); e.stopPropagation(); endDrag();
+      if (!file) return toast("Only a PDF or an image");
+      uploadConfirm(it, file);
+    });
+  }
+  async function uploadConfirm(it, file) {
+    if (file.size > 15e6) return toast("File over 15 MB");
+    toast("Uploading to Notion…");
+    try {
+      const data = await new Promise((ok, no) => { const r = new FileReader(); r.onload = () => ok(String(r.result)); r.onerror = no; r.readAsDataURL(file); });
+      const d = await call("/quest/trips/file", { id: it.id, db: it.db, filename: file.name, data });
+      Object.assign(it, d.item, { db: it.db });
+      toast("Saved as " + d.name);
+      drawLeft(); if (S.sel === it.id) openItem(it.id);
+    } catch (err) { toast("Not saved: " + err.message); }
   }
   // a screenshot is shrunk to at most 1400 px and saved as JPEG so it stays small on the server
   async function shrink(file) {
@@ -1006,10 +1052,11 @@
     const addr = fieldVal(it, "Address");
     const stay = isStay(it) ? `<div class="blk"><h3>CHECKLIST (same as your Notion cards)</h3>${CHECK.map((c, i) => `<div class="chk ${(ex.check || {})[i] ? "y" : ""}" data-c="${i}"><i></i>${esc(c)}</div>`).join("")}</div>` +
       [["benefits", "🏨 STAY BENEFITS", "Breakfast, upgrade, early check-in, late checkout, status."], ["credits", "💳 CREDITS TO USE", "Any hotel or card credit, with its deadline."],
-       ["gym", "🏋️ GYM PLAN", "Hotel gym, plus the nearest full gym with walking directions."], ["emails", "📬 EMAILS", "Booking emails and confirmation numbers."]]
+       ["gym", "🏋️ GYM PLAN", "Hotel gym, plus the nearest full gym with walking directions."]]
         .map(([k, t, ph]) => `<div class="blk"><h3>${t}</h3><div contenteditable class="log" data-x="${k}" data-ph="${esc(ph)}">${esc(ex[k] || "")}</div></div>`).join("") : "";
     const hike = isHike(it) ? `<div class="blk"><h3>🥾 TRAIL (GPX)</h3><div class="log">${ex.gpxName ? "Attached: " + esc(ex.gpxName) + " · " : ""}<a href="#" id="tvGpx">${ex.gpxName ? "Replace" : "＋ Attach"} GPX file</a></div></div>` : "";
     const files = (ex.files || []).map((f, i) => `<div><a href="${esc(f)}" target="_blank" rel="noopener">${esc(f.replace(/^https?:\/\//, "").slice(0, 40))} ↗</a> <a href="#" data-rmf="${i}" style="color:var(--ink-faint)">×</a></div>`).join("");
+    const notionFiles = (it.files || []).map((f) => `<div>📎 ${f.url ? `<a href="${esc(f.url)}" target="_blank" rel="noopener">${esc(f.name)} ↗</a>` : esc(f.name)}</div>`).join("");
     const D = document.getElementById("tvDrawer");
     D.innerHTML = `<button class="x" id="tvClose">×</button><div style="font-size:12px;color:var(--ink-faint)">${esc(d)} ${esc((it.start || "").slice(0, 4))}</div>
       <h2>${esc(it.icon || "")} ${esc(it.name)}</h2><span class="pill ${pillCls(it)}">${esc(label(it))}</span>
@@ -1018,15 +1065,16 @@
         ${STATUSES.concat(it.status && !STATUSES.includes(it.status) ? [it.status] : []).concat(it.status ? [] : [""]).map((s) => `<option ${s === it.status ? "selected" : ""}>${esc(s)}</option>`).join("")}</select></div>
       ${kv("Address")}<span>Google Maps</span><div>${addr ? `<a href="${gmaps(addr)}" target="_blank" rel="noopener">Open ↗</a> · <a href="${gdir({ address: addr })}" target="_blank" rel="noopener">Directions ↗</a>` : `<span style="color:var(--ink-faint)">add an address</span>`}</div>
       ${kv("Booked Through")}${kv("Points / Cash")}${kv("Card")}${kv("Cancel by")}${kv("Confirmation #")}
-      <span>Files</span><div>${files}<a href="#" id="tvAddFile">＋ add link</a></div></div>
+      <span class="${need.has("Files") ? "need" : ""}">Files</span><div id="tvFiles">${notionFiles}${files}<a href="#" id="tvAddFile">＋ add link</a>${Array.isArray(it.files) && !it.seed ? ` <span style="color:var(--ink-faint)">· drop a PDF or image on this panel</span>` : ""}</div></div>
       ${stay}${hike}${ex.img ? `<div class="blk"><h3>🖼 SCREENSHOT</h3><div class="log" id="tvShot">Loading…</div></div>` : ""}
-      ${need.size ? `<div class="blk"><div class="miss" style="color:var(--warn);font-size:12.5px">Missing: ${esc(missingInfo(it, ex).join(", "))}</div></div>` : ""}
+      ${need.size ? `<div class="blk">${missLine(missingInfo(it, ex), ' style="color:var(--warn);font-size:12.5px"')}</div>` : ""}
       <div class="blk msgs" id="tvMsgs"><h3>📬 MESSAGES AND CHANGES</h3><div class="log" id="tvMsgList">${planGate(it) ? "Save this trip to Notion to keep messages." : "Checking Notion…"}</div>
         ${planGate(it) ? "" : `<textarea id="tvMsgText" placeholder="Paste a host message or a change. First line can be: From: name"></textarea><button class="btn" id="tvMsgAdd" type="button">Add entry</button>`}</div>
       <div class="blk" id="tvPlan"><h3>✨ DAY PLAN</h3><div class="log">Checking Notion…</div></div>
       <div class="blk"><h3>NOTES</h3><div contenteditable class="log" data-x="notes" style="min-height:40px">${esc(ex.notes || "")}</div></div>
       <div class="blk">${it.url ? `<a href="${esc(it.url)}" target="_blank" rel="noopener">Open in Notion ↗</a>` : `<span class="log">Not in Notion yet: use "Create in Notion" at the top.</span>`}</div>`;
     D.classList.add("open");
+    if (!D.dataset.files) { D.dataset.files = "1"; fileTarget(D, () => S.sel); }
     document.getElementById("tvClose").onclick = () => closeDrawer();
     if (ex.img) call("/quest/trips/img?id=" + encodeURIComponent(id)).then((r) => { const el = document.getElementById("tvShot"); if (el && S.sel === id) el.innerHTML = r.image ? `<img class="shot" alt="Screenshot" src="${esc(r.image)}">` : "Not found on the server."; }).catch(() => {});
     D.querySelectorAll("[data-k]").forEach((el) => el.onblur = () => saveField(id, el.dataset.k, el.textContent));
