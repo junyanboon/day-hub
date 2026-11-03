@@ -252,3 +252,47 @@ test("drop payload and the date of a trip day", () => {
   assert.equal(T.tripDate("2026-11-12", 0), "2026-11-12");
   assert.equal(T.tripDate("2026-11-28", 4), "2026-12-02");
 });
+
+// d64 d65 (2026-11-02): missing info, calendar copies, check-out day, pasted messages
+const F = (o) => Object.fromEntries(Object.entries(o).map(([k, v]) => [k, { type: k === "Tags" ? "multi_select" : "rich_text", value: v }]));
+const fiction = { id: "n1", name: "FICTION St-Denis Apartment [2026.11.13]", status: "Prepaid", tags: "Accommodations",
+  start: "2026-11-13", end: "2026-11-17", fields: F({ Tags: "Accommodations", Address: "", "Confirmation #": "", "Departure / Check-in": "4 pm", "Arrival / Check-out": "", "Cancellation Policy": "" }) };
+
+test("missing info: a booked stay lists every empty must-have, nice-to-haves never warn", () => {
+  assert.deepEqual([...T.missingInfo(fiction)], ["address", "check-out", "confirmation #", "cancellation policy"]);
+  const full = { ...fiction, fields: F({ Tags: "Accommodations", Address: "1 St-Denis", "Confirmation #": "AB1", "Departure / Check-in": "4 pm", "Arrival / Check-out": "11 am", "Cancellation Policy": "Nov 10" }) };
+  assert.deepEqual([...T.missingInfo(full)], []);
+  assert.deepEqual([...T.missingInfo({ ...full, status: "" })], ["paid or owed"]);
+  assert.deepEqual([...T.missingInfo({ ...fiction, status: "Need to Book" })], ["address"]);
+  assert.deepEqual([...T.missingInfo({ ...fiction, status: "Cancelled" })], []);
+  // extras hold a value when Notion has no such column
+  assert.deepEqual([...T.missingInfo({ ...full, fields: {} , tags: "Hotel", start: "2026-11-13T16:00:00-05:00", end: "2026-11-17T11:00:00-05:00" },
+    { f: { Address: "x", "Confirmation #": "y", "Cancel by": "z" } })], []);
+});
+test("missing info: restaurants and flights", () => {
+  assert.deepEqual([...T.missingInfo({ id: "r", name: "Dinner at Joe Beef", start: "2026-11-15", status: "", fields: {} })], ["address", "time", "booked or not"]);
+  assert.deepEqual([...T.missingInfo({ id: "f", name: "Flight YYZ to YUL", start: "2026-11-12T08:00:00-05:00", status: "Prepaid", fields: {} })], ["confirmation #"]);
+  assert.equal(T.kindOf({ name: "VIA Rail train", fields: {} }), "transport");
+});
+test("calendar copy hidden when a Notion card of the same kind overlaps (d64)", () => {
+  const seedStay = { ...T.SEED.items.find((i) => i.name === "Montreal stay") };
+  const seedSpa = { ...T.SEED.items.find((i) => i.name === "Spa & Recovery Day") };
+  const out = T.hideCopies([seedStay, seedSpa, fiction]).map((i) => i.name);
+  assert.deepEqual(out, ["Spa & Recovery Day", fiction.name]);
+  // a stay on other dates does not hide it
+  assert.equal(T.hideCopies([seedStay, { ...fiction, start: "2026-12-01", end: "2026-12-03" }]).length, 2);
+});
+test("a stay with a check-out time shows on its last day", () => {
+  const st = { id: "s", name: "Hotel X", tags: "Hotel", start: "2026-11-13T16:00:00-05:00", end: "2026-11-17T11:00:00-05:00", fields: {} };
+  const p = T.dayPlan([st], "2026-11-12", 6);
+  assert.equal(p.days[1].on.length, 1);
+  assert.equal(p.days[5].out[0].id, "s");
+  assert.equal(p.days[4].staying.length, 1);
+  assert.equal(T.whenText(st), "Check-in 4:00 pm · check-out 11:00 am");
+});
+test("pasted message becomes one log entry", () => {
+  const e = T.pastedEntry("From: Marie (host)\nCheck-in is now 3 pm, code 4411.\nhttps://mail.google.com/mail/u/0/#inbox/abc", new Date(2026, 10, 2));
+  assert.equal(e.date, "2026-11-02"); assert.equal(e.from, "Marie (host)");
+  assert.equal(e.summary, "Check-in is now 3 pm, code 4411."); assert.equal(e.link, "https://mail.google.com/mail/u/0/#inbox/abc");
+  assert.equal(T.pastedEntry("   "), null);
+});
