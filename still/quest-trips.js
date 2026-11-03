@@ -87,13 +87,15 @@
   function dayPlan(list, tripStart, n) {
     const seen = new Set(), items = [];
     for (const it of list || []) { const k = it.id || it.name; if (seen.has(k)) continue; seen.add(k); items.push(it); }
-    const days = Array.from({ length: n }, () => ({ on: [], staying: [] })), undated = [];
+    const days = Array.from({ length: n }, () => ({ on: [], staying: [], out: [] })), undated = [];
     for (const it of items) {
       const d = dayIndex(localDay(it), tripStart);
       if (d < 0 || d >= n) { undated.push(it); continue; }
       days[d].on.push(it);
       const last = it.end ? dayIndex(it.end, tripStart) : d;
       if (last > d + 1 || (last > d && !/T/.test(it.end))) for (let i = d + 1; i < Math.min(last, n); i++) days[i].staying.push(it);
+      // a stay with a check-out time shows "Check-out" on its last day (d64)
+      if (last > d && last < n && isStay(it)) days[last].out.push(it);
     }
     return { items, days, undated };
   }
@@ -152,9 +154,95 @@
     let h = +m[1]; const ap = h >= 12 ? "pm" : "am"; h = h % 12 || 12;
     return `${h}:${m[2]} ${ap}`;
   }
+  // a stay's check-in / check-out time: the time in its dates, else the Notion text column
+  function stayTime(it, which) {
+    const t = timeOf(which === "in" ? it.start : it.end);
+    if (t) return t;
+    const f = (it.fields || {})[which === "in" ? "Departure / Check-in" : "Arrival / Check-out"];
+    return f && f.value ? String(f.value).trim().slice(0, 30) : "";
+  }
   function whenText(it) {
+    if (isStay(it)) { const ci = stayTime(it, "in"), co = stayTime(it, "out"); if (ci || co) return [ci && "Check-in " + ci, co && "check-out " + co].filter(Boolean).join(" · "); }
     const a = timeOf(it.start), b = it.end && it.end.slice(0, 10) === (it.start || "").slice(0, 10) ? timeOf(it.end) : "";
     return a ? (b ? `${a} to ${b}` : a) : "";
+  }
+
+  /* ── fields, missing info, calendar copies (Junyan 2026-11-02, d64 d65) ───── */
+  // a panel field reads the card's Notion column when it has one (any spelling below)
+  const ALIAS = { "Cancel by": ["Cancellation Policy", "Cancel By", "Cancel by"], "Card": ["Credit Card", "Card"],
+    "Confirmation #": ["Confirmation #", "Confirmation", "Confirmation Number"], "Address": ["Address", "Location"],
+    "Check-in": ["Departure / Check-in", "Check-in"], "Check-out": ["Arrival / Check-out", "Check-out"] };
+  const colFor = (it, k) => (ALIAS[k] || [k]).find((n) => it.fields && it.fields[n]);
+  function fieldOf(it, k, extra) {
+    const col = colFor(it, k);
+    if (col && it.fields[col].value) return it.fields[col].value;
+    if (k === "Address" && it.address) return it.address;
+    return ((extra || {}).f || {})[k] || (col ? it.fields[col].value : "");
+  }
+  const TRANSPORT_RE = /flight|✈|🛫|train|🚆|🚄|\bbus\b|🚌|ferry|⛴|car rental|rental car|transfer|shuttle|taxi|uber|via rail|airline/i;
+  const FOOD_RE = /restaurant|dinner|lunch|brunch|breakfast|café|cafe|bar\b|🍽|🍷|🍣|food|eat/i;
+  function kindOf(it) {
+    if (isStay(it)) return "stay";
+    const sel = Object.values(it.fields || {}).filter((f) => f && /^(select|multi_select)$/.test(f.type)).map((f) => f.value).join(" ");
+    if (TRANSPORT_RE.test(`${it.name} ${it.tags || ""} ${it.kind || ""} ${it.icon || ""} ${sel}`)) return "transport";
+    return FOOD_RE.test(`${it.name} ${it.tags || ""} ${it.icon || ""}`) ? "food" : "activity";
+  }
+  // not booked yet: only Address is asked for; Cancelled asks for nothing
+  const notBooked = (status) => /maybe|idea|need to book|not booked|to book/i.test(status || "");
+  const hasTime = (iso) => /T\d\d:\d\d/.test(iso || "");
+  const OWED_RE = /prepaid|paid|free|owing|owed|unpaid|balance|deposit|gas/i;
+  /* what a card still needs (d65). Stays: address, check-in, check-out, confirmation #,
+     a status that says paid or what is owed, cancellation policy. Restaurants and
+     activities: address, time, booked or not. Flights and transport: times, confirmation #.
+     Photos, benefits, credits and card never warn. */
+  function missingInfo(it, extra) {
+    const st = String(it.status || "").trim();
+    if (/cancel/i.test(st)) return [];
+    const k = kindOf(it), v = (f) => String(fieldOf(it, f, extra) || "").trim(), out = [];
+    if (k !== "transport" && !v("Address")) out.push("address");
+    if (notBooked(st)) return out;
+    if (k === "stay") {
+      if (!v("Check-in") && !hasTime(it.start)) out.push("check-in");
+      if (!v("Check-out") && !hasTime(it.end)) out.push("check-out");
+      if (!v("Confirmation #")) out.push("confirmation #");
+      if (!OWED_RE.test(st)) out.push("paid or owed");
+      if (!v("Cancel by")) out.push("cancellation policy");
+    } else if (k === "transport") {
+      if (!hasTime(it.start) && !v("Check-in")) out.push("times");
+      if (!v("Confirmation #")) out.push("confirmation #");
+    } else {
+      if (!hasTime(it.start)) out.push("time");
+      if (!st) out.push("booked or not");
+    }
+    return out;
+  }
+  // which panel field each warning points at
+  const MISSING_FIELD = { "address": "Address", "check-in": "Check-in", "check-out": "Check-out", "confirmation #": "Confirmation #",
+    "cancellation policy": "Cancel by", "paid or owed": "Status", "booked or not": "Status", "time": "When", "times": "Check-in" };
+  const dayOf = (s) => String(s || "").slice(0, 10);
+  const overlaps = (a, b) => {
+    const a0 = dayOf(a.start), a1 = dayOf(a.end) || a0, b0 = dayOf(b.start), b1 = dayOf(b.end) || b0;
+    return !!(a0 && b0) && a0 <= b1 && b0 <= a1;
+  };
+  /* d64: a calendar copy (seed) is hidden when a real Notion card of the same kind
+     overlaps its dates; the Notion card wins */
+  function hideCopies(items) {
+    const real = (items || []).filter((i) => !i.seed);
+    return (items || []).filter((c) => !c.seed || !real.some((r) => kindOf(r) === kindOf(c) && overlaps(r, c) &&
+      (kindOf(c) === "stay" || r.name.toLowerCase() === c.name.toLowerCase() || dayOf(r.start) === dayOf(c.start))));
+  }
+
+  // pasted text → one log entry: an optional "From: name" line, a Gmail link anywhere, the rest is the summary
+  function pastedEntry(text, now = new Date()) {
+    let t = String(text || "").trim();
+    if (!t) return null;
+    let from = "Me", link = "";
+    const fm = /^from:\s*(.+)$/im.exec(t); if (fm) { from = fm[1].replace(/<[^>]*>/g, "").trim().slice(0, 80) || from; t = t.replace(fm[0], ""); }
+    const lm = /https?:\/\/mail\.google\.com\/\S+/.exec(t); if (lm) { link = lm[0]; t = t.replace(lm[0], ""); }
+    const summary = t.replace(/\s+/g, " ").trim().slice(0, 600);
+    if (!summary) return null;
+    const date = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+    return { date, from, summary, link };
   }
 
   /* ── the first trip, from the Joint Plans calendar (Nov 12 to 17 2026) ───── */
@@ -305,7 +393,7 @@
   const planGate = (it) => it.seed || String(it.id).startsWith("seed-")
     ? `Save this trip to Notion to plan days: press "⇪ Create in Notion" at the top of the trip.` : "";
 
-  const api = { statusLook, dropPayload, tripDate, MTL, stayLines, planGate, planKind, planTag, cardLabel, planHtml, haversine, gpxPoints, gpxStats, dayIndex, localDay, dayPlan, pillOf, isStay, isHike, whenText, seedRows, SEED, fmtDur, tripKey, mergeTrips, splitTrips, isHomeTrip, localItems, whenLabel, destOf, mapStart };
+  const api = { pastedEntry, kindOf, missingInfo, hideCopies, fieldOf, MISSING_FIELD, statusLook, dropPayload, tripDate, MTL, stayLines, planGate, planKind, planTag, cardLabel, planHtml, haversine, gpxPoints, gpxStats, dayIndex, localDay, dayPlan, pillOf, isStay, isHike, whenText, seedRows, SEED, fmtDur, tripKey, mergeTrips, splitTrips, isHomeTrip, localItems, whenLabel, destOf, mapStart };
   root.QuestTrips = api;
   if (typeof document === "undefined" || typeof window === "undefined") return;
 
@@ -403,6 +491,8 @@
   #tripView .x{position:absolute;top:14px;right:14px;font-size:20px;color:var(--ink-faint)}
   #tripView .kv{display:grid;grid-template-columns:120px 1fr;gap:8px 12px;font-size:13px;margin:14px 0}
   #tripView .kv>span{color:var(--ink-faint)}
+  #tripView .item .miss{color:var(--warn);font-size:11.5px;margin-top:3px}#tripView .kv>.need{color:var(--warn);font-weight:700}#tripView .kv>div.need{outline:1px solid var(--warn);border-radius:5px;background:rgba(255,190,90,.08);min-height:18px}
+  #tripView .msgs .m{font-size:12.5px;padding:6px 0;border-top:1px solid rgba(255,255,255,.08)}#tripView .msgs .m b{color:var(--ink)}#tripView .msgs .m small{color:var(--ink-faint)}#tripView .msgs textarea{width:100%;min-height:54px;font:inherit;font-size:12.5px;background:#2a2f63;color:var(--ink);border:1px solid rgba(255,255,255,.2);border-radius:6px;box-sizing:border-box}
   #tripView [contenteditable]{min-height:18px;border-radius:4px;padding:1px 3px;background:rgba(255,255,255,.04)}
   #tripView [contenteditable]:focus{outline:2px solid var(--zap)}
   #tripView .blk{border-top:1px solid rgba(255,255,255,.12);padding:12px 0}
@@ -642,7 +732,9 @@
       // show the calendar copy for anything Notion does not have yet
       const have = new Set(S.cur.items.map((i) => i.name.toLowerCase()));
       const missing = SEED.items.filter((i) => !have.has(i.name.toLowerCase()));
-      if (missing.length) { S.cur.items.push(...missing.map((i) => ({ ...i }))); S.cur.seeded = true; }
+      if (missing.length) S.cur.items.push(...missing.map((i) => ({ ...i })));
+      S.cur.items = hideCopies(S.cur.items);   // d64: a Notion card of the same kind on those dates wins
+      S.cur.seeded = S.cur.items.some((i) => i.seed);
       if (!S.cur.places.length) S.cur.places = SEED.places.map((p) => ({ ...p }));
       try { const ex = JSON.parse(localStorage.getItem("quest-trip-seed-extras") || "{}"); for (const k in ex) S.cur.extras[k] = S.cur.extras[k] || ex[k]; } catch {}
       for (const it of S.cur.items) if (it.seed && (S.cur.extras[it.id] || {}).status) it.status = S.cur.extras[it.id].status;
@@ -672,10 +764,10 @@
   const pillCls = (it) => (S.cur && (S.cur.extras[it.id] || {}).plan ? "planned" : pillOf(it.status));
   const lookOf = (it) => statusLook(it.status, !!(S.cur && (S.cur.extras[it.id] || {}).plan));
   function card(it) {
-    const where = it.address ? " · " + esc(it.address.split(",")[0]) : "";
+    const ad = fieldVal(it, "Address"), where = ad ? " · " + esc(ad.split(",")[0]) : "";
     const w = whenText(it), lk = lookOf(it);
     return `<div class="item st-${lk.cls} ${S.sel === it.id ? "sel" : ""}" data-id="${esc(it.id)}" draggable="true"><div class="ic">${esc(it.icon || (isStay(it) ? "🏨" : isHike(it) ? "🥾" : "📍"))}</div>
-      <div style="min-width:0"><div class="stl"><i>${lk.icon}</i>${esc(lk.label)}</div><div class="t">${esc(it.name)}</div><div class="s">${esc(w)}${where}${(S.cur.extras[it.id] || {}).plan ? " · Planned by day planner" : ""}${it.seed ? " · calendar copy" : ""}</div></div>
+      <div style="min-width:0"><div class="stl"><i>${lk.icon}</i>${esc(lk.label)}</div><div class="t">${esc(it.name)}</div><div class="s">${esc(w)}${where}${(S.cur.extras[it.id] || {}).plan ? " · Planned by day planner" : ""}${it.seed ? " · calendar copy" : ""}</div>${(() => { const ms = missingInfo(it, S.cur.extras[it.id]); return ms.length ? `<div class="miss">Missing: ${esc(ms.join(", "))}</div>` : ""; })()}</div>
       <div class="r">${lk.book ? `<button class="bookbtn" data-book="${esc(it.id)}" title="Find where to book this">Book</button>` : ""}</div></div>`;
   }
   // where Book goes: the card's own link if it has one, else a search for it near the trip
@@ -710,7 +802,8 @@
       (S.day < 0 ? D.map((_, i) => i) : [S.day]).forEach((d) => {
         const its = plan.days[d].on, stay = plan.days[d].staying;
         const sl = (xs, w) => xs.length ? `<div class="log">${w}: ${xs.map((i) => esc(i.name)).join(", ")}</div>` : "";
-        const L = stayLines(stay), st = sl(L.staying, "Staying") + sl(L.stillOn, "Still on");
+        const L = stayLines(stay), out = plan.days[d].out || [];
+        const st = (out.length ? `<div class="log">Check-out: ${out.map((i) => esc(i.name) + (stayTime(i, "out") ? " by " + esc(stayTime(i, "out")) : "")).join(", ")}</div>` : "") + sl(L.staying, "Staying") + sl(L.stillOn, "Still on");
         h += `<div data-drop="${d}"><div class="day">${D[d]}<small></small></div><div class="rail"><div class="gap"></div>${its.map((it) => card(it) + `<div class="gap"></div>`).join("") || (st ? "" : `<div class="log nothing">Nothing planned yet.</div><div class="gap"></div>`)}${st}</div></div>`;
       });
       if (S.day < 0 && outside.length) h += `<div class="day">Outside the trip dates</div><div class="rail">${outside.map(card).join("")}</div>`;
@@ -871,15 +964,7 @@
   }
 
   /* fields: a Notion column when the card has one, else our extras */
-  const ALIAS = { "Cancel by": ["Cancellation Policy", "Cancel By", "Cancel by"], "Card": ["Credit Card", "Card"],
-    "Confirmation #": ["Confirmation #", "Confirmation", "Confirmation Number"], "Address": ["Address", "Location"] };
-  const colFor = (it, k) => (ALIAS[k] || [k]).find((n) => it.fields && it.fields[n]);
-  function fieldVal(it, k) {
-    const col = colFor(it, k);
-    if (col) return it.fields[col].value;
-    if (k === "Address" && it.address) return it.address;
-    return (extrasOf(it.id).f || {})[k] || "";
-  }
+  const fieldVal = (it, k) => fieldOf(it, k, extrasOf(it.id));
   async function saveField(id, k, value) {
     const it = S.cur.items.find((i) => i.id === id);
     if (!it) return;
@@ -887,12 +972,12 @@
     if (fieldVal(it, k) === value) return;
     const col = colFor(it, k);
     if (col && !it.seed) {
-      try { const d = await call("/quest/trips/item", { id, db: it.db, props: { [col]: value } }); Object.assign(it, d.item, { db: it.db }); toast("Saved to Notion"); }
+      try { const d = await call("/quest/trips/item", { id, db: it.db, props: { [col]: value } }); Object.assign(it, d.item, { db: it.db }); toast("Saved to Notion"); drawLeft(); }
       catch (e) { toast("Not saved: " + e.message); }
     } else {
       const ex = extrasOf(id); ex.f = { ...(ex.f || {}), [k]: value };
       if (k === "Address") it.address = value;
-      saveExtra(id);
+      saveExtra(id); drawLeft();
     }
   }
   async function saveExtra(id, k = id) {
@@ -911,7 +996,13 @@
     if (!it) return;
     S.sel = id; drawLeft(); drawMap();
     const ex = extrasOf(id), d = days()[dayIndex(it.start, S.cur.start)] || "";
-    const kv = (k, editable = true) => `<span>${k}</span><div ${editable ? `contenteditable data-k="${esc(k)}"` : ""}>${esc(fieldVal(it, k))}</div>`;
+    const need = new Set(missingInfo(it, ex).map((m) => MISSING_FIELD[m]));
+    const kv = (k, editable = true, lab = k) => { const n = need.has(k) ? "need" : ""; return `<span class="${n}">${lab}</span><div class="${n}" ${editable ? `contenteditable data-k="${esc(k)}"` : ""}>${esc(fieldVal(it, k))}</div>`; };
+    const kind = kindOf(it);
+    const times = kind === "stay" ? kv("Check-in", true, "Check-in") + kv("Check-out", true, "Check-out")
+      : kind === "transport" ? kv("Check-in", true, "Departs") + kv("Check-out", true, "Arrives") : "";
+    const STATUSES = it.db === "planner" ? ["Need to Book", "Maybe", "Free", "Taxes Still Owing", "Booked Unpaid", "Prepaid", "Gas", "Cancelled"]
+      : ["Need to Book", "Booked Unpaid", "Prepaid", "Planned", "Idea", "Maybe"];
     const addr = fieldVal(it, "Address");
     const stay = isStay(it) ? `<div class="blk"><h3>CHECKLIST (same as your Notion cards)</h3>${CHECK.map((c, i) => `<div class="chk ${(ex.check || {})[i] ? "y" : ""}" data-c="${i}"><i></i>${esc(c)}</div>`).join("")}</div>` +
       [["benefits", "🏨 STAY BENEFITS", "Breakfast, upgrade, early check-in, late checkout, status."], ["credits", "💳 CREDITS TO USE", "Any hotel or card credit, with its deadline."],
@@ -922,13 +1013,16 @@
     const D = document.getElementById("tvDrawer");
     D.innerHTML = `<button class="x" id="tvClose">×</button><div style="font-size:12px;color:var(--ink-faint)">${esc(d)} ${esc((it.start || "").slice(0, 4))}</div>
       <h2>${esc(it.icon || "")} ${esc(it.name)}</h2><span class="pill ${pillCls(it)}">${esc(label(it))}</span>
-      <div class="kv"><span>When</span><div>${esc(whenText(it) || "No time yet")}</div>
-      <span>Status</span><div><select id="tvStatus" style="font:inherit;background:#2a2f63;color:var(--ink);border:1px solid rgba(255,255,255,.2);border-radius:6px">
-        ${["Need to Book", "Booked Unpaid", "Prepaid", "Planned", "Idea", "Maybe"].concat(it.status && !["Need to Book", "Booked Unpaid", "Prepaid", "Planned", "Idea", "Maybe"].includes(it.status) ? [it.status] : []).map((s) => `<option ${s === it.status ? "selected" : ""}>${esc(s)}</option>`).join("")}</select></div>
+      <div class="kv"><span class="${need.has("When") ? "need" : ""}">When</span><div class="${need.has("When") ? "need" : ""}">${esc(whenText(it) || "No time yet")}</div>
+      ${times}<span class="${need.has("Status") ? "need" : ""}">Status</span><div><select id="tvStatus" style="font:inherit;background:#2a2f63;color:var(--ink);border:1px solid rgba(255,255,255,.2);border-radius:6px">
+        ${STATUSES.concat(it.status && !STATUSES.includes(it.status) ? [it.status] : []).concat(it.status ? [] : [""]).map((s) => `<option ${s === it.status ? "selected" : ""}>${esc(s)}</option>`).join("")}</select></div>
       ${kv("Address")}<span>Google Maps</span><div>${addr ? `<a href="${gmaps(addr)}" target="_blank" rel="noopener">Open ↗</a> · <a href="${gdir({ address: addr })}" target="_blank" rel="noopener">Directions ↗</a>` : `<span style="color:var(--ink-faint)">add an address</span>`}</div>
       ${kv("Booked Through")}${kv("Points / Cash")}${kv("Card")}${kv("Cancel by")}${kv("Confirmation #")}
       <span>Files</span><div>${files}<a href="#" id="tvAddFile">＋ add link</a></div></div>
       ${stay}${hike}${ex.img ? `<div class="blk"><h3>🖼 SCREENSHOT</h3><div class="log" id="tvShot">Loading…</div></div>` : ""}
+      ${need.size ? `<div class="blk"><div class="miss" style="color:var(--warn);font-size:12.5px">Missing: ${esc(missingInfo(it, ex).join(", "))}</div></div>` : ""}
+      <div class="blk msgs" id="tvMsgs"><h3>📬 MESSAGES AND CHANGES</h3><div class="log" id="tvMsgList">${planGate(it) ? "Save this trip to Notion to keep messages." : "Checking Notion…"}</div>
+        ${planGate(it) ? "" : `<textarea id="tvMsgText" placeholder="Paste a host message or a change. First line can be: From: name"></textarea><button class="btn" id="tvMsgAdd" type="button">Add entry</button>`}</div>
       <div class="blk" id="tvPlan"><h3>✨ DAY PLAN</h3><div class="log">Checking Notion…</div></div>
       <div class="blk"><h3>NOTES</h3><div contenteditable class="log" data-x="notes" style="min-height:40px">${esc(ex.notes || "")}</div></div>
       <div class="blk">${it.url ? `<a href="${esc(it.url)}" target="_blank" rel="noopener">Open in Notion ↗</a>` : `<span class="log">Not in Notion yet: use "Create in Notion" at the top.</span>`}</div>`;
@@ -947,6 +1041,7 @@
       catch (err) { toast("Not saved: " + err.message); }
     };
     drawPlan(it);
+    drawMsgs(it);
     const g = document.getElementById("tvGpx");
     if (g) g.onclick = (e) => { e.preventDefault(); pickFile(".gpx,application/gpx+xml", async (name, text) => {
       if (!gpxStats(text)) return toast("That file has no track points");
@@ -998,6 +1093,23 @@
     }
     if (plans[it.id]) paint(plans[it.id]);
     load();
+  }
+  /* messages and changes (stored in the card's Notion page under "📬 Messages and changes") */
+  function drawMsgs(it) {
+    const list = () => S.sel === it.id && document.getElementById("tvMsgList");
+    if (planGate(it)) return;
+    const paint = (entries) => { const el = list(); if (!el) return;
+      el.innerHTML = entries.length ? entries.map((e) => `<div class="m"><small>${esc(e.date)}${e.from ? " · " + esc(e.from) : ""}</small><div>${esc(e.summary)}${e.link ? ` · <a href="${esc(e.link)}" target="_blank" rel="noopener">Gmail thread ↗</a>` : ""}</div></div>`).join("") : "Nothing logged yet."; };
+    call("/quest/trips/log?id=" + encodeURIComponent(it.id)).then((r) => paint(r.entries || [])).catch((e) => { const el = list(); if (el) el.textContent = "Could not read: " + e.message; });
+    const btn = document.getElementById("tvMsgAdd");
+    if (btn) btn.onclick = async () => {
+      const entry = pastedEntry(document.getElementById("tvMsgText").value);
+      if (!entry) return toast("Paste some text first");
+      btn.disabled = true;
+      try { const r = await call("/quest/trips/log", { id: it.id, entry }); paint(r.entries || []); document.getElementById("tvMsgText").value = ""; toast("Saved to the Notion page"); }
+      catch (e) { toast("Not saved: " + e.message); }
+      btn.disabled = false;
+    };
   }
   function closeDrawer(quiet) {
     document.getElementById("tvDrawer").classList.remove("open");
