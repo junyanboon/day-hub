@@ -114,18 +114,25 @@
   /** Shown order inside a group: Order first (nulls last); a stable sort keeps the server's order otherwise. */
   const groupOf = (tasks, priority, skipId) => tasks.filter((t) => (t.priority || "") === (priority || "") && t.id !== skipId)
     .map((t, i) => [t, i]).sort((a, b) => ((a[0].order ?? Infinity) - (b[0].order ?? Infinity)) || a[1] - b[1]).map((x) => x[0]);
-  /** Drop task `id` into group `priority`, before task `beforeId` (null: at the end) → {priority, order}. */
+  /** Drop task `id` into group `priority`, before task `beforeId` (null: at the end) → {priority, order, renumber}.
+      When a neighbour has no Order yet, the whole group is numbered 1..n in its shown order (renumber lists the
+      other tasks whose Order changes), so the task lands exactly where it was dropped. */
   function dropTask(tasks, id, priority, beforeId) {
     const g = groupOf(tasks, priority, id);
-    const maxNum = g.reduce((m, t) => (t.order != null && t.order > m ? t.order : m), -Infinity);
-    const top = maxNum === -Infinity ? null : maxNum;
     let i = beforeId ? g.findIndex((t) => t.id === beforeId) : g.length;
     if (i < 0) i = g.length;
     const prev = i > 0 ? g[i - 1].order : null, next = i < g.length ? g[i].order : null;
-    let order;
-    if (prev == null && next == null) order = top == null ? 1 : top + 1;
-    else order = orderBetween(prev, next);
-    return { priority: priority || "", order };
+    const gapOk = prev != null && next != null && next - prev > 1e-6;
+    if (gapOk || (prev != null && i === g.length) || (next != null && i === 0)) {
+      return { priority: priority || "", order: orderBetween(prev, next), renumber: [] };
+    }
+    const renumber = [];
+    let n = 1, order = 1;
+    for (let k = 0; k <= g.length; k++) {
+      if (k === i) order = n++;
+      if (k < g.length) { const o = n++; if (g[k].order !== o) renumber.push({ id: g[k].id, order: o }); }
+    }
+    return { priority: priority || "", order, renumber };
   }
   const blockMinutes = (task) => (task.estMin ? Math.max(15, Math.ceil(task.estMin / 15) * 15) : 30);
 

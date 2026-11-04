@@ -631,12 +631,15 @@ async function patchTask(t, fields, undo) {
 }
 async function moveTask(id, p, beforeId) {
   const t = S.tasks.find((x) => x.id === id); if (!t || id === beforeId) return;
-  const next = C.dropTask(S.tasks, id, p, beforeId);
+  const { renumber, ...next } = C.dropTask(S.tasks, id, p, beforeId);
   const was = t.priority || "";
-  if (await patchTask(t, next) && was !== next.priority) toast("Priority set to " + (PRI.find((x) => x[0] === next.priority)[1]));
+  if (!(await patchTask(t, next))) return;
+  for (const r of renumber) { const o = S.tasks.find((x) => x.id === r.id); if (o) await patchTask(o, { order: r.order }); }
+  if (was !== next.priority) toast("Priority set to " + (PRI.find((x) => x[0] === next.priority)[1]));
 }
 async function setDone(t, done) {
-  if (await patchTask(t, { done })) if (done) toast(`Done: ${t.title}`, { action: () => patchTask(t, { done: false }) });
+  const was = t.status && t.status !== "Done" ? t.status : "Not Started";
+  if (await patchTask(t, { done, ...(done ? {} : { status: was }) })) if (done) toast(`Done: ${t.title}`, { action: () => patchTask(t, { done: false, status: was }) });
 }
 async function toggleSteps(t) {
   if (S.open.has(t.id)) { S.open.delete(t.id); renderTasks(); return; }

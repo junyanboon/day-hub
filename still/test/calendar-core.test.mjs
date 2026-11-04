@@ -62,12 +62,13 @@ test("drag order: the number between the new neighbours", () => {
 test("dropping a task: new order and priority for the target group", () => {
   const tasks = [
     { id: "a", priority: "🔴 High", order: 1 }, { id: "b", priority: "🔴 High", order: 2 },
-    { id: "c", priority: "🟡 Medium", order: null }, { id: "d", priority: "", order: 3 }];
-  assert.deepEqual(C.dropTask(tasks, "c", "🔴 High", "b"), { priority: "🔴 High", order: 1.5 });
-  assert.deepEqual(C.dropTask(tasks, "a", "🔴 High", null), { priority: "🔴 High", order: 3 });
-  assert.deepEqual(C.dropTask(tasks, "a", "", null), { priority: "", order: 4 });
-  // a group whose tasks have no Order yet still yields increasing numbers
-  assert.deepEqual(C.dropTask(tasks, "a", "🟡 Medium", "c"), { priority: "🟡 Medium", order: 1 });
+    { id: "c", priority: "🟡 Medium", order: null }, { id: "e", priority: "🟡 Medium", order: null }, { id: "d", priority: "", order: 3 }];
+  assert.deepEqual(C.dropTask(tasks, "c", "🔴 High", "b"), { priority: "🔴 High", order: 1.5, renumber: [] });
+  assert.deepEqual(C.dropTask(tasks, "a", "🔴 High", null), { priority: "🔴 High", order: 3, renumber: [] });
+  assert.deepEqual(C.dropTask(tasks, "a", "", null), { priority: "", order: 4, renumber: [] });
+  // unordered group: numbered 1..n so the task lands where it was dropped (between c and e), not on top
+  assert.deepEqual(C.dropTask(tasks, "a", "🟡 Medium", "e"), { priority: "🟡 Medium", order: 2, renumber: [{ id: "c", order: 1 }, { id: "e", order: 3 }] });
+  assert.deepEqual(C.dropTask(tasks, "a", "🟡 Medium", null).order, 3);
 });
 
 test("task block length is the Estimate, 30 minutes when it has none", () => {
