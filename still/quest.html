@@ -1141,8 +1141,9 @@
     document.body.appendChild(box);
     addEventListener("error", e => QT.mark("page error", e.message));
     addEventListener("unhandledrejection", e => QT.mark("page error (promise)", String(e.reason && e.reason.message || e.reason)));
+    let paired = "unknown"; try { paired = localStorage.getItem("quest-key") ? "yes" : "no"; } catch {}
+    QT.mark("page start", `paired ${paired}, service worker ${navigator.serviceWorker && navigator.serviceWorker.controller ? "on" : "off"}`);
   }
-  QT.mark("page start", `paired ${localStorage.getItem("quest-key") ? "yes" : "no"}, service worker ${navigator.serviceWorker && navigator.serviceWorker.controller ? "on" : "off"}`);
   /* ---------- config + clock ---------- */
   const API = new URLSearchParams(location.search).get("api") || "https://still.srv1948070.hstgr.cloud";
 
