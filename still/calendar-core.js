@@ -1,0 +1,144 @@
+/* Calendar app logic with no page in it (still/calendar.html, 2026-11-03), so node can test it:
+   still/test/calendar-core.test.mjs.
+
+   Days are "YYYY-MM-DD" strings (a date on the wall, no zone). Instants are epoch ms. A zone is an
+   IANA name, and every wall time goes through Intl, so a day can be 23 or 25 hours long (DST). */
+(function (root) {
+  "use strict";
+  const DAY = 86400000;
+  const fmts = new Map();
+  function fmt(tz) {
+    if (!fmts.has(tz)) fmts.set(tz, new Intl.DateTimeFormat("en-CA", { timeZone: tz, hourCycle: "h23",
+      year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", weekday: "short" }));
+    return fmts.get(tz);
+  }
+  const DOWS = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+
+  /** The wall clock in tz at instant ms: {day, min (minutes after midnight), dow (0 Sunday)}. */
+  function wall(ms, tz) {
+    const p = {};
+    for (const x of fmt(tz).formatToParts(new Date(ms))) p[x.type] = x.value;
+    return { day: `${p.year}-${p.month}-${p.day}`, min: (+p.hour % 24) * 60 + +p.minute, dow: DOWS[p.weekday] };
+  }
+  const civil = (day) => { const [y, m, d] = day.split("-").map(Number); return Date.UTC(y, m - 1, d); };
+  const dayOf = (utc) => new Date(utc).toISOString().slice(0, 10);
+  /** How far tz's wall clock is ahead of UTC at instant ms, in ms. */
+  function offset(ms, tz) { const w = wall(ms, tz); return civil(w.day) + w.min * 60000 - Math.floor(ms / 60000) * 60000; }
+  /** The instant when tz's wall clock reads `min` minutes after midnight on `day`. */
+  function instant(day, min, tz) {
+    const guess = civil(day) + min * 60000;
+    let t = guess - offset(guess, tz);
+    const o2 = offset(t, tz);
+    if (guess - o2 !== t) t = guess - o2;
+    return t;
+  }
+  const addDays = (day, n) => dayOf(civil(day) + n * DAY);
+  const dowOf = (day) => new Date(civil(day)).getUTCDay();
+  const weekStart = (day) => addDays(day, -((dowOf(day) + 6) % 7));
+  function isoWeek(day) {
+    const thu = addDays(day, 3 - ((dowOf(day) + 6) % 7));
+    const jan4 = thu.slice(0, 4) + "-01-04";
+    return 1 + Math.round((civil(weekStart(thu)) - civil(weekStart(jan4))) / (7 * DAY));
+  }
+  function addMonths(day, n) {
+    const [y, m] = day.split("-").map(Number);
+    return dayOf(Date.UTC(y, m - 1 + n, 1));
+  }
+  const monthKey = (day) => day.slice(0, 7);
+  function monthsFor(fromDay, toDay) {
+    const out = [];
+    for (let d = fromDay.slice(0, 7) + "-01"; d <= toDay; d = addMonths(d, 1)) out.push(monthKey(d));
+    return out;
+  }
+
+  /* ---- colour by kind (d96): purple exercise, blue food, red out-needs-prep, orange studio work, green other ---- */
+  const KINDS = [["ex", "Exercise"], ["food", "Food"], ["out", "Out, needs prep"], ["work", "Studio work"], ["other", "Everything else"]];
+  const RX = {
+    ex: /\b(gym|climb\w*|zouk|lambada|sauna|run|running|yoga|samba|training|practica|workout|swim\w*|bike|cycling|pilates|stretch\w*|walk|hike|dance class|forr[oó]|bachata|salsa|kizomba|boxing|tennis|squash|cardio|cold plunge)\b/i,
+    food: /\b(dinner|lunch|brunch|breakfast|groceries|grocery|market|gaia|hot pot|cook\w*|meal|eat|restaurant|coffee|caf[eé]|snack|picnic|potluck)\b/i,
+    out: /\b(train|trip|flight|fly|airport|bus|spa|ikea|show|movie|cinema|concert|theatre|theater|haircut|dentist|doctor|clinic|appointment|appt|hotel|check-?in|check-?out|travel|festival|party|wedding|museum|gallery|carnaval|carnival|drive to|pick ?up|drop ?off)\b/i,
+  };
+  /** {title, calName?, kind?} → "ex" | "food" | "out" | "work" | "other". A hand-set kind wins. */
+  function kindOf(ev) {
+    if (ev.kind && KINDS.some(([k]) => k === ev.kind)) return ev.kind;
+    const t = String(ev.title || "");
+    if (RX.ex.test(t)) return "ex";
+    if (RX.food.test(t)) return "food";
+    if (RX.out.test(t)) return "out";
+    if (/staff/i.test(ev.calName || "") || /\b(studio|viewing|renter|booking|payroll|team check-?in)\b/i.test(t)) return "work";
+    return "other";
+  }
+
+  /** Side-by-side columns for overlapping timed pieces [{id, s, e}] (minutes). Adds col and cols. */
+  function layout(items) {
+    const list = items.slice().sort((a, b) => a.s - b.s || b.e - a.e);
+    const out = [];
+    let cluster = [], colsEnd = [], clusterEnd = -Infinity;
+    const flush = () => { for (const x of cluster) x.cols = colsEnd.length; out.push(...cluster); cluster = []; colsEnd = []; };
+    for (const it of list) {
+      const x = { ...it };
+      if (x.s >= clusterEnd && cluster.length) flush();
+      let c = colsEnd.findIndex((end) => end <= x.s);
+      if (c < 0) { c = colsEnd.length; colsEnd.push(x.e); } else colsEnd[c] = x.e;
+      x.col = c; cluster.push(x);
+      clusterEnd = Math.max(clusterEnd === -Infinity ? x.e : clusterEnd, x.e);
+      if (cluster.length === 1) clusterEnd = x.e;
+    }
+    if (cluster.length) flush();
+    return out;
+  }
+
+  /** A timed event {start, end} (ms) cut into one piece per shown day: {day, top, bottom} in minutes. */
+  function pieces(ev, days, tz) {
+    const out = [];
+    for (const day of days) {
+      const d0 = instant(day, 0, tz), d1 = instant(addDays(day, 1), 0, tz);
+      if (ev.end <= d0 || ev.start >= d1) continue;
+      const s = Math.max(ev.start, d0), e = Math.min(ev.end, d1);
+      const top = s === d0 ? 0 : wall(s, tz).min;
+      const bottom = e === d1 ? 1440 : wall(e, tz).min;
+      out.push({ day, top, bottom: Math.max(bottom, top + 1) });
+    }
+    return out;
+  }
+  /** An all-day event {start, end: "YYYY-MM-DD", end exclusive} covers day? */
+  const coversDay = (ev, day) => ev.start <= day && day < ev.end;
+
+  /* ---- tasks ---- */
+  function orderBetween(prev, next) {
+    if (prev == null && next == null) return 1;
+    if (prev == null) return next - 1;
+    if (next == null) return prev + 1;
+    return (prev + next) / 2;
+  }
+  /** Shown order inside a group: Order first (nulls last); a stable sort keeps the server's order otherwise. */
+  const groupOf = (tasks, priority, skipId) => tasks.filter((t) => (t.priority || "") === (priority || "") && t.id !== skipId)
+    .map((t, i) => [t, i]).sort((a, b) => ((a[0].order ?? Infinity) - (b[0].order ?? Infinity)) || a[1] - b[1]).map((x) => x[0]);
+  /** Drop task `id` into group `priority`, before task `beforeId` (null: at the end) → {priority, order}. */
+  function dropTask(tasks, id, priority, beforeId) {
+    const g = groupOf(tasks, priority, id);
+    const maxNum = g.reduce((m, t) => (t.order != null && t.order > m ? t.order : m), -Infinity);
+    const top = maxNum === -Infinity ? null : maxNum;
+    let i = beforeId ? g.findIndex((t) => t.id === beforeId) : g.length;
+    if (i < 0) i = g.length;
+    const prev = i > 0 ? g[i - 1].order : null, next = i < g.length ? g[i].order : null;
+    let order;
+    if (prev == null && next == null) order = top == null ? 1 : top + 1;
+    else order = orderBetween(prev, next);
+    return { priority: priority || "", order };
+  }
+  const blockMinutes = (task) => (task.estMin ? Math.max(15, Math.ceil(task.estMin / 15) * 15) : 30);
+
+  /* ---- words ---- */
+  function hm(min) {
+    const h = Math.floor(min / 60) % 24, m = min % 60;
+    return `${h % 12 || 12}${m ? ":" + String(m).padStart(2, "0") : ""} ${h < 12 ? "am" : "pm"}`;
+  }
+  function dur(min) {
+    const h = Math.floor(min / 60), m = min % 60;
+    return h ? `${h} h${m ? ` ${m} min` : ""}` : `${m} min`;
+  }
+
+  root.CalCore = { wall, instant, offset, addDays, dowOf, weekStart, isoWeek, addMonths, monthKey, monthsFor,
+    KINDS, kindOf, layout, pieces, coversDay, orderBetween, groupOf, dropTask, blockMinutes, hm, dur };
+})(typeof window !== "undefined" ? window : globalThis);
