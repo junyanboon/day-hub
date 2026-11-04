@@ -1037,15 +1037,15 @@
   .mo-row { display:flex; align-items:center; gap:10px; width:100%; padding:10px 12px; border-radius:16px; background:rgba(255,255,255,.14); color:#fff; text-align:left; }
   .mo-row-t { width:66px; flex:none; font-size:13px; opacity:.85; } .mo-row-n { flex:1; min-width:0; font-size:15px; } .mo-row-go { flex:none; opacity:.7; font-size:18px; }
   /* ?embed=calendar (2026-10-30, d5): the Mac Day Quest orb's one-click popout shows only this calendar */
-  body.embed-cal #app > :not(.cal-h):not(#mtn) { display:none !important; }
+  body.embed-cal #app > :not(.cal-head):not(#mtn) { display:none !important; }
   body.embed-cal #app { padding-top:6px; }
-  body.embed-cal .cal-h { margin:0; padding:2px 2px 10px; position:relative; z-index:8; }
+  body.embed-cal .cal-head { margin:0; padding:2px 2px 10px; position:relative; z-index:8; }
   body.embed-cal #mtn { max-height:calc(100vh - 54px); }
   /* see-through widget (2026-10-30, Junyan: "a small seethrough calendar"): the Mac app paints its own
      blur behind the page, so the page drops the sky and its opaque fills; cards keep their glass */
   html:has(body.embed-cal), html[class]:has(body.embed-cal) { background:transparent !important; background-image:none !important; }
   body.embed-cal #sky { display:none !important; }
-  body.embed-cal .cal-h { display:none; }
+  body.embed-cal .cal-head { display:none; }
   body.embed-cal #app { padding:4px 8px 8px; }
   body.embed-cal #mtn { max-height:calc(100vh - 12px); background:transparent; }
   body.embed-cal .cal-sticky { background:rgba(40,36,88,.55) !important; -webkit-backdrop-filter:blur(8px); backdrop-filter:blur(8px); }
@@ -1106,7 +1106,7 @@
   <div id="nextLine"></div>
   <div id="habits"></div>
 
-  <h2 class="cal-h"><span>Calendar</span><button class="add-btn" id="zap" hidden>↩︎ Back to the quest</button><a class="add-btn" id="calAppBtn" href="calendar.html" target="_blank" rel="noopener" style="text-decoration:none">Open calendar app</a></h2>
+  <h2 class="cal-head"><span>Calendar</span><button class="add-btn" id="zap" hidden>↩︎ Back to the quest</button><a class="add-btn" id="calAppBtn" href="calendar.html" target="_blank" rel="noopener" style="text-decoration:none">Open calendar app</a></h2>
   <div id="mtn"><div class="cal-sticky" id="calDay"></div><div id="calBody"></div></div>
 
   <h2><span>Skills</span><button class="add-btn" id="skillsBtn">Open</button></h2>
@@ -6985,6 +6985,6 @@
 })();
 </script>
 <script src="quest-dash.js?v=20261019z"></script>
-<script src="quest-trips.js?v=20261102g"></script>
+<script src="quest-trips.js?v=20261103c"></script>
 </body>
 </html>
