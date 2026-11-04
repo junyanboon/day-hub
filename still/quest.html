@@ -1058,6 +1058,7 @@
 </style>
 <script src="keeps.js?v=20261009k"></script>
 <script src="bag.js?v=20261023a"></script>
+<script src="quest-timing.js?v=20261103a"></script>
 <script src="quest-merge.js?v=20261022g1"></script>
 <script src="quest-oura.js?v=20261019a"></script>
 <script src="quest-levels.js?v=20261016b"></script>
@@ -1123,6 +1124,25 @@
 
 <script>
 (() => {
+  /* ---------- ?timing=1: when each load step happened (quest-timing.js, d102) ---------- */
+  const QT = window.QuestTiming ? QuestTiming.create({ search:location.search, now:() => performance.now(), log:s => console.log(s) })
+    : { on:false, mark(){}, wrapFetch:f => f, lines:() => [], onLine(){} };
+  if (QT.on) {
+    window.fetch = QT.wrapFetch(window.fetch.bind(window));
+    const box = document.createElement("div");
+    box.id = "qtiming";
+    box.style.cssText = "position:fixed;left:8px;bottom:8px;z-index:3000;max-width:min(94vw,460px);max-height:45vh;overflow:auto;padding:8px 10px;"
+      + "border-radius:10px;background:rgba(10,12,30,.92);color:#cfe;font:11px/1.45 ui-monospace,Menlo,monospace;white-space:pre-wrap;box-shadow:0 6px 20px rgba(0,0,0,.5)";
+    box.innerHTML = `<div style="display:flex;justify-content:space-between;gap:8px;margin-bottom:4px"><b>Timing (ms since the page started)</b>`
+      + `<button type="button" style="font:inherit;border:0;border-radius:6px;padding:1px 8px;background:#c9b6ff;color:#2a2453;cursor:pointer">Copy</button></div><div></div>`;
+    const list = box.lastChild;
+    box.querySelector("button").onclick = () => { try { navigator.clipboard.writeText(QT.lines().join("\n")); } catch {} };
+    QT.onLine(line => { list.textContent += (list.textContent ? "\n" : "") + line; });
+    document.body.appendChild(box);
+    addEventListener("error", e => QT.mark("page error", e.message));
+    addEventListener("unhandledrejection", e => QT.mark("page error (promise)", String(e.reason && e.reason.message || e.reason)));
+  }
+  QT.mark("page start", `paired ${localStorage.getItem("quest-key") ? "yes" : "no"}, service worker ${navigator.serviceWorker && navigator.serviceWorker.controller ? "on" : "off"}`);
   /* ---------- config + clock ---------- */
   const API = new URLSearchParams(location.search).get("api") || "https://still.srv1948070.hstgr.cloud";
 
@@ -1255,20 +1275,21 @@
     return list.filter(t => waiting[t.id] !== true);
   }
   // the saved day for the day it is now, if there is one: true when it was put on screen
+  let savedWhy = "";   // why the saved day was not used (?timing=1)
   function useSaved(){
     const s = readSnap();
-    if (!s || !s.plan) return false;
+    if (!s || !s.plan) { savedWhy = !SNAP_OK ? "test clock (?at=)" : store.get(SNAP) ? "saved day unreadable" : "no saved day on this device"; return false; }
     const tzWas = PLAN_TZ;
     PLAN_TZ = s.plan.tz || null;   // the saved zone decides which day it is there
     const day = QuestOffline.savedDay(s, tzYmd(new Date(now() - 4 * 3600000)));
-    if (!day) { PLAN_TZ = tzWas; return false; }
+    if (!day) { PLAN_TZ = tzWas; savedWhy = `saved day is ${s.ymd}, and its agenda has no ${tzYmd(new Date(now() - 4 * 3600000))}`; return false; }
     PLAN = day.plan; GAME_YMD = day.ymd; TASKS = dropWaiting(day.tasks); AG = day.ag; PLAN_AT = day.at;
     OPS = day.ops || { edits:{}, drops:[], adds:[], ts:0 };
     const out = QuestOffline.pendingOps(readJSON(OPS_OUT, {}), dayKey());
     if (out && out.ts > (OPS.ts || 0)) OPS = out;
     return true;
   }
-  if (SNAP_OK) useSaved();   // shown as "updating…" until the first pull says whether it is offline
+  const SAVED_FIRST = SNAP_OK ? useSaved() : (savedWhy = "test clock (?at=)", false);   // shown as "updating…" until the first pull says whether it is offline
 
   // the service worker marks an answer from its saved copy (x-dq-saved: when it was fetched, 0 if unknown)
   // a slow but working line is not offline: it goes on as before (2026-10-11 Egypt), with the saved answer
@@ -1328,7 +1349,8 @@
     AG = next;
   }
   // at: when this calendar came from still-api, so an offline open can say how old it is
-  const saveSnap = () => { if (SNAP_OK && PLAN) try { localStorage.setItem(SNAP, JSON.stringify({ at:PLAN_AT || Date.now(), ymd:GAME_YMD, plan:PLAN, ops:OPS, tasks:TASKS, ag:AG })); } catch {} };
+  const saveSnap = () => { if (SNAP_OK && PLAN) try { localStorage.setItem(SNAP, JSON.stringify({ at:PLAN_AT || Date.now(), ymd:GAME_YMD, plan:PLAN, ops:OPS, tasks:TASKS, ag:AG })); }
+    catch (e) { QT.mark("saved day NOT saved", e.message); } };
   // a save that cannot hang the page on a network that never answers
   function postJSON(path, body, ms = 8000){
     const ac = new AbortController(), t = setTimeout(() => ac.abort(), ms);
@@ -1405,7 +1427,7 @@
   async function pullAll(){
     try {
       flushTasks();
-      try { await pullPlan(); }   // first: it sets the zone, which decides today's date key
+      try { await pullPlan(); QT.mark("fresh plan in", SAVED_AT == null ? "" : "from the saved copy (offline or slow)"); }   // first: it sets the zone, which decides today's date key
       catch (e) {
         // offline with nothing saved for this date by the service worker: the last day this phone saw (2026-10-17)
         if (!useSaved()) { SAVED_AT = PLAN ? PLAN_AT || 0 : null; throw e; }
@@ -1438,8 +1460,9 @@
       }   // offline: both wait for a fresh calendar, so nothing is placed twice or against an old day
       saveSnap();
       setTimeout(openPending, 0);
-    } catch (e) { pullErr = String(e.message || e); }
+    } catch (e) { pullErr = String(e.message || e); QT.mark("pull failed", pullErr); }
     render();
+    QT.mark("fresh calendar drawn", `${document.querySelectorAll("#calBody .cal-ev").length} items${pullErr ? ", " + pullErr : ""}`);
   }
   /* Same protocol as Stillness: the whole day's edit layer, last-write-wins on
      ts. Pull first so a phone edit made a minute ago is not overwritten. */
@@ -6979,7 +7002,10 @@
   addEventListener("pagehide", () => { if (syncTimer) pushG(true); });
   // the internet is back: pull at once, which also sends what waited (edits, ticks, the game) (2026-10-17)
   addEventListener("online", () => { lastWake = 0; wake(); });
-  render();   // the saved day, if there is one, before the network answers
+  try { render(); }   // the saved day, if there is one, before the network answers
+  catch (e) { QT.mark("first draw failed", e.message); throw e; }
+  if (SAVED_FIRST) QT.mark("saved day drawn", `${PLAN.blocks.length} blocks, ${document.querySelectorAll("#calBody .cal-ev").length} items on the calendar, saved ${Math.round((Date.now() - PLAN_AT) / 60000)} min ago`);
+  else QT.mark("saved day skipped", savedWhy);
   checkFresh();
   pullAll();
 })();
