@@ -624,7 +624,7 @@
     if (k === "trips") return showHome();
     document.body.classList.remove("trip-open", "trips-home");
     drawSide(k);
-    const el = k === "cal" ? document.querySelector(".cal-h") : k === "quests" ? document.getElementById("main") : k === "skills" ? document.getElementById("skillsRow") : null;
+    const el = k === "cal" ? document.querySelector(".cal-head") : k === "quests" ? document.getElementById("main") : k === "skills" ? document.getElementById("skillsRow") : null;
     if (k === "skills") { const b = document.getElementById("skillsBtn"); if (b) b.click(); }
     if (el) el.scrollIntoView({ behavior: "smooth", block: "start" }); else window.scrollTo({ top: 0, behavior: "smooth" });
   }
