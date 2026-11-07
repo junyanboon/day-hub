@@ -98,6 +98,7 @@ select.btn option,.pop option,.tz option{background:#2b2350}
 .morechip{position:absolute;z-index:4;font-size:11px;font-weight:700;border-radius:999px;padding:1px 7px;background:rgba(20,16,40,.85);border:1px solid var(--line);color:var(--ink);cursor:pointer}
 .morechip:hover{background:var(--glass2)}
 .pop .li{display:flex;gap:8px;align-items:center;padding:5px 6px;border-radius:7px;cursor:pointer}.pop .li:hover{background:var(--glass)}.pop .li i{width:8px;height:8px;border-radius:3px;background:var(--c);flex:none}.pop .li small{color:var(--faint);margin-left:auto;white-space:nowrap}
+.ev.crowd{padding-right:36px}
 .pop.list{max-height:60vh;overflow:auto}
 .oldtog{border:0;background:none;color:var(--faint);cursor:pointer;font-size:11.5px;padding:2px 0 6px;text-align:left}.oldtog:hover{color:var(--soft)}
 .ev small{color:var(--soft);font-variant-numeric:tabular-nums}
@@ -404,8 +405,9 @@ function timeGrid(v, days) {
   days.forEach((k) => {
     const ps = [], st = [];
     for (const e of timed) for (const p of C.pieces({ start: e.s, end: e.e }, [k], S.tz)) {
-      const x = { id: keyOf(e), s: p.top, e: Math.max(p.bottom, p.top + 20), ev: e, top: p.top, bot: p.bottom };
-      (!e.ghost && C.isStaff(calOf(e.calId).name) ? st : ps).push(x);
+      const staff = !e.ghost && C.isStaff(calOf(e.calId).name);
+      // Staff runs fold on real end times; other cards get a 20 min floor so they stay clickable
+      (staff ? st : ps).push({ id: keyOf(e), s: p.top, e: staff ? p.bottom : Math.max(p.bottom, p.top + 20), ev: e, top: p.top, bot: p.bottom });
     }
     body += `<div class="col" data-day="${k}" style="height:${24 * H}px">`;
     // Staff scheduling: a slim lane at the right edge, back-to-back shifts folded into one bar
@@ -420,7 +422,8 @@ function timeGrid(v, days) {
       const w = 100 / p.cols, ht = Math.max((p.bot - p.top) / 60 * H, 18);
       const ft = C.cardText({ title: e.title, h: ht - 2, w: ownPx / p.cols - 5 });
       const time = `<small>${C.hm(C.wall(e.s, S.tz).min)}${two ? " · " + C.hm(C.wall(e.s, S.tz2).min) : ""}</small>`;
-      const cls = ["ev", e.k === "out" ? "prep" : "", e.ghost ? "ghost" : "", ro ? "ro" : "", ft.lines === 2 ? "l2" : "", ft.time === "inline" ? "inl" : "", ht < 34 ? "short" : ""].join(" ");
+      const crowd = p.col === p.cols - 1 && more.some((m) => p.s < m.e && m.s < p.e);
+      const cls = ["ev", crowd ? "crowd" : "", e.k === "out" ? "prep" : "", e.ghost ? "ghost" : "", ro ? "ro" : "", ft.lines === 2 ? "l2" : "", ft.time === "inline" ? "inl" : "", ht < 34 ? "short" : ""].join(" ");
       body += `<div class="${cls}" data-key="${esc(keyOf(e))}" style="--c:${KCOL[e.k]};top:${p.top / 60 * H}px;height:${ht - 2}px;left:calc(${p.col * w}% * ${ownPx / colPx} + 2px);width:calc(${w}% * ${ownPx / colPx} - 5px)" title="${esc(e.title)} · ${esc(cal.name)}">
         <b>${KICON[e.k]}${esc(e.title)}</b>${ft.time === "none" ? "<small hidden></small>" : time}${ro || e.ghost ? "" : '<span class="h"></span>'}</div>`;
     }
@@ -576,7 +579,7 @@ function openList(x, el) {
   const r = el.getBoundingClientRect();
   let px = r.right + 8; if (px + 320 > innerWidth) px = Math.max(8, r.left - 320);
   p.style.left = px + "px"; p.style.top = Math.max(8, Math.min(r.top, innerHeight - p.offsetHeight - 8)) + "px";
-  p.querySelectorAll(".li").forEach((li) => li.onclick = () => openPop(items[+li.dataset.i], li));
+  p.querySelectorAll(".li").forEach((li) => li.onclick = () => openPop(items[+li.dataset.i], el));
 }
 function closePop() { const p = $("#pop"); if (p) p.remove(); document.querySelectorAll(".ev.draft").forEach((d) => d.remove()); }
 document.addEventListener("pointerdown", (e) => { const p = $("#pop"); if (p && !p.contains(e.target) && !e.target.closest(".ev,.pill,[data-more]")) closePop(); });
