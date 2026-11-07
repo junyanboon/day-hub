@@ -136,6 +136,65 @@
   }
   const blockMinutes = (task) => (task.estMin ? Math.max(15, Math.ceil(task.estMin / 15) * 15) : 30);
 
+
+  /* ---- readability (2026-11-06): Staff side lane, capped lanes with +N, card text, plain due dates ---- */
+  const isStaff = (calName) => /staff/i.test(String(calName || ""));
+  /** Fold overlapping or back-to-back pieces [{s, e}] into runs [{s, e, items}], in time order. */
+  function staffRuns(items) {
+    const out = [];
+    for (const it of items.slice().sort((a, b) => a.s - b.s || a.e - b.e)) {
+      const last = out[out.length - 1];
+      if (last && it.s <= last.e) { last.items.push(it); last.e = Math.max(last.e, it.e); }
+      else out.push({ s: it.s, e: it.e, items: [it] });
+    }
+    return out;
+  }
+  /** layout() with at most maxCols lanes per overlap cluster. Pieces past the cap are left out of `shown`
+      and listed per cluster in `more` [{s, e, col, items}], drawn as a "+N" chip. */
+  function layoutCapped(items, maxCols) {
+    const all = layout(items), shown = [], byCluster = new Map();
+    // layout() keeps each cluster together in order; rebuild clusters by sweeping
+    let id = -1, end = -Infinity;
+    for (const x of all) {
+      if (x.s >= end) id++;
+      end = Math.max(x.s >= end ? -Infinity : end, x.e);
+      if (x.col < maxCols) shown.push({ ...x, cols: Math.min(x.cols, maxCols) });
+      else {
+        const m = byCluster.get(id) || { s: Infinity, e: -Infinity, col: maxCols - 1, items: [] };
+        m.s = Math.min(m.s, x.s); m.e = Math.max(m.e, x.e); m.items.push(x); byCluster.set(id, m);
+      }
+    }
+    return { shown, more: [...byCluster.values()] };
+  }
+  /** How to fill a card h px tall and w px wide: title lines (1 or 2) and where the start time goes
+      ("line" under the title, "inline" after it, or "none"). The time is dropped before the title is cut. */
+  function cardText({ title, h, w }) {
+    const rows = Math.floor((h - 8) / 15.6), perLine = Math.floor((w - 14) / 6.6), len = String(title || "").length + 2;
+    const fits = len <= perLine;
+    if (rows <= 1) return { lines: 1, time: len + 8 <= perLine ? "inline" : "none" };
+    if (rows === 2) return fits ? { lines: 1, time: "line" } : { lines: 2, time: "none" };
+    return { lines: fits ? 1 : 2, time: "line" };
+  }
+  const MON3 = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const DOW3 = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+  const dueDay = (due, tz) => (!due ? "" : String(due).length === 10 ? String(due) : wall(Date.parse(due), tz).day);
+  const daysUntil = (due, today, tz) => Math.round((civil(dueDay(due, tz)) - civil(today)) / DAY);
+  /** A task's due date in plain words: "due today", "due Fri", "due Nov 20", "overdue 3 weeks". */
+  function dueText(due, today, tz) {
+    if (!due) return "";
+    const d = daysUntil(due, today, tz), day = dueDay(due, tz);
+    const pl = (n, w) => `${n} ${w}${n === 1 ? "" : "s"}`;
+    if (d === 0) return "due today";
+    if (d === 1) return "due tomorrow";
+    if (d > 1 && d < 7) return "due " + DOW3[dowOf(day)];
+    if (d >= 7) return `due ${MON3[+day.slice(5, 7) - 1]} ${+day.slice(8)}${day.slice(0, 4) === today.slice(0, 4) ? "" : ", " + day.slice(0, 4)}`;
+    if (d > -14) return "overdue " + pl(-d, "day");
+    if (d > -60) return "overdue " + pl(Math.floor(-d / 7), "week");
+    return "overdue " + pl(Math.floor(-d / 30), "month");
+  }
+  /** An open task more than a week overdue: shown under the "older overdue" toggle, never deleted. */
+  const isStale = (task, today, tz) => !task.done && !!task.due && daysUntil(task.due, today, tz) < -7;
+
   /* ---- words ---- */
   function hm(min) {
     const h = Math.floor(min / 60) % 24, m = min % 60;
@@ -147,5 +206,5 @@
   }
 
   root.CalCore = { wall, instant, offset, addDays, dowOf, weekStart, isoWeek, addMonths, monthKey, monthsFor,
-    KINDS, kindOf, layout, pieces, coversDay, orderBetween, groupOf, dropTask, blockMinutes, hm, dur };
+    KINDS, kindOf, layout, isStaff, staffRuns, layoutCapped, cardText, dueText, isStale, pieces, coversDay, orderBetween, groupOf, dropTask, blockMinutes, hm, dur };
 })(typeof window !== "undefined" ? window : globalThis);

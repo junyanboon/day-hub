@@ -29,7 +29,8 @@
 html,body{height:100%;margin:0}
 body{background:#2b2350;background-image:var(--sky);background-attachment:fixed;color:var(--ink);font-family:var(--font);font-size:13px;-webkit-font-smoothing:antialiased}
 button,input,select{font:inherit;color:inherit}
-.app{display:grid;grid-template-columns:250px minmax(0,1fr) 280px;height:100%}
+.app{display:grid;grid-template-columns:220px minmax(0,1fr) 280px;height:100%}
+.app.notasks{grid-template-columns:220px minmax(0,1fr)}.app.notasks aside.right{display:none}
 aside{background:var(--panel);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);overflow-y:auto;padding:16px 14px 30px;display:flex;flex-direction:column;gap:20px}
 aside.left{border-right:1px solid var(--line)}aside.right{border-left:1px solid var(--line)}
 .main{display:flex;flex-direction:column;min-width:0;min-height:0}
@@ -72,7 +73,7 @@ select.btn option,.pop option,.tz option{background:#2b2350}
 .subs label{display:flex;gap:6px;align-items:center;font-size:12px;color:var(--soft)}
 .add{width:100%;border:1px dashed var(--line);background:transparent;border-radius:9px;padding:7px 9px}
 .add::placeholder{color:var(--faint)}.add.small{padding:4px 7px;font-size:12px}
-.grid{display:grid;position:relative;min-width:0}
+.grid{display:grid;position:relative;width:max-content;min-width:100%}
 .pin{position:sticky;top:0;z-index:6;background:rgba(43,35,80,.78);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
 .colhead{display:grid;border-bottom:1px solid var(--line)}
 .colhead div{padding:9px 4px;text-align:center;font-size:15px;color:var(--soft);white-space:nowrap;cursor:pointer}
@@ -89,6 +90,17 @@ select.btn option,.pop option,.tz option{background:#2b2350}
 .ev{position:absolute;border-radius:9px;padding:4px 8px;font-size:12px;overflow:hidden;cursor:pointer;border:1px solid color-mix(in srgb,var(--c) 30%,transparent);border-left:3px solid var(--c);background:color-mix(in srgb,var(--c) 22%,rgba(43,35,80,.55));backdrop-filter:blur(6px);line-height:1.3;user-select:none;touch-action:none}
 .ev:hover{background:color-mix(in srgb,var(--c) 32%,rgba(43,35,80,.55))}
 .ev b{font-weight:600;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ev.l2 b{white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow-wrap:anywhere}
+.ev.inl{display:flex;gap:6px;align-items:baseline;padding-top:2px}.ev.inl b{flex:0 1 auto;min-width:0}.ev.inl small{flex:none}
+.ev.short{padding-top:2px;padding-bottom:0}
+.staff{position:absolute;right:2px;width:16px;border-radius:6px;background:color-mix(in srgb,var(--c) 45%,rgba(43,35,80,.5));border:1px solid color-mix(in srgb,var(--c) 70%,transparent);cursor:pointer;overflow:hidden;font-size:10px;font-weight:700;color:#2b2350;text-align:center;line-height:14px}
+.staff:hover{background:var(--c)}
+.morechip{position:absolute;z-index:4;font-size:11px;font-weight:700;border-radius:999px;padding:1px 7px;background:rgba(20,16,40,.85);border:1px solid var(--line);color:var(--ink);cursor:pointer}
+.morechip:hover{background:var(--glass2)}
+.pop .li{display:flex;gap:8px;align-items:center;padding:5px 6px;border-radius:7px;cursor:pointer}.pop .li:hover{background:var(--glass)}.pop .li i{width:8px;height:8px;border-radius:3px;background:var(--c);flex:none}.pop .li small{color:var(--faint);margin-left:auto;white-space:nowrap}
+.ev.crowd{padding-right:36px}
+.pop.list{max-height:60vh;overflow:auto}
+.oldtog{border:0;background:none;color:var(--faint);cursor:pointer;font-size:11.5px;padding:2px 0 6px;text-align:left}.oldtog:hover{color:var(--soft)}
 .ev small{color:var(--soft);font-variant-numeric:tabular-nums}
 .ev .h{position:absolute;left:0;right:0;bottom:0;height:8px;cursor:ns-resize}
 .ev.ro{cursor:default}.ev.dragging{box-shadow:0 8px 24px rgb(0 0 0/.35);z-index:5;opacity:.92}
@@ -131,7 +143,7 @@ select.btn option,.pop option,.tz option{background:#2b2350}
 .pair input{background:var(--glass);border:1px solid var(--line);border-radius:8px;padding:8px}
 .sugg{border:1px dashed var(--line);border-radius:10px;padding:8px;display:flex;flex-direction:column;gap:6px}
 button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--now);outline-offset:1px}
-@media (max-width:1100px){.app{grid-template-columns:230px minmax(0,1fr)}aside.right{display:none}}
+@media (max-width:1100px){.app,.app.notasks{grid-template-columns:200px minmax(0,1fr)}aside.right{display:none}}
 @media (max-width:760px){.app{grid-template-columns:1fr;grid-template-rows:auto 1fr}aside.left{max-height:34vh;border-right:0;border-bottom:1px solid var(--line)}}
 </style></head>
 <body>
@@ -148,6 +160,7 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid 
     <span class="status" id="status"></span>
     <select class="btn" id="viewSel" aria-label="View"><option value="day">Day</option><option value="week">Week</option><option value="month">Month</option><option value="year">Year</option><option value="list">List</option></select>
     <button class="btn" id="todayBtn">Today</button>
+    <button class="btn" id="tasksBtn" title="Show or hide the Tasks panel">Tasks</button>
     <button class="icon" id="prev" aria-label="Back">&#8249;</button><button class="icon" id="next" aria-label="Forward">&#8250;</button>
     <button class="icon" id="pairBtn" aria-label="Pairing" title="Pairing code">&#9881;&#65038;</button>
   </div>
@@ -160,7 +173,7 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid 
 </aside>
 </div>
 <div class="toast" id="toast"><span id="toastMsg"></span><button id="toastBtn" hidden></button></div>
-<script src="calendar-core.js"></script>
+<script src="calendar-core.js?v=20261106r"></script>
 <script>
 "use strict";
 const C = window.CalCore, qs = new URLSearchParams(location.search);
@@ -183,7 +196,7 @@ if (!ZONES.some((z) => z[0] === DEVICE_TZ)) ZONES.unshift([DEVICE_TZ, DEVICE_TZ.
 const CACHE_KEY = "cal-app-cache-v1";
 const S = { tz: store.get("cal-tz") || DEVICE_TZ, tz2: store.get("cal-tz2") || "", view: store.get("cal-view") || "week",
   cur: null, mini: null, cals: [], hidden: new Set(JSON.parse(store.get("cal-hidden") || "[]")),
-  months: {}, tasks: [], sugg: [], open: new Set(), steps: {}, loading: new Set() };
+  months: {}, tasks: [], sugg: [], open: new Set(), showOld: new Set(), extra: {}, steps: {}, loading: new Set() };
 try { const c = JSON.parse(store.get(CACHE_KEY) || "{}"); S.cals = c.cals || []; S.tasks = c.tasks || []; S.months = c.months || {}; S.sugg = c.sugg || []; } catch {}
 function saveCache() {
   const keep = {}, now = C.monthKey(today());
@@ -215,6 +228,9 @@ function toast(msg, { bad = false, action, label } = {}) {
 function status(s) { $("#status").textContent = s || ""; }
 
 /* ---------- events ---------- */
+/* Calendar colours as in his Google/Notion calendars (the approved prototype), whatever the server sends. */
+const CAL_COLOURS = { junyan: "#ffd479", caney: "#d9b48f", "joint plans": "#8fe3b0", "staff scheduling": "#ff9f6b" };
+const calColour = (c) => CAL_COLOURS[String(c.name || "").trim().toLowerCase()] || c.color;
 const calOf = (id) => S.cals.find((c) => c.id === id) || { id, name: "?", color: "#999", writable: false };
 function norm(e) {
   const x = { ...e };
@@ -318,7 +334,7 @@ async function deleteEvent(ev) {
 
 /* ---------- left panel ---------- */
 function renderSide() {
-  $("#cals").innerHTML = S.cals.map((c) => `<label class="${S.hidden.has(c.id) ? "off" : ""}" style="--c:${esc(c.color)}"><input type="checkbox" data-id="${esc(c.id)}" ${S.hidden.has(c.id) ? "" : "checked"}>${esc(c.name)}${c.writable ? "" : ' <span class="meta">read-only</span>'}${c.ok === false ? ` <span class="err" title="${esc(c.error)}">not readable</span>` : ""}</label>`).join("") || '<span class="meta">Pair to see your calendars.</span>';
+  $("#cals").innerHTML = S.cals.map((c) => `<label class="${S.hidden.has(c.id) ? "off" : ""}" style="--c:${esc(calColour(c))}"><input type="checkbox" data-id="${esc(c.id)}" ${S.hidden.has(c.id) ? "" : "checked"}>${esc(c.name)}${c.writable ? "" : ' <span class="meta">read-only</span>'}${c.ok === false ? ` <span class="err" title="${esc(c.error)}">not readable</span>` : ""}</label>`).join("") || '<span class="meta">Pair to see your calendars.</span>';
   $("#kinds").innerHTML = C.KINDS.map(([k, n]) => `<div style="--c:${KCOL[k]}"><i></i>${n}</div>`).join("");
   const open = ghosts();
   $("#suggBox").innerHTML = open.length ? `<p class="lbl">Suggestions (${open.length})</p>${open.map((g) => `<div class="sugg" style="--c:${KCOL[g.k]}"><b>${esc(g.title)}</b><span class="meta">${esc(whenText(g))} · from ${esc(g.by)}</span>${g.why ? `<span class="meta">${esc(g.why)}</span>` : ""}<div class="r" style="display:flex;gap:6px"><button class="btn pri" data-acc="${esc(g.id)}">Accept</button><button class="btn" data-skip="${esc(g.id)}">Skip</button><button class="btn" data-go="${esc(g.id)}">Show</button></div></div>`).join("")}` : "";
@@ -369,7 +385,7 @@ function zoneName(tz) { const z = ZONES.find((x) => x[0] === tz); return z ? z[1
 let lastScroll = null;
 function timeGrid(v, days) {
   const two = !!S.tz2 && S.tz2 !== S.tz;
-  const cols = `64px ${two ? "60px " : ""}repeat(${days.length},minmax(${days.length > 1 ? 90 : 200}px,1fr))`;
+  const cols = `64px ${two ? "60px " : ""}repeat(${days.length},minmax(${days.length > 1 ? 112 : 200}px,1fr))`;
   const t = today();
   let head = `<div class="gut">${esc(zoneName(S.tz))}</div>${two ? `<div class="gut">${esc(zoneName(S.tz2))}</div>` : ""}`;
   days.forEach((k) => { head += `<div class="${k === t ? "today" : ""}" data-day="${k}">${DOW[C.dowOf(k)]} <b>${+k.slice(8)}</b></div>`; });
@@ -382,16 +398,40 @@ function timeGrid(v, days) {
   if (two) gut += `<div class="gutter second">${hours(days[0], S.tz2)}</div>`;
   let body = "";
   const timed = [...evs.filter((e) => !e.allDay), ...gh.filter((g) => !g.allDay)];
+  // width each day column will get, so lanes and card text fit it (Junyan, 2026-11-06: "unreadable")
+  const colPx = Math.max(days.length > 1 ? 112 : 200, (v.clientWidth - 64 - (two ? 60 : 0)) / days.length);
+  const ownPx = colPx - 24, maxCols = Math.max(1, Math.min(3, Math.floor(ownPx / 64)));
+  S.extra = {};
   days.forEach((k) => {
-    const ps = [];
-    for (const e of timed) for (const p of C.pieces({ start: e.s, end: e.e }, [k], S.tz)) ps.push({ id: keyOf(e), s: p.top, e: p.bottom, ev: e });
+    const ps = [], st = [];
+    for (const e of timed) for (const p of C.pieces({ start: e.s, end: e.e }, [k], S.tz)) {
+      const staff = !e.ghost && C.isStaff(calOf(e.calId).name);
+      // Staff runs fold on real end times; other cards get a 20 min floor so they stay clickable
+      (staff ? st : ps).push({ id: keyOf(e), s: p.top, e: staff ? p.bottom : Math.max(p.bottom, p.top + 20), ev: e, top: p.top, bot: p.bottom });
+    }
     body += `<div class="col" data-day="${k}" style="height:${24 * H}px">`;
-    for (const p of C.layout(ps.map((x) => ({ id: x.id, s: x.s, e: Math.max(x.e, x.s + 20), ev: x.ev, top: x.s, bot: x.e })))) {
+    // Staff scheduling: a slim lane at the right edge, back-to-back shifts folded into one bar
+    C.staffRuns(st).forEach((r, i) => {
+      const id = `s|${k}|${i}`, ht = Math.max((r.e - r.s) / 60 * H, 14);
+      S.extra[id] = { title: `Staff scheduling, ${C.hm(r.s)} to ${C.hm(r.e % 1440)}`, items: r.items.map((x) => x.ev) };
+      body += `<div class="staff" data-more="${id}" style="--c:${esc(calColour(calOf(r.items[0].ev.calId)))};top:${r.s / 60 * H}px;height:${ht - 2}px" title="${esc(r.items.length + " Staff scheduling: " + r.items.map((x) => x.ev.title).join(", "))}">${r.items.length > 1 && ht > 18 ? r.items.length : ""}</div>`;
+    });
+    const { shown, more } = C.layoutCapped(ps, maxCols);
+    for (const p of shown) {
       const e = p.ev, cal = calOf(e.calId), ro = !e.ghost && !cal.writable;
       const w = 100 / p.cols, ht = Math.max((p.bot - p.top) / 60 * H, 18);
-      body += `<div class="ev ${e.k === "out" ? "prep" : ""} ${e.ghost ? "ghost" : ""} ${ro ? "ro" : ""}" data-key="${esc(keyOf(e))}" style="--c:${KCOL[e.k]};top:${p.top / 60 * H}px;height:${ht - 2}px;left:calc(${p.col * w}% + 2px);width:calc(${w}% - 5px)" title="${esc(e.title)} · ${esc(cal.name)}">
-        <b>${KICON[e.k]}${esc(e.title)}</b><small>${C.hm(C.wall(e.s, S.tz).min)}${two ? " · " + C.hm(C.wall(e.s, S.tz2).min) : ""}</small>${ro || e.ghost ? "" : '<span class="h"></span>'}</div>`;
+      const ft = C.cardText({ title: e.title, h: ht - 2, w: ownPx / p.cols - 5 });
+      const time = `<small>${C.hm(C.wall(e.s, S.tz).min)}${two ? " · " + C.hm(C.wall(e.s, S.tz2).min) : ""}</small>`;
+      const crowd = p.col === p.cols - 1 && more.some((m) => p.s < m.e && m.s < p.e);
+      const cls = ["ev", crowd ? "crowd" : "", e.k === "out" ? "prep" : "", e.ghost ? "ghost" : "", ro ? "ro" : "", ft.lines === 2 ? "l2" : "", ft.time === "inline" ? "inl" : "", ht < 34 ? "short" : ""].join(" ");
+      body += `<div class="${cls}" data-key="${esc(keyOf(e))}" style="--c:${KCOL[e.k]};top:${p.top / 60 * H}px;height:${ht - 2}px;left:calc(${p.col * w}% * ${ownPx / colPx} + 2px);width:calc(${w}% * ${ownPx / colPx} - 5px)" title="${esc(e.title)} · ${esc(cal.name)}">
+        <b>${KICON[e.k]}${esc(e.title)}</b>${ft.time === "none" ? "<small hidden></small>" : time}${ro || e.ghost ? "" : '<span class="h"></span>'}</div>`;
     }
+    more.forEach((m, i) => {
+      const id = `m|${k}|${i}`;
+      S.extra[id] = { title: `${m.items.length} more at ${C.hm(m.s)}`, items: m.items.map((x) => x.ev) };
+      body += `<button class="morechip" data-more="${id}" style="top:${m.s / 60 * H + 2}px;right:24px">+${m.items.length}</button>`;
+    });
     if (k === t) body += `<div class="now" style="top:${nowW.min / 60 * H}px"></div>`;
     body += "</div>";
   });
@@ -419,6 +459,7 @@ function wireGrid(v, days) {
   v.onscroll = () => { lastScroll = v.scrollTop; };
   v.querySelectorAll(".colhead [data-day]").forEach((d) => d.onclick = () => { S.cur = d.dataset.day; setView("day"); });
   v.querySelectorAll(".pill").forEach((p) => p.onclick = () => { const e = findByKey(p.dataset.key); if (e) openPop(e, p); });
+  v.querySelectorAll("[data-more]").forEach((b) => b.onclick = (e) => { e.stopPropagation(); const x = S.extra[b.dataset.more]; if (x) openList(x, b); });
   const colW = () => v.querySelector(".col").getBoundingClientRect().width;
   v.querySelectorAll(".ev").forEach((el) => {
     el.onpointerdown = (pd) => {
@@ -436,8 +477,8 @@ function wireGrid(v, days) {
         el.classList.add("dragging");
         dMin = Math.round((m.clientY - sy) / H * 60 / SNAP) * SNAP;
         dDay = days.length > 1 && !resize ? Math.round((m.clientX - sx) / colW()) : 0;
-        if (resize) { const len = Math.max(SNAP, (ev.e - ev.s) / 60000 + dMin); el.style.height = (len / 60 * H - 2) + "px"; el.querySelector("small").textContent = C.dur(len); }
-        else { el.style.transform = `translate(${dDay * colW()}px,${dMin / 60 * H}px)`; el.querySelector("small").textContent = C.hm(C.wall(shiftWall(ev.s, dDay, dMin), S.tz).min); }
+        if (resize) { const len = Math.max(SNAP, (ev.e - ev.s) / 60000 + dMin); el.style.height = (len / 60 * H - 2) + "px"; { const sm = el.querySelector("small"); sm.hidden = false; sm.textContent = C.dur(len); } }
+        else { el.style.transform = `translate(${dDay * colW()}px,${dMin / 60 * H}px)`; { const sm = el.querySelector("small"); sm.hidden = false; sm.textContent = C.hm(C.wall(shiftWall(ev.s, dDay, dMin), S.tz).min); } }
       };
       el.onpointerup = () => {
         el.onpointermove = el.onpointerup = null;
@@ -528,8 +569,20 @@ function openPop(ev, el, isNew) {
   ti.onkeydown = (e) => { if (e.key === "Enter") save(); };
   if ($("#pDel")) $("#pDel").onclick = () => { closePop(); deleteEvent(ev); };
 }
+/** A small list of events (the "+N" chip, or a Staff scheduling bar); each row opens its card. */
+function openList(x, el) {
+  closePop();
+  const p = document.createElement("div"); p.className = "pop list"; p.id = "pop";
+  const items = x.items.slice().sort((a, b) => a.s - b.s);
+  p.innerHTML = `<div class="t">${esc(x.title)}</div>` + items.map((e, i) => `<div class="li" data-i="${i}" style="--c:${KCOL[e.k]}"><i></i><span>${esc(e.title)}</span><small>${C.hm(C.wall(e.s, S.tz).min)} to ${C.hm(C.wall(e.e, S.tz).min)}</small></div>`).join("");
+  document.body.appendChild(p);
+  const r = el.getBoundingClientRect();
+  let px = r.right + 8; if (px + 320 > innerWidth) px = Math.max(8, r.left - 320);
+  p.style.left = px + "px"; p.style.top = Math.max(8, Math.min(r.top, innerHeight - p.offsetHeight - 8)) + "px";
+  p.querySelectorAll(".li").forEach((li) => li.onclick = () => openPop(items[+li.dataset.i], el));
+}
 function closePop() { const p = $("#pop"); if (p) p.remove(); document.querySelectorAll(".ev.draft").forEach((d) => d.remove()); }
-document.addEventListener("pointerdown", (e) => { const p = $("#pop"); if (p && !p.contains(e.target) && !e.target.closest(".ev,.pill")) closePop(); });
+document.addEventListener("pointerdown", (e) => { const p = $("#pop"); if (p && !p.contains(e.target) && !e.target.closest(".ev,.pill,[data-more]")) closePop(); });
 
 /* ---------- suggestions ---------- */
 async function acceptSugg(g, over = {}) {
@@ -598,12 +651,15 @@ function renderTasks() {
   for (const [p, name, col] of PRI) {
     const list = C.groupOf(S.tasks, p);
     h += `<div class="group" data-p="${esc(p)}"><div class="gh"><i style="background:${col}"></i>${name} <span class="meta">${list.filter((t) => !t.done).length}</span></div>`;
-    for (const t of list) {
+    const now = list.filter((t) => !C.isStale(t, today(), S.tz)), old = list.filter((t) => C.isStale(t, today(), S.tz));
+    const showOld = S.showOld.has(p);
+    for (const t of showOld ? [...now, ...old] : now) {
       const st = S.steps[t.id], cnt = st ? { n: st.length, d: st.filter((x) => x.checked).length } : t.steps;
-      const bits = [t.estimate, t.due ? "due " + t.due : "", cnt && cnt.n ? `${cnt.d}/${cnt.n} steps` : "", onCalendar(t) ? "on calendar" : ""].filter(Boolean).join(" · ");
+      const bits = [t.estimate, C.dueText(t.due, today(), S.tz), cnt && cnt.n ? `${cnt.d}/${cnt.n} steps` : "", onCalendar(t) ? "on calendar" : ""].filter(Boolean).join(" · ");
       h += `<div class="task ${t.done ? "done" : ""}" draggable="true" data-id="${esc(t.id)}"><input type="checkbox" ${t.done ? "checked" : ""} aria-label="Done"><div class="tt"><a href="${esc(t.url)}" target="_blank" rel="noopener" draggable="false">${esc(t.title)}</a>${bits ? `<div class="meta">${esc(bits)}</div>` : ""}</div><button class="tog" aria-label="Steps">${S.open.has(t.id) ? "▾" : "▸"}</button></div>`;
       if (S.open.has(t.id)) h += `<div class="subs">${st ? st.map((s) => `<label><input type="checkbox" data-t="${esc(t.id)}" data-b="${esc(s.id)}" ${s.checked ? "checked" : ""}>${esc(s.text)}</label>`).join("") : '<span class="meta">Loading steps…</span>'}<input class="add small" data-t="${esc(t.id)}" placeholder="+ Add a step"></div>`;
     }
+    if (old.length) h += `<button class="oldtog" data-old="${esc(p)}">${showOld ? "Hide" : "Show"} ${old.length} older overdue</button>`;
     h += "</div>";
   }
   box.innerHTML = questKey() ? h : '<span class="meta">Pair to see your tasks.</span>';
@@ -621,6 +677,7 @@ function renderTasks() {
     g.ondragleave = () => g.classList.remove("over");
     g.ondrop = (e) => { e.preventDefault(); g.classList.remove("over"); moveTask(e.dataTransfer.getData("text/task"), g.dataset.p, null); };
   });
+  box.querySelectorAll(".oldtog").forEach((b) => b.onclick = () => { const p = b.dataset.old; S.showOld.has(p) ? S.showOld.delete(p) : S.showOld.add(p); renderTasks(); });
   box.querySelectorAll(".subs input[type=checkbox]").forEach((i) => i.onchange = () => tickStep(i.dataset.t, i.dataset.b, i.checked));
   box.querySelectorAll(".subs .add").forEach((i) => i.onkeydown = (e) => { if (e.key === "Enter" && i.value.trim()) addStep(i.dataset.t, i.value.trim()); });
 }
@@ -693,6 +750,11 @@ function setup() {
   $("#tz1").onchange = (e) => { S.tz = e.target.value; store.set("cal-tz", S.tz); S.months = {}; render(); refresh(true); };
   $("#tz2").onchange = (e) => { S.tz2 = e.target.value; store.set("cal-tz2", S.tz2); render(); };
   $("#viewSel").onchange = (e) => setView(e.target.value);
+  const tasksOn = () => store.get("cal-tasks") ?? (innerWidth >= 1400 ? "1" : "0");
+  const applyTasks = () => $(".app").classList.toggle("notasks", tasksOn() !== "1");
+  $("#tasksBtn").onclick = () => { store.set("cal-tasks", tasksOn() === "1" ? "0" : "1"); applyTasks(); render(); };
+  applyTasks();
+  addEventListener("resize", () => { clearTimeout(setup.rt); setup.rt = setTimeout(() => { if (["day", "week"].includes(S.view)) render(); }, 150); });
   $("#todayBtn").onclick = () => { S.cur = today(); lastScroll = null; render(); refresh(); };
   $("#prev").onclick = () => step(-1); $("#next").onclick = () => step(1);
   $("#mmPrev").onclick = () => { S.mini = C.addMonths(S.mini, -1); renderMini(); };
