@@ -527,6 +527,8 @@
   body.gym-home #app{display:none}
   #gymHome{position:fixed;left:210px;top:0;right:0;bottom:0;z-index:30;display:none;overflow:auto;padding:28px 32px;font-family:var(--font);color:var(--ink);background:rgba(0,0,0,.18)}
   body.gym-home #gymHome{display:block}
+  body.gym-home .scrim,body.trips-home .scrim{z-index:40}
+  body.gym-home .sheet,body.trips-home .sheet{z-index:41}
   #tripHome{position:fixed;left:210px;top:0;right:0;bottom:0;z-index:30;display:none;overflow:auto;padding:28px 32px;font-family:var(--font);color:var(--ink);background:rgba(0,0,0,.18)}
   body.trips-home #tripHome{display:block}
   #tripHome button{font:inherit;color:inherit;border:0;background:none;cursor:pointer}
