@@ -247,27 +247,41 @@
   const EFF = { full: "Full ✓", part: "Part way", help: "Needed help" };
   const dayName = ymd => new Date(Date.parse(ymd + "T12:00:00Z")).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: "UTC" });
 
+  const vidId = g => (/(?:youtu\.be\/|v=)([\w-]{11})/.exec(g.video.url) || [])[1] || "";
+  const thumb = g => `https://i.ytimg.com/vi/${vidId(g)}/mqdefault.jpg`;
+  const lvName = (LV, g, n) => (LV && n ? LV.LEVELS[g.code][Math.min(7, n) - 1] : "");
+
+  // History: seven day dots for this week, then one compact row per past week
   function weekHTML(esc, g, st, LV) {
-    const days = [];
     const mon = st.weeks[0].monday;
-    for (let i = 0; i < 7; i++) { const d = addDays(mon, i); days.push(`<span class="gc-d${st.doneOn === d ? " on" : ""}">${"MTWTFSS"[i]}</span>`); }
-    let h = `<div class="gc-wk">${days.join("")}</div>
-      <p class="gc-big">${st.done ? `✅ Done this week (${esc(dayName(st.doneOn))}). Skip ${esc(g.title)} until Monday.` : `⬜ Not done this week. Today is a good day for the one set.`}</p>
-      <div class="glabel">Last 6 weeks</div><table class="gc-tab"><tr><th>Week of</th><th>Hardest</th><th>Reps</th><th>How</th></tr>`;
-    st.weeks.forEach((w, k) => { h +=`<tr><td>${esc(dayName(w.monday))}</td><td>${w.day ? esc(w.level ? `L${w.level} ${LV ? LV.LEVELS[g.code][Math.min(7, w.level) - 1] : ""}` : "?") : "·"}</td><td>${w.day && w.reps != null && w.reps !== "" ? esc(String(w.reps)) : "·"}</td><td>${w.day ? esc(EFF[w.effort] || "") : k ? "missed" : "not yet"}</td></tr>`; });
-    return h + `</table>${g.code === "OAC" ? `<p class="gnote">Getting stuck for 2 weeks or more? The video says check: too many reps, not hard enough, poor sleep, or too little protein.</p>` : ""}`;
+    const dots = Array.from({ length: 7 }, (_, i) => { const d = addDays(mon, i); return `<span class="gx-day${st.doneOn === d ? " on" : ""}">${"MTWTFSS"[i]}</span>`; }).join("");
+    const rows = st.weeks.map((w, k) => `<div class="gx-row${w.day ? "" : " off"}"><span>${esc(dayName(w.monday).replace(/^\w+,?\s*/, ""))}</span>
+      <span class="gx-grow">${w.day ? esc(`L${w.level || "?"} ${lvName(LV, g, w.level)}`) : k ? "Missed" : "Not yet"}</span>
+      <span class="gx-dim">${w.day && w.reps != null && w.reps !== "" ? esc(String(w.reps)) + " reps" : ""}</span><span class="gx-dim">${w.day ? esc(EFF[w.effort] || "") : ""}</span></div>`).join("");
+    return `<div class="gx-card"><div class="gx-week">${dots}</div><div class="gx-stat">${st.done ? `Done ${esc(dayName(st.doneOn))} · next one Monday` : "Not done this week"}</div></div>
+      <div class="gx-label">Last 6 weeks</div><div class="gx-list">${rows}</div>
+      ${g.code === "OAC" ? `<p class="gx-foot">Stuck 2+ weeks? Check volume, effort, sleep, protein.</p>` : ""}`;
   }
 
-  function prepHTML(esc, g) {
-    let h = `<a class="btn primary gc-vid" href="${esc(g.video.url)}" target="_blank" rel="noopener">▶ Watch the video (${esc(g.video.len)})</a>
-      <div class="glabel">Jump to a part</div><div class="gc-ch">${g.video.chapters.map(([s, t, n]) => `<a href="${esc(at(s))}" target="_blank" rel="noopener"><b>${t}</b> ${esc(n)}</a>`).join("")}</div>
-      <div class="glabel">The rules</div><ol class="gc-rules">${g.rules.map(([a, b]) => `<li><b>${esc(a)}.</b> ${esc(b)}</li>`).join("")}</ol>
-      <div class="glabel">Milestones, in order</div><ol class="gc-rules">${g.milestones.map(([, n]) => `<li>${esc(n)}</li>`).join("")}</ol>
-      <div class="glabel">Bring</div><ul class="gc-rules">${g.need.map(n => `<li>${esc(n)}</li>`).join("")}</ul>
-      <div class="glabel">The plan at the gym</div><ol class="gc-plan">`;
+  // Overview: hero (video), quick facts, the plan as a tight timeline, chapter chips
+  function prepHTML(esc, g, ctx) {
+    const x = ctx && ctx.x, LV = ctx && ctx.LV, mins = Math.round(totalSec(g) / 60);
     let t = 0;
-    g.steps.forEach(x => { h += `<li><b>${mmss(t)} to ${mmss(t + x.s)}</b> ${esc(x.title)}</li>`; t += x.s; });
-    return h + `</ol>`;
+    const plan = g.steps.map(st => { const r = `<div class="gx-step"><span class="gx-t">${mmss(t)}</span><span class="gx-grow">${esc(st.title.replace(/ \(.*\)$/, ""))}</span>${st.cue ? `<a class="gx-play" href="${esc(st.cue)}" target="_blank" rel="noopener" title="Watch this part">▶</a>` : ""}</div>`; t += st.s; return r; }).join("");
+    return `<a class="gx-hero" href="${esc(g.video.url)}" target="_blank" rel="noopener" style="background-image:url('${esc(thumb(g))}')"><span class="gx-pbtn">▶</span><span class="gx-len">${esc(g.video.len)}</span></a>
+      <div class="gx-facts"><span>⏱ ${mins} min</span><span>↻ ${g.perWeek} set / week</span>${x && LV ? `<span>◎ L${x.level} → L${Math.min(7, x.level + 1)}</span>` : ""}<span>🧰 ${esc(g.need[0].split(/[(,]/)[0].trim())}</span></div>
+      <button class="gx-cta" data-gc="start">Start session</button>
+      <div class="gx-label">The plan</div><div class="gx-list">${plan}</div>
+      <div class="gx-label">Jump into the video</div><div class="gx-chips">${g.video.chapters.map(([s, tt, n]) => `<a href="${esc(at2(g, s))}" target="_blank" rel="noopener"><b>${tt}</b> ${esc(n.split(":")[0])}</a>`).join("")}</div>`;
+  }
+  const at2 = (g, s) => `https://youtu.be/${vidId(g)}?t=${s}`;
+
+  // Rules: one line each, tap to open the detail; milestones as a stepper
+  function rulesHTML(esc, g, ctx) {
+    const cur = ctx && ctx.x ? ctx.x.level : 0;
+    return `<div class="gx-list">${g.rules.map(([a, b]) => `<details class="gx-rule"><summary>${esc(a)}</summary><p>${esc(b)}</p></details>`).join("")}</div>
+      <div class="gx-label">Milestones</div><div class="gx-steps">${g.milestones.map(([n, name]) => `<div class="gx-ms${n < cur ? " done" : n === cur ? " now" : ""}"><i></i><span>${esc(name)}</span></div>`).join("")}</div>
+      <div class="gx-label">Bring</div><div class="gx-chips">${g.need.map(n => `<span>${esc(n)}</span>`).join("")}</div>`;
   }
 
   /* The Go view. c: the clock, x: today's move in the Gym log, nowMs. Buttons carry data-gc="start|pause|next|back|reset",
@@ -334,11 +348,20 @@
 
   function html(esc, code, view, ctx) {
     const g = guide(code); if (!g) return "";
-    const tabs = [["week", "📅 Week"], ["prep", "📺 Prep"], ["go", "⏱ Go"]].map(([k, n]) => `<button class="gchip${view === k ? " on" : ""}" data-gcv="${k}">${n}</button>`).join("");
-    const body = view === "prep" ? prepHTML(esc, g) : view === "go" ? goHTML(esc, g, ctx.clock, ctx.x, ctx.now, ctx.LV) : weekHTML(esc, g, ctx.week, ctx.LV);
-    return `<div class="gc"><div class="gc-top"><b>🎯 Coach · ${esc(g.title)}</b><button class="btn ghost small" data-gcclose>${ctx.page ? "Open Gym log to save" : "Back to log"}</button></div>
-      <div class="gchips gc-tabs">${tabs}</div>${body}</div>`;
+    ctx = ctx || {};
+    const tabs = [["prep", "Overview"], ["rules", "How to"], ["week", "History"], ["go", "Session"]].map(([k, n]) => `<button class="${view === k ? "on" : ""}" data-gcv="${k}">${n}</button>`).join("");
+    const body = view === "go" ? goHTML(esc, g, ctx.clock, ctx.x, ctx.now, ctx.LV) : view === "week" ? weekHTML(esc, g, ctx.week, ctx.LV)
+      : view === "rules" ? rulesHTML(esc, g, ctx) : prepHTML(esc, g, ctx);
+    return `<div class="gc gx" aria-label="Coach"><div class="gx-top"><div><div class="gx-eye">Coach · ${esc(g.video.by)}</div><h2>${esc(g.title)}</h2></div>
+      <button class="gx-ghost" data-gcclose>${ctx.page ? "Log & save" : "Back to log"}</button></div>
+      <div class="gx-tabs">${tabs}</div>${body}</div>`;
   }
 
-  root.QuestGymCoach = { GUIDES, guide, totalSec, elapsed, stepAt, startOf, act, applyLog, weekStatus, mondayOf, html, mmss };
+  // the move list on the desk page: thumbnail, name, level and this week's tick
+  function navHTML(esc, cur, rows) {
+    return rows.map(r => { const g = guide(r.code); return `<button class="gx-mv${r.code === cur ? " on" : ""}" data-gcm="${r.code}">
+      <img src="${esc(thumb(g))}" alt="" loading="lazy"><span class="gx-grow"><b>${esc(g.title)}</b><small>L${r.level}${r.done ? " · done this week" : ""}</small></span>${r.done ? `<i class="gx-tick">✓</i>` : ""}</button>`; }).join("");
+  }
+
+  root.QuestGymCoach = { navHTML, GUIDES, guide, totalSec, elapsed, stepAt, startOf, act, applyLog, weekStatus, mondayOf, html, mmss };
 })(typeof window !== "undefined" ? window : globalThis);

@@ -367,6 +367,60 @@
   .btn.small { flex:none; padding:8px 12px; font-size:13px; }
   .glabel { display:block; font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--ink-soft); margin:14px 0 6px; }
   #gProg { width:100%; padding:12px; border-radius:12px; background:rgba(0,0,0,.25); color:var(--ink); border:1px solid var(--glass-border); font:inherit; font-size:15px; }
+  /* Gym coach, compact (2026-11-09, after Mobbin: Nike Training Club hero, WHOOP list) */
+  .gx { --gx-line:rgba(255,255,255,.08); --gx-card:rgba(255,255,255,.05); --gx-dim:rgba(255,255,255,.55); --gx-acc:#8fe3b0; }
+  .gx-page { display:grid; grid-template-columns:250px minmax(0, 640px); gap:28px; align-items:start; }
+  .gx-nav { position:sticky; top:0; display:flex; flex-direction:column; gap:4px; }
+  .gx-nav h1 { font-size:22px; font-weight:700; margin:0 0 10px; letter-spacing:-.01em; }
+  #gymHome button.gx-mv, .gx-mv { display:flex; align-items:center; gap:10px; width:100%; padding:6px; border-radius:12px; text-align:left; background:transparent; border:0; color:inherit; cursor:pointer; }
+  .gx-mv:hover { background:rgba(255,255,255,.05); } .gx-mv.on { background:rgba(255,255,255,.09); }
+  .gx-mv img { width:56px; height:36px; object-fit:cover; border-radius:8px; flex:none; opacity:.85; }
+  .gx-mv b { display:block; font-size:14px; font-weight:600; } .gx-mv small { font-size:12px; color:rgba(255,255,255,.5); }
+  .gx-tick { font-style:normal; color:#8fe3b0; font-size:13px; }
+  .gx-grow { flex:1; min-width:0; }
+  .gx-top { display:flex; justify-content:space-between; align-items:flex-end; gap:12px; }
+  .gx-eye { font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--gx-dim); }
+  .gx h2 { margin:2px 0 0; font-size:24px; font-weight:700; letter-spacing:-.01em; text-transform:none; }
+  .gx button.gx-ghost { width:auto; padding:6px 12px; border-radius:999px; border:1px solid var(--gx-line); background:transparent; color:var(--gx-dim); font-size:13px; cursor:pointer; }
+  .gx-tabs { display:flex; gap:18px; border-bottom:1px solid var(--gx-line); margin:14px 0 16px; }
+  .gx-tabs button { width:auto; padding:8px 0; margin-bottom:-1px; background:none; border:0; border-bottom:2px solid transparent; border-radius:0; color:var(--gx-dim); font-size:14px; cursor:pointer; box-shadow:none; }
+  .gx-tabs button.on { color:#fff; border-color:var(--gx-acc); font-weight:600; }
+  .gx-pick { display:flex; gap:6px; overflow-x:auto; margin-bottom:12px; }
+  .gx-pick button { width:auto; flex:none; padding:5px 11px; border-radius:999px; font-size:12px; background:rgba(255,255,255,.07); border:0; color:#fff; }
+  .gx-pick button.on { background:#fff; color:#2a2453; }
+  .gx-hero { position:relative; display:block; aspect-ratio:16/7; border-radius:16px; background-size:cover; background-position:center; overflow:hidden; }
+  .gx-hero::after { content:""; position:absolute; inset:0; background:linear-gradient(180deg, transparent 40%, rgba(0,0,0,.55)); }
+  .gx-pbtn { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width:52px; height:52px; border-radius:50%; background:rgba(255,255,255,.92); color:#2a2453; display:grid; place-items:center; font-size:18px; z-index:1; }
+  .gx-len { position:absolute; right:10px; bottom:8px; font-size:12px; color:#fff; z-index:1; }
+  .gx-facts { display:flex; flex-wrap:wrap; gap:6px 16px; margin:12px 0; font-size:13px; color:var(--gx-dim); }
+  .gx button.gx-cta { display:block; width:100%; padding:13px; border-radius:999px; border:0; background:#fff; color:#2a2453; font-weight:700; font-size:15px; cursor:pointer; }
+  .gx-label { margin:18px 0 6px; font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--gx-dim); }
+  .gx-list { border-radius:14px; background:var(--gx-card); overflow:hidden; }
+  .gx-step, .gx-row { display:flex; align-items:center; gap:12px; padding:9px 12px; font-size:14px; border-top:1px solid var(--gx-line); }
+  .gx-step:first-child, .gx-row:first-child { border-top:0; }
+  .gx-t { width:38px; flex:none; font-variant-numeric:tabular-nums; color:var(--gx-dim); font-size:12px; }
+  .gx-play { color:var(--gx-dim); text-decoration:none; font-size:11px; } .gx-play:hover { color:#fff; }
+  .gx-row.off { color:var(--gx-dim); } .gx-row > span:first-child { width:56px; flex:none; white-space:nowrap; font-size:12px; color:var(--gx-dim); }
+  .gx-dim { color:var(--gx-dim); font-size:12px; }
+  .gx-chips { display:flex; flex-wrap:wrap; gap:6px; }
+  .gx-chips a, .gx-chips span { padding:5px 10px; border-radius:999px; background:var(--gx-card); color:#fff; text-decoration:none; font-size:12px; }
+  .gx-chips b { color:var(--gx-dim); font-weight:500; margin-right:3px; }
+  .gx-rule { border-top:1px solid var(--gx-line); } .gx-rule:first-child { border-top:0; }
+  .gx-rule summary { list-style:none; cursor:pointer; padding:10px 12px; font-size:14px; display:flex; justify-content:space-between; }
+  .gx-rule summary::-webkit-details-marker { display:none; }
+  .gx-rule summary::after { content:"+"; color:var(--gx-dim); } .gx-rule[open] summary::after { content:"−"; }
+  .gx-rule p { margin:0; padding:0 12px 12px; font-size:13px; line-height:1.5; color:rgba(255,255,255,.75); }
+  .gx-steps { display:flex; flex-direction:column; gap:0; padding-left:6px; }
+  .gx-ms { display:flex; align-items:center; gap:10px; font-size:13px; color:var(--gx-dim); padding:5px 0; position:relative; }
+  .gx-ms i { width:10px; height:10px; border-radius:50%; border:1.5px solid rgba(255,255,255,.3); flex:none; }
+  .gx-ms.done i { background:var(--gx-acc); border-color:var(--gx-acc); } .gx-ms.done { color:rgba(255,255,255,.75); }
+  .gx-ms.now i { background:#ffd479; border-color:#ffd479; box-shadow:0 0 0 4px rgba(255,212,121,.2); } .gx-ms.now { color:#fff; font-weight:600; }
+  .gx-card { padding:14px; border-radius:14px; background:var(--gx-card); }
+  .gx-week { display:flex; gap:6px; } .gx-day { flex:1; text-align:center; padding:7px 0; border-radius:9px; font-size:12px; background:rgba(255,255,255,.05); color:var(--gx-dim); }
+  .gx-day.on { background:var(--gx-acc); color:#12321f; font-weight:700; }
+  .gx-stat { margin-top:10px; font-size:14px; }
+  .gx-foot { font-size:12px; color:var(--gx-dim); margin-top:10px; }
+  .gx .gc-step { background:var(--gx-card); }
   .gym-page { max-width:760px; } .gym-page h1 { font-size:26px; margin:0 0 10px; }
   .gym-page .gc-t { font-size:4em; } .gym-page .gc-step { font-size:1.1em; }
   .gc-moves { margin-bottom:6px; }
@@ -1108,7 +1162,7 @@
 <script src="quest-gut.js?v=20261024g3"></script>
 <script src="quest-library.js?v=20261022b1"></script>
 <script src="quest-gym.js?v=20261019x"></script>
-<script src="quest-gymcoach.js?v=20261109e"></script>
+<script src="quest-gymcoach.js?v=20261109f"></script>
 <script src="quest-morning.js?v=20261030c"></script>
 <script src="quest-buckets.js?v=20261030c"></script>
 <script src="quest-agenda.js?v=20261024a"></script>
@@ -4782,7 +4836,7 @@
     sh.querySelectorAll("[data-feel]").forEach(b => b.onclick = () => { GYM.feel = GYM.feel === b.dataset.feel ? null : b.dataset.feel; saveDraft(); drawGym(); });
     $("gRest").onclick = startRest;
     $("gSave").onclick = saveGym;
-    if ($("gCoach")) $("gCoach").onclick = () => { const c = coachClock(gymCoachCode); gymCoach = c && c.started ? "go" : "week"; if (gymPageEl) { closeSheet(); return drawCoach(); } drawGym(); };
+    if ($("gCoach")) $("gCoach").onclick = () => { const c = coachClock(gymCoachCode); gymCoach = c && c.started ? "go" : "prep"; if (gymPageEl) { closeSheet(); return drawCoach(); } drawGym(); };
   }
   /* The desk Gym page (sidebar, 2026-11-09): the same coach, drawn into the page with a move picker on top. The
      clock per move lives in GYM.coaches[code]; "Open Gym log" opens the log sheet to save. */
@@ -4792,7 +4846,7 @@
       if (!GYM) GYM = newGym(GL.programFor("", ymdLocal())); saveDraft(); }
   }
   window.QuestGymPage = {
-    async open(el){ gymPageEl = el; el.innerHTML = `<div class="gnote">Loading your gym…</div>`; await gymReady(); if (!gymPageEl) return; gymCoach = gymCoach || "week"; drawCoach(); },
+    async open(el){ gymPageEl = el; el.innerHTML = `<div class="gnote">Loading your gym…</div>`; await gymReady(); if (!gymPageEl) return; gymCoach = gymCoach || "prep"; drawCoach(); },
     close(){ gymPageEl = null; clearInterval(gymCoachTick); gymCoachTick = null; },
   };
   const coachClock = code => { GYM.coaches = GYM.coaches || {}; if (code === "OAC" && GYM.coach && !GYM.coaches.OAC) GYM.coaches.OAC = GYM.coach; return GYM.coaches[code]; };
@@ -4801,11 +4855,14 @@
     if (!GYM.e[code]) GYM.e[code] = LV.startMove(code, LV.currentLevel(gymLevels(), code));
     const x = GYM.e[code], clock = coachClock(code);
     const week = GC.weekStatus(code, (gymInfo.last || []).map(w => ({ ...w, day:gymDay(w) })), x, gameYmd(), LV.touched);
-    const pick = `<div class="gchips gc-moves">${Object.values(GC.GUIDES).map(m => `<button class="gchip${m.code === code ? " on" : ""}" data-gcm="${m.code}">${esc(m.title)}</button>`).join("")}</div>`;
+    const lastW = (gymInfo.last || []).map(w => ({ ...w, day:gymDay(w) }));
+    const navRows = Object.keys(GC.GUIDES).map(k => ({ code:k, level:(GYM.e[k] || {}).level || LV.currentLevel(gymLevels(), k),
+      done:GC.weekStatus(k, lastW, GYM.e[k], gameYmd(), LV.touched).done }));
+    const pick = gymPageEl ? "" : `<div class="gx-pick">${Object.values(GC.GUIDES).map(m => `<button class="${m.code === code ? "on" : ""}" data-gcm="${m.code}">${esc(m.title)}</button>`).join("")}</div>`;
     const inner = GC.html(esc, code, gymCoach, { week, clock, x, now:Date.now(), LV, page:!!gymPageEl });
     let sh;
     if (gymPageEl) {
-      gymPageEl.innerHTML = `<div class="gym-page"><h1>🏋 Gym</h1>${pick}${inner}</div>`; sh = gymPageEl;
+      gymPageEl.innerHTML = `<div class="gx-page"><nav class="gx-nav"><h1>Gym</h1>${GC.navHTML(esc, code, navRows)}</nav><main class="gx-main">${inner}</main></div>`; sh = gymPageEl;
     } else {
       const keepScroll = $("sheet").classList.contains("open") ? $("sheet").scrollTop : null;
       openSheet(pick + inner, true);
@@ -4815,7 +4872,7 @@
     sh.querySelectorAll("[data-gcm]").forEach(b => b.onclick = () => { gymCoachCode = b.dataset.gcm; gymCoach = gymCoach === "go" && !coachClock(b.dataset.gcm) ? "prep" : gymCoach; redraw(); });
     sh.querySelector("[data-gcclose]").onclick = () => { if (gymPageEl) { openGym(null); return; } gymCoach = null; drawGym(); };
     sh.querySelectorAll("[data-gcv]").forEach(b => b.onclick = () => { gymCoach = b.dataset.gcv; sh.scrollTop = 0; redraw(); });
-    sh.querySelectorAll("[data-gc]").forEach(b => b.onclick = () => { GYM.coaches[code] = GC.act(g, coachClock(code), b.dataset.gc, Date.now()); if (code === "OAC") GYM.coach = GYM.coaches.OAC; saveDraft(); redraw(); });
+    sh.querySelectorAll("[data-gc]").forEach(b => b.onclick = () => { if (b.dataset.gc === "start") gymCoach = "go"; GYM.coaches[code] = GC.act(g, coachClock(code), b.dataset.gc, Date.now()); if (code === "OAC") GYM.coach = GYM.coaches.OAC; saveDraft(); redraw(); });
     sh.querySelectorAll("[data-gctest]").forEach(b => b.onclick = () => gymTest(code, b.dataset.gctest === "1", b.getBoundingClientRect()));
     sh.querySelectorAll("[data-gcreps]").forEach(inp => inp.oninput = () => { GYM.e[code] = GC.applyLog(GYM.e[code], inp.dataset.gcreps, inp.value); saveDraft(); });
     sh.querySelectorAll("[data-gcmile]").forEach(b => b.onclick = () => { GYM.e[code] = GC.applyLog(GYM.e[code], "mile", b.dataset.gcmile); saveDraft(); redraw(); });
