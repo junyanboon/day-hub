@@ -51,22 +51,38 @@
     return out;
   }
 
-  /* ---- colour by kind (d96): purple exercise, blue food, red out-needs-prep, orange studio work, green other ---- */
-  const KINDS = [["ex", "Exercise"], ["food", "Food"], ["out", "Out, needs prep"], ["work", "Studio work"], ["other", "Everything else"]];
-  const RX = {
-    ex: /\b(gym|climb\w*|zouk|lambada|sauna|run|running|yoga|samba|training|practica|workout|swim\w*|bike|cycling|pilates|stretch\w*|walk|hike|dance class|forr[oó]|bachata|salsa|kizomba|boxing|tennis|squash|cardio|cold plunge)\b/i,
-    food: /\b(dinner|lunch|brunch|breakfast|groceries|grocery|market|gaia|hot pot|cook\w*|meal|eat|restaurant|coffee|caf[eé]|snack|picnic|potluck)\b/i,
-    out: /\b(train|trip|flight|fly|airport|bus|spa|ikea|show|movie|cinema|concert|theatre|theater|haircut|dentist|doctor|clinic|appointment|appt|hotel|check-?in|check-?out|travel|festival|party|wedding|museum|gallery|carnaval|carnival|drive to|pick ?up|drop ?off)\b/i,
-  };
-  /** {title, calName?, kind?} → "ex" | "food" | "out" | "work" | "other". A hand-set kind wins. */
+  /* ---- block types (2026-11-10, one-system ticket 026): eleven kinds of block, each with its own colour,
+     helper and page, plus "other". Guessed from the title, first match wins; a hand-set kind wins over the guess. ---- */
+  const KINDS = [["deep", "Deep Work"], ["studio", "Studio On-Site"], ["yoga", "Yoga"], ["gym", "Gym"], ["dance", "Dance"],
+    ["cook", "Culinary"], ["travel", "Travel"], ["social", "Social"], ["errand", "Errands"], ["wind", "Wind Down"],
+    ["rest", "Rest"], ["other", "Other"]];
+  /* Hand-set kinds saved before the eleven types (ex, food, out, work). "ex" is guessed again: gym or dance. */
+  const OLD_KIND = { food: "cook", out: "travel", work: "studio" };
+  const RX = [
+    ["deep", /\b(work block|deep work|focus block|focus time)\b/i],
+    ["wind", /\b(wind.?down|bedtime)\b/i],
+    ["rest", /\b(isha kriya|yoga nidra|nidra|nsdr)\b/i],
+    ["yoga", /\b(yoga|sadhana|shambhavi|mahamudra|kriya|angamardana|yogasanas?|surya|bhuta shuddhi|nadi shuddhi|hatha)\b/i],
+    ["dance", /\b(zouk|lambada|samba|salsa|bachata|kizomba|forr[oó]|practica|dance|dancing|ws|workshop|battle|hip hop)\b/i],
+    ["gym", /\b(gym|workout|climb\w*|run|running|swim\w*|bike|cycling|pilates|stretch\w*|hike|boxing|tennis|squash|cardio|training)\b/i],
+    ["studio", /\b(studio|viewing|renter|booking|payroll|team check-?in|on-?site|fbs)\b/i],
+    ["social", /\b(birthday|party|wedding|visit|mom|dad|friends?|everyone|date night|hang ?out)\b/i],
+    ["travel", /\b(train|trip|flight|fly|airport|bus|drive|hotel|check-?in|check-?out|travel|stay at|airbnb|ferry|festival|carnaval|carnival)\b/i],
+    ["errand", /\b(errands?|bank|branch|scotia|bmo|pharmacy|post office|pick ?up|drop ?off|return|dentist|doctor|clinic|appointment|appt|haircut|ikea|passport)\b/i],
+    ["cook", /\b(dinner|lunch|brunch|breakfast|groceries|grocery|market|gaia|hot pot|cook\w*|meal|prep|eat|restaurant|coffee|caf[eé]|snack|picnic|potluck|veggie|pudding|focaccia)\b/i],
+    ["rest", /\b(nap|rest|sauna|cold plunge|massage|walk)\b/i],
+  ];
+  function guessKind(title, calName) {
+    const t = String(title || "");
+    for (const [k, rx] of RX) if (rx.test(t)) return k;
+    return /staff/i.test(calName || "") ? "studio" : "other";
+  }
+  /** {title, calName?, kind?} → one of KINDS. A hand-set kind wins. */
   function kindOf(ev) {
     if (ev.kind && KINDS.some(([k]) => k === ev.kind)) return ev.kind;
-    const t = String(ev.title || "");
-    if (RX.ex.test(t)) return "ex";
-    if (RX.food.test(t)) return "food";
-    if (RX.out.test(t)) return "out";
-    if (/staff/i.test(ev.calName || "") || /\b(studio|viewing|renter|booking|payroll|team check-?in)\b/i.test(t)) return "work";
-    return "other";
+    if (OLD_KIND[ev.kind]) return OLD_KIND[ev.kind];
+    const g = guessKind(ev.title, ev.calName);
+    return ev.kind === "ex" && g !== "dance" ? "gym" : g;
   }
 
   /** Side-by-side columns for overlapping timed pieces [{id, s, e}] (minutes). Adds col and cols. */

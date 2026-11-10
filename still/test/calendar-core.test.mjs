@@ -31,17 +31,41 @@ test("days, Monday weeks and ISO week numbers", () => {
 });
 
 test("kind is guessed from the title (d96), a hand-set kind wins", () => {
-  assert.equal(C.kindOf({ title: "Gym & Sauna" }), "ex");
-  assert.equal(C.kindOf({ title: "Zouk Training" }), "ex");
-  assert.equal(C.kindOf({ title: "Dinner with Caney" }), "food");
-  assert.equal(C.kindOf({ title: "Groceries together" }), "food");
-  assert.equal(C.kindOf({ title: "Dentist" }), "out");
-  assert.equal(C.kindOf({ title: "Montreal: train" }), "out");
-  assert.equal(C.kindOf({ title: "Flight to São Paulo" }), "out");
-  assert.equal(C.kindOf({ title: "Training day" }), "ex", "training is not a train");
-  assert.equal(C.kindOf({ title: "Viewing, Studio B", calName: "Staff scheduling" }), "work");
-  assert.equal(C.kindOf({ title: "Call Mom" }), "other");
-  assert.equal(C.kindOf({ title: "Gym", kind: "food" }), "food");
+  assert.equal(C.kindOf({ title: "Gym & Sauna" }), "gym");
+  assert.equal(C.kindOf({ title: "Gym · Jack Woods" }), "gym");
+  assert.equal(C.kindOf({ title: "Training day" }), "gym");
+  assert.equal(C.kindOf({ title: "Zouk Training" }), "dance");
+  assert.equal(C.kindOf({ title: "Lambada WS" }), "dance");
+  assert.equal(C.kindOf({ title: "Solo Battle WS" }), "dance");
+  assert.equal(C.kindOf({ title: "Practica" }), "dance");
+  assert.equal(C.kindOf({ title: "Work block · 🎯 0/2" }), "deep");
+  assert.equal(C.kindOf({ title: "Morning Yoga" }), "yoga");
+  assert.equal(C.kindOf({ title: "Isha Kriya" }), "rest");
+  assert.equal(C.kindOf({ title: "Wind down" }), "wind");
+  assert.equal(C.kindOf({ title: "Dinner with Caney" }), "cook");
+  assert.equal(C.kindOf({ title: "Groceries together" }), "cook");
+  assert.equal(C.kindOf({ title: "Prep focaccia" }), "cook");
+  assert.equal(C.kindOf({ title: "Dinner w/ everyone?" }), "social");
+  assert.equal(C.kindOf({ title: "Visit Mom" }), "social");
+  assert.equal(C.kindOf({ title: "Caney's Birthday" }), "social");
+  assert.equal(C.kindOf({ title: "Dentist" }), "errand");
+  assert.equal(C.kindOf({ title: "Packing & Errands" }), "errand");
+  assert.equal(C.kindOf({ title: "Montreal: train" }), "travel");
+  assert.equal(C.kindOf({ title: "Flight to São Paulo" }), "travel");
+  assert.equal(C.kindOf({ title: "Drive" }), "travel");
+  assert.equal(C.kindOf({ title: "Stay at FICTION" }), "travel");
+  assert.equal(C.kindOf({ title: "Viewing, Studio B", calName: "Staff scheduling" }), "studio");
+  assert.equal(C.kindOf({ title: "Need FBS", calName: "Staff scheduling" }), "studio");
+  assert.equal(C.kindOf({ title: "901 Bell Internet will expire", calName: "Staff Scheduling" }), "studio");
+  assert.equal(C.kindOf({ title: "Remembrance Day" }), "other");
+  assert.equal(C.kindOf({ title: "Gym", kind: "cook" }), "cook");
+  assert.equal(C.kindOf({ title: "Gym", kind: "food" }), "cook");
+  assert.equal(C.kindOf({ title: "Drive", kind: "work" }), "studio");
+  assert.equal(C.kindOf({ title: "Hotel", kind: "out" }), "travel");
+  assert.equal(C.kindOf({ title: "Call the bank", kind: "ex" }), "gym");
+  assert.equal(C.kindOf({ title: "Zouk night", kind: "ex" }), "dance");
+  assert.equal(C.kindOf({ title: "Zouk night", kind: "other" }), "other");
+  assert.deepEqual(C.KINDS.map((x) => x[0]), ["deep", "studio", "yoga", "gym", "dance", "cook", "travel", "social", "errand", "wind", "rest", "other"]);
 });
 
 test("overlapping events share the width, others take all of it", () => {
