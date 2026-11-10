@@ -621,7 +621,9 @@
   }
 
   /* sidebar: Today, Calendar, Quests & XP, Skills, Trips (one item; the trips list lives on the Trips page) */
+  let navOn = "today";
   function drawSide(active) {
+    navOn = active || navOn;
     const navs = [["today", "☀ Today"], ["cal", "▦ Calendar"], ["quests", "★ Quests &amp; XP"], ["skills", "◆ Skills"], ["trips", "✈ Trips"], ["gym", "🏋 Gym"]];
     side.innerHTML = `<div class="brand"><div class="logo">★</div><div><b>DAY <span>QUEST</span></b><small>STILLNESS</small></div></div>` +
       navs.map(([k, l]) => `<button class="nav ${active === k ? "on" : ""}" data-nav="${k}">${l}</button>`).join("");
@@ -743,7 +745,7 @@
       S.live = true;
       S.trips = mergeTrips([...S.trips, ...(d.trips || []).map((t) => ({ ...t, icon: "🧳" }))]);
     } catch (e) { S.note = e.message; S.trips = mergeTrips(S.trips); }
-    drawSide(document.body.classList.contains("trips-home") ? "trips" : "today");
+    drawSide(document.body.classList.contains("trips-home") ? "trips" : navOn);
     if (document.body.classList.contains("trips-home")) showHome();
   }
   async function openTrip(name) {
@@ -1284,5 +1286,6 @@
     catch (e) { toast("Import failed: " + e.message); }
   });
 
+  drawSide("today");   // at once: the trips list only fills the Trips page, it never held up the sidebar (2026-11-09)
   loadTrips();
 })(typeof globalThis !== "undefined" ? globalThis : this);

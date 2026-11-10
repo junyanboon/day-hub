@@ -385,7 +385,14 @@
   .gx-tabs { display:flex; gap:18px; border-bottom:1px solid var(--gx-line); margin:14px 0 16px; }
   .gx-tabs button { width:auto; padding:8px 0; margin-bottom:-1px; background:none; border:0; border-bottom:2px solid transparent; border-radius:0; color:var(--gx-dim); font-size:14px; cursor:pointer; box-shadow:none; }
   .gx-tabs button.on { color:#fff; border-color:var(--gx-acc); font-weight:600; }
-  .gx-pick { display:flex; gap:6px; overflow-x:auto; margin-bottom:12px; }
+  body.has-side .gym-top { display:none; }
+  .gx-pick { display:flex; gap:8px; overflow-x:auto; margin:0 -16px 12px; padding:0 16px 4px; scroll-snap-type:x mandatory; scrollbar-width:none; }
+  .gx-pick::-webkit-scrollbar { display:none; }
+  .sheet .gx-pick .gx-mv, .gx-pick .gx-mv { border-radius:14px; width:auto; margin:0; min-height:0; box-shadow:none; color:#fff; font:inherit; text-align:left; flex:0 0 132px; flex-direction:column; align-items:flex-start; gap:6px; padding:6px; scroll-snap-align:start; background:rgba(255,255,255,.05); position:relative; }
+  .gx-pick .gx-mv.on { background:rgba(255,255,255,.14); box-shadow:inset 0 0 0 1.5px #8fe3b0; }
+  .gx-pick .gx-mv img { width:100%; height:64px; }
+  .gx-pick .gx-mv b { font-size:13px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:118px; }
+  .gx-pick .gx-tick { position:absolute; top:10px; right:12px; background:#8fe3b0; color:#12321f; border-radius:50%; width:18px; height:18px; display:grid; place-items:center; font-size:11px; }
   .gx-pick button { width:auto; flex:none; padding:5px 11px; border-radius:999px; font-size:12px; background:rgba(255,255,255,.07); border:0; color:#fff; }
   .gx-pick button.on { background:#fff; color:#2a2453; }
   .gx-hero { position:relative; display:block; aspect-ratio:16/7; border-radius:16px; background-size:cover; background-position:center; overflow:hidden; }
@@ -1179,6 +1186,7 @@
     <div class="avatar" id="avatar"><img src="sprites/head.webp" alt=""></div>
     <div class="status"><span id="statusL">Loading your day…</span><span id="statusR"></span></div>
     <div class="combo" id="combo" title="Days in a row ending at 70% prana or more"><span class="n" id="comboN">·</span><span class="l" id="comboL">days 70+</span></div>
+    <button class="gear gym-top" id="gymBtn" aria-label="Gym coach">🏋️</button>
     <button class="gear" id="bagBtn" aria-label="Bag">🎒</button>
     <button class="gear" id="gear" aria-label="Settings">⚙️</button>
   </div>
@@ -4753,6 +4761,8 @@
      view ("week" | "prep" | "go") or null; the clock lives in the draft (GYM.coach) so a redraw or reload keeps it. */
   let gymCoach = null, gymCoachTick = null, gymCoachStep = -1, gymCoachCode = "OAC", gymPageEl = null;
   const GC = window.QuestGymCoach;
+  // phone: the 🏋️ button at the top opens the coach any time, no gym block needed (2026-11-09)
+  if ($("gymBtn")) $("gymBtn").onclick = async () => { await openGym(null); gymCoach = "prep"; drawGym(); };
   async function openGym(block){
     gymShowMove = false; gymTesting = null; gymRow = null; GYMASK = null; gymCoach = null; if (gymPageEl) { clearInterval(gymCoachTick); gymCoachTick = null; }
     // opening the log at the gym means you're there; opening it early (to move it) does not
@@ -4781,11 +4791,11 @@
       ${asking ? `<div class="gmv-ask"><span>Are you sure? ${esc(shortName(blk))} at ${fmtT(blk.s)} comes off your schedule${blk.id && blk.calId ? " and Google Calendar" : ""}.</span>
         <span class="gmv-ask-b"><button class="btn ghost small" id="gSkipNo">Cancel</button><button class="btn primary small" id="gSkipYes">Yes, skip</button></span></div>` : ""}
       ${blk && (early || gymShowMove) ? gymMoveHTML(blk) : ""}
+      ${P.strength && GC ? `<button class="btn gc-open" id="gCoach">🎯 Coach <small>video, how to, minute-by-minute session</small></button>` : ""}
       <div class="gtopline"><select id="gProg" aria-label="Program">${Object.keys(PROGRAMS).map(k => `<option ${k === GYM.program ? "selected" : ""}>${k}</option>`).join("")}</select></div>
       <div class="gbw"><label for="gBw">⚖️ Body weight</label><input class="set" id="gBw" inputmode="decimal" placeholder="lbs" value="${esc(GYM.bw || "")}">
         <small id="gBwT">${tr ? `Last ${esc(String(tr.last.lbs))}` : "optional"}</small></div>`;
     const due = gymDue(), ringNote = due.length ? ` A green ring means you haven't done it in the last ${GL.DUE_DAYS} days.` : "";
-    if (P.strength && GC) h += `<button class="btn gc-open" id="gCoach">🎯 Coach <small>each move: this week, the video, minute by minute</small></button>`;
     if (P.strength) h += `<div class="gmoves">${GL.movesHTML(LV, esc, GYM, gymRow, gymTesting, due)}</div>
       <p class="gnote">Tap a move you're doing today. The ones you leave shut aren't logged.${ringNote}</p>`;
     if (P.mobility) h += `<div class="glabel">Mobility</div><div class="gchips">${P.mobility.map(m =>
@@ -4858,7 +4868,8 @@
     const lastW = (gymInfo.last || []).map(w => ({ ...w, day:gymDay(w) }));
     const navRows = Object.keys(GC.GUIDES).map(k => ({ code:k, level:(GYM.e[k] || {}).level || LV.currentLevel(gymLevels(), k),
       done:GC.weekStatus(k, lastW, GYM.e[k], gameYmd(), LV.touched).done }));
-    const pick = gymPageEl ? "" : `<div class="gx-pick">${Object.values(GC.GUIDES).map(m => `<button class="${m.code === code ? "on" : ""}" data-gcm="${m.code}">${esc(m.title)}</button>`).join("")}</div>`;
+    // phone (2026-11-09): the same move list as small cards that scroll sideways above the coach
+    const pick = gymPageEl ? "" : `<div class="gx-pick">${GC.navHTML(esc, code, navRows)}</div>`;
     const inner = GC.html(esc, code, gymCoach, { week, clock, x, now:Date.now(), LV, page:!!gymPageEl });
     let sh;
     if (gymPageEl) {
@@ -7156,6 +7167,6 @@
 })();
 </script>
 <script src="quest-dash.js?v=20261019z"></script>
-<script src="quest-trips.js?v=20261109d"></script>
+<script src="quest-trips.js?v=20261109e"></script>
 </body>
 </html>
