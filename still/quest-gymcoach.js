@@ -21,11 +21,16 @@
       need: ["Gymnastics rings you can set low", "Chalk if the rings are slippery", "Your phone on this screen"],
       rules: [
         ["Once a week, one set", "The whole week's training for this move is one set, under 3 minutes. If it's already done this week, skip it today."],
-        ["Full range, every rep", "Start from a dead hang (arm straight) and pull until your wrist touches your chest, then lower all the way. Half reps only make you strong in that half."],
-        ["Help comes from two places", "Your feet on the floor take some weight. Your other hand on its ring takes some more. Use the feet first; the other arm tires if it does too much."],
-        ["Right hard, not wrong hard", "Take help away a little each rep until you can't stop yourself sinking on the way down and you get stuck on the way up. That's your limit, and that's where you train."],
-        ["Alternate arms every rep", "Left, right, left, right. Short pauses to reset your grip are fine. No resting."],
-        ["Stop the set when any of these is true", "You need a rest. You can't attack the next rep with full effort. It stops being fun."],
+        ["One rep = up AND down", "A rep is the full pull up (dead hang until your wrist touches your chest) and the full lowering back to a dead hang. Both halves, every rep, on each arm."],
+        ["One continuous set", "Left rep (up and down), straight into right rep (up and down), straight back to left. Almost no break: a second or two to reset your grip is fine, a rest is not."],
+        ["Full range, every rep", "Half reps only make you strong in that half. The middle to bottom of the rep is the hardest part; the top and the bottom are easier."],
+        ["Help comes from two places", "Your feet on the floor take some weight. Your other hand on its ring takes some more. Use the feet first; if the other arm does too much it tires and the set ends early."],
+        ["Change the help during the rep", "Give yourself a little more help through the hard middle-bottom and less at the easy top and bottom. Small changes: think 20 tiny steps, not 2 big ones."],
+        ["Right hard: forced negatives", "Take help away until you can't stop yourself sinking on the way down and you get stuck on the way up. You're stronger lowering than lifting, so a lowering you can't hold is the heaviest work there is, and the proof you're at your limit."],
+        ["Stop the set when any of these is true", "You need a rest. You can't attack the next rep with full effort. It stops being fun. More after that doesn't build strength, it eats recovery."],
+        ["Stopping early protects your elbows", "The most common mistake is doing too much. Extra reps raise the risk of tendonitis and tennis elbow and make you less consistent week to week."],
+        ["Test on the first rep of the week", "Your freshest rep is your strength test. Try your next milestone there, then do the set."],
+        ["Stuck for 2 weeks or more?", "Check four things: too much volume, not hard enough, poor recovery (sleep), too little protein."],
       ],
       milestones: [[3, "Partial two-arm chin"], [4, "Full two-arm chin"], [5, "Part of a one-arm negative, controlled"],
         [6, "Full one-arm negative, controlled"], [7, "Partial one-arm chin, going up"], [8, "Full one-arm chin 🏆"]],
@@ -37,12 +42,15 @@
           "1:15 to 2:15 · 5 easy two-arm chins or ring rows, half effort.", "2:15 to 3:00 · 1 easy one-arm rep each arm, lots of help from the feet."] },
         { s: 90, title: "Find your help level", do: ["One rep left, one rep right.", "Feet take most of the help. Other hand rests lightly on its ring.",
           "Goal: it feels hard but you can still do it. Remember how much help that was."], cue: at(180) },
-        { s: 60, title: "Test rep (freshest rep of the week)", do: ["Try your next milestone once, with as little help as you can.",
+        { s: 60, title: "Test rep (freshest rep of the week)", do: ["Try your next milestone once, with as little help as you can. Up and down both count, part range counts for the partial milestones.",
           "Tap Passed or Not yet below. Then shake out for 30 seconds."], test: true, cue: at(525) },
-        { s: 180, title: "The one set", set: true, do: ["Left, right, left, right. Count the reps.",
-          "Each rep: dead hang, pull until the wrist touches the chest, lower slowly (3 to 5 seconds).",
-          "Each rep, take a little help away (less leg, lighter other hand) until you sink on the way down and get stuck on the way up. Stay at that edge.",
-          "Short grip resets are fine. No rests."], stop: true, cue: at(355) },
+        { s: 180, title: "The one set (one continuous set)", set: true, do: [
+          "One rep = up AND down. Left arm: dead hang, pull until the wrist touches the chest, lower all the way back to a dead hang (3 to 5 seconds down).",
+          "Then straight into the right arm, up and down. Then left again. Count every rep per arm.",
+          "Almost no break between reps: a second or two to reset your grip, never a rest.",
+          "More help through the hard middle-bottom, less at the top and bottom. Feet first, other hand light.",
+          "Each rep, take a tiny bit of help away until you sink on the way down and get stuck on the way up (a forced negative). Stay at that edge.",
+          "Keep every rep full range, even when it gets hard."], stop: true, cue: at(355) },
         { s: 90, title: "Log it", log: true, do: ["Reps per arm, the hardest thing you did, and how it went.", "Then you're done with this move for the week."] },
       ],
     },
@@ -126,7 +134,7 @@
     h += `<div class="gc-step"><div class="gc-h"><span>Step ${p.i + 1} of ${g.steps.length}</span><span id="gcL">${mmss(p.left)} left</span></div>
       <h4>${esc(st.title)}</h4><ul>${st.do.map(d => `<li>${esc(d)}</li>`).join("")}</ul>`;
     if (st.cue) h += `<a class="gc-cue" href="${esc(st.cue)}" target="_blank" rel="noopener">▶ See this part of the video</a>`;
-    if (st.stop) h += `<div class="gc-stop"><b>Stop the set when:</b> you need a rest · you can't attack the next rep full effort · it stops being fun.</div>`;
+    if (st.stop) h += `<div class="gc-stop"><b>Stop the set when:</b> you need a rest · you can't attack the next rep full effort · it stops being fun. Stopping early protects your elbows.</div>`;
     if (st.test && x && LV) {
       const t = LV.testLevel(x), last = (x.tests || []).slice(-1)[0];
       h += t == null ? `<p class="gnote">You're at the top level in the log.</p>`

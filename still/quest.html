@@ -1104,7 +1104,7 @@
 <script src="quest-gut.js?v=20261024g3"></script>
 <script src="quest-library.js?v=20261022b1"></script>
 <script src="quest-gym.js?v=20261019x"></script>
-<script src="quest-gymcoach.js?v=20261109a"></script>
+<script src="quest-gymcoach.js?v=20261109b"></script>
 <script src="quest-morning.js?v=20261030c"></script>
 <script src="quest-buckets.js?v=20261030c"></script>
 <script src="quest-agenda.js?v=20261024a"></script>
@@ -4770,14 +4770,14 @@
     sh.querySelectorAll("[data-gcreps]").forEach(inp => inp.oninput = () => { GYM.e[code] = GC.applyLog(GYM.e[code], inp.dataset.gcreps, inp.value); saveDraft(); });
     sh.querySelectorAll("[data-gcmile]").forEach(b => b.onclick = () => { GYM.e[code] = GC.applyLog(GYM.e[code], "mile", b.dataset.gcmile); saveDraft(); drawGym(); });
     sh.querySelectorAll("[data-gceff]").forEach(b => b.onclick = () => { GYM.e[code] = GC.applyLog(GYM.e[code], "eff", b.dataset.gceff); saveDraft(); drawGym(); });
-    // the clock: the time ticks in place; a new step redraws and buzzes
+    // the clock: the time ticks in place; a new step redraws quietly
     clearInterval(gymCoachTick); gymCoachTick = null;
     const c = GYM.coach;
     gymCoachStep = c && c.started ? GC.stepAt(g, GC.elapsed(c, Date.now())).i : -1;
     if (gymCoach === "go" && c && c.started && !c.paused) gymCoachTick = setInterval(() => {
       if (!gymCoach || !$("gcT")) { clearInterval(gymCoachTick); gymCoachTick = null; return; }
       const sec = GC.elapsed(GYM.coach, Date.now()), p = GC.stepAt(g, sec);
-      if (p.i !== gymCoachStep) { if (navigator.vibrate) navigator.vibrate([120, 80, 120]); return drawGym(); }
+      if (p.i !== gymCoachStep) return drawGym();   // no buzz on a new step (2026-11-09); level ups keep theirs
       $("gcT").firstChild.textContent = GC.mmss(sec);
       if ($("gcL")) $("gcL").textContent = `${GC.mmss(p.left)} left`;
     }, 1000);
