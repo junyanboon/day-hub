@@ -6,7 +6,7 @@
    Move guides come from a video watched and broken down. One-Arm Chin is from Jack Woods, "How anyone can achieve a
    one-arm chinup in 3 minutes a week" (youtu.be/Q3dhtlOq8NE): one set a week, alternating arms, full range,
    assistance taken away until the lowering is forced. Nordic Curl, Handstand Push-Up, Planche Push-Up and Front Lever Row are from his videos 6AxkQmf-8lM, PwutudyK_1Y,
-   qoaLWaaWyDM and JcS6_llzbBg (watched 2026-11-09). Single-Leg Squat has no video yet. Warm-ups marked "my addition" are not
+   qoaLWaaWyDM and JcS6_llzbBg (watched 2026-11-09). Single-Leg Squat is from tmb7zNxKaRQ. Warm-ups marked "my addition" are not
    from the videos.
    Pure, so it can be tested (node --test still/test). */
 (function (root) {
@@ -169,6 +169,38 @@
           "Up: ease the push slightly so you can move, still pulling as hard as possible every inch. Slow.",
           "Can lift the feet? Do it, knees to chest (tuck). Stuck? Walk the feet back."], cue: "https://youtu.be/JcS6_llzbBg?t=436" },
         { s: 60, title: "Log it", log: true, do: ["Hardest position you held and how it went.", "Other pull days: pull-ups, not more rows."], cue: "https://youtu.be/JcS6_llzbBg?t=464" },
+      ],
+    },
+    SLS: {
+      code: "SLS", title: "Single-Leg Squat", perWeek: 1,
+      stopText: "Stop when it stops being fun or you don't want more. One full rep a week is enough; two if they're quick.",
+      video: { url: "https://youtu.be/tmb7zNxKaRQ", by: "Jack Woods", name: "How to build powerful legs in one rep a week", len: "14:45",
+        chapters: [[0, "0:00", "Intro"], [63, "1:03", "Why it matters"], [170, "2:50", "How it works"], [318, "5:18", "The method"], [337, "5:37", "Scaling down: zero load, balance"], [481, "8:01", "Scaling up: vest, help at the bottom"], [718, "11:58", "Once a week, one set"], [792, "13:12", "Measuring progress"]] },
+      need: ["Two very sturdy stools or chairs, one beside each hip", "Weight vest(s), once you're past bodyweight", "Optional: a slant board, or chalk the ankle up"],
+      rules: [
+        ["Once a week, one set", "Max effort from the start. Usually one full rep, two if they're quick. A one-second reset between reps, no rest."],
+        ["Full range", "Down until no gap between hamstring and calf, knee toward the chest (as little gap as possible between thigh and stomach). Heel can lift if that's what it takes."],
+        ["Weight over the foot", "Take the hands away for a moment: you should fall straight down. Falling backward means your weight is behind the foot, so move forward over it. Leaning back on the hands is the common mistake."],
+        ["Don't roll forward too far", "If you fold over so much you lose the deep hip bend, you never train standing up out of it."],
+        ["Help from hands and the other foot", "Use as much as the bottom needs (it's the hardest part) and less and less as you rise. Lift the hands off where it gets easy."],
+        ["The rep ends when you don't need help", "Everything above that point is easy and doesn't count."],
+        ["Check you're at your limit", "During the rep take the help away about 10 times. You should fall and fail a bit every time. Never need help = too light. Can't control it = too heavy."],
+        ["Load with a vest", "Add as much as you can while still needing your hands for most of the range. Start light; add in steps of 10 kg."],
+        ["Test without the vest first", "Two-leg squat → single-leg negative → single-leg positive, then 10, 20, 30, 40 kg. His long goal: 75% of bodyweight."],
+      ],
+      milestones: [[1, "Two-leg squat, full range"], [2, "Single-leg negative"], [3, "Full single-leg squat, no weight"], [4, "+10 kg"], [5, "+20 kg"], [6, "+30 kg"], [7, "+40 kg"]],
+      steps: [
+        { s: 60, title: "Set up", do: ["A sturdy stool beside each hip, hands reach the seats.", "Barefoot or flat shoes. Slant board or chalk the ankle if your heel needs it."], cue: "https://youtu.be/tmb7zNxKaRQ?t=337" },
+        { s: 120, title: "Warm up and balance check", do: ["0:00 to 1:00 · 3 slow two-leg squats, full range, hands on the stools (the zero).",
+          "1:00 to 2:00 · At the bottom, lift the hands for a second: fall straight down? Good. Fall back? Shift forward over your foot and try again."], cue: "https://youtu.be/tmb7zNxKaRQ?t=400" },
+        { s: 60, title: "Test (no vest)", test: true, do: ["Try your next test once: single-leg negative, then single-leg up.", "Tap Passed or Not yet. Then put the vest on if you use one."], cue: "https://youtu.be/tmb7zNxKaRQ?t=792" },
+        { s: 150, title: "The one set (1 or 2 reps)", set: true, stop: true, do: [
+          "Working foot flat (heel up if needed), free leg out in front, hands on the stools.",
+          "Lower all the way: hamstring on calf, knee toward chest, weight over the foot.",
+          "Bottom is the hardest: push with the hands or touch the other foot down to get through it.",
+          "Rise using less and less help. About 10 times on the way, take the help away and let yourself fail a little.",
+          "The rep ends when you no longer need the hands. One-second reset, then a second rep only if it was quick."], cue: "https://youtu.be/tmb7zNxKaRQ?t=481" },
+        { s: 60, title: "Log it", log: true, do: ["The hardest level, vest weight in the Gym log row, and how it went.", "If you split the week, this goes with the Nordic curl."] },
       ],
     },
   };

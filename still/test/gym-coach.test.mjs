@@ -47,7 +47,7 @@ test("every view renders", () => {
   assert.match(C.html(esc, "OAC", "prep", { week }), /youtu\.be\/Q3dhtlOq8NE\?t=355/);
 });
 test("the four new moves have full guides whose milestones fit the log levels", () => {
-  for (const c of ["NC", "HSPU", "PPU", "FLR"]) {
+  for (const c of ["NC", "HSPU", "PPU", "FLR", "SLS"]) {
     const g = C.guide(c); assert.ok(g, c);
     assert.ok(g.steps.some(s => s.set) && g.steps.some(s => s.log), c);
     g.milestones.forEach(([n]) => assert.ok(n >= 1 && n <= 7, c));
