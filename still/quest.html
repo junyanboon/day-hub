@@ -367,6 +367,32 @@
   .btn.small { flex:none; padding:8px 12px; font-size:13px; }
   .glabel { display:block; font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--ink-soft); margin:14px 0 6px; }
   #gProg { width:100%; padding:12px; border-radius:12px; background:rgba(0,0,0,.25); color:var(--ink); border:1px solid var(--glass-border); font:inherit; font-size:15px; }
+  .gc-open { display:block; width:100%; margin-top:10px; text-align:left; }
+  .gc-open small { display:block; opacity:.7; font-weight:400; }
+  .gc-top { display:flex; justify-content:space-between; align-items:center; gap:8px; }
+  .gc-tabs { margin:10px 0; }
+  .gc-wk { display:flex; gap:6px; margin:8px 0; }
+  .gc-d { flex:1; text-align:center; padding:6px 0; border-radius:10px; background:rgba(255,255,255,.08); }
+  .gc-d.on { background:rgba(143,227,176,.45); font-weight:700; }
+  .gc-big { font-size:1.05em; line-height:1.4; }
+  .gc-tab { width:100%; border-collapse:collapse; font-size:.9em; }
+  .gc-tab th, .gc-tab td { text-align:left; padding:5px 4px; border-bottom:1px solid rgba(255,255,255,.1); }
+  .gc-vid { display:block; text-align:center; text-decoration:none; margin:6px 0 10px; }
+  .gc-ch a { display:block; padding:8px 10px; margin-top:4px; border-radius:10px; background:rgba(255,255,255,.08); color:inherit; text-decoration:none; }
+  .gc-rules li, .gc-plan li { margin:6px 0; line-height:1.4; }
+  .gc-clock { text-align:center; margin:6px 0 10px; }
+  .gc-t { font-size:2.6em; font-weight:700; font-variant-numeric:tabular-nums; }
+  .gc-t small { font-size:.4em; opacity:.6; }
+  .gc-dots { display:flex; justify-content:center; gap:6px; margin-top:4px; }
+  .gc-dot { width:10px; height:10px; border-radius:50%; background:rgba(255,255,255,.2); }
+  .gc-dot.past { background:rgba(143,227,176,.6); } .gc-dot.now { background:#ffd479; transform:scale(1.3); }
+  .gc-step { padding:12px; border-radius:14px; background:rgba(255,255,255,.1); }
+  .gc-step h4 { margin:6px 0; font-size:1.25em; } .gc-step li { margin:6px 0; line-height:1.4; }
+  .gc-h { display:flex; justify-content:space-between; opacity:.75; font-size:.9em; font-variant-numeric:tabular-nums; }
+  .gc-cue { display:inline-block; margin-top:6px; color:#9fd0ff; }
+  .gc-stop { margin-top:10px; padding:10px; border-radius:10px; background:rgba(255,120,120,.16); }
+  .gc-test { margin-top:10px; }
+  .gc-ctl { margin-top:10px; }
   .gmove { margin-top:12px; padding:12px; border-radius:14px; background:rgba(255,255,255,.08); }
   /* compact rows (later 2026-10-16): one shut row per move, one open at a time */
   .gmoves .gmove { margin-top:6px; padding:0; overflow:hidden; }
@@ -1078,6 +1104,7 @@
 <script src="quest-gut.js?v=20261024g3"></script>
 <script src="quest-library.js?v=20261022b1"></script>
 <script src="quest-gym.js?v=20261019x"></script>
+<script src="quest-gymcoach.js?v=20261109a"></script>
 <script src="quest-morning.js?v=20261030c"></script>
 <script src="quest-buckets.js?v=20261030c"></script>
 <script src="quest-agenda.js?v=20261024a"></script>
@@ -4641,8 +4668,12 @@
   const gymDue = () => GL.dueKeys(LV, GYM, (gymInfo.last || []).map(w => ({ ...w, day:gymDay(w) })), gameYmd());
 
   let gymShowMove = false, gymTesting = null, gymRow = null;
+  /* Coach (2026-11-09): a move's week, its video and a minute-by-minute clock (quest-gymcoach.js). gymCoach is the open
+     view ("week" | "prep" | "go") or null; the clock lives in the draft (GYM.coach) so a redraw or reload keeps it. */
+  let gymCoach = null, gymCoachTick = null, gymCoachStep = -1;
+  const GC = window.QuestGymCoach;
   async function openGym(block){
-    gymShowMove = false; gymTesting = null; gymRow = null; GYMASK = null;
+    gymShowMove = false; gymTesting = null; gymRow = null; GYMASK = null; gymCoach = null;
     // opening the log at the gym means you're there; opening it early (to move it) does not
     if (block && !G.day.checks[gk(block)] && block.s - now() < 30 * 60000) checkIn(block);
     await loadGymInfo();
@@ -4658,6 +4689,8 @@
      level and a ✓ once logged; one row opens at a time (quest-gymlog.js). Body weight is one small line. Every change
      saves the draft on this phone at once, as before. */
   function drawGym(){
+    if (gymCoach && GC) return drawCoach();
+    clearInterval(gymCoachTick); gymCoachTick = null;
     const P = PROGRAMS[GYM.program];
     const blk = GYM.blockKey && blocks().find(x => x.key === GYM.blockKey);
     const early = blk && blk.s - now() >= 30 * 60000;   // not at the gym yet: the move options come first
@@ -4671,6 +4704,7 @@
       <div class="gbw"><label for="gBw">⚖️ Body weight</label><input class="set" id="gBw" inputmode="decimal" placeholder="lbs" value="${esc(GYM.bw || "")}">
         <small id="gBwT">${tr ? `Last ${esc(String(tr.last.lbs))}` : "optional"}</small></div>`;
     const due = gymDue(), ringNote = due.length ? ` A green ring means you haven't done it in the last ${GL.DUE_DAYS} days.` : "";
+    if (P.strength && GC) h += `<button class="btn gc-open" id="gCoach">🎯 Coach · One-Arm Chin <small>this week, the video, minute by minute</small></button>`;
     if (P.strength) h += `<div class="gmoves">${GL.movesHTML(LV, esc, GYM, gymRow, gymTesting, due)}</div>
       <p class="gnote">Tap a move you're doing today. The ones you leave shut aren't logged.${ringNote}</p>`;
     if (P.mobility) h += `<div class="glabel">Mobility</div><div class="gchips">${P.mobility.map(m =>
@@ -4692,7 +4726,7 @@
     openSheet(h, true);
     const sh = $("sheet");
     if (keepScroll != null) sh.scrollTop = keepScroll;
-    $("gClose").onclick = () => { GYMASK = null; saveDraft(); stopRest(); closeSheet(); };
+    $("gClose").onclick = () => { GYMASK = null; gymCoach = null; saveDraft(); stopRest(); closeSheet(); };
     if ($("gSkip")) $("gSkip").onclick = () => { GYMASK = asking ? null : { key:blk.key, kind:"skip" }; drawGym(); };
     if ($("gSkipNo")) $("gSkipNo").onclick = () => { GYMASK = null; drawGym(); };
     if ($("gSkipYes")) $("gSkipYes").onclick = () => skipGym(blk, $("gSkipYes"));
@@ -4721,6 +4755,32 @@
     sh.querySelectorAll("[data-feel]").forEach(b => b.onclick = () => { GYM.feel = GYM.feel === b.dataset.feel ? null : b.dataset.feel; saveDraft(); drawGym(); });
     $("gRest").onclick = startRest;
     $("gSave").onclick = saveGym;
+    if ($("gCoach")) $("gCoach").onclick = () => { gymCoach = GYM.coach && GYM.coach.started ? "go" : "week"; drawGym(); };
+  }
+  function drawCoach(){
+    const code = "OAC", g = GC.guide(code), x = GYM.e[code];
+    const week = GC.weekStatus(code, (gymInfo.last || []).map(w => ({ ...w, day:gymDay(w) })), x, gameYmd(), LV.touched);
+    const keepScroll = $("sheet").classList.contains("open") ? $("sheet").scrollTop : null;
+    openSheet(GC.html(esc, code, gymCoach, { week, clock:GYM.coach, x, now:Date.now(), LV }), true);
+    const sh = $("sheet"); if (keepScroll != null) sh.scrollTop = keepScroll;
+    sh.querySelector("[data-gcclose]").onclick = () => { gymCoach = null; drawGym(); };
+    sh.querySelectorAll("[data-gcv]").forEach(b => b.onclick = () => { gymCoach = b.dataset.gcv; sh.scrollTop = 0; drawGym(); });
+    sh.querySelectorAll("[data-gc]").forEach(b => b.onclick = () => { GYM.coach = GC.act(g, GYM.coach, b.dataset.gc, Date.now()); saveDraft(); drawGym(); });
+    sh.querySelectorAll("[data-gctest]").forEach(b => b.onclick = () => gymTest(code, b.dataset.gctest === "1", b.getBoundingClientRect()));
+    sh.querySelectorAll("[data-gcreps]").forEach(inp => inp.oninput = () => { GYM.e[code] = GC.applyLog(GYM.e[code], inp.dataset.gcreps, inp.value); saveDraft(); });
+    sh.querySelectorAll("[data-gcmile]").forEach(b => b.onclick = () => { GYM.e[code] = GC.applyLog(GYM.e[code], "mile", b.dataset.gcmile); saveDraft(); drawGym(); });
+    sh.querySelectorAll("[data-gceff]").forEach(b => b.onclick = () => { GYM.e[code] = GC.applyLog(GYM.e[code], "eff", b.dataset.gceff); saveDraft(); drawGym(); });
+    // the clock: the time ticks in place; a new step redraws and buzzes
+    clearInterval(gymCoachTick); gymCoachTick = null;
+    const c = GYM.coach;
+    gymCoachStep = c && c.started ? GC.stepAt(g, GC.elapsed(c, Date.now())).i : -1;
+    if (gymCoach === "go" && c && c.started && !c.paused) gymCoachTick = setInterval(() => {
+      if (!gymCoach || !$("gcT")) { clearInterval(gymCoachTick); gymCoachTick = null; return; }
+      const sec = GC.elapsed(GYM.coach, Date.now()), p = GC.stepAt(g, sec);
+      if (p.i !== gymCoachStep) { if (navigator.vibrate) navigator.vibrate([120, 80, 120]); return drawGym(); }
+      $("gcT").firstChild.textContent = GC.mmss(sec);
+      if ($("gcL")) $("gcL").textContent = `${GC.mmss(p.left)} left`;
+    }, 1000);
   }
   // d18: a pass is one level up and a little party; "not yet" only records the try
   function gymTest(c, pass, rect){
