@@ -5,7 +5,9 @@
    - Go: a running clock that walks the session step by step, then logs the set into the Gym log row.
    Move guides come from a video watched and broken down. One-Arm Chin is from Jack Woods, "How anyone can achieve a
    one-arm chinup in 3 minutes a week" (youtu.be/Q3dhtlOq8NE): one set a week, alternating arms, full range,
-   assistance taken away until the lowering is forced. The other moves get a guide when their video is broken down.
+   assistance taken away until the lowering is forced. Nordic Curl, Handstand Push-Up, Planche Push-Up and Front Lever Row are from his videos 6AxkQmf-8lM, PwutudyK_1Y,
+   qoaLWaaWyDM and JcS6_llzbBg (watched 2026-11-09). Single-Leg Squat has no video yet. Warm-ups marked "my addition" are not
+   from the videos.
    Pure, so it can be tested (node --test still/test). */
 (function (root) {
   "use strict";
@@ -15,6 +17,7 @@
   const GUIDES = {
     OAC: {
       code: "OAC", title: "One-Arm Chin", perWeek: 1,
+      stopText: "you need a rest · you can't attack the next rep full effort · it stops being fun. Stopping early protects your elbows.",
       video: { url: `https://youtu.be/${VID}`, by: "Jack Woods", name: "One-arm chin-up in 3 minutes a week", len: "12:55",
         chapters: [[0, "0:00", "What this is"], [60, "1:00", "The setup: rings, feet, other hand"], [180, "3:00", "How hard: get to forced negatives"],
           [355, "5:55", "One set a week, alternate arms"], [525, "8:45", "Test rep and milestones"], [700, "11:40", "Biggest mistake: doing too much"]] },
@@ -52,6 +55,120 @@
           "Each rep, take a tiny bit of help away until you sink on the way down and get stuck on the way up (a forced negative). Stay at that edge.",
           "Keep every rep full range, even when it gets hard."], stop: true, cue: at(355) },
         { s: 90, title: "Log it", log: true, do: ["Reps per arm, the hardest thing you did, and how it went.", "Then you're done with this move for the week."] },
+      ],
+    },
+    NC: {
+      code: "NC", title: "Nordic Curl", perWeek: 1,
+      stopText: "Stop when you feel satisfied and don't want any more. That's the week.",
+      video: { url: "https://youtu.be/6AxkQmf-8lM", by: "Jack Woods", name: "Build a Nordic curl from scratch in 2 minutes a week", len: "5:05",
+        chapters: [[0, "0:00", "Why: knees, sprint, jump"], [49, "0:49", "Gear: heel anchor, knee pad"], [101, "1:41", "Mechanics: only the knee matters"], [186, "3:06", "One rep a week, full range"]] },
+      need: ["Something heavy to hook your heels under (Nordic strap in a door, loaded barbell, fixed rack)", "A pad or folded mat for the knees", "Space to fall forward onto your hands"],
+      rules: [
+        ["Once a week, one rep", "The whole week is one full rep, a minute or two of grinding. When you feel satisfied and don't want more, you're done for the week."],
+        ["Think only about the knee", "The move is the knee going from straight (body upright) to 90 degrees and back. Ignore what the upper body is doing."],
+        ["Two ways to get help", "1) Fold at the hips (bend forward): shorter lever, less load on the knee. 2) Hands on the floor pushing you up. Near the top you can't reach the floor, so fold at the hips first, then add the hands."],
+        ["Harder = less help", "Take the hands away and open the hips until your body is one straight line from knees to head."],
+        ["Every degree is a grind", "On the way down, actively try to pull your heels to your butt and hold yourself up while your weight pries the knee open. You should be getting stuck and failing the whole way."],
+        ["A rep only counts to the floor", "Lowering 45 degrees and calling it failure is the big mistake. Go all the way until your hips touch the floor, using as much help as you need."],
+        ["Progress = more strength each week", "If your max goes up week to week you're on track. Keep coming back until the full Nordic."],
+      ],
+      milestones: [[1, "Hands do most of the work"], [2, "Hands help the whole way"], [3, "Hands help only near the bottom"], [4, "Part of the range with no hands"], [5, "Full negative, no hands"], [6, "Pull back up with no hands"], [7, "Weighted"]],
+      steps: [
+        { s: 60, title: "Set up the anchor", do: ["Heels hooked under the strap or bar, firm. Pull up on it once to check it holds.", "Pad under the knees. Kneel upright, hips straight."], cue: "https://youtu.be/6AxkQmf-8lM?t=49" },
+        { s: 120, title: "Warm up (my addition, not in the video)", do: ["0:00 to 0:45 · 10 slow bodyweight good mornings or hip hinges.", "0:45 to 1:30 · 2 easy part-way Nordics, lots of hand help, only a little range.", "1:30 to 2:00 · Shake the legs out, kneel back in position."] },
+        { s: 45, title: "Plan your help", do: ["Pick where you'll fold at the hips and where the hands come in.", "Rule: never stop the rep. If you're dropping too fast, fold more or push with the hands."], cue: "https://youtu.be/6AxkQmf-8lM?t=101" },
+        { s: 150, title: "The one rep", set: true, stop: true, do: [
+          "Start upright, straight line knees to head.",
+          "Lower slowly. The whole time, try to pull your heels toward your butt and hold yourself up.",
+          "When you start to fall: fold at the hips. Still falling: hands on the floor and push just enough to keep it a grind.",
+          "Keep going until your hips touch the floor. That's the rep.",
+          "If you have it in you, push back up with as little help as you can, grinding every inch."], cue: "https://youtu.be/6AxkQmf-8lM?t=186" },
+        { s: 60, title: "Log it", log: true, do: ["The hardest thing you did and how it went.", "Done with this move for the week."] },
+      ],
+    },
+    HSPU: {
+      code: "HSPU", title: "Handstand Push-Up", perWeek: 1,
+      stopText: "Stop when it stops being fun, or you can't push every inch at full effort. Have more? Make next week count more.",
+      video: { url: "https://youtu.be/PwutudyK_1Y", by: "Jack Woods", name: "The fastest way to build strong shoulders at home", len: "12:05",
+        chapters: [[0, "0:00", "What this is"], [46, "0:46", "Equipment"], [70, "1:10", "Goals and roadmap"], [192, "3:12", "Scaling down: the zero, full range"], [307, "5:07", "Scaling up: feet on box, then straps"], [545, "9:05", "One set a week"], [593, "9:53", "Measuring progress"], [660, "11:00", "Common mistakes"]] },
+      need: ["Rings set low or parallettes (anything that lets your head go below your hands)", "A sturdy box, stool or chair for the feet", "Ring straps to hook the feet into, if you're there"],
+      rules: [
+        ["Once a week, one set", "One continuous set, max effort from rep 1, under 3 minutes. Brief pause between reps to breathe, and between up and down to check full range."],
+        ["Full range", "Top: arms overhead, shoulders up by your ears. Bottom: shoulders touch the rings or bars. Every up and every down."],
+        ["Hips stay up, always", "Scale by moving the FEET, never by dropping the hips. Torso stays steep (45 to 90 degrees to the floor) like a real handstand push-up."],
+        ["Know your zero", "Standing on your feet with no weight on the arms, guiding a full-range rep. When tired, go back toward the zero so you can always hit full range."],
+        ["The knob: weight on hands vs feet", "Floor feet (pike) → feet on a box → feet in the straps → less strap help → freestanding. More weight on the hands = harder."],
+        ["Forced negatives", "Push up as hard as you can with a load heavy enough that you're forced down, failing every inch. On the way up: push, get stuck, step the feet down a level, never drop the hips."],
+        ["Mistakes to avoid", "Not full range. Dropping the hips when it gets hard. Not adjusting so every inch is maximum."],
+      ],
+      milestones: [[1, "Pike, feet on floor, some weight on hands"], [2, "Pike push-up, full range"], [3, "Feet on the box (part of the range)"], [4, "Feet off at the bottom: shoulder stand"], [5, "Strap-assisted push from shoulder stand"], [6, "That range with no strap help"], [7, "Freestanding HSPU 🏆"]],
+      steps: [
+        { s: 60, title: "Set up", do: ["Rings low, or parallettes. Box behind you at a distance you can step onto.", "Check straps and buckles. Clear space to come down."], cue: "https://youtu.be/PwutudyK_1Y?t=46" },
+        { s: 120, title: "Warm up (my addition) and practise the zero", do: ["0:00 to 0:45 · Wrist circles and arm circles.", "0:45 to 1:30 · 2 zero reps: standing, hands on rings, guide a full-range rep with no weight. Shoulders to ears at top, shoulders to rings at bottom.", "1:30 to 2:00 · 2 easy pike push-ups, hips high."], cue: "https://youtu.be/PwutudyK_1Y?t=192" },
+        { s: 60, title: "Find your level on the way down", test: true, do: ["Elbows slightly bent, hips stacked over shoulders. Try your hardest foot position.", "Lower until you start being forced down. That's your level. Falling? Step down one level (straps → box → floor)."], cue: "https://youtu.be/PwutudyK_1Y?t=307" },
+        { s: 180, title: "The one set (continuous)", set: true, stop: true, do: [
+          "Each rep: from the top (shoulders by ears) lower to shoulders touching the rings, fighting the whole way, then push back up.",
+          "Always be trying to push up. Hips stay stacked over the shoulders.",
+          "Down: forced down slowly at your limit. Use the feet to catch and slow it if needed.",
+          "Up: push, get stuck, step the feet down a level, keep pushing. Never drop the hips.",
+          "Brief breath between reps. Short check at top and bottom that you hit full range."], cue: "https://youtu.be/PwutudyK_1Y?t=545" },
+        { s: 60, title: "Log it", log: true, do: ["Which level you started rep 1 at (that's your weekly number), and how it went."], cue: "https://youtu.be/PwutudyK_1Y?t=593" },
+      ],
+    },
+    PPU: {
+      code: "PPU", title: "Planche Push-Up", perWeek: 1,
+      stopText: "Stop when you need a break. That ends the week. One set only.",
+      video: { url: "https://youtu.be/qoaLWaaWyDM", by: "Jack Woods", name: "How to build push-up strength insanely fast", len: "11:47",
+        chapters: [[0, "0:00", "Intro"], [71, "1:11", "The goal: max pushing strength"], [113, "1:53", "The problem with push-ups"], [221, "3:41", "The fix: lean"], [324, "5:24", "How to do the rep"], [543, "9:03", "The protocol: once a week"]] },
+      need: ["Floor space (rings or parallettes later)", "Nothing else"],
+      rules: [
+        ["Once a week, one set", "Continuous reps, as little rest between reps as you can, no set rep count. Under 3 minutes. Stop when you need a break."],
+        ["The knob is lean", "How far your shoulders are ahead of your hands. Shoulders over hands = easy, far ahead = hard (planche push-up)."],
+        ["Body position", "Plank, body rigid in a straight line, hips about level with shoulders (no sag, no pike), on your toes, elbows locked at the top."],
+        ["Full range", "Bottom: chest AND hips touch the floor. Top: elbows locked."],
+        ["Down: lean until forced down", "Bend the elbows slightly, lean forward until you start sinking. Push the ground away as hard as you can the whole time. Stuck? Lean more. Falling fast? Lean less."],
+        ["Up: back off until you win", "Keep pushing at max. Same impossible spot? Lean back slightly until you start moving. Moving easily? Add lean until stuck again. Repeat to lockout."],
+        ["Always be able to scale to zero", "Too hard or tired: bring a foot or knee forward to take weight off the hands, down to no weight at all. Never stop because it's too heavy."],
+        ["Progress = lean on rep 1", "How far you can lean on your first, freshest rep. Go a bit further each week."],
+      ],
+      milestones: [[1, "Weight taken off (knee forward)"], [2, "Leaning push-up"], [3, "Tuck"], [4, "Hips level with shoulders"], [5, "Legs extended, hips level"], [6, "Advanced tuck"], [7, "Full planche push-up, some range 🏆"]],
+      steps: [
+        { s: 120, title: "Warm up (my addition)", do: ["0:00 to 0:45 · Wrist circles, palms flat rocks forward and back (wrists take a lot here).", "0:45 to 2:00 · 3 easy push-ups with a small lean, chest and hips to floor."] },
+        { s: 60, title: "Test rep: how far can you lean?", test: true, do: ["Top of a plank, elbows slightly bent, lean forward as far as you can and still start a controlled lowering.", "Note it: hands at your hips? Your belly? That's this week's number."], cue: "https://youtu.be/qoaLWaaWyDM?t=324" },
+        { s: 180, title: "The one set (continuous)", set: true, stop: true, do: [
+          "Down: lean until you start being forced down, push the ground away as hard as possible. Stuck → lean more. Too fast → lean less. Inch down until chest and hips touch.",
+          "Up: push at max. Stuck at the same spot → lean back a little until you win. Moving easily → add lean. Lock the elbows at the top.",
+          "Straight into the next rep, as little rest as you can. Each rep is weaker, so lean less each time.",
+          "Too tired? Bring a knee forward to take weight off rather than stopping."], cue: "https://youtu.be/qoaLWaaWyDM?t=543" },
+        { s: 60, title: "Log it", log: true, do: ["How far you leaned on rep 1, reps, and how it went."] },
+      ],
+    },
+    FLR: {
+      code: "FLR", title: "Front Lever Row", perWeek: 1,
+      stopText: "Stop as soon as you can't pull as hard as possible. Short and sweet: one or two intense reps.",
+      video: { url: "https://youtu.be/JcS6_llzbBg", by: "Jack Woods", name: "You're not rowing hard enough", len: "8:27",
+        chapters: [[0, "0:00", "Intro"], [22, "0:22", "Why normal rows don't work"], [351, "5:51", "How to do it"], [436, "7:16", "Easier, harder, tuck"], [464, "7:44", "Once a week, one set"]] },
+      need: ["Gymnastic rings (or TRX, table edge, sturdy bar)", "Check the anchor: you fail the lowering on purpose"],
+      rules: [
+        ["Once a week, one set", "One or two intense reps. Stop as soon as you can't pull as hard as possible."],
+        ["Pull as hard as possible at every point", "The load has to change through the rep so every inch is a max. Rows that don't make you red in the face do nothing."],
+        ["The knob: push your hands away", "Push the rings toward your feet. Your shoulders move the other way, so the lever gets longer and harder. You can change it mid-rep."],
+        ["Down: forced down", "From the top, keep rowing the elbows down and keep your body where it is, while pushing the hands away until you lose control and sink. Fight until arms are locked straight."],
+        ["Up: slightly easier", "Ease the hand push a little so you can still move, but keep pulling as hard as possible every inch. Whole rep slow."],
+        ["Full range", "Arms fully locked at the bottom, to the top of the row."],
+        ["Levels", "Feet walked back (easier) → feet on floor, hands pushed out → hands pushed far enough that the feet lift off (first goal) → knees to chest: tuck front lever row → full front lever."],
+      ],
+      milestones: [[1, "Feet walked back, weight off"], [2, "Leaning row, hands pushed out"], [3, "Feet off: tuck front lever row"], [4, "Hips level with shoulders"], [5, "Legs extended, hips level"], [6, "Advanced tuck"], [7, "Full front lever row 🏆"]],
+      steps: [
+        { s: 60, title: "Set up", do: ["Rings at about hip height, straps and anchor checked.", "Feet flat, knees bent, lean back with arms straight."], cue: "https://youtu.be/JcS6_llzbBg?t=351" },
+        { s: 90, title: "Warm up (my addition)", do: ["0:00 to 0:45 · 8 scap pulls in the row position: arms straight, squeeze the shoulder blades together and back.", "0:45 to 1:30 · 3 easy rows, body upright, half effort."] },
+        { s: 150, title: "The one set (1 or 2 reps)", set: true, stop: true, test: true, do: [
+          "Pull to the top of a row.",
+          "Hold the top: keep rowing the elbows down, keep your body where it is.",
+          "Push your hands away toward your feet until you lose control and sink. Keep rowing the elbows down the whole way to locked arms.",
+          "Up: ease the push slightly so you can move, still pulling as hard as possible every inch. Slow.",
+          "Can lift the feet? Do it, knees to chest (tuck). Stuck? Walk the feet back."], cue: "https://youtu.be/JcS6_llzbBg?t=436" },
+        { s: 60, title: "Log it", log: true, do: ["Hardest position you held and how it went.", "Other pull days: pull-ups, not more rows."], cue: "https://youtu.be/JcS6_llzbBg?t=464" },
       ],
     },
   };
@@ -106,7 +223,7 @@
       <p class="gc-big">${st.done ? `✅ Done this week (${esc(dayName(st.doneOn))}). Skip ${esc(g.title)} until Monday.` : `⬜ Not done this week. Today is a good day for the one set.`}</p>
       <div class="glabel">Last 6 weeks</div><table class="gc-tab"><tr><th>Week of</th><th>Hardest</th><th>Reps</th><th>How</th></tr>`;
     st.weeks.forEach((w, k) => { h +=`<tr><td>${esc(dayName(w.monday))}</td><td>${w.day ? esc(w.level ? `L${w.level} ${LV ? LV.LEVELS[g.code][Math.min(7, w.level) - 1] : ""}` : "?") : "·"}</td><td>${w.day && w.reps != null && w.reps !== "" ? esc(String(w.reps)) : "·"}</td><td>${w.day ? esc(EFF[w.effort] || "") : k ? "missed" : "not yet"}</td></tr>`; });
-    return h + `</table><p class="gnote">Getting stuck for 2 weeks or more? The video says check: too many reps, not hard enough, poor sleep, or too little protein.</p>`;
+    return h + `</table>${g.code === "OAC" ? `<p class="gnote">Getting stuck for 2 weeks or more? The video says check: too many reps, not hard enough, poor sleep, or too little protein.</p>` : ""}`;
   }
 
   function prepHTML(esc, g) {
@@ -134,7 +251,7 @@
     h += `<div class="gc-step"><div class="gc-h"><span>Step ${p.i + 1} of ${g.steps.length}</span><span id="gcL">${mmss(p.left)} left</span></div>
       <h4>${esc(st.title)}</h4><ul>${st.do.map(d => `<li>${esc(d)}</li>`).join("")}</ul>`;
     if (st.cue) h += `<a class="gc-cue" href="${esc(st.cue)}" target="_blank" rel="noopener">▶ See this part of the video</a>`;
-    if (st.stop) h += `<div class="gc-stop"><b>Stop the set when:</b> you need a rest · you can't attack the next rep full effort · it stops being fun. Stopping early protects your elbows.</div>`;
+    if (st.stop) h += `<div class="gc-stop"><b>Stop:</b> ${esc(g.stopText)}</div>`;
     if (st.test && x && LV) {
       const t = LV.testLevel(x), last = (x.tests || []).slice(-1)[0];
       h += t == null ? `<p class="gnote">You're at the top level in the log.</p>`

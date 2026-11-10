@@ -46,3 +46,13 @@ test("every view renders", () => {
   for (const v of ["week", "prep", "go"]) assert.match(C.html(esc, "OAC", v, { week, clock:{ started:1, skip:600 }, x, now:2, LV:L }), /Coach/);
   assert.match(C.html(esc, "OAC", "prep", { week }), /youtu\.be\/Q3dhtlOq8NE\?t=355/);
 });
+test("the four new moves have full guides whose milestones fit the log levels", () => {
+  for (const c of ["NC", "HSPU", "PPU", "FLR"]) {
+    const g = C.guide(c); assert.ok(g, c);
+    assert.ok(g.steps.some(s => s.set) && g.steps.some(s => s.log), c);
+    g.milestones.forEach(([n]) => assert.ok(n >= 1 && n <= 7, c));
+    const week = C.weekStatus(c, [], null, "2026-11-09", L.touched);
+    assert.match(C.html(esc, c, "go", { week, clock:{ started:1, skip:9999 }, x:L.startMove(c, 3), now:2, LV:L }), /Log it/);
+    assert.match(C.html(esc, c, "prep", { week }), /youtu\.be/);
+  }
+});
