@@ -187,7 +187,7 @@
     const g = guide(code); if (!g) return "";
     const tabs = [["week", "📅 Week"], ["prep", "📺 Prep"], ["go", "⏱ Go"]].map(([k, n]) => `<button class="gchip${view === k ? " on" : ""}" data-gcv="${k}">${n}</button>`).join("");
     const body = view === "prep" ? prepHTML(esc, g) : view === "go" ? goHTML(esc, g, ctx.clock, ctx.x, ctx.now, ctx.LV) : weekHTML(esc, g, ctx.week, ctx.LV);
-    return `<div class="gc"><div class="gc-top"><b>🎯 Coach · ${esc(g.title)}</b><button class="btn ghost small" data-gcclose>Back to log</button></div>
+    return `<div class="gc"><div class="gc-top"><b>🎯 Coach · ${esc(g.title)}</b><button class="btn ghost small" data-gcclose>${ctx.page ? "Open Gym log to save" : "Back to log"}</button></div>
       <div class="gchips gc-tabs">${tabs}</div>${body}</div>`;
   }
 
