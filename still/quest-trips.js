@@ -524,6 +524,9 @@
   #tripView .toast{position:absolute;left:24px;bottom:18px;z-index:950;background:#2a2f63;border:1px solid rgba(255,255,255,.2);border-radius:10px;padding:8px 12px;font-size:13px}
   #tripView .src{font-size:11px;color:var(--ink-faint);margin-top:18px}
   body.trips-home #app{display:none}
+  body.gym-home #app{display:none}
+  #gymHome{position:fixed;left:210px;top:0;right:0;bottom:0;z-index:30;display:none;overflow:auto;padding:28px 32px;font-family:var(--font);color:var(--ink);background:rgba(0,0,0,.18)}
+  body.gym-home #gymHome{display:block}
   #tripHome{position:fixed;left:210px;top:0;right:0;bottom:0;z-index:30;display:none;overflow:auto;padding:28px 32px;font-family:var(--font);color:var(--ink);background:rgba(0,0,0,.18)}
   body.trips-home #tripHome{display:block}
   #tripHome button{font:inherit;color:inherit;border:0;background:none;cursor:pointer}
@@ -602,6 +605,9 @@
   const home = document.createElement("section");
   home.id = "tripHome";
   document.body.appendChild(home);
+  const gymHome = document.createElement("section");
+  gymHome.id = "gymHome";
+  document.body.appendChild(gymHome);
   document.body.classList.add("has-side");
 
   const S = { trips: [], local: null, homeTab: "Upcoming", cur: null, tab: "Itinerary", day: -1, sel: null, mode: "map", live: false, note: "" };
@@ -614,7 +620,7 @@
 
   /* sidebar: Today, Calendar, Quests & XP, Skills, Trips (one item; the trips list lives on the Trips page) */
   function drawSide(active) {
-    const navs = [["today", "☀ Today"], ["cal", "▦ Calendar"], ["quests", "★ Quests &amp; XP"], ["skills", "◆ Skills"], ["trips", "✈ Trips"]];
+    const navs = [["today", "☀ Today"], ["cal", "▦ Calendar"], ["quests", "★ Quests &amp; XP"], ["skills", "◆ Skills"], ["trips", "✈ Trips"], ["gym", "🏋 Gym"]];
     side.innerHTML = `<div class="brand"><div class="logo">★</div><div><b>DAY <span>QUEST</span></b><small>STILLNESS</small></div></div>` +
       navs.map(([k, l]) => `<button class="nav ${active === k ? "on" : ""}" data-nav="${k}">${l}</button>`).join("");
     side.querySelectorAll("[data-nav]").forEach((b) => b.onclick = () => go(b.dataset.nav));
@@ -622,7 +628,9 @@
   function go(k) {
     if (k === "new") return newTrip();
     if (k === "trips") return showHome();
-    document.body.classList.remove("trip-open", "trips-home");
+    document.body.classList.remove("trip-open", "trips-home", "gym-home");
+    if (window.QuestGymPage) window.QuestGymPage.close();
+    if (k === "gym") return showGym();
     drawSide(k);
     const el = k === "cal" ? document.querySelector(".cal-head") : k === "quests" ? document.getElementById("main") : k === "skills" ? document.getElementById("skillsRow") : null;
     if (k === "skills") { const b = document.getElementById("skillsBtn"); if (b) b.click(); }
@@ -630,8 +638,15 @@
   }
   /* Trips home: Upcoming (now and future, soonest first) and Past (newest first) */
   const today = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
+  /* Gym page (2026-11-09): the coach for each move (week, video prep, minute-by-minute clock), drawn by quest.html */
+  function showGym() {
+    document.body.classList.add("gym-home");
+    drawSide("gym");
+    if (window.QuestGymPage) window.QuestGymPage.open(gymHome); else gymHome.innerHTML = `<div class="empty">The gym page is still loading.</div>`;
+  }
   function showHome() {
-    document.body.classList.remove("trip-open");
+    document.body.classList.remove("trip-open", "gym-home");
+    if (window.QuestGymPage) window.QuestGymPage.close();
     document.body.classList.add("trips-home");
     drawSide("trips");
     const { upcoming, past, needsDates } = splitTrips(S.trips, today());
