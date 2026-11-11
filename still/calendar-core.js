@@ -193,7 +193,7 @@
       in Studio Evening, not Ink. */
   const LOOK_RENAMED = { morning: "evening" };
   /** A saved look name → a known look id ("ink" for anything else). */
-  const lookId = (saved) => { const id = LOOK_RENAMED[saved] || saved; return LOOKS.some((l) => l.id === id) ? id : "ink"; };
+  const lookId = (saved) => { const id = Object.hasOwn(LOOK_RENAMED, saved) ? LOOK_RENAMED[saved] : saved; return LOOKS.some((l) => l.id === id) ? id : "ink"; };
 
   /* ---- words ---- */
   function hm(min) {

@@ -3,7 +3,8 @@
 // more professional and exciting", and "the month and stuff fade out on the top edge so it needs to be clean".
 // Then, the same day: "Can you give me three more colour schemes. Make it really inspirational for a dancer and
 // business owner". Then, on the one light look, Studio Morning: "How about a dark version instead?", so it became
-// Studio Evening, and a phone that saved Studio Morning opens in Studio Evening. So the page has four looks (calendar-core.js LOOKS): Ink (the default, the :root block) and three
+// Studio Evening, and a phone that saved Studio Morning opens in Studio Evening.
+// So the page has four looks (calendar-core.js LOOKS): Ink (the default, the :root block) and three
 // more, each one :root[data-look="..."] block of variables over it. Every look is checked here the same way:
 // each block type a clearly different colour in the same family as Ink, the "now" accent never mistaken for a type,
 // readable text on every event card, solid bars, and nothing but colours changed.
