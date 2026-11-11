@@ -152,6 +152,31 @@
   }
   const blockMinutes = (task) => (task.estMin ? Math.max(15, Math.ceil(task.estMin / 15) * 15) : 30);
 
+  /* ---- a finger swipe between days (Junyan, 2026-11-11: "it changes days when I'm in the day view very easily").
+     The strip used to be one native scroller in both directions with x snapping, so a scroll that drifted
+     sideways snapped to the next day. Now a finger moves days only through these two rules. ---- */
+  const SWIPE = { lockPx: 10, minPx: 70, maxPx: 110, widthShare: 0.2, ratio: 2, flickPxPerMs: 0.5, flickMinPx: 30 };
+  /** Which way a touch is going after it has moved dx, dy px: null (not yet 10 px), "x" (more sideways
+      than up/down) or "y" (a scroll; it never changes the day). Decided once, in the first 10 px. */
+  function swipeLock(dx, dy) {
+    const ax = Math.abs(dx), ay = Math.abs(dy);
+    if (Math.max(ax, ay) < SWIPE.lockPx) return null;
+    return ax > ay ? "x" : "y";
+  }
+  /** At the end of a sideways-locked touch: +1 (to later days), -1 (to earlier days) or 0 (stay).
+      {dx, dy} is the whole move in px, vx the finger speed in px/ms over its last moment, width the strip's
+      width. A day change needs sideways travel at least twice the up/down travel, and either a long
+      enough move (a fifth of the width, 70 to 110 px) or a fast deliberate flick. */
+  function swipeCommit({ dx, dy, vx = 0 }, width) {
+    const ax = Math.abs(dx), ay = Math.abs(dy);
+    if (ax < SWIPE.ratio * ay) return 0;
+    const need = Math.min(SWIPE.maxPx, Math.max(SWIPE.minPx, (width || 0) * SWIPE.widthShare));
+    const far = ax >= need;
+    const flick = ax >= SWIPE.flickMinPx && Math.abs(vx) >= SWIPE.flickPxPerMs && Math.sign(vx) === Math.sign(dx);
+    if (!far && !flick) return 0;
+    return dx < 0 ? 1 : -1;
+  }
+
   /* ---- words ---- */
   function hm(min) {
     const h = Math.floor(min / 60) % 24, m = min % 60;
@@ -163,5 +188,5 @@
   }
 
   root.CalCore = { wall, instant, offset, addDays, dowOf, weekStart, isoWeek, addMonths, monthKey, monthsFor,
-    KINDS, kindOf, layout, pieces, coversDay, orderBetween, groupOf, dropTask, blockMinutes, hm, dur };
+    KINDS, kindOf, layout, pieces, coversDay, orderBetween, groupOf, dropTask, blockMinutes, hm, dur, SWIPE, swipeLock, swipeCommit };
 })(typeof window !== "undefined" ? window : globalThis);
