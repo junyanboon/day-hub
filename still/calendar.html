@@ -45,14 +45,14 @@
 :root{
 /* the palette */
 --amber:#fbbf24;--orange:#fb923c;--lime:#a3e635;--emerald:#34d399;--cyan:#22d3ee;--blue:#60a5fa;
---indigo:#818cf8;--purple:#c084fc;--pink:#f472b6;--slate:#94a3b8;--sand:#d6bc8a;--grey:#8b93a3;--red:#ff4f5e;
+--indigo:#818cf8;--purple:#c084fc;--pink:#f472b6;--slate:#94a3b8;--sand:#d6bc8a;--stone:#a8a29e;--red:#ff4f5e;
 /* surfaces and text */
 --bg:#0e1015;--bar:#14171e;--raise:#1a1e27;--raise2:#232835;--line:rgba(255,255,255,.09);--hair:rgba(255,255,255,.05);
 --ink:#f2f4f8;--soft:#a9b0bf;--faint:#6e7686;
 --now:var(--red);--accent:var(--red);--go:var(--ink);
 /* block types: colour means type */
 --k-deep:var(--amber);--k-studio:var(--orange);--k-yoga:var(--cyan);--k-gym:var(--purple);--k-dance:var(--pink);--k-cook:var(--lime);
---k-travel:var(--blue);--k-social:var(--emerald);--k-errand:var(--indigo);--k-wind:var(--slate);--k-rest:var(--sand);--k-other:var(--grey);
+--k-travel:var(--blue);--k-social:var(--emerald);--k-errand:var(--indigo);--k-wind:var(--slate);--k-rest:var(--sand);--k-other:var(--stone);
 /* old names some rules still use */
 --glass:var(--raise);--glass2:var(--raise2);--panel:var(--bar);--pin:var(--bar);--deep:var(--bar);
 --H:56px;--hh:68px;--gut:56px;--rail:56px;--radius:8px;
@@ -582,7 +582,7 @@ const yToMin = (col, clientY) => Math.max(0, Math.min(1440 - SNAP, Math.floor((c
 /** Move an instant by whole days on the wall (DST safe) plus minutes. */
 function shiftWall(ms, dDay, dMin) { const w = C.wall(ms, S.tz); return C.instant(C.addDays(w.day, dDay), w.min, S.tz) + dMin * 60000; }
 
-let raf = 0, settle = 0, dragging = false, lastScroll = 0;
+let raf = 0, settle = 0, dragging = false, swiping = false, lastScroll = 0;
 function wireStrip(v) {
   v.onscroll = () => {
     lastScroll = Date.now();
@@ -595,6 +595,7 @@ function wireStrip(v) {
       clearTimeout(settle);
       settle = setTimeout(() => {   // near either end of the strip: lay a fresh strip around where he stopped
         const at = dayDiff(S.cur, S.win0);
+        if (swiping) return;   // never rebuild the strip under a finger; the scroll that ends the swipe comes back here
         if (at < 4 || at > WIN - S.n - 4) { S.win0 = C.addDays(S.cur, -BACK); render(); refresh(); }
       }, 220);
     });
@@ -667,14 +668,15 @@ function wireSwipe(v) {
     g = null;
     if (!TOUCH || S.page !== "cal" || S.n === "m" || !$("#strip") || e.touches.length !== 1 || swipeBlocked(e.target, v)) return;
     const t = at(e);
+    swiping = true;
     g = { x0: t.clientX, y0: t.clientY, left0: v.scrollLeft, cur0: S.cur, lock: null, pts: [{ x: t.clientX, t: performance.now() }] };
   }, { passive: true });
   v.addEventListener("touchmove", (e) => {
     if (!g) return;
-    if (e.touches.length !== 1) { const x = g; g = null; if (x.lock === "x") goTo(x.cur0); return; }
+    if (e.touches.length !== 1) { const x = g; g = null; swiping = false; if (x.lock === "x") goTo(x.cur0); return; }
     const t = at(e), dx = t.clientX - g.x0, dy = t.clientY - g.y0;
     if (!g.lock) g.lock = C.swipeLock(dx, dy);
-    if (g.lock === "y") { g = null; return; }   // a scroll: the browser has it, and it never changes the day
+    if (g.lock === "y") { g = null; swiping = false; return; }   // a scroll: the browser has it, and it never changes the day
     if (g.lock !== "x") return;
     if (e.cancelable) e.preventDefault();
     v.scrollLeft = Math.max(0, Math.min((WIN - S.n) * dw, g.left0 - dx));   // the days follow the finger
@@ -683,8 +685,9 @@ function wireSwipe(v) {
     while (g.pts.length > 2 && now - g.pts[0].t > 100) g.pts.shift();
   }, { passive: false });
   const end = (e) => {
-    if (!g) return;
-    const x = g, t = at(e); g = null;
+    if (!g) { swiping = false; return; }
+    if (e.type === "touchend" && e.touches.length) return;   // one of two fingers lifted: wait for the last one
+    const x = g, t = at(e); g = null; swiping = false;
     if (x.lock !== "x") return;
     const dx = t.clientX - x.x0, dy = t.clientY - x.y0, p = x.pts[0], dt = performance.now() - p.t;
     const vx = dt > 0 ? (t.clientX - p.x) / dt : 0;
