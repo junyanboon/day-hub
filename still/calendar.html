@@ -13,7 +13,7 @@
 <meta name="apple-mobile-web-app-title" content="Calendar">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>Calendar</title>
-<script src="calendar-core.js?v=4"></script>
+<script src="calendar-core.js?v=5"></script>
 <script>
 /* The look saved on this device (the Look row in Settings) goes on here, before anything is drawn, so the page never
    opens in the old look first. Ink, the default, is the plain page with no data-look. */
@@ -38,7 +38,7 @@
   Colour is by BLOCK TYPE (eleven types, calendar-core.js KINDS), guessed from the title; a hand-set type is
   kept on the Google event (extendedProperties.private.kind). Every new event goes to Joint Plans.
   Studio shifts (the Staff Scheduling calendar) sit in a slim rail on the right of each day.
-  Four looks (2026-11-11): Ink (default), Stage Lights, Studio Morning, Velvet & Brass, picked per device in
+  Four looks (2026-11-11): Ink (default), Stage Lights, Studio Evening, Velvet & Brass, picked per device in
   Settings > Look (calendar-core.js LOOKS, localStorage "cal-look", put on in the head before the first paint).
   Each type's helper and page are later tickets (034 to 043); until then a type page lists its next blocks.
 
@@ -75,7 +75,6 @@
 --ev-fill:26%;--pill-fill:22%;--ev-title:15%;--ev-ink:#ffffff;--ev-time-p:40%;--ev-time:#c3c9d4;--ev-halo:0%;
 /* small washes and shadows */
 --glow:rgba(255,255,255,.06);--today-col:rgba(255,255,255,.018);--past:rgba(0,0,0,.18);--drop:rgba(0,0,0,.6);--track:rgba(255,255,255,.12);
---status:var(--bar);
 /* block types: colour means type */
 --k-deep:var(--amber);--k-studio:var(--orange);--k-yoga:var(--cyan);--k-gym:var(--purple);--k-dance:var(--pink);--k-cook:var(--lime);
 --k-travel:var(--blue);--k-social:var(--emerald);--k-errand:var(--indigo);--k-wind:var(--slate);--k-rest:var(--sand);--k-other:var(--stone);
@@ -97,20 +96,18 @@
 --ink:#f7f1fb;--soft:#bdb1cc;--faint:#8a7d9e;
 --now:#ffc857;--accent:#ffc857;--on-accent:#1a1024;--accent-ink:#ffc857;--neutral:#f7f1fb;
 --ev-fill:30%;--pill-fill:26%;--ev-title:12%;--ev-ink:#ffffff;--ev-time-p:40%;--ev-time:#d9cfe6;--ev-halo:38%;
---glow:rgba(255,200,87,.10);--today-col:rgba(255,200,87,.035);--past:rgba(0,0,0,.22);--drop:rgba(0,0,0,.65);--track:rgba(236,220,255,.12);
---status:var(--bar)}
-/* Studio Morning: a sunlit studio, a maple floor, a paper planner. Warm cream, warm ink, ballet coral for "now".
-   Coral sits near Studio On-Site, so Studio On-Site is a deep burnt orange and Deep Work an ochre. The iPhone draws
-   its clock in white over the top of the page (black-translucent), so a dark strip fills that space in this look. */
-:root[data-look="morning"]{
---amber:#9a7d00;--orange:#a35a0a;--lime:#4f9418;--emerald:#14946a;--cyan:#0e8fa3;--blue:#2563c8;
---indigo:#6358d0;--purple:#9a46c8;--pink:#c7317f;--slate:#5f6f86;--sand:#a1865a;--stone:#857d77;--red:#c42b3c;
---bg:#faf6ef;--bar:#fffdf9;--raise:#f4eee4;--raise2:#e8dfd1;--line:rgba(96,72,40,.16);--hair:rgba(96,72,40,.09);
---ink:#1f1b16;--soft:#5e554a;--faint:#736a5e;
---now:#d24a22;--accent:#d24a22;--on-accent:#ffffff;--accent-ink:#b23a17;--neutral:#1f1b16;
---ev-fill:14%;--pill-fill:16%;--ev-title:50%;--ev-ink:#1f1b16;--ev-time-p:40%;--ev-time:#4a4239;--ev-halo:0%;
---glow:rgba(210,74,34,.12);--today-col:rgba(210,74,34,.035);--past:rgba(96,72,40,.05);--drop:rgba(96,72,40,.16);--track:rgba(31,27,22,.10);
---status:#1f1b16;color-scheme:light}
+--glow:rgba(255,200,87,.10);--today-col:rgba(255,200,87,.035);--past:rgba(0,0,0,.22);--drop:rgba(0,0,0,.65);--track:rgba(236,220,255,.12)}
+/* Studio Evening (Junyan, 2026-11-11, on Studio Morning: "How about a dark version instead?"): the same studio after
+   hours, warm lamp light on a maple floor. Espresso brown, warm cream text, coral for "now". Coral sits near Studio
+   On-Site, so Studio On-Site turns a yellower tangerine; Dance stays pink, well clear of coral. */
+:root[data-look="evening"]{
+--amber:#fbbf24;--orange:#fc980c;--lime:#a3e635;--emerald:#34d399;--cyan:#22d3ee;--blue:#60a5fa;
+--indigo:#818cf8;--purple:#c084fc;--pink:#f472b6;--slate:#94a3b8;--sand:#d6bc8a;--stone:#a8a29e;--red:#ff5a5f;
+--bg:#17120e;--bar:#211a14;--raise:#2a2119;--raise2:#352a20;--line:rgba(255,228,196,.10);--hair:rgba(255,228,196,.055);
+--ink:#f3eadc;--soft:#c4b5a2;--faint:#94826e;
+--now:#ff7a59;--accent:#ff7a59;--on-accent:#1c120c;--accent-ink:#ff7a59;--neutral:#f3eadc;
+--ev-fill:26%;--pill-fill:22%;--ev-title:14%;--ev-ink:#fff8ee;--ev-time-p:38%;--ev-time:#e2d6c6;--ev-halo:0%;
+--glow:rgba(255,122,89,.10);--today-col:rgba(255,170,110,.03);--past:rgba(0,0,0,.22);--drop:rgba(0,0,0,.6);--track:rgba(255,228,196,.12)}
 /* Velvet & Brass: a quiet, premium front office. Emerald-black, warm cream text, brushed brass for "now", calmer
    gem tones. Brass sits near Deep Work and Rest, so Deep Work is a bright citrine and Rest a pale linen. */
 :root[data-look="velvet"]{
@@ -120,9 +117,7 @@
 --ink:#f3ead8;--soft:#b8b4a0;--faint:#82907f;
 --now:#c8a46a;--accent:#c8a46a;--on-accent:#10201b;--accent-ink:#d8b77f;--neutral:#f3ead8;
 --ev-fill:26%;--pill-fill:22%;--ev-title:14%;--ev-ink:#fffaf0;--ev-time-p:38%;--ev-time:#d4ccb8;--ev-halo:0%;
---glow:rgba(200,164,106,.10);--today-col:rgba(200,164,106,.03);--past:rgba(0,0,0,.2);--drop:rgba(0,0,0,.55);--track:rgba(243,234,216,.12);
---status:var(--bar)}
-:root[data-look="morning"] body::before{content:"";position:fixed;left:0;right:0;top:0;height:env(safe-area-inset-top,0px);background:var(--status);z-index:200;pointer-events:none}
+--glow:rgba(200,164,106,.10);--today-col:rgba(200,164,106,.03);--past:rgba(0,0,0,.2);--drop:rgba(0,0,0,.55);--track:rgba(243,234,216,.12)}
 *{box-sizing:border-box}
 html,body{height:100%;margin:0;overflow:hidden}
 body{background:var(--bar);color:var(--ink);font-family:var(--font);font-size:13px;-webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent}
