@@ -18,13 +18,14 @@
 /* The look saved on this device (the Look row in Settings) goes on here, before anything is drawn, so the page never
    opens in the old look first. Ink, the default, is the plain page with no data-look. */
 (function () {
-  var id = "ink";
-  try { id = CalCore.lookId(localStorage.getItem("cal-look")); } catch (e) {}
-  if (id === "ink") return;
-  var L = CalCore.LOOKS.filter(function (x) { return x.id === id; })[0];
-  document.documentElement.dataset.look = id;
-  document.querySelector('meta[name="theme-color"]').content = L.theme;
-  document.querySelector('meta[name="color-scheme"]').content = L.scheme;
+  try {
+    var id = CalCore.lookId(localStorage.getItem("cal-look"));
+    if (id === "ink") return;
+    var L = CalCore.LOOKS.filter(function (x) { return x.id === id; })[0];
+    document.documentElement.dataset.look = id;
+    document.querySelector('meta[name="theme-color"]').content = L.theme;
+    document.querySelector('meta[name="color-scheme"]').content = L.scheme;
+  } catch (e) {}
 })();
 </script>
 <!--
@@ -285,11 +286,11 @@ body.touch .sc.snap{scroll-snap-type:none}
 /* the Look row in Settings: a tiny picture of each look (its header, stage, now line and three block colours) */
 .looks{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
 .look{display:flex;flex-direction:column;align-items:center;gap:6px;border:0;background:none;padding:4px 0;color:var(--soft);font-size:11.5px;line-height:1.2;text-align:center;min-width:0}
-.sw-chip{position:relative;width:52px;height:52px;border-radius:14px;background:linear-gradient(var(--sw-bar) 0 30%,var(--sw-bg) 30%);box-shadow:inset 0 0 0 1px var(--line);display:flex;align-items:flex-end;justify-content:center;gap:4px;padding-bottom:8px;overflow:hidden;transition:box-shadow .15s}
-.sw-chip i{width:8px;height:15px;border-radius:3px;background:var(--sw-1)}.sw-chip i:nth-child(2){height:21px;background:var(--sw-2)}.sw-chip i:nth-child(3){height:11px;background:var(--sw-3)}
-.sw-chip::after{content:"";position:absolute;left:6px;right:6px;top:calc(30% + 6px);height:2px;border-radius:1px;background:var(--sw-acc)}
-.sw-nm{display:block;min-height:2.4em}
-.look[aria-pressed=true]{color:var(--ink);font-weight:600}.look[aria-pressed=true] .sw-chip{box-shadow:0 0 0 2px var(--bar),0 0 0 4px var(--accent)}
+.lk-chip{position:relative;width:52px;height:52px;border-radius:14px;background:linear-gradient(var(--lk-bar) 0 30%,var(--lk-bg) 30%);box-shadow:inset 0 0 0 1px var(--line);display:flex;align-items:flex-end;justify-content:center;gap:4px;padding-bottom:8px;overflow:hidden;transition:box-shadow .15s}
+.lk-chip i{width:8px;height:15px;border-radius:3px;background:var(--lk-1)}.lk-chip i:nth-child(2){height:21px;background:var(--lk-2)}.lk-chip i:nth-child(3){height:11px;background:var(--lk-3)}
+.lk-chip::after{content:"";position:absolute;left:6px;right:6px;top:calc(30% + 6px);height:2px;border-radius:1px;background:var(--lk-acc)}
+.lk-nm{display:block;min-height:2.4em}
+.look[aria-pressed=true]{color:var(--ink);font-weight:600}.look[aria-pressed=true] .lk-chip{box-shadow:0 0 0 2px var(--bar),0 0 0 4px var(--accent)}
 .grab{display:none}
 .modal{position:fixed;inset:0;background:rgb(0 0 0/.5);z-index:80;display:grid;place-items:center;padding:16px}
 .modal .card{background:var(--raise);max-width:340px;display:flex;flex-direction:column;gap:10px;box-shadow:0 16px 50px rgb(0 0 0/.55)}
@@ -883,7 +884,7 @@ const dayLabel = (k) => `${DOW[C.dowOf(k)]} ${MON[+k.slice(5, 7) - 1]} ${+k.slic
 function pSet() {
   const opts = (sel, none) => (none ? `<option value="">None</option>` : "") + ZONES.map(([id, n]) => `<option value="${esc(id)}" ${id === sel ? "selected" : ""}>${esc(n)}</option>`).join("");
   const cur = C.lookId(document.documentElement.dataset.look);
-  return `<div class="field"><p class="lbl" style="margin:0">Look</p><div class="looks" role="group" aria-label="Look">${C.LOOKS.map((l) => `<button class="look" data-look="${l.id}" aria-pressed="${l.id === cur}" style="--sw-bg:${l.bg};--sw-bar:${l.theme};--sw-acc:${l.accent};--sw-1:${l.gels[0]};--sw-2:${l.gels[1]};--sw-3:${l.gels[2]}"><span class="sw-chip" aria-hidden="true"><i></i><i></i><i></i></span><span class="sw-nm">${esc(l.name)}</span></button>`).join("")}</div><div class="meta">Tap one to try it on the whole calendar. This device remembers it.</div></div>
+  return `<div class="field"><p class="lbl" style="margin:0">Look</p><div class="looks" role="group" aria-label="Look">${C.LOOKS.map((l) => `<button class="look" data-look="${l.id}" aria-pressed="${l.id === cur}" style="--lk-bg:${l.bg};--lk-bar:${l.theme};--lk-acc:${l.accent};--lk-1:${l.gels[0]};--lk-2:${l.gels[1]};--lk-3:${l.gels[2]}"><span class="lk-chip" aria-hidden="true"><i></i><i></i><i></i></span><span class="lk-nm">${esc(l.name)}</span></button>`).join("")}</div><div class="meta">Tap one to try it on the whole calendar. This device remembers it.</div></div>
     <div class="field"><p class="lbl" style="margin:0">Studio shifts</p><label class="sw" for="railSw">Show in a slim rail, not as full blocks<input type="checkbox" id="railSw" ${S.rail ? "checked" : ""}></label></div>
     <div class="field"><p class="lbl" style="margin:0">Time zones</p><label class="sw" for="tz1">Main<select id="tz1">${opts(S.tz)}</select></label><label class="sw" for="tz2">Second<select id="tz2">${opts(S.tz2, true)}</select></label></div>
     <div class="field"><p class="lbl" style="margin:0">Block types</p>${C.KINDS.map(([k, n]) => `<div class="r k-${k}" style="color:var(--soft)"><i style="width:12px;height:12px;border-radius:4px;background:var(--c)"></i>${KICON[k] ? KICON[k] + " " : ""}${n}</div>`).join("")}<div class="meta">Guessed from the title. Change one on its event and it sticks.</div></div>
