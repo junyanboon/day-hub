@@ -10,7 +10,7 @@ import { fileURLToPath } from "node:url";
 
 const ROOT = fileURLToPath(new URL("../../..", import.meta.url));
 const PORT = +(process.argv[2] || process.env.PORT || 8791);
-const TYPES = { ".html": "text/html", ".js": "text/javascript", ".mjs": "text/javascript", ".css": "text/css", ".svg": "image/svg+xml", ".png": "image/png", ".json": "application/json" };
+const TYPES = { ".html": "text/html", ".js": "text/javascript", ".mjs": "text/javascript", ".css": "text/css", ".svg": "image/svg+xml", ".png": "image/png", ".json": "application/json", ".webmanifest": "application/manifest+json" };
 const CALS = [
   { id: "joint", name: "Joint Plans", color: "#33c481", writable: true, ok: true },
   { id: "junyan", name: "Junyan", color: "#f6bf26", writable: true, ok: true },
