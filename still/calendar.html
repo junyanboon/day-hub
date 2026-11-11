@@ -13,6 +13,21 @@
 <meta name="apple-mobile-web-app-title" content="Calendar">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>Calendar</title>
+<script src="calendar-core.js?v=4"></script>
+<script>
+/* The look saved on this device (the Look row in Settings) goes on here, before anything is drawn, so the page never
+   opens in the old look first. Ink, the default, is the plain page with no data-look. */
+(function () {
+  try {
+    var id = CalCore.lookId(localStorage.getItem("cal-look"));
+    if (id === "ink") return;
+    var L = CalCore.LOOKS.filter(function (x) { return x.id === id; })[0];
+    document.documentElement.dataset.look = id;
+    document.querySelector('meta[name="theme-color"]').content = L.theme;
+    document.querySelector('meta[name="color-scheme"]').content = L.scheme;
+  } catch (e) {}
+})();
+</script>
 <!--
   Calendar: Junyan's calendar app. Second shape (2026-11-10, one-system map ticket 026 "Build the new
   calendar shell"; approved mockup saved at fleet/wayfinder/one-system/assets/026-calendar-mockup.html):
@@ -23,6 +38,8 @@
   Colour is by BLOCK TYPE (eleven types, calendar-core.js KINDS), guessed from the title; a hand-set type is
   kept on the Google event (extendedProperties.private.kind). Every new event goes to Joint Plans.
   Studio shifts (the Staff Scheduling calendar) sit in a slim rail on the right of each day.
+  Four looks (2026-11-11): Ink (default), Stage Lights, Studio Morning, Velvet & Brass, picked per device in
+  Settings > Look (calendar-core.js LOOKS, localStorage "cal-look", put on in the head before the first paint).
   Each type's helper and page are later tickets (034 to 043); until then a type page lists its next blocks.
 
   Backend: still-api /planner/* (src/planner.mjs, planner-tasks.mjs, suggestions.mjs), gated by the
@@ -50,6 +67,15 @@
 --bg:#0e1015;--bar:#14171e;--raise:#1a1e27;--raise2:#232835;--line:rgba(255,255,255,.09);--hair:rgba(255,255,255,.05);
 --ink:#f2f4f8;--soft:#a9b0bf;--faint:#6e7686;
 --now:var(--red);--accent:var(--red);--go:var(--ink);
+/* text on the accent (today, the chosen view, the now pill), the accent as text (Today button), the plain colour of a
+   pressed chip with no type */
+--on-accent:#ffffff;--accent-ink:var(--accent);--neutral:#ffffff;
+/* event cards: fill and pill tint (share of the type colour), title and time (a share of the type colour mixed into
+   --ev-ink / --ev-time), and a glow round each card (0% is none) */
+--ev-fill:26%;--pill-fill:22%;--ev-title:15%;--ev-ink:#ffffff;--ev-time-p:40%;--ev-time:#c3c9d4;--ev-halo:0%;
+/* small washes and shadows */
+--glow:rgba(255,255,255,.06);--today-col:rgba(255,255,255,.018);--past:rgba(0,0,0,.18);--drop:rgba(0,0,0,.6);--track:rgba(255,255,255,.12);
+--status:var(--bar);
 /* block types: colour means type */
 --k-deep:var(--amber);--k-studio:var(--orange);--k-yoga:var(--cyan);--k-gym:var(--purple);--k-dance:var(--pink);--k-cook:var(--lime);
 --k-travel:var(--blue);--k-social:var(--emerald);--k-errand:var(--indigo);--k-wind:var(--slate);--k-rest:var(--sand);--k-other:var(--stone);
@@ -58,6 +84,45 @@
 --H:56px;--hh:68px;--gut:56px;--rail:56px;--radius:8px;
 --font:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,sans-serif;
 --display:"SF Pro Display",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;color-scheme:dark}
+/* Three more looks (Junyan, 2026-11-11: "Can you give me three more colour schemes. Make it really inspirational for a
+   dancer and business owner"). Picked per device from the Look row in Settings (calendar-core.js LOOKS). Each is
+   colours only: every block type keeps its Ink colour family, and where the look's accent sits near a type, that
+   type's shade moves away from it (still/test/calendar-look.test.mjs checks the distance and every card's contrast). */
+/* Stage Lights: the moment before the curtain. A plum-black stage, spotlight gold for "now", jewel-tone gels that glow.
+   Gold sits near Deep Work, so Deep Work turns a deep amber-orange and Studio On-Site a vermilion. */
+:root[data-look="stage"]{
+--amber:#e08000;--orange:#ff5c3a;--lime:#a6ec3c;--emerald:#28e0a0;--cyan:#2ee0e8;--blue:#3d8bff;
+--indigo:#8a80ff;--purple:#c46cf5;--pink:#ff4fae;--slate:#9ea6cf;--sand:#c8b49c;--stone:#a39aa3;--red:#ff5c6c;
+--bg:#120d1a;--bar:#1d1529;--raise:#251b34;--raise2:#302343;--line:rgba(236,220,255,.10);--hair:rgba(236,220,255,.055);
+--ink:#f7f1fb;--soft:#bdb1cc;--faint:#8a7d9e;
+--now:#ffc857;--accent:#ffc857;--on-accent:#1a1024;--accent-ink:#ffc857;--neutral:#f7f1fb;
+--ev-fill:30%;--pill-fill:26%;--ev-title:12%;--ev-ink:#ffffff;--ev-time-p:40%;--ev-time:#d9cfe6;--ev-halo:38%;
+--glow:rgba(255,200,87,.10);--today-col:rgba(255,200,87,.035);--past:rgba(0,0,0,.22);--drop:rgba(0,0,0,.65);--track:rgba(236,220,255,.12);
+--status:var(--bar)}
+/* Studio Morning: a sunlit studio, a maple floor, a paper planner. Warm cream, warm ink, ballet coral for "now".
+   Coral sits near Studio On-Site, so Studio On-Site is a deep burnt orange and Deep Work an ochre. The iPhone draws
+   its clock in white over the top of the page (black-translucent), so a dark strip fills that space in this look. */
+:root[data-look="morning"]{
+--amber:#9a7d00;--orange:#a35a0a;--lime:#4f9418;--emerald:#14946a;--cyan:#0e8fa3;--blue:#2563c8;
+--indigo:#6358d0;--purple:#9a46c8;--pink:#c7317f;--slate:#5f6f86;--sand:#a1865a;--stone:#857d77;--red:#c42b3c;
+--bg:#faf6ef;--bar:#fffdf9;--raise:#f4eee4;--raise2:#e8dfd1;--line:rgba(96,72,40,.16);--hair:rgba(96,72,40,.09);
+--ink:#1f1b16;--soft:#5e554a;--faint:#736a5e;
+--now:#d24a22;--accent:#d24a22;--on-accent:#ffffff;--accent-ink:#b23a17;--neutral:#1f1b16;
+--ev-fill:14%;--pill-fill:16%;--ev-title:50%;--ev-ink:#1f1b16;--ev-time-p:40%;--ev-time:#4a4239;--ev-halo:0%;
+--glow:rgba(210,74,34,.12);--today-col:rgba(210,74,34,.035);--past:rgba(96,72,40,.05);--drop:rgba(96,72,40,.16);--track:rgba(31,27,22,.10);
+--status:#1f1b16;color-scheme:light}
+/* Velvet & Brass: a quiet, premium front office. Emerald-black, warm cream text, brushed brass for "now", calmer
+   gem tones. Brass sits near Deep Work and Rest, so Deep Work is a bright citrine and Rest a pale linen. */
+:root[data-look="velvet"]{
+--amber:#f5cc1f;--orange:#d0603e;--lime:#a3c45c;--emerald:#4cbf86;--cyan:#3cc6c0;--blue:#4f88e0;
+--indigo:#9097ec;--purple:#b97ad9;--pink:#d9668f;--slate:#8ea2ac;--sand:#e0d6c2;--stone:#a39c92;--red:#e0605a;
+--bg:#0b1a17;--bar:#11251f;--raise:#16302a;--raise2:#1e3c34;--line:rgba(243,234,216,.10);--hair:rgba(243,234,216,.055);
+--ink:#f3ead8;--soft:#b8b4a0;--faint:#82907f;
+--now:#c8a46a;--accent:#c8a46a;--on-accent:#10201b;--accent-ink:#d8b77f;--neutral:#f3ead8;
+--ev-fill:26%;--pill-fill:22%;--ev-title:14%;--ev-ink:#fffaf0;--ev-time-p:38%;--ev-time:#d4ccb8;--ev-halo:0%;
+--glow:rgba(200,164,106,.10);--today-col:rgba(200,164,106,.03);--past:rgba(0,0,0,.2);--drop:rgba(0,0,0,.55);--track:rgba(243,234,216,.12);
+--status:var(--bar)}
+:root[data-look="morning"] body::before{content:"";position:fixed;left:0;right:0;top:0;height:env(safe-area-inset-top,0px);background:var(--status);z-index:200;pointer-events:none}
 *{box-sizing:border-box}
 html,body{height:100%;margin:0;overflow:hidden}
 body{background:var(--bar);color:var(--ink);font-family:var(--font);font-size:13px;-webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent}
@@ -85,7 +150,7 @@ select option{background:var(--raise)}
 .rail .nm{opacity:0;transition:opacity .15s;font-size:13px;padding-left:4px}
 body.railopen .rail .nm{opacity:1}
 .rail button:hover{background:var(--raise)}.rail button:hover .ic{transform:scale(1.12)}
-.rail button[aria-pressed=true]{background:color-mix(in srgb,var(--c,#fff) 18%,var(--bg));color:var(--ink);font-weight:600}
+.rail button[aria-pressed=true]{background:color-mix(in srgb,var(--c,var(--neutral)) 18%,var(--bg));color:var(--ink);font-weight:600}
 .rail .live::after{content:"";position:absolute;left:28px;top:5px;width:7px;height:7px;border-radius:50%;background:var(--now)}
 .rail hr{border:0;border-top:1px solid var(--line);margin:6px 4px;align-self:stretch}
 
@@ -96,13 +161,13 @@ body.railopen .rail .nm{opacity:1}
 .mini b{color:var(--faint);font-weight:500;font-size:10.5px;padding-bottom:3px}
 .mini button{border:0;background:none;border-radius:8px;aspect-ratio:1;padding:0;position:relative;font-variant-numeric:tabular-nums}
 .mini button:hover{background:var(--raise)}.mini .out{color:var(--faint)}.mini .sel{background:var(--raise2)}
-.mini .today{background:var(--accent);color:#fff;font-weight:700}
+.mini .today{background:var(--accent);color:var(--on-accent);font-weight:700}
 .cals label{display:flex;gap:10px;align-items:center;padding:4px 0;font-size:13.5px;cursor:pointer}
 .cals input{appearance:none;-webkit-appearance:none;width:14px;height:14px;border-radius:4px;border:2px solid var(--c);margin:0;flex:none}
 .cals input:checked{background:var(--c)}.cals label.off{color:var(--faint)}.cals .err{color:var(--red);font-size:11px}
 .drop{position:fixed;left:calc(var(--rail) + 14px);bottom:calc(14px + env(safe-area-inset-bottom,0px));width:208px;z-index:15;transition:left .2s}
 .dropbox{display:flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:12px;padding:10px 12px;background:var(--raise);transition:border-color .2s,box-shadow .2s}
-.dropbox:focus-within{border-color:color-mix(in srgb,var(--ink) 40%,transparent);box-shadow:0 0 0 4px rgba(255,255,255,.06)}
+.dropbox:focus-within{border-color:color-mix(in srgb,var(--ink) 40%,transparent);box-shadow:0 0 0 4px var(--glow)}
 .dropbox input{flex:1;min-width:0;border:0;background:none;outline:none}.dropbox input::placeholder{color:var(--faint)}
 kbd{font:inherit;font-size:11px;border:1px solid var(--line);background:var(--raise2);border-radius:6px;padding:1px 6px;color:var(--soft)}
 .fly{position:fixed;z-index:60;background:var(--ink);color:var(--bg);font-weight:600;border-radius:999px;padding:5px 12px;pointer-events:none;animation:fly .7s cubic-bezier(.3,.7,.2,1) forwards;max-width:220px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -117,8 +182,8 @@ kbd{font:inherit;font-size:11px;border:1px solid var(--line);background:var(--ra
 .wk,.status{color:var(--faint);font-size:12.5px;white-space:nowrap}
 .seg{display:flex;background:var(--raise);border:1px solid var(--line);border-radius:10px;padding:2px;gap:2px}
 .seg button{border:0;background:none;padding:5px 12px;border-radius:8px;color:var(--soft);white-space:nowrap;font-weight:500;font-variant-numeric:tabular-nums}
-.seg button[aria-pressed=true]{background:var(--accent);color:#fff;font-weight:700}
-#todayBtn{color:var(--accent);font-weight:600;background:color-mix(in srgb,var(--accent) 12%,var(--bar));border-color:color-mix(in srgb,var(--accent) 35%,transparent)}
+.seg button[aria-pressed=true]{background:var(--accent);color:var(--on-accent);font-weight:700}
+#todayBtn{color:var(--accent-ink);font-weight:600;background:color-mix(in srgb,var(--accent) 12%,var(--bar));border-color:color-mix(in srgb,var(--accent) 35%,transparent)}
 #todayBtn:hover{background:color-mix(in srgb,var(--accent) 20%,var(--bar))}
 .sc{flex:1;min-height:0;overflow:auto;position:relative;scrollbar-width:none;background:var(--bg)}.sc::-webkit-scrollbar{display:none}
 .sc.snap{scroll-snap-type:x mandatory;scroll-padding-left:var(--gut);overscroll-behavior-x:contain}
@@ -129,42 +194,42 @@ body.touch .sc.snap{scroll-snap-type:none}
 .strip{display:flex;width:max-content}
 .gut{position:sticky;left:0;z-index:7;width:var(--gut);flex:none;background:var(--bg);border-right:1px solid var(--line);display:flex}
 .gut>div{flex:1;min-width:0}
-.corner{position:sticky;top:0;height:var(--hh);z-index:2;background:var(--bar);display:flex;align-items:flex-end;justify-content:center;padding:0 2px 7px;font-size:9.5px;font-weight:600;letter-spacing:.02em;color:var(--soft);border-bottom:1px solid var(--line);box-shadow:0 6px 12px -8px rgba(0,0,0,.6);overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.corner{position:sticky;top:0;height:var(--hh);z-index:2;background:var(--bar);display:flex;align-items:flex-end;justify-content:center;padding:0 2px 7px;font-size:9.5px;font-weight:600;letter-spacing:.02em;color:var(--soft);border-bottom:1px solid var(--line);box-shadow:0 6px 12px -8px var(--drop);overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
 .corner span{overflow:hidden;text-overflow:ellipsis}
 .hours{position:relative;height:calc(24*var(--H))}
 .hours span{position:absolute;right:7px;font-size:10.5px;color:var(--faint);transform:translateY(-50%);font-variant-numeric:tabular-nums;white-space:nowrap;letter-spacing:.01em}
 .second .hours span{color:var(--k-travel)}
-.hours .nowlbl{background:var(--now);color:#fff;font-weight:700;border-radius:5px;padding:1px 4px;right:3px;z-index:2;font-size:10px}
+.hours .nowlbl{background:var(--now);color:var(--on-accent);font-weight:700;border-radius:5px;padding:1px 4px;right:3px;z-index:2;font-size:10px}
 .day{flex:none;width:var(--dw);scroll-snap-align:start;border-left:1px solid var(--hair)}
-.dhead{position:sticky;top:0;z-index:5;height:var(--hh);background:var(--bar);border-bottom:1px solid var(--line);box-shadow:0 6px 12px -8px rgba(0,0,0,.6);padding:8px 6px 6px;display:flex;flex-direction:column;gap:6px;overflow:hidden}
+.dhead{position:sticky;top:0;z-index:5;height:var(--hh);background:var(--bar);border-bottom:1px solid var(--line);box-shadow:0 6px 12px -8px var(--drop);padding:8px 6px 6px;display:flex;flex-direction:column;gap:6px;overflow:hidden}
 .dn{display:flex;align-items:center;justify-content:center;gap:6px;font-size:14px;color:var(--soft);white-space:nowrap;min-height:22px}
 .dn>span{cursor:pointer}.dn b{font-weight:600;color:var(--ink);font-variant-numeric:tabular-nums}
 .day.today .dn{color:var(--ink);font-weight:600}
-.day.today .dn b{background:var(--accent);color:#fff;border-radius:7px;padding:1px 7px;font-weight:700}
+.day.today .dn b{background:var(--accent);color:var(--on-accent);border-radius:7px;padding:1px 7px;font-weight:700}
 .dn .keys{font-size:10.5px;font-weight:600;background:color-mix(in srgb,var(--k-studio) 18%,var(--bar));color:var(--k-studio);border:0;border-radius:999px;padding:2px 8px;line-height:1.3}
 .strip.narrow .dn{flex-direction:column;gap:1px;font-size:10px;min-height:0}
 .strip.narrow .dn b{font-size:13px}.strip.narrow .day.today .dn b{padding:0 5px}
 .strip.narrow .dn .keys{display:none}
 .shape{position:relative;height:3px;border-radius:2px;background:var(--hair);margin:0 6px;overflow:hidden;flex:none}
 .shape i{position:absolute;top:0;bottom:0;background:var(--c);border-radius:2px}
-.pill{display:block;width:100%;text-align:left;border:0;font-size:11.5px;font-weight:600;border-radius:6px;padding:3px 7px;box-shadow:inset 3px 0 0 var(--c);background:color-mix(in srgb,var(--c) 22%,var(--bar));color:color-mix(in srgb,var(--c) 15%,#fff);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:none}
+.pill{display:block;width:100%;text-align:left;border:0;font-size:11.5px;font-weight:600;border-radius:6px;padding:3px 7px;box-shadow:inset 3px 0 0 var(--c);background:color-mix(in srgb,var(--c) var(--pill-fill),var(--bar));color:color-mix(in srgb,var(--c) var(--ev-title),var(--ev-ink));white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:none}
 .pill.ghost{box-shadow:none;border:1.5px dashed var(--c);background:transparent}.pill.more{box-shadow:none;background:none;color:var(--faint);font-weight:500}
 .col{position:relative;height:calc(24*var(--H));background-image:linear-gradient(var(--hair) 1px,transparent 1px);background-size:100% var(--H)}
-.day.today .col{background-color:rgba(255,255,255,.018)}
+.day.today .col{background-color:var(--today-col)}
 .day.past .ev,.day.past .pip{opacity:.5}
-.shade{position:absolute;left:0;right:0;top:0;background:rgba(0,0,0,.18);pointer-events:none}
+.shade{position:absolute;left:0;right:0;top:0;background:var(--past);pointer-events:none}
 /* an event: a solid tinted card with a strong colour bar, a bright title and a quieter time */
 .ev{position:absolute;text-align:left;border-radius:var(--radius);padding:4px 7px 4px 9px;font-size:12px;overflow:hidden;border:0;
-  background:color-mix(in srgb,var(--c) 26%,var(--bg));box-shadow:inset 3px 0 0 var(--c),0 0 0 1px var(--bg);
-  color:color-mix(in srgb,var(--c) 15%,#fff);line-height:1.3;user-select:none;-webkit-user-select:none;cursor:pointer;transition:box-shadow .15s,background .15s}
-.ev:hover{background:color-mix(in srgb,var(--c) 30%,var(--bg));z-index:3}
+  background:color-mix(in srgb,var(--c) var(--ev-fill),var(--bg));box-shadow:inset 3px 0 0 var(--c),0 0 0 1px var(--bg),0 0 14px -3px color-mix(in srgb,var(--c) var(--ev-halo),transparent);
+  color:color-mix(in srgb,var(--c) var(--ev-title),var(--ev-ink));line-height:1.3;user-select:none;-webkit-user-select:none;cursor:pointer;transition:box-shadow .15s,background .15s}
+.ev:hover{background:color-mix(in srgb,var(--c) calc(var(--ev-fill) + 4%),var(--bg));z-index:3}
 .ev.on{box-shadow:inset 3px 0 0 var(--c),0 0 0 2px var(--c),0 8px 24px rgba(0,0,0,.45);z-index:4}
 .ev b{font-weight:600;display:flex;align-items:center;white-space:nowrap;overflow:hidden;min-width:0;letter-spacing:-.005em}
 .ev b .t{overflow:hidden;text-overflow:ellipsis;min-width:0}
 .ev .ei{flex:none;display:inline-block;width:1.25em;margin-right:4px;text-align:center;font-size:11.5px;line-height:1;vertical-align:-1px}
 .ev.tall b{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;white-space:normal;overflow-wrap:normal;-webkit-hyphens:auto;hyphens:auto}
 .ev.tall b .t{overflow:visible}
-.ev small{display:block;color:color-mix(in srgb,var(--c) 40%,#c3c9d4);font-size:11px;font-variant-numeric:tabular-nums;white-space:nowrap;margin-top:1px}
+.ev small{display:block;color:color-mix(in srgb,var(--c) var(--ev-time-p),var(--ev-time));font-size:11px;font-variant-numeric:tabular-nums;white-space:nowrap;margin-top:1px}
 .ev.sm{padding-top:0;padding-bottom:0;display:flex;align-items:center}.ev.sm small{display:none}.ev.sm b{flex:1}
 .ev .h{position:absolute;left:0;right:0;bottom:0;height:8px;cursor:ns-resize}
 .ev.ro{cursor:default}.ev.dragging{box-shadow:inset 3px 0 0 var(--c),0 8px 24px rgb(0 0 0/.5);z-index:6;opacity:.95;transition:none}
@@ -183,9 +248,9 @@ body.touch .sc.snap{scroll-snap-type:none}
 .mh{font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--faint);text-align:center;padding:8px 6px;border-bottom:1px solid var(--line);background:var(--bar);position:sticky;top:0;z-index:2}
 .mday{border-left:1px solid var(--hair);border-bottom:1px solid var(--hair);padding:5px;overflow:hidden;cursor:pointer;min-width:0}
 .mday:hover{background:var(--raise)}.mday .n{text-align:right;font-size:12.5px;margin-bottom:3px;font-variant-numeric:tabular-nums}.mday.out{opacity:.4}
-.mday.today .n span{background:var(--accent);color:#fff;border-radius:6px;padding:1px 6px;font-weight:700}
+.mday.today .n span{background:var(--accent);color:var(--on-accent);border-radius:6px;padding:1px 6px;font-weight:700}
 .mday .p{font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:flex;gap:5px;align-items:center;padding:1px 2px}
-.mday .p .t{overflow:hidden;text-overflow:ellipsis;min-width:0}.mday .p i{width:7px;height:7px;border-radius:50%;background:var(--c);flex:none}.mday .p.ad{background:color-mix(in srgb,var(--c) 22%,var(--bg));box-shadow:inset 2px 0 0 var(--c);border-radius:4px;padding:1px 5px;color:color-mix(in srgb,var(--c) 15%,#fff)}
+.mday .p .t{overflow:hidden;text-overflow:ellipsis;min-width:0}.mday .p i{width:7px;height:7px;border-radius:50%;background:var(--c);flex:none}.mday .p.ad{background:color-mix(in srgb,var(--c) var(--pill-fill),var(--bg));box-shadow:inset 2px 0 0 var(--c);border-radius:4px;padding:1px 5px;color:color-mix(in srgb,var(--c) var(--ev-title),var(--ev-ink))}
 .more{color:var(--faint);font-size:11px}
 .pair{max-width:420px;margin:60px auto;display:flex;flex-direction:column;gap:10px;padding:0 16px}
 .pair input{background:var(--raise);border:1px solid var(--line);border-radius:8px;padding:8px}
@@ -213,11 +278,19 @@ body.touch .sc.snap{scroll-snap-type:none}
 .tinput{font-family:var(--display);font-size:20px!important;font-weight:700}
 .chips{display:flex;gap:6px;flex-wrap:wrap}
 .chip{border:1px solid var(--line);background:none;border-radius:999px;padding:4px 10px;color:var(--soft)}
-.chip[aria-pressed=true]{background:color-mix(in srgb,var(--c,#fff) 22%,var(--bar));border-color:var(--c,var(--ink));color:var(--ink);font-weight:600}
+.chip[aria-pressed=true]{background:color-mix(in srgb,var(--c,var(--neutral)) 22%,var(--bar));border-color:var(--c,var(--ink));color:var(--ink);font-weight:600}
 .chip:disabled{opacity:.5;cursor:default}
 .keys-list{display:grid;grid-template-columns:1fr auto;gap:9px 10px;align-items:center;color:var(--soft)}
 .sw{display:flex;justify-content:space-between;gap:10px;align-items:center;color:var(--soft)}
 .sw input{width:16px;height:16px;accent-color:var(--accent);flex:none}.sw select{width:150px}
+/* the Look row in Settings: a tiny picture of each look (its header, stage, now line and three block colours) */
+.looks{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+.look{display:flex;flex-direction:column;align-items:center;gap:6px;border:0;background:none;padding:4px 0;color:var(--soft);font-size:11.5px;line-height:1.2;text-align:center;min-width:0}
+.lk-chip{position:relative;width:52px;height:52px;border-radius:14px;background:linear-gradient(var(--lk-bar) 0 30%,var(--lk-bg) 30%);box-shadow:inset 0 0 0 1px var(--line);display:flex;align-items:flex-end;justify-content:center;gap:4px;padding-bottom:8px;overflow:hidden;transition:box-shadow .15s}
+.lk-chip i{width:8px;height:15px;border-radius:3px;background:var(--lk-1)}.lk-chip i:nth-child(2){height:21px;background:var(--lk-2)}.lk-chip i:nth-child(3){height:11px;background:var(--lk-3)}
+.lk-chip::after{content:"";position:absolute;left:6px;right:6px;top:calc(30% + 6px);height:2px;border-radius:1px;background:var(--lk-acc)}
+.lk-nm{display:block;min-height:2.4em}
+.look[aria-pressed=true]{color:var(--ink);font-weight:600}.look[aria-pressed=true] .lk-chip{box-shadow:0 0 0 2px var(--bar),0 0 0 4px var(--accent)}
 .grab{display:none}
 .modal{position:fixed;inset:0;background:rgb(0 0 0/.5);z-index:80;display:grid;place-items:center;padding:16px}
 .modal .card{background:var(--raise);max-width:340px;display:flex;flex-direction:column;gap:10px;box-shadow:0 16px 50px rgb(0 0 0/.55)}
@@ -249,7 +322,7 @@ body.onpage .left,body.onpage .main,body.onpage .panel{display:none}
   .app,body.nopanel .app{grid-template-columns:minmax(0,1fr)}
   .rail,.left{display:none}
   body.month .left{display:flex;position:fixed;top:calc(56px + env(safe-area-inset-top,0px));left:8px;right:8px;z-index:25;border:1px solid var(--line);border-radius:16px;background:var(--raise);box-shadow:0 16px 40px rgb(0 0 0/.5);padding:14px;max-height:70%}
-  .drop{left:0;right:0;bottom:0;width:auto;z-index:20;border-top:1px solid var(--line);background:var(--bar);box-shadow:0 -6px 14px -8px rgba(0,0,0,.6);padding:8px max(14px,env(safe-area-inset-right,0px)) calc(8px + env(safe-area-inset-bottom,0px)) max(14px,env(safe-area-inset-left,0px))}
+  .drop{left:0;right:0;bottom:0;width:auto;z-index:20;border-top:1px solid var(--line);background:var(--bar);box-shadow:0 -6px 14px -8px var(--drop);padding:8px max(14px,env(safe-area-inset-right,0px)) calc(8px + env(safe-area-inset-bottom,0px)) max(14px,env(safe-area-inset-left,0px))}
   .dropbox{min-height:44px;padding:8px 14px}
   .dropbox kbd,.wk,.nav,.wide{display:none}.onlyphone{display:initial}
   .bar{padding:8px 10px 8px max(16px,env(safe-area-inset-left,0px));gap:6px;flex-wrap:nowrap;min-height:52px}
@@ -302,7 +375,6 @@ body.onpage .left,body.onpage .main,body.onpage .panel{display:none}
 </div>
 <div class="drop"><div class="dropbox"><input id="newTask" placeholder="+ New task, press Enter" aria-label="New task" autocomplete="off"><kbd>N</kbd></div></div>
 <div class="toast" id="toast"></div>
-<script src="calendar-core.js?v=3"></script>
 <script>
 "use strict";
 const C = window.CalCore, qs = new URLSearchParams(location.search);
@@ -760,7 +832,7 @@ function pNow() {
   if (cur) { frac = (now - cur.s) / (cur.e - cur.s); big = untilText((cur.e - now) / 60000) + " left"; sub = "in " + cur.title; ico = KICON[cur.k] || "●"; k = cur.k; lbl = "Right now"; }
   else if (next) { const mins = (next.s - now) / 60000; frac = Math.max(0, 1 - mins / 180); big = untilText(mins); sub = "free until " + next.title; ico = KICON[next.k] || "●"; k = next.k; }
   const R = 2 * Math.PI * 32;
-  return `<div class="card nowcard"><div class="ring"><svg width="76" height="76" viewBox="0 0 76 76"><circle cx="38" cy="38" r="32" fill="none" stroke="rgba(255,255,255,.12)" stroke-width="6"/><circle cx="38" cy="38" r="32" fill="none" stroke="var(--k-${k})" stroke-width="6" stroke-linecap="round" stroke-dasharray="${R}" stroke-dashoffset="${R * (1 - frac)}"/></svg><span>${ico}</span></div>
+  return `<div class="card nowcard"><div class="ring"><svg width="76" height="76" viewBox="0 0 76 76"><circle cx="38" cy="38" r="32" fill="none" style="stroke:var(--track)" stroke-width="6"/><circle cx="38" cy="38" r="32" fill="none" stroke="var(--k-${k})" stroke-width="6" stroke-linecap="round" stroke-dasharray="${R}" stroke-dashoffset="${R * (1 - frac)}"/></svg><span>${ico}</span></div>
       <div style="min-width:0"><p class="lbl" style="margin:0 0 4px">${lbl}</p><div class="big">${esc(big)}</div><div style="font-size:13px;color:var(--soft);overflow-wrap:anywhere">${esc(sub)}</div></div></div>
     ${cur && next ? `<div><p class="lbl">Then</p>${rowHTML(next, C.wall(next.s, S.tz).day !== t)}</div>` : ""}
     <div><p class="lbl">Rest of today</p>${rest.map((e) => rowHTML(e)).join("") || '<span class="meta">Clear. Nothing left on the calendar today.</span>'}</div>
@@ -811,10 +883,21 @@ function pList(x) {
 const dayLabel = (k) => `${DOW[C.dowOf(k)]} ${MON[+k.slice(5, 7) - 1]} ${+k.slice(8)}`;
 function pSet() {
   const opts = (sel, none) => (none ? `<option value="">None</option>` : "") + ZONES.map(([id, n]) => `<option value="${esc(id)}" ${id === sel ? "selected" : ""}>${esc(n)}</option>`).join("");
-  return `<div class="field"><p class="lbl" style="margin:0">Studio shifts</p><label class="sw" for="railSw">Show in a slim rail, not as full blocks<input type="checkbox" id="railSw" ${S.rail ? "checked" : ""}></label></div>
+  const cur = C.lookId(document.documentElement.dataset.look);
+  return `<div class="field"><p class="lbl" style="margin:0">Look</p><div class="looks" role="group" aria-label="Look">${C.LOOKS.map((l) => `<button class="look" data-look="${l.id}" aria-pressed="${l.id === cur}" style="--lk-bg:${l.bg};--lk-bar:${l.theme};--lk-acc:${l.accent};--lk-1:${l.gels[0]};--lk-2:${l.gels[1]};--lk-3:${l.gels[2]}"><span class="lk-chip" aria-hidden="true"><i></i><i></i><i></i></span><span class="lk-nm">${esc(l.name)}</span></button>`).join("")}</div><div class="meta">Tap one to try it on the whole calendar. This device remembers it.</div></div>
+    <div class="field"><p class="lbl" style="margin:0">Studio shifts</p><label class="sw" for="railSw">Show in a slim rail, not as full blocks<input type="checkbox" id="railSw" ${S.rail ? "checked" : ""}></label></div>
     <div class="field"><p class="lbl" style="margin:0">Time zones</p><label class="sw" for="tz1">Main<select id="tz1">${opts(S.tz)}</select></label><label class="sw" for="tz2">Second<select id="tz2">${opts(S.tz2, true)}</select></label></div>
     <div class="field"><p class="lbl" style="margin:0">Block types</p>${C.KINDS.map(([k, n]) => `<div class="r k-${k}" style="color:var(--soft)"><i style="width:12px;height:12px;border-radius:4px;background:var(--c)"></i>${KICON[k] ? KICON[k] + " " : ""}${n}</div>`).join("")}<div class="meta">Guessed from the title. Change one on its event and it sticks.</div></div>
     <div class="field"><p class="lbl" style="margin:0">This device</p><button class="btn" id="pairBtn">Change pairing code</button></div>`;
+}
+/** Put a look on the whole page at once and keep it on this device (the head script puts it back before the next paint). */
+function setLook(id) {
+  const L = C.LOOKS.find((x) => x.id === C.lookId(id)), root = document.documentElement;
+  if (L.id === "ink") delete root.dataset.look; else root.dataset.look = L.id;
+  $('meta[name="theme-color"]').content = L.theme;
+  $('meta[name="color-scheme"]').content = L.scheme;
+  store.set("cal-look", L.id === "ink" ? null : L.id);
+  $$("button[data-look]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.look === L.id)));
 }
 function pKeys() {
   const k = [["Swipe left or right", TOUCH ? "one finger, sideways" : "two fingers"], ["Back and forward", "← →"], ["Today", "T"], ["Day", "1 or D"], ["3 days", "3"], ["Week", "7 or W"], ["Month", "M"], ["New task", "N"], ["Show or hide this panel", "P"], ["Close details", "Esc"]];
@@ -867,10 +950,11 @@ function wirePair() {
 /* ---------- controls ---------- */
 function setup() {
   document.addEventListener("click", (e) => {
-    const t = e.target.closest("[data-railtog],[data-page],[data-n],[data-p],[data-key],[data-staff],[data-allday],[data-open],[data-acc],[data-skip],[data-go],[data-dur],[data-kind],#pSave,#pDel,#pAcc,#pSkip,#pairBtn");
+    const t = e.target.closest("[data-railtog],[data-page],[data-n],[data-p],[data-key],[data-staff],[data-allday],[data-open],[data-acc],[data-skip],[data-go],[data-dur],[data-kind],button[data-look],#pSave,#pDel,#pAcc,#pSkip,#pairBtn");
     if (!t || t.closest(".ev")) return;
     const d = t.dataset;
-    if ("railtog" in d) { document.body.classList.toggle("railopen"); renderRail(); setTimeout(size, 260); }
+    if (t.matches("button[data-look]")) setLook(d.look);
+    else if ("railtog" in d) { document.body.classList.toggle("railopen"); renderRail(); setTimeout(size, 260); }
     else if (d.page) showPage(d.page);
     else if (d.n) setN(d.n === "m" ? "m" : +d.n);
     else if (d.p) panel(d.p);

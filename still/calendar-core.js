@@ -177,6 +177,20 @@
     return dx < 0 ? 1 : -1;
   }
 
+  /* ---- looks (Junyan, 2026-11-11: "Can you give me three more colour schemes. Make it really inspirational for a
+     dancer and business owner"). Ink is the default and the plain :root palette in calendar.html; each other look is
+     one :root[data-look="<id>"] block of variables there. This table only feeds the swatches in the menu sheet and
+     the theme-color tag (theme is the header bar colour); still/test/calendar-look.test.mjs checks it matches the CSS.
+     The choice is kept per device in localStorage "cal-look" and put on in the page head, before the first paint. ---- */
+  const LOOKS = [
+    { id: "ink", name: "Ink", bg: "#0e1015", theme: "#14171e", accent: "#ff4f5e", ink: "#f2f4f8", gels: ["#fbbf24", "#22d3ee", "#f472b6"], scheme: "dark" },
+    { id: "stage", name: "Stage Lights", bg: "#120d1a", theme: "#1d1529", accent: "#ffc857", ink: "#f7f1fb", gels: ["#e08000", "#2ee0e8", "#ff4fae"], scheme: "dark" },
+    { id: "morning", name: "Studio Morning", bg: "#faf6ef", theme: "#fffdf9", accent: "#d24a22", ink: "#1f1b16", gels: ["#9a7d00", "#0e8fa3", "#c7317f"], scheme: "light" },
+    { id: "velvet", name: "Velvet & Brass", bg: "#0b1a17", theme: "#11251f", accent: "#c8a46a", ink: "#f3ead8", gels: ["#f5cc1f", "#3cc6c0", "#d9668f"], scheme: "dark" },
+  ];
+  /** A saved look name → a known look id ("ink" for anything else). */
+  const lookId = (saved) => (LOOKS.some((l) => l.id === saved) ? saved : "ink");
+
   /* ---- words ---- */
   function hm(min) {
     const h = Math.floor(min / 60) % 24, m = min % 60;
@@ -188,5 +202,5 @@
   }
 
   root.CalCore = { wall, instant, offset, addDays, dowOf, weekStart, isoWeek, addMonths, monthKey, monthsFor,
-    KINDS, kindOf, layout, pieces, coversDay, orderBetween, groupOf, dropTask, blockMinutes, hm, dur, SWIPE, swipeLock, swipeCommit };
+    KINDS, kindOf, layout, pieces, coversDay, orderBetween, groupOf, dropTask, blockMinutes, hm, dur, SWIPE, swipeLock, swipeCommit, LOOKS, lookId };
 })(typeof window !== "undefined" ? window : globalThis);
