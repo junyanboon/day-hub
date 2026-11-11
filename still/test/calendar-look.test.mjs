@@ -2,7 +2,9 @@
 // Junyan, 2026-11-11: "the colours are a bit confusing. Give me a complete colour and visual redesign to make it much
 // more professional and exciting", and "the month and stuff fade out on the top edge so it needs to be clean".
 // Then, the same day: "Can you give me three more colour schemes. Make it really inspirational for a dancer and
-// business owner". So the page has four looks (calendar-core.js LOOKS): Ink (the default, the :root block) and three
+// business owner". Then, on the one light look, Studio Morning: "How about a dark version instead?", so it became
+// Studio Evening, and a phone that saved Studio Morning opens in Studio Evening.
+// So the page has four looks (calendar-core.js LOOKS): Ink (the default, the :root block) and three
 // more, each one :root[data-look="..."] block of variables over it. Every look is checked here the same way:
 // each block type a clearly different colour in the same family as Ink, the "now" accent never mistaken for a type,
 // readable text on every event card, solid bars, and nothing but colours changed.
@@ -53,13 +55,20 @@ const kinds = C.KINDS.map(([k]) => k);
 const pctOf = (vars, name) => { const v = resolver(vars)(vars[name]); assert.match(v, /^\d+%$/, `--${name}`); return parseFloat(v) / 100; };
 const colour = (vars, name) => { const v = resolver(vars)(vars[name]); assert.match(v, /^#[0-9a-f]{6}$/i, `--${name} = ${v}`); return hex(v); };
 
-test("the looks: Ink first and the default, then Stage Lights, Studio Morning and Velvet & Brass", () => {
-  assert.deepEqual(C.LOOKS.map((l) => l.name), ["Ink", "Stage Lights", "Studio Morning", "Velvet & Brass"]);
+test("the looks: Ink first and the default, then Stage Lights, Studio Evening and Velvet & Brass", () => {
+  assert.deepEqual(C.LOOKS.map((l) => l.name), ["Ink", "Stage Lights", "Studio Evening", "Velvet & Brass"]);
   assert.equal(C.lookId(null), "ink"); assert.equal(C.lookId("nonsense"), "ink"); assert.equal(C.lookId("stage"), "stage");
   for (const id of LOOKS.slice(1)) assert.ok(blockOf(id), `no :root[data-look="${id}"] block`);
 });
 
-test("a look changes colours only: its block holds nothing but variables, and only Studio Morning adds one rule", () => {
+test("a phone that saved Studio Morning opens in Studio Evening, not Ink", () => {
+  assert.equal(C.lookId("morning"), "evening");
+  assert.equal(C.lookId("evening"), "evening");
+  assert.ok(!C.LOOKS.some((l) => l.id === "morning" || /Morning/.test(l.name)), "Studio Morning is no longer offered");
+  assert.ok(!blockOf("morning"), "no Studio Morning block left in the CSS");
+});
+
+test("a look changes colours only: its block holds nothing but variables, and no look adds a rule of its own", () => {
   for (const id of LOOKS.slice(1)) {
     const body = blockOf(id).replace(/\/\*[\s\S]*?\*\//g, "").trim();
     for (const decl of body.split(";").map((s) => s.trim()).filter(Boolean)) assert.match(decl, /^(--[\w-]+|color-scheme):/, `${id}: ${decl}`);
@@ -67,8 +76,7 @@ test("a look changes colours only: its block holds nothing but variables, and on
   }
   const rules = [...css.matchAll(/([^{}]*data-look[^{}]*)\{([^}]*)\}/g)].map((m) => [m[1].replace(/\/\*[\s\S]*?\*\//g, "").trim(), m[2]]);
   const extra = rules.filter(([sel]) => !/^:root\[data-look="\w+"\]$/.test(sel));
-  assert.deepEqual(extra.map(([s]) => s), [':root[data-look="morning"] body::before'], "the only extra rule is the dark strip behind the iPhone clock");
-  assert.doesNotMatch(extra[0][1], /\b(width|margin|padding|display|top-margin|font)/);
+  assert.deepEqual(extra.map(([s]) => s), [], "a look adds a rule beyond its variables");
 });
 
 test("no colour is written outside the look variables (black shadows aside)", () => {
@@ -80,7 +88,7 @@ test("no colour is written outside the look variables (black shadows aside)", ()
   assert.doesNotMatch(script, /rgba\(255/, "the page script draws a fixed white");
 });
 
-for (const id of ["ink", "stage", "morning", "velvet"]) {
+for (const id of ["ink", "stage", "evening", "velvet"]) {
   const vars = varsFor(id), R = resolver(vars);
   test(`${id}: every block type takes a palette colour, all clearly different, each in its Ink colour family`, () => {
     const inkC = Object.fromEntries(kinds.map((k) => [k, colour(base, "k-" + k)]));
@@ -156,14 +164,26 @@ test("the saved look is put on before the page is drawn, with its theme colour, 
   assert.match(head, /<meta name="theme-color" content="#14171e">/, "Ink's theme colour is still the default");
 });
 
-test("Studio Morning keeps the iPhone clock readable: a dark strip fills the status bar area", () => {
-  const rule = css.match(/:root\[data-look="morning"\] body::before\{([^}]*)\}/)[1];
-  assert.match(rule, /height:env\(safe-area-inset-top/);
-  assert.match(rule, /position:fixed/);
-  assert.match(rule, /pointer-events:none/);
-  const strip = colour(varsFor("morning"), "status");
-  assert.ok(contrast([255, 255, 255], strip) >= 7, "white clock text on the strip");
-  assert.match(html, /apple-mobile-web-app-status-bar-style" content="black-translucent"/);
+test("every look is dark now, so the light-only pieces are gone: no status-bar strip, no --status, no light scheme", () => {
+  assert.ok(C.LOOKS.every((l) => l.scheme === "dark"));
+  assert.doesNotMatch(css, /body::before/);
+  assert.doesNotMatch(css, /--status/);
+  assert.doesNotMatch(css, /color-scheme:light/);
+  assert.match(html, /apple-mobile-web-app-status-bar-style" content="black-translucent"/, "the iPhone clock stays white over the dark header");
+});
+
+test("Studio Evening is a warm brown, clearly apart from Ink (blue-black), Stage Lights (plum) and Velvet & Brass (emerald)", () => {
+  const ev = varsFor("evening");
+  for (const t of ["bg", "bar"]) {
+    const [h, c] = hueChroma(colour(ev, t));
+    assert.ok(h >= 40 && h <= 90 && c >= 2.5, `--${t} is a warm brown (hue ${h.toFixed(0)}, chroma ${c.toFixed(1)})`);
+    for (const id of ["ink", "stage", "velvet"]) {
+      const d = deltaE(colour(ev, t), colour(varsFor(id), t));
+      assert.ok(d >= 5, `--${t} is too close to ${id} (deltaE ${d.toFixed(1)})`);
+    }
+  }
+  const [h] = hueChroma(colour(ev, "now"));
+  assert.ok(h >= 25 && h <= 55, `"now" is a coral (hue ${h.toFixed(0)})`);
 });
 
 test("the Look row: one swatch per look in the menu sheet, and a tap saves it on this device", () => {

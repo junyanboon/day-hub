@@ -185,11 +185,15 @@
   const LOOKS = [
     { id: "ink", name: "Ink", bg: "#0e1015", theme: "#14171e", accent: "#ff4f5e", ink: "#f2f4f8", gels: ["#fbbf24", "#22d3ee", "#f472b6"], scheme: "dark" },
     { id: "stage", name: "Stage Lights", bg: "#120d1a", theme: "#1d1529", accent: "#ffc857", ink: "#f7f1fb", gels: ["#e08000", "#2ee0e8", "#ff4fae"], scheme: "dark" },
-    { id: "morning", name: "Studio Morning", bg: "#faf6ef", theme: "#fffdf9", accent: "#d24a22", ink: "#1f1b16", gels: ["#9a7d00", "#0e8fa3", "#c7317f"], scheme: "light" },
+    { id: "evening", name: "Studio Evening", bg: "#17120e", theme: "#211a14", accent: "#ff7a59", ink: "#f3eadc", gels: ["#fbbf24", "#22d3ee", "#f472b6"], scheme: "dark" },
     { id: "velvet", name: "Velvet & Brass", bg: "#0b1a17", theme: "#11251f", accent: "#c8a46a", ink: "#f3ead8", gels: ["#f5cc1f", "#3cc6c0", "#d9668f"], scheme: "dark" },
   ];
+  /** Looks that were replaced, by the look that took their place. Studio Morning, the one light look, became the
+      dark Studio Evening (Junyan, 2026-11-11: "How about a dark version instead?"), so a phone that saved it opens
+      in Studio Evening, not Ink. */
+  const LOOK_RENAMED = { morning: "evening" };
   /** A saved look name → a known look id ("ink" for anything else). */
-  const lookId = (saved) => (LOOKS.some((l) => l.id === saved) ? saved : "ink");
+  const lookId = (saved) => { const id = Object.hasOwn(LOOK_RENAMED, saved) ? LOOK_RENAMED[saved] : saved; return LOOKS.some((l) => l.id === id) ? id : "ink"; };
 
   /* ---- words ---- */
   function hm(min) {
