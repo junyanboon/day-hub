@@ -202,6 +202,7 @@ kbd{font:inherit;font-size:11px;border:1px solid var(--line);background:var(--ra
 .seg,.bar .btn,.bar .icon,.nav{flex:none}.nav{white-space:nowrap}
 /* "November 2026": the month bold, the year light (his reference picture); a phone shows the month alone (below) */
 .bar h1 span{font-weight:300;color:var(--ink)}
+#title{touch-action:manipulation}   /* five quick taps open the readout; never a double-tap zoom */
 .wk,.status{color:var(--faint);font-size:12.5px;white-space:nowrap}
 .seg{display:flex;background:var(--raise);border:1px solid var(--line);border-radius:10px;padding:2px;gap:2px}
 .seg button{border:0;background:none;padding:5px 12px;border-radius:8px;color:var(--soft);white-space:nowrap;font-weight:500;font-variant-numeric:tabular-nums}
@@ -421,6 +422,13 @@ const H = 56, SNAP = 15, WIN = 36, BACK = 14;
 /** A phone or tablet: the finger moves days through wireSwipe (never native sideways scrolling). */
 const TOUCH = matchMedia("(hover: none) and (pointer: coarse)").matches;
 document.body.classList.toggle("touch", TOUCH);
+/* The hidden readout (Junyan, 2026-11-12, d18: "18 yes"): five quick taps on the month name load calendar-readout.js,
+   which shows this build, the phone's answers and a log of every day change with its cause. Until then CalHook.on is
+   null and diag() does nothing. BUILD names this copy of the page, so a screenshot proves which copy ran: change it on
+   every change to this page or calendar-readout.js (the date plus a letter). */
+const BUILD = "2026-11-12a readout";
+const CalHook = window.CalHook = { BUILD, on: null };
+const diag = (kind, msg) => { if (CalHook.on) CalHook.on(kind, msg); };
 const $ = (s) => document.querySelector(s), $$ = (s) => [...document.querySelectorAll(s)];
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const store = { get(k) { try { return localStorage.getItem(k); } catch { return null; } },
@@ -444,6 +452,9 @@ const S = { tz: store.get("cal-tz") || DEVICE_TZ, tz2: store.get("cal-tz2") || "
   months: {}, sugg: [], loading: new Set(), tab: "now", ev: null, form: null, page: "cal", rail: store.get("cal-rail") !== "0", top: null,
   look: C.lookId(store.get("cal-look")) };
 S.n = S.n === "m" ? "m" : +S.n || 3;
+{ let cur = null;   // every write to the shown day goes past the readout, with the call stack that made it
+  Object.defineProperty(S, "cur", { enumerable: true, get: () => cur,
+    set(v) { if (CalHook.on && v !== cur) CalHook.on("day", { from: cur, to: v, stack: new Error().stack }); cur = v; } }); }
 try { const c = JSON.parse(store.get(CACHE_KEY) || "{}"); S.cals = c.cals || []; S.months = c.months || {}; S.sugg = c.sugg || []; } catch {}
 function saveCache() {
   const keep = {}, now = C.monthKey(today());
@@ -707,6 +718,7 @@ let raf = 0, settle = 0, dragging = false, swiping = false, lastScroll = 0, last
     gutter is slid back by the same amount, so it stays put. */
 function slideTo(x, ms = 0) {
   const st = $("#strip"), gut = st && st.querySelector(".gut"); if (!st) return;
+  if (CalHook.on && Math.round(x) !== Math.round(slideX)) CalHook.on("slide", { x, ms, stack: new Error().stack });
   slideX = x;
   st.style.transition = gut.style.transition = ms ? `transform ${ms}ms cubic-bezier(.2,.7,.2,1)` : "none";
   st.style.transform = `translateX(${-x}px)`; gut.style.transform = `translateX(${x}px)`;
@@ -719,18 +731,18 @@ function shownX() {
   return -m.m41;
 }
 function wireStrip(v) {
-  v.onscroll = () => {
+  v.onscroll = function onScroll() {
     if (TOUCH) { S.top = v.scrollTop; return; }   // a phone: only up/down scrolls; the day comes only from goTo
     if (v.scrollLeft === lastLeft) { S.top = v.scrollTop; return; }   // up/down only: the day stays
     lastLeft = v.scrollLeft; lastScroll = Date.now();
     if (raf) return;
-    raf = requestAnimationFrame(() => {
+    raf = requestAnimationFrame(function scrollFrame() {
       raf = 0; if (S.page !== "cal" || S.n === "m" || !v.clientWidth || !dw) return;
       S.top = v.scrollTop;
       const i = Math.max(0, Math.min(WIN - 1, Math.round(v.scrollLeft / dw))), day = stripDays[i];
       if (day && day !== S.cur) { S.cur = day; S.miniLock = false; head(); fitHead(); }
       clearTimeout(settle);
-      settle = setTimeout(() => {   // near either end of the strip: lay a fresh strip around where he stopped
+      settle = setTimeout(function edgeRebuild() {   // near either end of the strip: lay a fresh strip around where he stopped
         const at = dayDiff(S.cur, S.win0);
         if (swiping) return;   // never rebuild the strip under a finger; the scroll that ends the swipe comes back here
         if (at < 4 || at > WIN - S.n - 4) { S.win0 = C.addDays(S.cur, -BACK); render(); refresh(); }
@@ -809,13 +821,14 @@ function wireSwipe(v) {
     swiping = true;
     g = { x0: t.clientX, y0: t.clientY, left0: slideX, cur0: S.cur, lock: null, pts: [{ x: t.clientX, t: performance.now() }] };
   }, { passive: true });
-  v.addEventListener("touchmove", (e) => {
+  v.addEventListener("touchmove", function swipeMove(e) {
     if (!g) return;
     if (e.touches.length !== 1) { const x = g; g = null; swiping = false; if (x.lock === "x") goTo(x.cur0); return; }
     const t = at(e), dx = t.clientX - g.x0, dy = t.clientY - g.y0;
     if (!g.lock) {
       g.lock = C.swipeLock(dx, dy);
       if (g.lock === "x" && !e.cancelable) g.lock = "y";   // the browser is already scrolling up/down: leave it
+      if (g.lock) diag("lock", `dx ${Math.round(dx)} dy ${Math.round(dy)} ${g.lock}${e.cancelable ? "" : " notcancelable"}`);
     }
     if (g.lock === "y") { g = null; swiping = false; return; }   // a scroll: the browser has it, and it never changes the day
     if (g.lock !== "x") return;
@@ -828,7 +841,7 @@ function wireSwipe(v) {
     g.pts.push({ x: t.clientX, t: now });
     while (g.pts.length > 2 && now - g.pts[0].t > 100) g.pts.shift();
   }, { passive: false });
-  const end = (e) => {
+  const swipeEnd = (e) => {
     if (!g) { swiping = false; return; }
     if (e.type === "touchend" && e.touches.length) return;   // one of two fingers lifted: wait for the last one
     const x = g, t = at(e); g = null; swiping = false;
@@ -836,11 +849,12 @@ function wireSwipe(v) {
     const dx = t.clientX - x.x0, dy = t.clientY - x.y0, p = x.pts[0], dt = performance.now() - p.t;
     const vx = dt > 0 ? (t.clientX - p.x) / dt : 0;
     const dir = e.type === "touchcancel" ? 0 : C.swipeCommit({ dx, dy, vx }, v.clientWidth);
+    diag("swipe", `dx ${Math.round(dx)} dy ${Math.round(dy)} vx ${vx.toFixed(2)} dir ${dir}${e.type === "touchcancel" ? " cancel" : ""}`);
     const by = S.n === 1 ? 1 : S.n === 7 ? 7 : Math.min(S.n, Math.max(1, Math.round(Math.abs(dx) / dw)));
     goTo(dir ? C.addDays(x.cur0, dir * by) : x.cur0);
   };
-  v.addEventListener("touchend", end);
-  v.addEventListener("touchcancel", end);
+  v.addEventListener("touchend", swipeEnd);
+  v.addEventListener("touchcancel", swipeEnd);
 }
 function goTo(day, smooth = true) {
   const v = $("#view"), i = dayDiff(day, S.win0);
@@ -849,7 +863,7 @@ function goTo(day, smooth = true) {
     S.cur = day; S.miniLock = false; head(); fitHead();
     slideTo(i * dw, ms);
     clearTimeout(settle);
-    settle = setTimeout(() => {
+    settle = setTimeout(function edgeRebuild() {
       if (S.page !== "cal" || S.n === "m" || !$("#strip")) return;
       if (swiping) return;   // never rebuild the strip under a finger; that swipe's end calls goTo, which rebuilds then
       const at = dayDiff(S.cur, S.win0);
@@ -1042,7 +1056,7 @@ function wirePair() {
 
 /* ---------- controls ---------- */
 function setup() {
-  document.addEventListener("click", (e) => {
+  document.addEventListener("click", function clickRouter(e) {
     const t = e.target.closest("[data-railtog],[data-page],[data-n],[data-p],[data-key],[data-staff],[data-allday],[data-open],[data-acc],[data-skip],[data-go],[data-dur],[data-kind],button[data-look],#pSave,#pDel,#pAcc,#pSkip,#pairBtn");
     if (!t || t.closest(".ev")) return;
     const d = t.dataset;
@@ -1079,8 +1093,18 @@ function setup() {
   $("#prev").onclick = () => step(-1); $("#next").onclick = () => step(1);
   $("#mmPrev").onclick = () => { S.miniLock = true; S.mini = C.addMonths(S.mini, -1); renderMini(); };
   $("#mmNext").onclick = () => { S.miniLock = true; S.mini = C.addMonths(S.mini, 1); renderMini(); };
-  $("#mini").onclick = (e) => { const b = e.target.closest("button"); if (!b) return; document.body.classList.remove("month"); S.miniLock = false; if (S.n === "m") { S.cur = b.dataset.k; render(); refresh(); } else goTo(S.n === 7 ? C.weekStart(b.dataset.k) : b.dataset.k); };
-  $("#title").onclick = () => { if (innerWidth <= 760) document.body.classList.toggle("month"); };
+  $("#mini").onclick = function miniPick(e) { const b = e.target.closest("button"); if (!b) return; document.body.classList.remove("month"); S.miniLock = false; if (S.n === "m") { S.cur = b.dataset.k; render(); refresh(); } else goTo(S.n === 7 ? C.weekStart(b.dataset.k) : b.dataset.k); };
+  /* A lone tap opens or closes the month picker (phone), 350 ms later; a quick run of taps never does, and the fifth
+     opens or closes the readout. (The month picker also re-lays the page: body.month matches the month view's .month
+     grid rule, so the title moves under the finger; the readout's taps must not depend on it.) */
+  let taps = [], tapT = 0;
+  $("#title").onclick = function titleTap() {
+    const now = Date.now(); taps = taps.filter((t) => now - t < 2000); taps.push(now);
+    clearTimeout(tapT);
+    if (taps.length >= 5) { taps = []; readout(); return; }
+    const n = taps.length;
+    tapT = setTimeout(() => { if (n === 1 && innerWidth <= 760) document.body.classList.toggle("month"); }, 350);
+  };
   $("#panelBtn").onclick = () => { if (innerWidth <= 1100) { if (!document.body.classList.contains("popen")) panel("now"); document.body.classList.toggle("popen"); } else { document.body.classList.toggle("nopanel"); setTimeout(size, 300); } };
   $("#pClose").onclick = () => { panel("now"); document.body.classList.remove("popen"); if (innerWidth > 1100) { document.body.classList.add("nopanel"); setTimeout(size, 300); } };
   $("#pbody").addEventListener("keydown", (e) => { if (e.target.id === "pTitle" && e.key === "Enter") { if (S.ev.ghost) $("#pAcc").click(); else saveEvent(); } });
@@ -1097,7 +1121,7 @@ function setup() {
     } catch (err) { inp.value = v; toast("Task not added: " + err.message, { bad: true }); }
     inp.disabled = false; inp.focus();
   };
-  document.addEventListener("keydown", (e) => {
+  document.addEventListener("keydown", function keyRouter(e) {
     if (e.target.matches?.("input,select,textarea") || e.metaKey || e.ctrlKey || e.altKey || $(".modal")) return;
     const k = e.key.toLowerCase();
     if (k === "escape") { if (S.page !== "cal") showPage("cal"); else { panel("now"); document.body.classList.remove("popen", "month"); } }
@@ -1109,10 +1133,16 @@ function setup() {
     e.preventDefault();
   });
   wireSwipe($("#view"));
-  addEventListener("resize", size);
+  addEventListener("resize", function onResize() { size(); });
   addEventListener("focus", () => { if (S.tab !== "event" && questKey()) { refresh(); loadSide(); } });
   setInterval(() => { showLook(); tickNow(); if (S.tab === "now" && S.page === "cal" && !dragging) paintPanel(); renderRail(); }, 30000);
   document.addEventListener("visibilitychange", () => { if (!document.hidden) showLook(); });
+}
+/** Open or close the hidden readout; its script loads the first time only. */
+function readout() {
+  if (window.CalReadout) { CalReadout.toggle(); return; }
+  CalHook.state = () => ({ cur: S.cur, win0: S.win0, n: S.n, dw, slideX, shown: TOUCH && $("#strip") ? shownX() : null, touch: TOUCH, api: API });
+  const s = document.createElement("script"); s.src = "calendar-readout.js?v=1"; document.head.appendChild(s);
 }
 function boot() { render(); loadSide(); refresh(); }
 setup(); boot();
