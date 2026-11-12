@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en"><head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="theme-color" content="#14171e">
 <meta name="color-scheme" content="dark">
 <link rel="icon" type="image/svg+xml" href="calendar-icon.svg?v=2">
@@ -215,6 +215,10 @@ kbd{font:inherit;font-size:11px;border:1px solid var(--line);background:var(--ra
    through native sideways scrolling, which snapped to the next day on any sideways drift (2026-11-11). These two
    rules are a backstop now: the clipped .pane below leaves the view no sideways range to scroll. */
 body.touch .sc{overflow-x:hidden;touch-action:pan-y}
+/* No zoom on a phone (Junyan, 2026-11-12): iOS zooms the page when a focused text box has text under 16px, so every
+   text box is 16px on touch (the editor title keeps its 20px); manipulation stops the double-tap zoom everywhere. */
+body.touch input,body.touch select,body.touch textarea{font-size:16px}
+@media (hover:none) and (pointer:coarse){html,body{touch-action:manipulation}}
 body.touch .sc.snap{scroll-snap-type:none}
 /* On touch the days sit in a pane that clips them sideways without scrolling (overflow-x:clip): the view has no
    sideways scroll range at all, so iOS has nothing to move during an up/down glide or a trackpad scroll. The
@@ -422,11 +426,13 @@ const H = 56, SNAP = 15, WIN = 36, BACK = 14;
 /** A phone or tablet: the finger moves days through wireSwipe (never native sideways scrolling). */
 const TOUCH = matchMedia("(hover: none) and (pointer: coarse)").matches;
 document.body.classList.toggle("touch", TOUCH);
+/* Safari in a tab may still pinch-zoom past user-scalable=no; its own gesture events stop that (touch only). */
+if (TOUCH) for (const g of ["gesturestart", "gesturechange"]) document.addEventListener(g, (e) => e.preventDefault(), { passive: false });
 /* The hidden readout (Junyan, 2026-11-12, d18: "18 yes"): five quick taps on the month name load calendar-readout.js,
    which shows this build, the phone's answers and a log of every day change with its cause. Until then CalHook.on is
    null and diag() does nothing. BUILD names this copy of the page, so a screenshot proves which copy ran: change it on
    every change to this page or calendar-readout.js (the date plus a letter). */
-const BUILD = "2026-11-12a readout";
+const BUILD = "2026-11-12b no zoom";
 const CalHook = window.CalHook = { BUILD, on: null };
 const diag = (kind, msg) => { if (CalHook.on) CalHook.on(kind, msg); };
 const $ = (s) => document.querySelector(s), $$ = (s) => [...document.querySelectorAll(s)];
@@ -1043,10 +1049,19 @@ function showPage(k) {
 }
 
 /* ---------- pairing ---------- */
-function pairHTML() { return `<div class="pair"><h2>Pair this device</h2><p class="meta">Enter the Day Quest pairing code to read and change your calendars and tasks.</p><input id="pairIn" type="password" autocomplete="off" aria-label="Pairing code"><button class="btn pri" id="pairGo">Pair</button></div>`; }
+/* On a phone the box shows the code as plain text, offers no autofill or autocorrect, and a paste drops spaces and line
+   breaks and replaces what is there (Junyan, 2026-11-12: a paste "adds extra digits"). Desktop keeps the hidden box. */
+function pairHTML() {
+  const box = TOUCH ? `type="text" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" data-1p-ignore data-lpignore="true"` : `type="password" autocomplete="off"`;
+  return `<div class="pair"><h2>Pair this device</h2><p class="meta">Enter the Day Quest pairing code to read and change your calendars and tasks.</p><input id="pairIn" ${box} aria-label="Pairing code"><button class="btn pri" id="pairGo">Pair</button></div>`;
+}
 function wirePair() {
+  if (TOUCH) $("#pairIn").addEventListener("paste", (e) => {
+    const text = (e.clipboardData || window.clipboardData)?.getData("text"); if (text == null) return;
+    e.preventDefault(); e.target.value = text.replace(/\s+/g, "");
+  });
   const go = async () => {
-    const val = $("#pairIn").value.trim(); if (!val) return;
+    const raw = $("#pairIn").value, val = TOUCH ? raw.replace(/\s+/g, "") : raw.trim(); if (!val) return;
     const old = questKey(); store.set("quest-key", val);
     try { await api("/planner/calendars"); toast("Paired"); boot(); }
     catch (e) { store.set("quest-key", old || null); toast("That code did not work: " + e.message, { bad: true }); }
