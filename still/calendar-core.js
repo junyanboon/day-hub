@@ -179,6 +179,46 @@
     return dx < 0 ? 1 : -1;
   }
 
+  /* ---- pinch stretches the hours (Junyan, 2026-11-12, d1 "1 yes ... all I care about is having a very smooth
+     functional exprience"). Two fingers on the day grid stretch or squeeze the hour rows on a phone, from the whole day
+     on one screen up to three times today's 56px an hour. The page draws every time-based position as a calc() on one
+     CSS variable (--H), so a pinch changes that one value and rebuilds nothing. ---- */
+  const HOUR = { start: 56, max: 168 };
+  const clamp = (x, lo, hi) => Math.min(hi, Math.max(lo, x));
+  /** The hour height for fingers now `d` px apart, when they were `d0` apart at height h0, kept within [min, max]. */
+  function pinchHeight(h0, d0, d, min, max) {
+    if (!(d0 > 0)) return clamp(h0, min, max);
+    return clamp(h0 * d / d0, min, max);
+  }
+  /** The smallest hour height: the 24 hours fit the day view's `viewH` px between its day header (`head` px) and the
+      bottom bar laid over it (`foot` px). Never above today's 56, never under 8. */
+  const hourMin = (viewH, head, foot) => clamp((viewH - head - foot) / 24, 8, HOUR.start);
+  /** The minute of the day under a point `y` px below the top of the day view, scrolled `scrollTop`, with a `head` px
+      day header and hours `h` px tall. Kept within the day (0 to 1440). */
+  const pinchMinute = (scrollTop, y, head, h) => clamp((scrollTop + y - head) / h * 60, 0, 1440);
+  /** The scroll position that puts `minute` back `y` px below the top of the view once the hours are `h` px tall,
+      kept within 0 and `maxScroll`. */
+  const pinchScroll = (minute, y, head, h, maxScroll) => clamp(head + minute / 60 * h - y, 0, Math.max(0, maxScroll));
+  /** How much a card of `mins` minutes shows at `h` px an hour: "sm" (title only) under 36px, "tall" (start and end on
+      the phone) at 54px or more, else "" (title and start time). A card is never drawn under 19px. */
+  function cardFit(mins, h) {
+    const ht = Math.max(mins / 60 * h, 19);
+    return ht < 36 ? "sm" : ht >= 54 ? "tall" : "";
+  }
+  /** A tall card's time on the phone: "1:45 to 2:15 pm", the am or pm said once when both ends share it. */
+  function cardTime(s, e) {
+    const a = hm(s), b = hm(e), pa = a.slice(-2), pb = b.slice(-2);
+    return (pa === pb ? a.slice(0, -3) : a) + " to " + b;
+  }
+  /** The hour height a page starts with: a phone's saved `cal-hour`, kept within 8 and 168; 56 on a desktop, or when
+      nothing usable is saved. */
+  function startHour(store, touch) {
+    if (!touch) return HOUR.start;
+    let v;
+    try { v = parseFloat(store.getItem("cal-hour")); } catch (_) { return HOUR.start; }
+    return v > 0 ? clamp(v, 8, HOUR.max) : HOUR.start;
+  }
+
   /* ---- looks (Junyan, 2026-11-11: "Can you give me three more colour schemes. Make it really inspirational for a
      dancer and business owner"). Ink is the plain :root palette in calendar.html; each other look (or half of a
      look) is one :root[data-look="<face>"] block of variables there. This table only feeds the swatches in the menu
@@ -267,5 +307,5 @@
   }
 
   root.CalCore = { wall, instant, offset, addDays, dowOf, weekStart, isoWeek, addMonths, monthKey, monthsFor,
-    KINDS, kindOf, layout, pieces, coversDay, orderBetween, groupOf, dropTask, blockMinutes, hm, dur, SWIPE, swipeLock, swipeCommit, LOOKS, lookId, startLook, LOOK_RESET, placeOf, sunTimes, sunHalf, lookFace, pageLink };
+    KINDS, kindOf, layout, pieces, coversDay, orderBetween, groupOf, dropTask, blockMinutes, hm, dur, SWIPE, swipeLock, swipeCommit, HOUR, pinchHeight, hourMin, pinchMinute, pinchScroll, cardFit, cardTime, startHour, LOOKS, lookId, startLook, LOOK_RESET, placeOf, sunTimes, sunHalf, lookFace, pageLink };
 })(typeof window !== "undefined" ? window : globalThis);
