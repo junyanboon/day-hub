@@ -13,18 +13,20 @@
 <meta name="apple-mobile-web-app-title" content="Calendar">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>Calendar</title>
-<script src="calendar-core.js?v=5"></script>
+<script src="calendar-core.js?v=6"></script>
 <script>
-/* The look saved on this device (the Look row in Settings) goes on here, before anything is drawn, so the page never
-   opens in the old look first. Ink, the default, is the plain page with no data-look. */
+/* The look saved on this device (the Look row in Settings; Studio when none) goes on here, before anything is drawn,
+   so the page never opens in the wrong look first. Studio shows its day or night half by the sun in the calendar's
+   time zone. Ink is the plain page with no data-look. */
 (function () {
+  var id = "studio", tz = "America/Toronto";
+  try { tz = Intl.DateTimeFormat().resolvedOptions().timeZone || tz; } catch (e) {}
+  try { id = CalCore.startLook(localStorage); tz = localStorage.getItem("cal-tz") || tz; } catch (e) {}
   try {
-    var id = CalCore.lookId(localStorage.getItem("cal-look"));
-    if (id === "ink") return;
-    var L = CalCore.LOOKS.filter(function (x) { return x.id === id; })[0];
-    document.documentElement.dataset.look = id;
-    document.querySelector('meta[name="theme-color"]').content = L.theme;
-    document.querySelector('meta[name="color-scheme"]').content = L.scheme;
+    var f = CalCore.lookFace(id, Date.now(), tz);
+    if (f.face) document.documentElement.dataset.look = f.face;
+    document.querySelector('meta[name="theme-color"]').content = f.theme;
+    document.querySelector('meta[name="color-scheme"]').content = f.scheme;
   } catch (e) {}
 })();
 </script>
@@ -38,8 +40,9 @@
   Colour is by BLOCK TYPE (eleven types, calendar-core.js KINDS), guessed from the title; a hand-set type is
   kept on the Google event (extendedProperties.private.kind). Every new event goes to Joint Plans.
   Studio shifts (the Staff Scheduling calendar) sit in a slim rail on the right of each day.
-  Four looks (2026-11-11): Ink (default), Stage Lights, Studio Evening, Velvet & Brass, picked per device in
-  Settings > Look (calendar-core.js LOOKS, localStorage "cal-look", put on in the head before the first paint).
+  Four looks (2026-11-11): Studio (default; light by day, charcoal by night, switching at sunrise and sunset),
+  Ink, Stage Lights, Velvet & Brass, picked per device in Settings > Look (calendar-core.js LOOKS, localStorage
+  "cal-look", put on in the head before the first paint).
   Each type's helper and page are later tickets (034 to 043); until then a type page lists its next blocks.
 
   Backend: still-api /planner/* (src/planner.mjs, planner-tasks.mjs, suggestions.mjs), gated by the
@@ -75,6 +78,13 @@
 --ev-fill:26%;--pill-fill:22%;--ev-title:15%;--ev-ink:#ffffff;--ev-time-p:40%;--ev-time:#c3c9d4;--ev-halo:0%;
 /* small washes and shadows */
 --glow:rgba(255,255,255,.06);--today-col:rgba(255,255,255,.018);--past:rgba(0,0,0,.18);--drop:rgba(0,0,0,.6);--track:rgba(255,255,255,.12);
+/* big shadows (the selected card, side panel, pop-ups) and the pop-up dimmer: a colour and a strength (1 is full) */
+--lift:#000000;--lift-k:1;
+/* an event that is over (earlier today, or a past day): its card fill, and its title (a share of the type colour
+   mixed into --dim-ink); no see-through, so the title still reads at 4.5:1 or better */
+--dim-fill:12%;--dim-title:20%;--dim-ink:var(--soft);
+/* the strip behind the iPhone clock in home-screen mode (only a light look needs one) */
+--status:transparent;
 /* block types: colour means type */
 --k-deep:var(--amber);--k-studio:var(--orange);--k-yoga:var(--cyan);--k-gym:var(--purple);--k-dance:var(--pink);--k-cook:var(--lime);
 --k-travel:var(--blue);--k-social:var(--emerald);--k-errand:var(--indigo);--k-wind:var(--slate);--k-rest:var(--sand);--k-other:var(--stone);
@@ -83,10 +93,37 @@
 --H:56px;--hh:68px;--gut:56px;--rail:56px;--radius:8px;
 --font:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,sans-serif;
 --display:"SF Pro Display",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;color-scheme:dark}
-/* Three more looks (Junyan, 2026-11-11: "Can you give me three more colour schemes. Make it really inspirational for a
+/* More looks (Junyan, 2026-11-11: "Can you give me three more colour schemes. Make it really inspirational for a
    dancer and business owner"). Picked per device from the Look row in Settings (calendar-core.js LOOKS). Each is
    colours only: every block type keeps its Ink colour family, and where the look's accent sits near a type, that
    type's shade moves away from it (still/test/calendar-look.test.mjs checks the distance and every card's contrast). */
+/* Studio, the default (Junyan, 2026-11-11: "Let's go wtih the calendar mode with the night mode for when it's night"):
+   two halves, put on by the sun (calendar-core.js lookFace): the day half from sunrise to sunset, the night half from
+   sunset to sunrise. Both use one coral for "now", today, the Today button and the chosen view, so they feel like one look.
+   Day: Studio Morning as first shipped (PR 125). A sunlit studio, a maple floor, a paper planner. Warm cream, warm ink,
+   ballet coral. Coral sits near Studio On-Site, so Studio On-Site is a deep burnt orange and Deep Work an ochre. The
+   iPhone draws its clock in white over the top of the page (black-translucent), so a dark strip fills that space;
+   big shadows are a soft warm brown, not black. */
+:root[data-look="studio-day"]{
+--amber:#9a7d00;--orange:#a35a0a;--lime:#4f9418;--emerald:#14946a;--cyan:#0e8fa3;--blue:#2563c8;
+--indigo:#6358d0;--purple:#9a46c8;--pink:#c7317f;--slate:#5f6f86;--sand:#a1865a;--stone:#857d77;--red:#c42b3c;
+--bg:#faf6ef;--bar:#fffdf9;--raise:#f4eee4;--raise2:#e8dfd1;--line:rgba(96,72,40,.16);--hair:rgba(96,72,40,.09);
+--ink:#1f1b16;--soft:#5e554a;--faint:#736a5e;
+--now:#d24a22;--accent:#d24a22;--on-accent:#ffffff;--accent-ink:#b23a17;--neutral:#1f1b16;
+--ev-fill:14%;--pill-fill:16%;--ev-title:50%;--ev-ink:#1f1b16;--ev-time-p:40%;--ev-time:#4a4239;--ev-halo:0%;
+--glow:rgba(210,74,34,.12);--today-col:rgba(210,74,34,.035);--past:rgba(96,72,40,.05);--drop:rgba(96,72,40,.16);--track:rgba(31,27,22,.10);
+--lift:#3c2a14;--lift-k:.4;--dim-fill:7%;--dim-title:30%;
+--status:#1f1b16;color-scheme:light}
+/* Night: a flat neutral charcoal with off-white text and no tint, the header and bottom bar a touch lifted from the
+   page. The same coral, brightened for the dark; Studio On-Site a yellower tangerine to stay clear of it. */
+:root[data-look="studio-night"]{
+--amber:#fbbf24;--orange:#fc980c;--lime:#a3e635;--emerald:#34d399;--cyan:#22d3ee;--blue:#60a5fa;
+--indigo:#818cf8;--purple:#c084fc;--pink:#f472b6;--slate:#94a3b8;--sand:#d6bc8a;--stone:#a8a29e;--red:#ff5a5f;
+--bg:#1c1c1c;--bar:#262626;--raise:#2e2e2e;--raise2:#3a3a3a;--line:rgba(255,255,255,.10);--hair:rgba(255,255,255,.055);
+--ink:#e6e6e6;--soft:#ababab;--faint:#8c8c8c;
+--now:#ff7a59;--accent:#ff7a59;--on-accent:#1c1c1c;--accent-ink:#ff7a59;--neutral:#e6e6e6;
+--ev-fill:26%;--pill-fill:22%;--ev-title:14%;--ev-ink:#ffffff;--ev-time-p:38%;--ev-time:#d6d6d6;--ev-halo:0%;
+--glow:rgba(255,122,89,.10);--today-col:rgba(255,255,255,.02);--past:rgba(0,0,0,.2);--drop:rgba(0,0,0,.55);--track:rgba(255,255,255,.12)}
 /* Stage Lights: the moment before the curtain. A plum-black stage, spotlight gold for "now", jewel-tone gels that glow.
    Gold sits near Deep Work, so Deep Work turns a deep amber-orange and Studio On-Site a vermilion. */
 :root[data-look="stage"]{
@@ -97,17 +134,6 @@
 --now:#ffc857;--accent:#ffc857;--on-accent:#1a1024;--accent-ink:#ffc857;--neutral:#f7f1fb;
 --ev-fill:30%;--pill-fill:26%;--ev-title:12%;--ev-ink:#ffffff;--ev-time-p:40%;--ev-time:#d9cfe6;--ev-halo:38%;
 --glow:rgba(255,200,87,.10);--today-col:rgba(255,200,87,.035);--past:rgba(0,0,0,.22);--drop:rgba(0,0,0,.65);--track:rgba(236,220,255,.12)}
-/* Studio Evening (Junyan, 2026-11-11, on Studio Morning: "How about a dark version instead?"): the same studio after
-   hours, warm lamp light on a maple floor. Espresso brown, warm cream text, coral for "now". Coral sits near Studio
-   On-Site, so Studio On-Site turns a yellower tangerine; Dance stays pink, well clear of coral. */
-:root[data-look="evening"]{
---amber:#fbbf24;--orange:#fc980c;--lime:#a3e635;--emerald:#34d399;--cyan:#22d3ee;--blue:#60a5fa;
---indigo:#818cf8;--purple:#c084fc;--pink:#f472b6;--slate:#94a3b8;--sand:#d6bc8a;--stone:#a8a29e;--red:#ff5a5f;
---bg:#17120e;--bar:#211a14;--raise:#2a2119;--raise2:#352a20;--line:rgba(255,228,196,.10);--hair:rgba(255,228,196,.055);
---ink:#f3eadc;--soft:#c4b5a2;--faint:#94826e;
---now:#ff7a59;--accent:#ff7a59;--on-accent:#1c120c;--accent-ink:#ff7a59;--neutral:#f3eadc;
---ev-fill:26%;--pill-fill:22%;--ev-title:14%;--ev-ink:#fff8ee;--ev-time-p:38%;--ev-time:#e2d6c6;--ev-halo:0%;
---glow:rgba(255,122,89,.10);--today-col:rgba(255,170,110,.03);--past:rgba(0,0,0,.22);--drop:rgba(0,0,0,.6);--track:rgba(255,228,196,.12)}
 /* Velvet & Brass: a quiet, premium front office. Emerald-black, warm cream text, brushed brass for "now", calmer
    gem tones. Brass sits near Deep Work and Rest, so Deep Work is a bright citrine and Rest a pale linen. */
 :root[data-look="velvet"]{
@@ -120,6 +146,7 @@
 --glow:rgba(200,164,106,.10);--today-col:rgba(200,164,106,.03);--past:rgba(0,0,0,.2);--drop:rgba(0,0,0,.55);--track:rgba(243,234,216,.12)}
 *{box-sizing:border-box}
 html,body{height:100%;margin:0;overflow:hidden}
+body::before{content:"";position:fixed;left:0;right:0;top:0;height:env(safe-area-inset-top,0px);background:var(--status);z-index:200;pointer-events:none}
 body{background:var(--bar);color:var(--ink);font-family:var(--font);font-size:13px;-webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent}
 button,input,select{font:inherit;color:inherit}button{cursor:pointer}
 button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--now);outline-offset:1px}
@@ -173,7 +200,8 @@ kbd{font:inherit;font-size:11px;border:1px solid var(--line);background:var(--ra
 .bar{display:flex;align-items:center;gap:8px;padding:12px 16px 10px 20px;background:var(--bar);position:relative;z-index:9}
 .bar h1{font-family:var(--display);font-size:24px;margin:0;font-weight:700;letter-spacing:-.02em;white-space:nowrap;cursor:default;min-width:0;overflow:hidden;text-overflow:ellipsis}
 .seg,.bar .btn,.bar .icon,.nav{flex:none}.nav{white-space:nowrap}
-.bar h1 span{font-weight:400;color:var(--soft)}
+/* "November 2026": the month bold, the year light (his reference picture); a phone shows the month alone (below) */
+.bar h1 span{font-weight:300;color:var(--ink)}
 .wk,.status{color:var(--faint);font-size:12.5px;white-space:nowrap}
 .seg{display:flex;background:var(--raise);border:1px solid var(--line);border-radius:10px;padding:2px;gap:2px}
 .seg button{border:0;background:none;padding:5px 12px;border-radius:8px;color:var(--soft);white-space:nowrap;font-weight:500;font-variant-numeric:tabular-nums}
@@ -211,14 +239,14 @@ body.touch .sc.snap{scroll-snap-type:none}
 .pill.ghost{box-shadow:none;border:1.5px dashed var(--c);background:transparent}.pill.more{box-shadow:none;background:none;color:var(--faint);font-weight:500}
 .col{position:relative;height:calc(24*var(--H));background-image:linear-gradient(var(--hair) 1px,transparent 1px);background-size:100% var(--H)}
 .day.today .col{background-color:var(--today-col)}
-.day.past .ev,.day.past .pip{opacity:.5}
+.day.past .pip{opacity:.5}
 .shade{position:absolute;left:0;right:0;top:0;background:var(--past);pointer-events:none}
 /* an event: a solid tinted card with a strong colour bar, a bright title and a quieter time */
 .ev{position:absolute;text-align:left;border-radius:var(--radius);padding:4px 7px 4px 9px;font-size:12px;overflow:hidden;border:0;
   background:color-mix(in srgb,var(--c) var(--ev-fill),var(--bg));box-shadow:inset 3px 0 0 var(--c),0 0 0 1px var(--bg),0 0 14px -3px color-mix(in srgb,var(--c) var(--ev-halo),transparent);
   color:color-mix(in srgb,var(--c) var(--ev-title),var(--ev-ink));line-height:1.3;user-select:none;-webkit-user-select:none;cursor:pointer;transition:box-shadow .15s,background .15s}
 .ev:hover{background:color-mix(in srgb,var(--c) calc(var(--ev-fill) + 4%),var(--bg));z-index:3}
-.ev.on{box-shadow:inset 3px 0 0 var(--c),0 0 0 2px var(--c),0 8px 24px rgba(0,0,0,.45);z-index:4}
+.ev.on{box-shadow:inset 3px 0 0 var(--c),0 0 0 2px var(--c),0 8px 24px color-mix(in srgb,var(--lift) calc(45% * var(--lift-k)),transparent);z-index:4}
 .ev b{font-weight:600;display:flex;align-items:center;white-space:nowrap;overflow:hidden;min-width:0;letter-spacing:-.005em}
 .ev b .t{overflow:hidden;text-overflow:ellipsis;min-width:0}
 .ev .ei{flex:none;display:inline-block;width:1.25em;margin-right:4px;text-align:center;font-size:11.5px;line-height:1;vertical-align:-1px}
@@ -227,9 +255,14 @@ body.touch .sc.snap{scroll-snap-type:none}
 .ev small{display:block;color:color-mix(in srgb,var(--c) var(--ev-time-p),var(--ev-time));font-size:11px;font-variant-numeric:tabular-nums;white-space:nowrap;margin-top:1px}
 .ev.sm{padding-top:0;padding-bottom:0;display:flex;align-items:center}.ev.sm small{display:none}.ev.sm b{flex:1}
 .ev .h{position:absolute;left:0;right:0;bottom:0;height:8px;cursor:ns-resize}
-.ev.ro{cursor:default}.ev.dragging{box-shadow:inset 3px 0 0 var(--c),0 8px 24px rgb(0 0 0/.5);z-index:6;opacity:.95;transition:none}
+.ev.ro{cursor:default}.ev.dragging{box-shadow:inset 3px 0 0 var(--c),0 8px 24px color-mix(in srgb,var(--lift) calc(50% * var(--lift-k)),transparent);z-index:6;opacity:.95;transition:none}
 .ev.ghost{box-shadow:none;border:1.5px dashed var(--c);background:color-mix(in srgb,var(--c) 8%,var(--bg))}.ev.ghost b .t::before{content:"Suggested: ";color:var(--soft);font-weight:500}
-.ev.draft{border:1.5px dashed var(--c)}.ev.done{opacity:.62}
+.ev.draft{border:1.5px dashed var(--c)}
+/* an event that is over (earlier today, or on a past day): a paler card and a quieter title, never see-through, so the
+   title still reads at 4.5:1 or better in every look (see-through washed it out on the cream look) */
+.ev.done:not(.ghost),.day.past .ev:not(.ghost){background:color-mix(in srgb,var(--c) var(--dim-fill),var(--bg));color:color-mix(in srgb,var(--c) var(--dim-title),var(--dim-ink))}
+.ev.done:not(.ghost):hover,.day.past .ev:not(.ghost):hover{background:color-mix(in srgb,var(--c) calc(var(--dim-fill) + 4%),var(--bg))}
+.ev.done small,.day.past .ev small{color:var(--faint)}.ev.done .ei,.day.past .ev .ei{opacity:.6}
 .strip.narrow .dn>span{display:flex;flex-direction:column;align-items:center;gap:2px;line-height:1.1}
 .strip.narrow .ev{padding:3px 3px 3px 6px;font-size:10.5px;line-height:1.2}.strip.narrow .ev .ei{display:none}
 .strip.narrow .ev b{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:4;white-space:normal;overflow-wrap:normal;-webkit-hyphens:auto;hyphens:auto}
@@ -283,13 +316,14 @@ body.touch .sc.snap{scroll-snap-type:none}
 .look{display:flex;flex-direction:column;align-items:center;gap:6px;border:0;background:none;padding:4px 0;color:var(--soft);font-size:11.5px;line-height:1.2;text-align:center;min-width:0}
 .lk-chip{position:relative;width:52px;height:52px;border-radius:14px;background:linear-gradient(var(--lk-bar) 0 30%,var(--lk-bg) 30%);box-shadow:inset 0 0 0 1px var(--line);display:flex;align-items:flex-end;justify-content:center;gap:4px;padding-bottom:8px;overflow:hidden;transition:box-shadow .15s}
 .lk-chip i{width:8px;height:15px;border-radius:3px;background:var(--lk-1)}.lk-chip i:nth-child(2){height:21px;background:var(--lk-2)}.lk-chip i:nth-child(3){height:11px;background:var(--lk-3)}
+.lk-chip.split{background:linear-gradient(var(--lk-bar) 0 30%,transparent 30%) left/50% 100% no-repeat,linear-gradient(var(--lk-bar2) 0 30%,transparent 30%) right/50% 100% no-repeat,linear-gradient(90deg,var(--lk-bg) 50%,var(--lk-bg2) 50%)}
 .lk-chip::after{content:"";position:absolute;left:6px;right:6px;top:calc(30% + 6px);height:2px;border-radius:1px;background:var(--lk-acc)}
 .lk-nm{display:block;min-height:2.4em}
 .look[aria-pressed=true]{color:var(--ink);font-weight:600}.look[aria-pressed=true] .lk-chip{box-shadow:0 0 0 2px var(--bar),0 0 0 4px var(--accent)}
 .grab{display:none}
-.modal{position:fixed;inset:0;background:rgb(0 0 0/.5);z-index:80;display:grid;place-items:center;padding:16px}
-.modal .card{background:var(--raise);max-width:340px;display:flex;flex-direction:column;gap:10px;box-shadow:0 16px 50px rgb(0 0 0/.55)}
-.toast{position:fixed;bottom:calc(18px + env(safe-area-inset-bottom,0px));left:50%;transform:translate(-50%,20px);background:var(--raise2);border:1px solid var(--line);padding:8px 16px;border-radius:999px;font-size:12.5px;z-index:70;opacity:0;transition:.25s;pointer-events:none;white-space:nowrap;max-width:92vw;overflow:hidden;text-overflow:ellipsis;box-shadow:0 8px 24px rgb(0 0 0/.4)}
+.modal{position:fixed;inset:0;background:color-mix(in srgb,var(--lift) calc(50% * var(--lift-k)),transparent);z-index:80;display:grid;place-items:center;padding:16px}
+.modal .card{background:var(--raise);max-width:340px;display:flex;flex-direction:column;gap:10px;box-shadow:0 16px 50px color-mix(in srgb,var(--lift) calc(55% * var(--lift-k)),transparent)}
+.toast{position:fixed;bottom:calc(18px + env(safe-area-inset-bottom,0px));left:50%;transform:translate(-50%,20px);background:var(--raise2);border:1px solid var(--line);padding:8px 16px;border-radius:999px;font-size:12.5px;z-index:70;opacity:0;transition:.25s;pointer-events:none;white-space:nowrap;max-width:92vw;overflow:hidden;text-overflow:ellipsis;box-shadow:0 8px 24px color-mix(in srgb,var(--lift) calc(40% * var(--lift-k)),transparent)}
 .toast.on{opacity:1;transform:translate(-50%,0)}.toast.bad{border-color:var(--red)}
 
 /* a block type's own page */
@@ -309,14 +343,14 @@ body.onpage .left,body.onpage .main,body.onpage .panel{display:none}
 @media (max-width:1320px){.wk{display:none}}
 @media (max-width:1100px){
   .app,body.nopanel .app{grid-template-columns:var(--rail) 230px minmax(0,1fr)}
-  .panel{position:fixed;top:0;right:0;bottom:0;width:324px;z-index:30;transform:translateX(105%);transition:transform .28s ease;background:var(--bar);box-shadow:-20px 0 60px rgba(0,0,0,.45);padding-top:env(safe-area-inset-top,0px)}
+  .panel{position:fixed;top:0;right:0;bottom:0;width:324px;z-index:30;transform:translateX(105%);transition:transform .28s ease;background:var(--bar);box-shadow:-20px 0 60px color-mix(in srgb,var(--lift) calc(45% * var(--lift-k)),transparent);padding-top:env(safe-area-inset-top,0px)}
   body.popen .panel{transform:none}
 }
 @media (max-width:760px){
   :root{--gut:46px}
   .app,body.nopanel .app{grid-template-columns:minmax(0,1fr)}
   .rail,.left{display:none}
-  body.month .left{display:flex;position:fixed;top:calc(56px + env(safe-area-inset-top,0px));left:8px;right:8px;z-index:25;border:1px solid var(--line);border-radius:16px;background:var(--raise);box-shadow:0 16px 40px rgb(0 0 0/.5);padding:14px;max-height:70%}
+  body.month .left{display:flex;position:fixed;top:calc(56px + env(safe-area-inset-top,0px));left:8px;right:8px;z-index:25;border:1px solid var(--line);border-radius:16px;background:var(--raise);box-shadow:0 16px 40px color-mix(in srgb,var(--lift) calc(50% * var(--lift-k)),transparent);padding:14px;max-height:70%}
   .drop{left:0;right:0;bottom:0;width:auto;z-index:20;border-top:1px solid var(--line);background:var(--bar);box-shadow:0 -6px 14px -8px var(--drop);padding:8px max(14px,env(safe-area-inset-right,0px)) calc(8px + env(safe-area-inset-bottom,0px)) max(14px,env(safe-area-inset-left,0px))}
   .dropbox{min-height:44px;padding:8px 14px}
   .dropbox kbd,.wk,.nav,.wide{display:none}.onlyphone{display:initial}
@@ -398,7 +432,8 @@ const zoneName = (tz) => (ZONES.find((x) => x[0] === tz) || [0, tz])[1];
 const CACHE_KEY = "cal-app-cache-v1";
 const S = { tz: store.get("cal-tz") || DEVICE_TZ, tz2: store.get("cal-tz2") || "", n: store.get("cal-n") || "3",
   cur: null, win0: null, mini: null, miniLock: false, cals: [], hidden: new Set(JSON.parse(store.get("cal-hidden") || "[]")),
-  months: {}, sugg: [], loading: new Set(), tab: "now", ev: null, form: null, page: "cal", rail: store.get("cal-rail") !== "0", top: null };
+  months: {}, sugg: [], loading: new Set(), tab: "now", ev: null, form: null, page: "cal", rail: store.get("cal-rail") !== "0", top: null,
+  look: C.lookId(store.get("cal-look")) };
 S.n = S.n === "m" ? "m" : +S.n || 3;
 try { const c = JSON.parse(store.get(CACHE_KEY) || "{}"); S.cals = c.cals || []; S.months = c.months || {}; S.sugg = c.sugg || []; } catch {}
 function saveCache() {
@@ -878,21 +913,29 @@ function pList(x) {
 const dayLabel = (k) => `${DOW[C.dowOf(k)]} ${MON[+k.slice(5, 7) - 1]} ${+k.slice(8)}`;
 function pSet() {
   const opts = (sel, none) => (none ? `<option value="">None</option>` : "") + ZONES.map(([id, n]) => `<option value="${esc(id)}" ${id === sel ? "selected" : ""}>${esc(n)}</option>`).join("");
-  const cur = C.lookId(document.documentElement.dataset.look);
-  return `<div class="field"><p class="lbl" style="margin:0">Look</p><div class="looks" role="group" aria-label="Look">${C.LOOKS.map((l) => `<button class="look" data-look="${l.id}" aria-pressed="${l.id === cur}" style="--lk-bg:${l.bg};--lk-bar:${l.theme};--lk-acc:${l.accent};--lk-1:${l.gels[0]};--lk-2:${l.gels[1]};--lk-3:${l.gels[2]}"><span class="lk-chip" aria-hidden="true"><i></i><i></i><i></i></span><span class="lk-nm">${esc(l.name)}</span></button>`).join("")}</div><div class="meta">Tap one to try it on the whole calendar. This device remembers it.</div></div>
+  const swatch = (l) => { const a = l.day || l, b = l.night || l;
+    return `--lk-bg:${a.bg};--lk-bar:${a.theme};--lk-bg2:${b.bg};--lk-bar2:${b.theme};--lk-acc:${a.accent};--lk-1:${a.gels[0]};--lk-2:${a.gels[1]};--lk-3:${a.gels[2]}`; };
+  return `<div class="field"><p class="lbl" style="margin:0">Look</p><div class="looks" role="group" aria-label="Look">${C.LOOKS.map((l) => `<button class="look" data-look="${l.id}" aria-pressed="${l.id === S.look}" style="${swatch(l)}"><span class="lk-chip ${l.day ? "split" : ""}" aria-hidden="true"><i></i><i></i><i></i></span><span class="lk-nm">${esc(l.name)}</span></button>`).join("")}</div><div class="meta">Tap one to try it on the whole calendar. This device remembers it. Studio is light by day and dark after sunset.</div></div>
     <div class="field"><p class="lbl" style="margin:0">Studio shifts</p><label class="sw" for="railSw">Show in a slim rail, not as full blocks<input type="checkbox" id="railSw" ${S.rail ? "checked" : ""}></label></div>
     <div class="field"><p class="lbl" style="margin:0">Time zones</p><label class="sw" for="tz1">Main<select id="tz1">${opts(S.tz)}</select></label><label class="sw" for="tz2">Second<select id="tz2">${opts(S.tz2, true)}</select></label></div>
     <div class="field"><p class="lbl" style="margin:0">Block types</p>${C.KINDS.map(([k, n]) => `<div class="r k-${k}" style="color:var(--soft)"><i style="width:12px;height:12px;border-radius:4px;background:var(--c)"></i>${KICON[k] ? KICON[k] + " " : ""}${n}</div>`).join("")}<div class="meta">Guessed from the title. Change one on its event and it sticks.</div></div>
     <div class="field"><p class="lbl" style="margin:0">This device</p><button class="btn" id="pairBtn">Change pairing code</button></div>`;
 }
-/** Put a look on the whole page at once and keep it on this device (the head script puts it back before the next paint). */
+/** Put the chosen look on the whole page; for Studio, the half the sun says (day or night) in the calendar's zone.
+    Runs on a tap, every 30 s and when the page comes back into view, so Studio flips at sunrise and sunset by itself. */
+function showLook() {
+  const f = C.lookFace(S.look, Date.now(), S.tz), root = document.documentElement;
+  if ((root.dataset.look || null) !== f.face) { if (f.face) root.dataset.look = f.face; else delete root.dataset.look; }
+  const tc = $('meta[name="theme-color"]'), cs = $('meta[name="color-scheme"]');
+  if (tc.content !== f.theme) tc.content = f.theme;
+  if (cs.content !== f.scheme) cs.content = f.scheme;
+}
+/** Pick a look and keep it on this device (the head script puts it back before the next paint). */
 function setLook(id) {
-  const L = C.LOOKS.find((x) => x.id === C.lookId(id)), root = document.documentElement;
-  if (L.id === "ink") delete root.dataset.look; else root.dataset.look = L.id;
-  $('meta[name="theme-color"]').content = L.theme;
-  $('meta[name="color-scheme"]').content = L.scheme;
-  store.set("cal-look", L.id === "ink" ? null : L.id);
-  $$("button[data-look]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.look === L.id)));
+  S.look = C.lookId(id);
+  store.set("cal-look", S.look);
+  showLook();
+  $$("button[data-look]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.look === S.look)));
 }
 function pKeys() {
   const k = [["Swipe left or right", TOUCH ? "one finger, sideways" : "two fingers"], ["Back and forward", "← →"], ["Today", "T"], ["Day", "1 or D"], ["3 days", "3"], ["Week", "7 or W"], ["Month", "M"], ["New task", "N"], ["Show or hide this panel", "P"], ["Close details", "Esc"]];
@@ -973,7 +1016,7 @@ function setup() {
   document.addEventListener("change", (e) => {
     const t = e.target;
     if (t.id === "railSw") { S.rail = t.checked; store.set("cal-rail", S.rail ? "1" : "0"); render(); }
-    else if (t.id === "tz1") { S.tz = t.value; store.set("cal-tz", S.tz); S.months = {}; render(); refresh(true); }
+    else if (t.id === "tz1") { S.tz = t.value; store.set("cal-tz", S.tz); S.months = {}; showLook(); render(); refresh(true); }
     else if (t.id === "tz2") { S.tz2 = t.value; store.set("cal-tz2", S.tz2); render(); }
     else if (t.closest("#cals")) { const id = t.dataset.id; t.checked ? S.hidden.delete(id) : S.hidden.add(id); store.set("cal-hidden", JSON.stringify([...S.hidden])); render(); }
   });
@@ -1013,7 +1056,8 @@ function setup() {
   wireSwipe($("#view"));
   addEventListener("resize", size);
   addEventListener("focus", () => { if (S.tab !== "event" && questKey()) { refresh(); loadSide(); } });
-  setInterval(() => { tickNow(); if (S.tab === "now" && S.page === "cal" && !dragging) paintPanel(); renderRail(); }, 30000);
+  setInterval(() => { showLook(); tickNow(); if (S.tab === "now" && S.page === "cal" && !dragging) paintPanel(); renderRail(); }, 30000);
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) showLook(); });
 }
 function boot() { render(); loadSide(); refresh(); }
 setup(); boot();

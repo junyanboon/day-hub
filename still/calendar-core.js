@@ -178,22 +178,70 @@
   }
 
   /* ---- looks (Junyan, 2026-11-11: "Can you give me three more colour schemes. Make it really inspirational for a
-     dancer and business owner"). Ink is the default and the plain :root palette in calendar.html; each other look is
-     one :root[data-look="<id>"] block of variables there. This table only feeds the swatches in the menu sheet and
-     the theme-color tag (theme is the header bar colour); still/test/calendar-look.test.mjs checks it matches the CSS.
-     The choice is kept per device in localStorage "cal-look" and put on in the page head, before the first paint. ---- */
+     dancer and business owner"). Ink is the plain :root palette in calendar.html; each other look (or half of a
+     look) is one :root[data-look="<face>"] block of variables there. This table only feeds the swatches in the menu
+     sheet and the theme-color tag (theme is the header bar colour); still/test/calendar-look.test.mjs checks it
+     matches the CSS. The choice is kept per device in localStorage "cal-look" and put on in the page head, before
+     the first paint. ---- */
+  /* Studio (Junyan, 2026-11-11: "Let's go wtih the calendar mode with the night mode for when it's night") is the
+     default since then: the light Studio Morning look from sunrise to sunset and a charcoal night look from sunset
+     to sunrise. Its two halves are two CSS blocks, data-look="studio-day" and "studio-night"; lookFace picks one. */
   const LOOKS = [
+    { id: "studio", name: "Studio",
+      day: { face: "studio-day", bg: "#faf6ef", theme: "#fffdf9", accent: "#d24a22", ink: "#1f1b16", gels: ["#9a7d00", "#0e8fa3", "#c7317f"], scheme: "light" },
+      night: { face: "studio-night", bg: "#1c1c1c", theme: "#262626", accent: "#ff7a59", ink: "#e6e6e6", gels: ["#fbbf24", "#22d3ee", "#f472b6"], scheme: "dark" } },
     { id: "ink", name: "Ink", bg: "#0e1015", theme: "#14171e", accent: "#ff4f5e", ink: "#f2f4f8", gels: ["#fbbf24", "#22d3ee", "#f472b6"], scheme: "dark" },
     { id: "stage", name: "Stage Lights", bg: "#120d1a", theme: "#1d1529", accent: "#ffc857", ink: "#f7f1fb", gels: ["#e08000", "#2ee0e8", "#ff4fae"], scheme: "dark" },
-    { id: "evening", name: "Studio Evening", bg: "#17120e", theme: "#211a14", accent: "#ff7a59", ink: "#f3eadc", gels: ["#fbbf24", "#22d3ee", "#f472b6"], scheme: "dark" },
     { id: "velvet", name: "Velvet & Brass", bg: "#0b1a17", theme: "#11251f", accent: "#c8a46a", ink: "#f3ead8", gels: ["#f5cc1f", "#3cc6c0", "#d9668f"], scheme: "dark" },
   ];
-  /** Looks that were replaced, by the look that took their place. Studio Morning, the one light look, became the
-      dark Studio Evening (Junyan, 2026-11-11: "How about a dark version instead?"), so a phone that saved it opens
-      in Studio Evening, not Ink. */
-  const LOOK_RENAMED = { morning: "evening" };
-  /** A saved look name → a known look id ("ink" for anything else). */
-  const lookId = (saved) => { const id = Object.hasOwn(LOOK_RENAMED, saved) ? LOOK_RENAMED[saved] : saved; return LOOKS.some((l) => l.id === id) ? id : "ink"; };
+  const DEFAULT_LOOK = "studio";
+  /** Looks that were replaced, by the look that took their place: Studio Morning (light) and Studio Evening (dark)
+      are now the two halves of Studio. */
+  const LOOK_RENAMED = { morning: "studio", evening: "studio" };
+  /** A saved look name → a known look id (Studio for anything else, and for no saved choice). */
+  const lookId = (saved) => { const id = Object.hasOwn(LOOK_RENAMED, saved) ? LOOK_RENAMED[saved] : saved; return LOOKS.some((l) => l.id === id) ? id : DEFAULT_LOOK; };
+  /** Junyan picked Studio on 2026-11-11, so every device forgets the look it saved while he tried them, once; his
+      taps after that are kept. `storage` is localStorage (or a stand-in with getItem, setItem and removeItem).
+      Returns the look id to show. */
+  const LOOK_RESET = "2026-11-11-studio";
+  function startLook(storage) {
+    if (storage.getItem("cal-look-reset") !== LOOK_RESET) { storage.removeItem("cal-look"); storage.setItem("cal-look-reset", LOOK_RESET); }
+    return lookId(storage.getItem("cal-look"));
+  }
+
+  /* ---- sunrise and sunset, worked out on the device: no location permission and no network call. The calendar's
+     time zone picks the city (Toronto when it is not one we know). The sunrise equation in NOAA's low-precision
+     form (about a minute out), with the sun's top edge on the horizon and the usual refraction (-0.833 degrees). */
+  const ZONE_PLACE = { "America/Toronto": [43.65, -79.38], "America/Vancouver": [49.28, -123.12], "America/Sao_Paulo": [-23.55, -46.63],
+    "Europe/London": [51.51, -0.13], "Europe/Lisbon": [38.72, -9.14], "Asia/Tokyo": [35.68, 139.69], "Asia/Kuala_Lumpur": [3.14, 101.69] };
+  /** [latitude, longitude] for a time zone; Toronto for any zone not in the table. */
+  const placeOf = (tz) => ZONE_PLACE[tz] || ZONE_PLACE["America/Toronto"];
+  /** Sunrise and sunset on `day` ("YYYY-MM-DD") at [lat, lon], as epoch ms: {rise, set}. Where the sun never sets
+      that day both are null and up is true; where it never rises both are null and up is false. */
+  function sunTimes(day, [lat, lon]) {
+    const r = Math.PI / 180, n = civil(day) / DAY - 10957;
+    const J = n - lon / 360, M = (357.5291 + 0.98560028 * J) % 360;
+    const Cn = 1.9148 * Math.sin(M * r) + 0.02 * Math.sin(2 * M * r) + 0.0003 * Math.sin(3 * M * r);
+    const L = (M + Cn + 180 + 102.9372) % 360;
+    const transit = 2451545 + J + 0.0053 * Math.sin(M * r) - 0.0069 * Math.sin(2 * L * r);
+    const dec = Math.asin(Math.sin(L * r) * Math.sin(23.4397 * r));
+    const cosW = (Math.sin(-0.833 * r) - Math.sin(lat * r) * Math.sin(dec)) / (Math.cos(lat * r) * Math.cos(dec));
+    if (cosW < -1 || cosW > 1) return { rise: null, set: null, up: cosW < -1 };
+    const w = Math.acos(cosW) / r / 360, ms = (j) => Math.round((j - 2440587.5) * DAY);
+    return { rise: ms(transit - w), set: ms(transit + w) };
+  }
+  /** "day" between sunrise and sunset in tz's city on tz's date, "night" otherwise. */
+  function sunHalf(ms, tz) {
+    const s = sunTimes(wall(ms, tz).day, placeOf(tz));
+    if (s.rise == null) return s.up ? "day" : "night";
+    return ms >= s.rise && ms < s.set ? "day" : "night";
+  }
+  /** What to put on the page for look `id` at instant ms in zone tz: {face (the data-look value; null for Ink, the
+      plain page), theme (the theme-color), scheme (light or dark)}. */
+  function lookFace(id, ms, tz) {
+    const L = LOOKS.find((x) => x.id === lookId(id)), f = L.day ? L[sunHalf(ms, tz)] : L;
+    return { face: L.day ? f.face : L.id === "ink" ? null : L.id, theme: f.theme, scheme: f.scheme };
+  }
 
   /* ---- words ---- */
   function hm(min) {
@@ -206,5 +254,5 @@
   }
 
   root.CalCore = { wall, instant, offset, addDays, dowOf, weekStart, isoWeek, addMonths, monthKey, monthsFor,
-    KINDS, kindOf, layout, pieces, coversDay, orderBetween, groupOf, dropTask, blockMinutes, hm, dur, SWIPE, swipeLock, swipeCommit, LOOKS, lookId };
+    KINDS, kindOf, layout, pieces, coversDay, orderBetween, groupOf, dropTask, blockMinutes, hm, dur, SWIPE, swipeLock, swipeCommit, LOOKS, lookId, startLook, LOOK_RESET, placeOf, sunTimes, sunHalf, lookFace };
 })(typeof window !== "undefined" ? window : globalThis);
