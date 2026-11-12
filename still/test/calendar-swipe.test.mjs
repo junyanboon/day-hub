@@ -50,3 +50,12 @@ test("a fast deliberate flick changes the day with less travel, a twitch does no
   assert.equal(C.swipeCommit({ dx: -20, dy: 2, vx: -1.2 }, PHONE), 0, "under 30 px is a twitch");
   assert.equal(C.swipeCommit({ dx: -45, dy: 6, vx: 0.8 }, PHONE), 0, "the finger came back: no change");
 });
+
+// Junyan, 2026-11-11 (later): "calendar mobile app changed dates when swiping up and down". A thumb scroll arcs, so
+// its first 10 px can lean sideways; that grabbed the strip as a day swipe and stopped the scroll.
+test("the first 10 px lock sideways only when they are at least 1.5 times the up/down move", () => {
+  assert.equal(C.swipeLock(12, 9), "y", "a thumb arc at the start of a scroll is a scroll");
+  assert.equal(C.swipeLock(-14, 10), "y");
+  assert.equal(C.swipeLock(15, 10), "x");
+  assert.equal(C.swipeLock(-12, 4), "x");
+});
