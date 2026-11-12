@@ -13,7 +13,7 @@
 <meta name="apple-mobile-web-app-title" content="Calendar">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>Calendar</title>
-<script src="calendar-core.js?v=12"></script>
+<script src="calendar-core.js?v=13"></script>
 <script>
 /* The look saved on this device (the Look row in Settings; Studio when none) goes on here, before anything is drawn,
    so the page never opens in the wrong look first. Studio shows its day or night half by the sun in the calendar's
@@ -28,6 +28,8 @@
     document.querySelector('meta[name="theme-color"]').content = f.theme;
     document.querySelector('meta[name="color-scheme"]').content = f.scheme;
   } catch (e) {}
+  /* the hour height this phone last pinched to (slice 01), so the day opens at that height, never 56 first */
+  try { document.documentElement.style.setProperty("--H", CalCore.startHour(localStorage, matchMedia("(hover: none) and (pointer: coarse)").matches) + "px"); } catch (e) {}
 })();
 </script>
 <!--
@@ -270,6 +272,8 @@ body.touch .pane{overflow-x:clip}
 .ev.tall b .t{overflow:visible}
 .ev small{display:block;color:color-mix(in srgb,var(--c) var(--ev-time-p),var(--ev-time));font-size:11px;font-variant-numeric:tabular-nums;white-space:nowrap;margin-top:1px}
 .ev.sm{padding-top:0;padding-bottom:0;display:flex;align-items:center}.ev.sm small{display:none}.ev.sm b{flex:1}
+/* the card's time: the start (.t1), or on a phone's tall card start and end, "1:45 to 2:15 pm" (.t2, slice 01) */
+.ev small .t2{display:none}body.touch .ev.tall small .t1{display:none}body.touch .ev.tall small .t2{display:inline}body.touch .ev.tall small{white-space:normal}.ev small .z2{display:block;color:var(--k-travel)}
 .ev .h{position:absolute;left:0;right:0;bottom:0;height:8px;cursor:ns-resize}
 .ev.ro{cursor:default}.ev.dragging{box-shadow:inset 3px 0 0 var(--c),0 8px 24px color-mix(in srgb,var(--lift) calc(50% * var(--lift-k)),transparent);z-index:6;opacity:.95;transition:none}
 .ev.ghost{box-shadow:none;border:1.5px dashed var(--c);background:color-mix(in srgb,var(--c) 8%,var(--bg))}.ev.ghost b .t::before{content:"Suggested: ";color:var(--soft);font-weight:500}
@@ -443,7 +447,7 @@ html.hsfill .modal{bottom:calc(-1 * var(--hsgap,0px))}
 "use strict";
 const C = window.CalCore, qs = new URLSearchParams(location.search);
 const API = qs.get("api") || "https://still.srv1948070.hstgr.cloud";
-const H = 56, SNAP = 15, WIN = 36, BACK = 14;
+const SNAP = 15, WIN = 36, BACK = 14;
 /** A phone or tablet: the finger moves days through wireSwipe (never native sideways scrolling). */
 const TOUCH = matchMedia("(hover: none) and (pointer: coarse)").matches;
 /** Wide enough for Day Quest's desktop pages (quest-trips.js draws Trips from 768 px; under that it does nothing). */
@@ -455,7 +459,7 @@ if (TOUCH) for (const g of ["gesturestart", "gesturechange"]) document.addEventL
    which shows this build, the phone's answers and a log of every day change with its cause. Until then CalHook.on is
    null and diag() does nothing. BUILD names this copy of the page, so a screenshot proves which copy ran: change it on
    every change to this page or calendar-readout.js (the date plus a letter). */
-const BUILD = "2026-11-12g top clear";
+const BUILD = "2026-11-12j top clear, pinch and sheet";
 const CalHook = window.CalHook = { BUILD, on: null };
 const diag = (kind, msg) => { if (CalHook.on) CalHook.on(kind, msg); };
 /* The iPhone home screen app's fit (2026-11-12): html.hs in a home screen app on touch, html.hsfill and --hsgap when
@@ -504,7 +508,8 @@ const CACHE_KEY = "cal-app-cache-v1";
 const S = { tz: store.get("cal-tz") || DEVICE_TZ, tz2: store.get("cal-tz2") || "", n: store.get("cal-n") || "3",
   cur: null, win0: null, mini: null, miniLock: false, cals: [], hidden: new Set(JSON.parse(store.get("cal-hidden") || "[]")),
   months: {}, sugg: [], loading: new Set(), tab: "now", ev: null, form: null, page: "cal", rail: store.get("cal-rail") !== "0", top: null,
-  look: C.lookId(store.get("cal-look")) };
+  look: C.lookId(store.get("cal-look")),
+  h: C.startHour({ getItem: store.get }, TOUCH) };   // the hour height in px: 56 on a desktop; a phone's own pinched height (slice 01)
 S.n = S.n === "m" ? "m" : +S.n || 3;
 { let cur = null;   // every write to the shown day goes past the readout, with the call stack that made it
   Object.defineProperty(S, "cur", { enumerable: true, get: () => cur,
@@ -675,7 +680,11 @@ function head() {
 }
 
 /* ---------- main ---------- */
+/** A pinch in progress (wirePinch), its queued frame, a render() it held back, and the end of the quiet time after it
+    when a click from its fingers is dropped. */
+let pinch = null, pinchFrame = 0, pinchRender = false, pinchQuiet = 0;
 function render() {
+  if (pinch) { pinchRender = true; return; }   // never rebuild under two fingers; the pinch's end draws it (slice 01)
   head(); renderSide(); renderRail();
   const v = $("#view");
   if (!questKey()) { v.classList.remove("snap"); v.innerHTML = pairHTML(); wirePair(); return; }
@@ -689,13 +698,14 @@ const nowText = (min) => C.hm(min).replace(/ [ap]m$/, "").replace(/^(\d+)$/, "$1
 const two = () => !!S.tz2 && S.tz2 !== S.tz;
 let dw = 200, stripDays = [];
 function strip(v) {
-  const t = today(), nowW = C.wall(Date.now(), S.tz), nowY = nowW.min / 60 * H;
+  const t = today(), nowW = C.wall(Date.now(), S.tz), nowY = atMin(nowW.min);
+  v.style.setProperty("--H", S.h + "px");
   const days = stripDays = Array.from({ length: WIN }, (_, i) => C.addDays(S.win0, i));
   const evs = eventsFor(days[0], days[WIN - 1]), gh = ghosts();
   const allDay = [...evs.filter((e) => e.allDay), ...gh.filter((g) => g.allDay)];
   const timed = [...evs.filter((e) => !e.allDay), ...gh.filter((g) => !g.allDay)];
-  const hours = (tz) => { let s = ""; for (let h = 1; h < 24; h++) s += `<span style="top:${h * H}px">${C.hm(C.wall(C.instant(S.cur, h * 60, S.tz), tz).min)}</span>`; return s; };
-  let h = `<div class="gut"><div><div class="corner" title="Times in ${esc(zoneName(S.tz))}"><span>${esc(zoneName(S.tz))}</span></div><div class="hours">${hours(S.tz)}<span class="nowlbl" id="nowlbl" style="top:${nowY}px" ${days.includes(t) ? "" : "hidden"}>${nowText(nowW.min)}</span></div></div>
+  const hours = (tz) => { let s = ""; for (let h = 1; h < 24; h++) s += `<span style="top:calc(${h} * var(--H))">${C.hm(C.wall(C.instant(S.cur, h * 60, S.tz), tz).min)}</span>`; return s; };
+  let h = `<div class="gut"><div><div class="corner" title="Times in ${esc(zoneName(S.tz))}"><span>${esc(zoneName(S.tz))}</span></div><div class="hours">${hours(S.tz)}<span class="nowlbl" id="nowlbl" style="top:${nowY}" ${days.includes(t) ? "" : "hidden"}>${nowText(nowW.min)}</span></div></div>
     ${two() ? `<div class="second"><div class="corner" title="Times in ${esc(zoneName(S.tz2))}"><span>${esc(zoneName(S.tz2))}</span></div><div class="hours">${hours(S.tz2)}</div></div>` : ""}</div>`;
   for (const k of days) {
     const ad = allDay.filter((a) => C.coversDay(a, k)), ps = [], staff = [];
@@ -706,23 +716,23 @@ function strip(v) {
       <div class="dn"><span data-open="${k}">${DOW[C.dowOf(k)]} <b>${+k.slice(8)}</b></span>${staff.length ? `<button class="keys" data-staff="${k}" title="Studio shifts">🔑 ${staff.length}</button>` : ""}</div>
       <div class="shape" title="The shape of the day, 6 am to 10 pm">${shape}</div>
       ${ad.length <= 2 ? ad.map(pill).join("") : pill(ad[0]) + `<button class="pill more" data-allday="${k}">${ad.length - 1} more</button>`}</header><div class="col" data-day="${k}">`;
-    if (k === t) h += `<div class="shade" id="shade" style="height:${nowY}px"></div>`;
+    if (k === t) h += `<div class="shade" id="shade" style="height:${nowY}"></div>`;
     const rr = staff.length ? 22 : 4;
     for (const p of C.layout(ps)) {
-      const e = p.ev, cal = calOf(e.calId), ro = !e.ghost && !cal.writable, ht = Math.max((p.bot - p.top) / 60 * H, 19);
-      h += `<div class="ev k-${e.k} ${ht < 36 ? "sm" : ht >= 54 ? "tall" : ""} ${e.ghost ? "ghost" : ""} ${ro ? "ro" : ""} ${k === t && p.bot <= nowW.min ? "done" : ""} ${S.ev && keyOf(S.ev) === keyOf(e) ? "on" : ""}" role="button" tabindex="0" data-key="${esc(keyOf(e))}"
-        style="top:${p.top / 60 * H}px;height:${ht - 2}px;left:calc((100% - ${rr}px) * ${p.col / p.cols} + 2px);width:calc((100% - ${rr}px) * ${1 / p.cols} - 3px)" title="${esc(e.title)} · ${esc(cal.name)}">
-        <b>${KICON[e.k] && !e.title.includes(KICON[e.k]) ? `<span class="ei" aria-hidden="true">${KICON[e.k]}</span>` : ""}<span class="t">${esc(e.title)}</span></b><small>${C.hm(C.wall(e.s, S.tz).min)}${two() ? " · " + C.hm(C.wall(e.s, S.tz2).min) : ""}</small>${ro || e.ghost ? "" : '<span class="h"></span>'}</div>`;
+      const e = p.ev, cal = calOf(e.calId), ro = !e.ghost && !cal.writable, m = p.bot - p.top;
+      h += `<div class="ev k-${e.k} ${C.cardFit(m, S.h)} ${e.ghost ? "ghost" : ""} ${ro ? "ro" : ""} ${k === t && p.bot <= nowW.min ? "done" : ""} ${S.ev && keyOf(S.ev) === keyOf(e) ? "on" : ""}" role="button" tabindex="0" data-key="${esc(keyOf(e))}" data-m="${m}"
+        style="top:${atMin(p.top)};height:calc(max(${m / 60} * var(--H), 19px) - 2px);left:calc((100% - ${rr}px) * ${p.col / p.cols} + 2px);width:calc((100% - ${rr}px) * ${1 / p.cols} - 3px)" title="${esc(e.title)} · ${esc(cal.name)}">
+        <b>${KICON[e.k] && !e.title.includes(KICON[e.k]) ? `<span class="ei" aria-hidden="true">${KICON[e.k]}</span>` : ""}<span class="t">${esc(e.title)}</span></b><small><span class="t1">${C.hm(C.wall(e.s, S.tz).min)}${two() ? " · " + C.hm(C.wall(e.s, S.tz2).min) : ""}</span><span class="t2">${cardTimeOf(e, S.tz)}${two() ? `<span class="z2">${cardTimeOf(e, S.tz2)}</span>` : ""}</span></small>${ro || e.ghost ? "" : '<span class="h"></span>'}</div>`;
     }
-    for (const p of staff) h += `<button class="pip" data-key="${esc(p.id)}" title="${esc(p.ev.title)} · ${C.hm(p.top)}" style="top:${p.top / 60 * H}px;height:${Math.max(16, (p.bot - p.top) / 60 * H - 2)}px">${staffIcon(p.ev.title)}</button>`;
-    if (k === t) h += `<div class="nowline" id="nowline" style="top:${nowY}px"></div>`;
+    for (const p of staff) h += `<button class="pip" data-key="${esc(p.id)}" title="${esc(p.ev.title)} · ${C.hm(p.top)}" style="top:${atMin(p.top)};height:max(16px, calc(${(p.bot - p.top) / 60} * var(--H) - 2px))">${staffIcon(p.ev.title)}</button>`;
+    if (k === t) h += `<div class="nowline" id="nowline" style="top:${nowY}"></div>`;
     h += "</div></section>";
   }
   const keepTop = v.querySelector(".strip") ? v.scrollTop : S.top;
   v.classList.add("snap");
   v.innerHTML = `<div class="pane"><div class="strip" id="strip">${h}</div></div>`;
   size();
-  v.scrollTop = keepTop ?? Math.max(0, (days.includes(t) ? nowY : 8 * H) - 220);
+  v.scrollTop = keepTop ?? Math.max(0, (days.includes(t) ? nowW.min / 60 : 8) * S.h - 220);
   wireStrip(v);
 }
 function size() {
@@ -732,6 +742,7 @@ function size() {
   dw = (v.clientWidth - g) / S.n; st.style.setProperty("--dw", dw + "px");
   st.classList.toggle("narrow", dw < 72);
   fitHead();
+  if (TOUCH && !pinch) { const lo = hourLow(v); if (S.h < lo) setHour(lo, $$("#strip .ev[data-m]")); }   // a taller screen (a turn): the day never fits loosely
   if (TOUCH) slideTo(dayDiff(S.cur, S.win0) * dw); else v.scrollLeft = dayDiff(S.cur, S.win0) * dw;
 }
 /** The day header is as tall as the shown days need: one line, plus a row per all-day event (at most 2). */
@@ -742,10 +753,10 @@ function fitHead() {
   v.style.setProperty("--hh", ($("#strip")?.classList.contains("narrow") ? 52 : 46) + rows * 25 + "px");
 }
 function tickNow() {
-  const w = C.wall(Date.now(), S.tz), y = w.min / 60 * H;
-  for (const id of ["nowline", "nowlbl"]) { const el = document.getElementById(id); if (el) el.style.top = y + "px"; }
+  const w = C.wall(Date.now(), S.tz), y = atMin(w.min);
+  for (const id of ["nowline", "nowlbl"]) { const el = document.getElementById(id); if (el) el.style.top = y; }
   const l = $("#nowlbl"); if (l) l.textContent = nowText(w.min);
-  const sh = $("#shade"); if (sh) sh.style.height = y + "px";
+  const sh = $("#shade"); if (sh) sh.style.height = y;
 }
 const keyOf = (e) => (e.ghost ? "g|" : "e|") + e.calId + "|" + e.id;
 function findByKey(key) {
@@ -754,7 +765,7 @@ function findByKey(key) {
   for (const m of Object.values(S.months)) { const e = (m.events || []).find((x) => x.id === id && x.calId === calId); if (e) return norm(e); }
   return null;
 }
-const yToMin = (col, clientY) => Math.max(0, Math.min(1440 - SNAP, Math.floor((clientY - col.getBoundingClientRect().top) / H * 60 / SNAP) * SNAP));
+const yToMin = (col, clientY) => Math.max(0, Math.min(1440 - SNAP, Math.floor((clientY - col.getBoundingClientRect().top) / S.h * 60 / SNAP) * SNAP));
 /** Move an instant by whole days on the wall (DST safe) plus minutes. */
 function shiftWall(ms, dDay, dMin) { const w = C.wall(ms, S.tz); return C.instant(C.addDays(w.day, dDay), w.min, S.tz) + dMin * 60000; }
 
@@ -820,10 +831,10 @@ function wireStrip(v) {
         if (Math.abs(m.clientY - sy) > 4 || Math.abs(m.clientX - sx) > 4) moved = true;
         if (!moved) return;
         dragging = true; el.classList.add("dragging");
-        dMin = Math.round((m.clientY - sy) / H * 60 / SNAP) * SNAP;
+        dMin = Math.round((m.clientY - sy) / S.h * 60 / SNAP) * SNAP;
         dDay = S.n > 1 && !resize ? Math.round((m.clientX - sx) / dw) : 0;
-        if (resize) { const len = Math.max(SNAP, (ev.e - ev.s) / 60000 + dMin); el.style.height = (len / 60 * H - 2) + "px"; el.querySelector("small").textContent = C.dur(len); }
-        else { el.style.transform = `translate(${dDay * dw}px,${dMin / 60 * H}px)`; el.querySelector("small").textContent = C.hm(C.wall(shiftWall(ev.s, dDay, dMin), S.tz).min); }
+        if (resize) { const len = Math.max(SNAP, (ev.e - ev.s) / 60000 + dMin); el.style.height = (len / 60 * S.h - 2) + "px"; el.querySelector("small").textContent = C.dur(len); }
+        else { el.style.transform = `translate(${dDay * dw}px,${dMin / 60 * S.h}px)`; el.querySelector("small").textContent = C.hm(C.wall(shiftWall(ev.s, dDay, dMin), S.tz).min); }
       };
       el.onpointerup = () => {
         el.onpointermove = el.onpointerup = null; dragging = false;
@@ -842,7 +853,7 @@ function wireStrip(v) {
       const min = Math.floor(yToMin(col, e.clientY) / 30) * 30, s = C.instant(col.dataset.day, min, S.tz), cal = homeCal();
       if (!cal) { toast("No calendar you can write to", { bad: true }); return; }
       clearDraft();
-      const el = document.createElement("div"); el.className = "ev draft k-other"; el.style.cssText = `top:${min / 60 * H}px;height:${H - 2}px;left:2px;right:3px`;
+      const el = document.createElement("div"); el.className = "ev draft k-other"; el.style.cssText = `top:${atMin(min)};height:calc(var(--H) - 2px);left:2px;right:3px`;
       el.innerHTML = `<b><span class="t">New event</span></b><small>${C.hm(min)}</small>`; col.appendChild(el);
       panel("event", { isNew: true, id: "draft", calId: cal.id, title: "", s, e: s + 3600000, start: new Date(s).toISOString(), end: new Date(s + 3600000).toISOString(), k: "other" });
       $("#pTitle")?.focus();
@@ -869,6 +880,7 @@ function wireSwipe(v) {
   let g = null;
   const at = (e) => e.touches[0] || e.changedTouches[0];
   v.addEventListener("touchstart", (e) => {
+    if (g && g.lock === "x") goTo(g.cur0);   // a second finger mid swipe: the days slide back to where they were (slice 01)
     g = null;
     if (!TOUCH || S.page !== "cal" || S.n === "m" || !$("#strip") || e.touches.length !== 1 || swipeBlocked(e.target, v)) return;
     const t = at(e);
@@ -910,6 +922,72 @@ function wireSwipe(v) {
   v.addEventListener("touchend", swipeEnd);
   v.addEventListener("touchcancel", swipeEnd);
 }
+/* ---------- pinch stretches the hours (slice 01; Junyan, 2026-11-12, d1: "all I care about is having a very smooth
+   functional exprience") ----------
+   Two fingers on the day grid stretch or squeeze the hour rows, from the whole day on one screen up to 168px an hour.
+   Every time-based place in the strip (hour labels, grid lines, cards, shift pips, the now line and pill, the past
+   shade, the draft card) is a calc() on one CSS variable, --H on #view, so a pinch writes that one value, the cards'
+   sm and tall classes (each card carries its minutes in data-m) and the scroll position, at most once a frame, and
+   never rebuilds the strip. touch-action stays pan-y on the view (manipulation on the page): the browser never pinch
+   zooms there, and the pinch's touchmoves are cancelled so two fingers do not also scroll. When iOS will not let a
+   touchmove be cancelled (a scroll still gliding as the second finger lands), the pinch still runs and its scroll
+   write wins each frame. Lifting the fingers keeps the height on this phone (cal-hour) and opens nothing. */
+/** A time of day as a CSS length on the live hour height. */
+const atMin = (min) => `calc(${min / 60} * var(--H))`;
+/** A phone's tall card time in zone tz, "1:45 to 2:15 pm". */
+function cardTimeOf(e, tz) { return C.cardTime(C.wall(e.s, tz).min, C.wall(e.e, tz).min); }
+/** The day header's height as fitHead last set it (--hh on the view). */
+const headH = (v) => parseFloat(getComputedStyle(v).getPropertyValue("--hh")) || 46;
+/** The smallest hour height on this screen: the 24 hours fit between the day header and the bottom bar. */
+function hourLow(v) {
+  const cs = getComputedStyle(v);
+  return C.hourMin(v.clientHeight, headH(v), parseFloat(cs.paddingBottom) || 0);
+}
+/** Draw the hours `h` px tall without a rebuild: one variable, and each card's detail class only where it changes. */
+function setHour(h, cards) {
+  S.h = h; $("#view").style.setProperty("--H", h + "px");
+  for (const el of cards) { const f = C.cardFit(+el.dataset.m, h); el.classList.toggle("sm", f === "sm"); el.classList.toggle("tall", f === "tall"); }
+}
+function wirePinch(v) {
+  if (!TOUCH) return;
+  const fingers = (e) => { const [a, b] = e.touches; return { y: (a.clientY + b.clientY) / 2, d: Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY) }; };
+  function pinchStep() {
+    pinchFrame = 0; const p = pinch; if (!p) return;
+    const h = C.pinchHeight(p.h0, p.d0, p.d, p.lo, C.HOUR.max);
+    if (h !== S.h) setHour(h, p.cards);
+    v.scrollTop = C.pinchScroll(p.minute, p.y, p.head, h, p.sh0 + 24 * (h - p.h0) - p.ch);
+  }
+  v.addEventListener("touchstart", function pinchStart(e) {
+    if (pinch || e.touches.length !== 2 || S.page !== "cal" || S.n === "m" || !$("#strip")) return;
+    if (![...e.touches].every((t) => t.target.closest?.("#strip"))) return;
+    const m = fingers(e), top = v.getBoundingClientRect().top, head = headH(v);
+    clearTimeout(settle);   // no edge rebuild under the fingers; the pinch's end lays the strip again if one was due
+    pinch = { d0: m.d, d: m.d, h0: S.h, top, head, y: m.y - top, lo: Math.min(S.h, hourLow(v)), sh0: v.scrollHeight, ch: v.clientHeight,
+      minute: C.pinchMinute(v.scrollTop, m.y - top, head, S.h), cards: [...v.querySelectorAll("#strip .ev[data-m]")] };
+    diag("pinch", `start h ${Math.round(S.h)} at ${C.hm(Math.round(pinch.minute))}`);
+  }, { passive: true });
+  v.addEventListener("touchmove", function pinchMove(e) {
+    if (!pinch) return;
+    if (e.cancelable) e.preventDefault();   // two fingers stretch the hours; they never also scroll
+    if (e.touches.length < 2) return;       // one finger lifted: the height holds until the last one lifts
+    const m = fingers(e); pinch.d = m.d; pinch.y = m.y - pinch.top;
+    if (!pinchFrame) pinchFrame = requestAnimationFrame(pinchStep);
+  }, { passive: false });
+  const pinchEnd = (e) => {
+    if (!pinch || e.touches.length) return;
+    if (pinchFrame) { cancelAnimationFrame(pinchFrame); pinchStep(); }
+    diag("pinch", `end h ${Math.round(S.h)}`);
+    pinch = null; pinchQuiet = performance.now() + 450; S.top = v.scrollTop;
+    store.set("cal-hour", String(Math.round(S.h * 10) / 10));
+    if (pinchRender) { pinchRender = false; render(); }
+    const at = dayDiff(S.cur, S.win0);
+    if (at < 4 || at > WIN - S.n - 4) goTo(S.cur, false);   // an edge rebuild the pinch held back
+  };
+  v.addEventListener("touchend", pinchEnd);
+  v.addEventListener("touchcancel", pinchEnd);
+  // a pinch never opens an event or starts a new one: a click from its fingers is dropped
+  v.addEventListener("click", (e) => { if (pinch || performance.now() < pinchQuiet) { e.stopPropagation(); e.preventDefault(); } }, true);
+}
 function goTo(day, smooth = true) {
   const v = $("#view"), i = dayDiff(day, S.win0);
   if (TOUCH && S.n !== "m" && $("#strip") && i >= 0 && i <= WIN - S.n) {   // a phone: the day is set here, then the strip slides to it
@@ -941,7 +1019,7 @@ function setN(n) {
 function step(d) { if (S.n === "m") { S.cur = C.addMonths(S.cur, d); S.miniLock = false; render(); refresh(); } else goTo(C.addDays(S.cur, d * S.n)); }
 function goToday() {
   const t = today(); goTo(S.n === 7 ? C.weekStart(t) : S.n === "m" ? t : t);
-  if (S.n !== "m") $("#view").scrollTo({ top: Math.max(0, C.wall(Date.now(), S.tz).min / 60 * H - 220), behavior: "smooth" });
+  if (S.n !== "m") $("#view").scrollTo({ top: Math.max(0, C.wall(Date.now(), S.tz).min / 60 * S.h - 220), behavior: "smooth" });
 }
 function monthView(v) {
   const first = S.cur.slice(0, 8) + "01", s = C.weekStart(first), t = today(), mo = first.slice(5, 7);
@@ -1199,7 +1277,7 @@ function setup() {
     else return;
     e.preventDefault();
   });
-  wireSwipe($("#view"));
+  wireSwipe($("#view")); wirePinch($("#view"));
   addEventListener("resize", function onResize() { size(); });
   addEventListener("focus", () => { if (S.tab !== "event" && questKey()) { refresh(); loadSide(); } });
   setInterval(() => { showLook(); tickNow(); if (S.tab === "now" && S.page === "cal" && !dragging) paintPanel(); renderRail(); }, 30000);
@@ -1208,7 +1286,7 @@ function setup() {
 /** Open or close the hidden readout; its script loads the first time only. */
 function readout() {
   if (window.CalReadout) { CalReadout.toggle(); return; }
-  CalHook.state = () => ({ cur: S.cur, win0: S.win0, n: S.n, dw, slideX, shown: TOUCH && $("#strip") ? shownX() : null, touch: TOUCH, api: API });
+  CalHook.state = () => ({ cur: S.cur, win0: S.win0, n: S.n, dw, slideX, shown: TOUCH && $("#strip") ? shownX() : null, touch: TOUCH, api: API, h: S.h });
   const s = document.createElement("script"); s.src = "calendar-readout.js?v=4"; document.head.appendChild(s);
 }
 function boot() { render(); loadSide(); refresh(); }
