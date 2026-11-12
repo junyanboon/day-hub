@@ -84,6 +84,49 @@ try {
   a = b; await drag(330, 818, 60, 818, 260); b = await shown();
   check("day view: a swipe on the New task box keeps the day", b.day === a.day, `${a.day} -> ${b.day}`);
 
+  /* ---- a thumb scroll that starts with a sideways lean (Junyan, 2026-11-11: "changed dates when swiping up and
+     down") ---- */
+  await open(3);
+  a = await shown();
+  /** One finger: a first move that leans sideways, then a long move up. */
+  async function arc(x0, y0, lx, ly, x1, y1, ms = 450, steps = 14) {
+    await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x: x0, y: y0 }] });
+    await sleep(20);
+    await cdp.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [{ x: x0 + lx, y: y0 + ly }] });
+    for (let i = 1; i <= steps; i++) {
+      await sleep(ms / steps);
+      await cdp.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [{ x: x0 + lx + (x1 - x0 - lx) * i / steps, y: y0 + ly + (y1 - y0 - ly) * i / steps }] });
+    }
+    await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+    await sleep(1100);
+  }
+  // Chrome itself will not scroll a pan-y strip for a gesture whose first move leans sideways (the iPhone does), so
+  // this checks the page's part: it must not grab the strip and slide the days under the finger.
+  await page.evaluate(() => { const v = document.querySelector("#view"), l0 = v.scrollLeft; window.__slid = 0;
+    v.addEventListener("scroll", () => { window.__slid = Math.max(window.__slid, Math.abs(v.scrollLeft - l0)); }); });
+  await arc(200, 650, -13, -9, 140, 330);
+  b = await shown();
+  const slid = await page.evaluate(() => window.__slid);
+  check("3 days: a scroll whose first move leans sideways never slides the days", slid === 0, `slid ${slid} px`);
+  check("3 days: and it keeps the days", b.day === a.day, `${a.day} -> ${b.day}`);
+
+  /* ---- the iPhone drops a smooth scroll while the page is still gliding up or down: the strip must still land
+     back on the day it started on ---- */
+  await open(3);
+  await page.evaluate(() => {
+    const v = document.querySelector("#view"), real = v.scrollTo.bind(v);
+    v.scrollTo = (o) => (o && o.behavior === "smooth" ? undefined : real(o));   // the glide swallows the smooth scroll
+  });
+  a = await shown();
+  const glide = page.evaluate(() => new Promise((ok) => {   // a scroll still gliding after the finger lifts
+    const v = document.querySelector("#view"); let n = 0;
+    const id = setInterval(() => { v.scrollTop += 2; if (++n > 150) { clearInterval(id); ok(); } }, 16);
+  }));
+  await drag(260, 500, 190, 506, 500);   // a slow 70 px sideways nudge: not a day change
+  await glide; await sleep(900);
+  b = await shown();
+  check("3 days: a sideways nudge during a glide lands back on the same days", b.day === a.day && b.left === a.left, `${a.day} -> ${b.day}, left ${a.left} -> ${b.left}`);
+
   /* ---- 3 days ---- */
   await open(3);
   a = await shown(); await drag(200, 650, 240, 350, 450); b = await shown();

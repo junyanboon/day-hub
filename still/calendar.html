@@ -13,7 +13,7 @@
 <meta name="apple-mobile-web-app-title" content="Calendar">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>Calendar</title>
-<script src="calendar-core.js?v=6"></script>
+<script src="calendar-core.js?v=7"></script>
 <script>
 /* The look saved on this device (the Look row in Settings; Studio when none) goes on here, before anything is drawn,
    so the page never opens in the wrong look first. Studio shows its day or night half by the sun in the calendar's
@@ -684,10 +684,15 @@ const yToMin = (col, clientY) => Math.max(0, Math.min(1440 - SNAP, Math.floor((c
 /** Move an instant by whole days on the wall (DST safe) plus minutes. */
 function shiftWall(ms, dDay, dMin) { const w = C.wall(ms, S.tz); return C.instant(C.addDays(w.day, dDay), w.min, S.tz) + dMin * 60000; }
 
-let raf = 0, settle = 0, dragging = false, swiping = false, lastScroll = 0;
+/* lastScroll is the last time the strip moved sideways. An up/down scroll never counts, and never changes the
+   day: on the iPhone a page still gliding up or down kept lastScroll fresh, so goTo's landing fallback never ran
+   and a dropped snap-back left the strip on the next day (Junyan, 2026-11-11: "changed dates when swiping up and
+   down"). */
+let raf = 0, settle = 0, dragging = false, swiping = false, lastScroll = 0, lastLeft = -1;
 function wireStrip(v) {
   v.onscroll = () => {
-    lastScroll = Date.now();
+    if (v.scrollLeft === lastLeft) { S.top = v.scrollTop; return; }   // up/down only: the day stays
+    lastLeft = v.scrollLeft; lastScroll = Date.now();
     if (raf) return;
     raf = requestAnimationFrame(() => {
       raf = 0; if (S.page !== "cal" || S.n === "m" || !v.clientWidth || !dw) return;
@@ -777,7 +782,10 @@ function wireSwipe(v) {
     if (!g) return;
     if (e.touches.length !== 1) { const x = g; g = null; swiping = false; if (x.lock === "x") goTo(x.cur0); return; }
     const t = at(e), dx = t.clientX - g.x0, dy = t.clientY - g.y0;
-    if (!g.lock) g.lock = C.swipeLock(dx, dy);
+    if (!g.lock) {
+      g.lock = C.swipeLock(dx, dy);
+      if (g.lock === "x" && !e.cancelable) g.lock = "y";   // the browser is already scrolling up/down: leave it
+    }
     if (g.lock === "y") { g = null; swiping = false; return; }   // a scroll: the browser has it, and it never changes the day
     if (g.lock !== "x") return;
     if (e.cancelable) e.preventDefault();
