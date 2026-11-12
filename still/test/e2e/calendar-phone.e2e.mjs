@@ -111,8 +111,8 @@ try {
   check("day view: a diagonal swipe (sideways under twice the up/down) stays on the day", b.day === a.day, `${a.day} -> ${b.day}`);
   a = b; await flick(250, 500, 195, 503); b = await shown();
   check("day view: a quick 55 px flick goes to the next day", b.day === plus(a.day, 1), `${a.day} -> ${b.day}`);
-  a = b; await drag(330, 818, 60, 818, 260); b = await shown();
-  check("day view: a swipe on the New task box keeps the day", b.day === a.day, `${a.day} -> ${b.day}`);
+  const drop = await page.evaluate(() => getComputedStyle(document.querySelector(".drop")).display);
+  check("day view: no New task bar at the bottom on a phone", drop === "none", drop);
 
   /* ---- the two-week jump (Junyan, 2026-11-11: "jumping from Nov 11 to oct 28", then "It keeps jumping 2 weeks back
      now to Oct 14", in the day view). The strip holds 36 days and starts 14 before the shown day. When the strip is
@@ -307,7 +307,7 @@ try {
 
   /* ---- a clean top and bottom edge ---- */
   await open(1);
-  const edge = await page.evaluate(() => [".bar", ".dhead", ".corner", ".drop"].map((s) => {
+  const edge = await page.evaluate(() => [".bar", ".dhead", ".corner"].map((s) => {
     const cs = getComputedStyle(document.querySelector(s)), bg = cs.backgroundColor;
     const alpha = /rgba\(/.test(bg) ? +bg.split(",")[3].replace(")", "") : /rgb\(/.test(bg) ? 1 : 0;
     return { s, alpha, blur: cs.backdropFilter || cs.webkitBackdropFilter || "none" };
