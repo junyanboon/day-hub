@@ -387,6 +387,34 @@ body.onpage .left,body.onpage .main,body.onpage .panel{display:none}
   .panel{top:auto;left:0;width:auto;max-height:78%;border-radius:22px 22px 0 0;border:1px solid var(--line);transform:translateY(105%);padding-top:0;bottom:0}
   .grab{display:block;width:40px;height:4px;border-radius:2px;background:var(--raise2);margin:8px auto 0;flex:none}
   .pbody{min-width:0;padding-bottom:calc(84px + env(safe-area-inset-bottom,0px))}
+  /* the event sheet: one-line rows (slice 02). Every box in it is 16px or more so iOS never zooms (PR 133). The time
+     and day boxes lie unseen over their row text, so a tap opens the phone's own wheels and the row reads "1:45 PM". */
+  .panel:has(.sheet) .ptabs{display:none}
+  .panel:has(.sheet) .pbody{padding-top:4px;gap:12px}
+  .sheet{display:flex;flex-direction:column;gap:12px}
+  .shead{display:grid;grid-template-columns:72px 1fr 72px;align-items:center;min-height:44px}
+  .shead b{text-align:center;font-size:16px}
+  .shead .icon{justify-self:start;width:44px;height:44px;font-size:19px;margin-left:-10px}
+  .shead .btn.pri{justify-self:end;padding:8px 16px;font-size:15px}
+  .sheet .tinput{width:100%;background:none;border:0;border-radius:0;padding:4px 0 8px;border-bottom:1px solid var(--line)}
+  .rows{display:flex;flex-direction:column;background:var(--raise);border:1px solid var(--line);border-radius:14px;overflow:hidden;flex:none}
+  .srow{position:relative;display:flex;align-items:center;gap:12px;width:100%;min-height:46px;padding:0 14px;margin:0;border:0;border-top:1px solid var(--line);background:none;color:var(--ink);font-size:15px;text-align:left}
+  .rows>.srow:first-child{border-top:0}
+  .srow>span{width:76px;flex:none;color:var(--soft)}
+  .srow output{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .srow i{font-style:normal;color:var(--faint);font-size:18px}
+  .srow .ov{position:absolute;inset:0;width:100%;height:100%;opacity:0;font-size:16px;border:0;margin:0;padding:0;-webkit-appearance:none;appearance:none}
+  .srow .tx{flex:1;min-width:0;background:none;border:0;padding:13px 0;font-size:16px;line-height:1.3;color:var(--ink);outline:0}
+  .srow textarea.tx{resize:none;font-family:inherit;min-height:46px;max-height:40vh;overflow-y:auto}
+  .srow .tx::placeholder{color:var(--faint)}.srow .tx:disabled::placeholder{color:transparent}
+  .srow.sub{min-height:0;padding:0 14px 10px 102px;border-top:0;margin-top:-6px;font-size:12px;color:var(--faint)}
+  .snotes{flex:1;min-width:0;padding:13px 0;white-space:pre-wrap;overflow-wrap:anywhere;color:var(--soft);max-height:40vh;overflow-y:auto}
+  .srow .tog{appearance:none;-webkit-appearance:none;margin:0 0 0 auto;width:50px;height:30px;border-radius:15px;background:var(--raise2);border:1px solid var(--line);position:relative;flex:none;transition:background .15s}
+  .srow .tog::before{content:"";position:absolute;top:2px;left:2px;width:24px;height:24px;border-radius:50%;background:var(--ink);transition:transform .15s}
+  .srow .tog:checked{background:var(--accent)}.srow .tog:checked::before{transform:translateX(20px);background:var(--bg)}
+  .srow.del{color:var(--red);border-top:0}
+  .srow:disabled,.srow .tx:disabled,.srow .tog:disabled{opacity:1;color:inherit;-webkit-text-fill-color:currentColor}
+  .rows>.chips{padding:4px 14px 12px}
   .dn{font-size:13px}
   div.month{grid-auto-rows:minmax(92px,1fr)}.mday{padding:4px 3px}.mday .p{font-size:10.5px;padding:1px}.mday .p .meta{display:none}
   .page{grid-column:1;padding:16px max(16px,env(safe-area-inset-right,0px)) 96px max(16px,env(safe-area-inset-left,0px))}
@@ -1070,6 +1098,8 @@ function pNow() {
     ${sug.length ? `<div><p class="lbl">Suggestions (${sug.length})</p>${sug.map((g) => `<div class="sugg"><b>${esc(g.title)}</b><span class="meta">${esc(whenText(g))} · from ${esc(g.by)}</span>${g.why ? `<span class="meta">${esc(g.why)}</span>` : ""}<div class="r"><button class="btn pri" data-acc="${esc(g.id)}">Accept</button><button class="btn" data-skip="${esc(g.id)}">Skip</button><button class="btn" data-go="${esc(g.id)}">Show</button></div></div>`).join("")}</div>` : ""}`;
 }
 function pEvent(ev) {
+  if (sheetOn()) return pSheet(ev);
+  if (S.form && S.form.sheet) S.form = null;
   const isNew = !!ev.isNew, cal = calOf(ev.calId), canEdit = ev.ghost || isNew || cal.writable;
   const len = ev.allDay ? 0 : Math.round((ev.e - ev.s) / 60000);
   const durs = [...new Set([15, 30, 45, 60, 90, 120, 180, len])].filter(Boolean).sort((a, b) => a - b);
@@ -1089,7 +1119,98 @@ function pEvent(ev) {
       : `${isNew || !canEdit ? "" : '<button class="btn del" id="pDel">Delete</button>'}${ev.htmlLink ? `<a class="meta" href="${esc(ev.htmlLink)}" target="_blank" rel="noopener">Open in Google</a>` : ""}<span class="spacer"></span>${canEdit ? '<button class="btn pri" id="pSave">Save</button>' : ""}`}</div>
     ${!isNew && !ev.ghost && TYPES.includes(ev.k) ? `<button class="btn k-${ev.k}" data-page="${ev.k}" style="border-color:color-mix(in srgb,var(--c) 50%,transparent)">${esc(WIDE.matches && C.pageLink(ev.k) ? C.pageLink(ev.k).label : `Open the ${KNAME[ev.k]} page`)} &#8250;</button>` : ""}`;
 }
+/* ---------- the phone's event sheet (slice 02, Junyan 2026-11-12, d2): one-line rows, 760px wide or less ----------
+   S.form holds the rows (calendar-core.js sheetForm); a change to a row updates S.form and repaints only the row texts,
+   so the box being typed in keeps its focus. Save sends only what changed (sheetPatch). Desktop keeps pEvent above. */
+const sheetOn = () => matchMedia("(max-width: 760px)").matches;
+function pSheet(ev) {
+  const isNew = !!ev.isNew, cal = calOf(ev.calId), canEdit = ev.ghost || isNew || cal.writable;
+  if (!S.form || !S.form.sheet) S.form = C.sheetForm(ev, S.tz);
+  const f = S.form, dis = canEdit && !ev.ghost ? "" : "disabled", guess = C.kindOf({ title: ev.title, calName: cal.name });
+  const writable = S.cals.filter((c) => c.writable || c.id === ev.calId);
+  const rich = C.notesRich(ev.description || "");
+  const row = (lbl, inner, x = "") => `<label class="srow" ${x}><span>${lbl}</span>${inner}</label>`;
+  const tx = sheetTexts(f, ev), out = (k) => `<output data-v="${k}">${esc(tx[k])}</output>`;
+  const pick = (type, key, lbl) => `${out(key)}<input class="ov" type="${type}" data-f="${key}" value="${esc(f[key])}" aria-label="${lbl}" ${dis}>`;
+  return `<div class="sheet">
+    <div class="shead"><button class="icon" id="pX" aria-label="Close">&#10005;</button><b>Event</b>${canEdit && !ev.ghost ? '<button class="btn pri" id="pSave">Save</button>' : "<span></span>"}</div>
+    ${ev.ghost ? `<div class="meta">Suggested by ${esc(ev.by)}${ev.why ? ": " + esc(ev.why) : ""}</div>` : ""}
+    <input class="tinput" id="pTitle" value="${esc(f.title)}" placeholder="Title" aria-label="Title" autocomplete="off" ${canEdit ? "" : "disabled"}>
+    <div class="rows">
+      ${row("Day", pick("date", "day", "Day"))}
+      ${row("Starts", pick("time", "start", "Starts"), `data-timed ${f.allDay ? "hidden" : ""}`)}
+      ${row("Ends", pick("time", "end", "Ends"), `data-timed ${f.allDay ? "hidden" : ""}`)}
+      ${two() ? `<div class="srow sub" data-v="tz2" data-timed ${f.allDay ? "hidden" : ""}>${esc(tx.tz2)}</div>` : ""}
+      ${row("Ends", pick("date", "endDay", "Last day"), `data-dayrow ${f.allDay ? "" : "hidden"}`)}
+      ${row("All-day", `<input class="tog" type="checkbox" role="switch" data-f="allDay" ${f.allDay ? "checked" : ""} aria-label="All-day" ${dis}>`)}
+      ${row("Location", `<input class="tx" type="text" data-f="location" value="${esc(f.location)}" placeholder="Add location" autocomplete="off" ${dis}>`)}
+      ${rich ? `<div class="srow"><span>Notes</span><div class="snotes">${esc(C.notesText(ev.description))}</div></div>`
+        : row("Notes", `<textarea class="tx" data-f="description" rows="${Math.min(8, f.description.split("\n").length)}" placeholder="Add notes" ${dis}>${esc(f.description)}</textarea>`)}
+      ${ev.ghost ? "" : `<button class="srow" data-sheet="type" ${dis}><span>Type</span>${out("kind")}<i>&#8250;</i></button>
+      <div class="chips" data-v="types" hidden><button class="chip k-${guess}" data-kind="" aria-pressed="${!f.kind}">Guess: ${esc(KNAME[guess])}</button>${C.KINDS.map(([k, n]) => `<button class="chip k-${k}" data-kind="${k}" aria-pressed="${f.kind === k}">${KICON[k] ? KICON[k] + " " : ""}${n}</button>`).join("")}</div>`}
+      ${row("Calendar", `${out("cal")}<i>&#8250;</i><select class="ov" id="pCal" aria-label="Calendar" ${canEdit ? "" : "disabled"}>${writable.map((c) => `<option value="${esc(c.id)}" ${c.id === f.calId ? "selected" : ""}>${esc(c.name)}</option>`).join("")}</select>`)}
+    </div>
+    ${isNew || !canEdit || ev.ghost ? "" : '<div class="rows"><button class="srow del" id="pDel">Delete event</button></div>'}
+    ${canEdit ? "" : `<div class="meta">${esc(cal.name)} is read-only here.</div>`}
+    ${ev.ghost ? `<div class="r"><button class="btn" id="pSkip">Skip</button><span class="spacer"></span><button class="btn pri" id="pAcc">Accept</button></div>` : ""}
+    ${ev.htmlLink ? `<a class="meta" href="${esc(ev.htmlLink)}" target="_blank" rel="noopener">Open in Google</a>` : ""}
+    ${!isNew && !ev.ghost && TYPES.includes(ev.k) ? `<button class="btn k-${ev.k}" data-page="${ev.k}" style="border-color:color-mix(in srgb,var(--c) 50%,transparent)">${esc(WIDE.matches && C.pageLink(ev.k) ? C.pageLink(ev.k).label : `Open the ${KNAME[ev.k]} page`)} &#8250;</button>` : ""}
+  </div>`;
+}
+/** The words in the sheet's rows for a form: "Fri, Nov 13", "1:45 PM", an end on a later day names that day. */
+function sheetTexts(f, ev) {
+  const endDay = C.addDays(f.day, Math.floor((C.toMin(f.start) + C.sheetLength(f)) / 1440)), w = C.sheetWhen(f, S.tz);
+  return { day: C.dayText(f.day), start: C.clock(C.toMin(f.start)), endDay: C.dayText(f.endDay),
+    end: C.clock(C.toMin(f.end)) + (endDay !== f.day ? " · " + C.dayText(endDay) : ""),
+    tz2: two() && !f.allDay ? `${zoneName(S.tz2)}: ${C.hm(C.wall(Date.parse(w.start), S.tz2).min)} to ${C.hm(C.wall(Date.parse(w.end), S.tz2).min)}` : "",
+    kind: KNAME[f.kind || C.kindOf({ title: ev.title, calName: calOf(ev.calId).name })], cal: calOf(f.calId).name };
+}
+function sheetPaint() {
+  const f = S.form, b = $("#pbody"); if (!f || !f.sheet || !b.querySelector(".sheet")) return;
+  const tx = sheetTexts(f, S.ev);
+  for (const o of b.querySelectorAll("[data-v]")) if (o.dataset.v in tx) o.textContent = tx[o.dataset.v];
+  for (const el of b.querySelectorAll(".ov[data-f]")) if (el !== document.activeElement && el.value !== f[el.dataset.f]) el.value = f[el.dataset.f];
+  b.querySelectorAll("[data-timed]").forEach((x) => { x.hidden = f.allDay; });
+  b.querySelectorAll("[data-dayrow]").forEach((x) => { x.hidden = !f.allDay; });
+  b.querySelectorAll("textarea[data-f]").forEach(grow);
+}
+const grow = (t) => { t.style.height = "auto"; t.style.height = t.scrollHeight + "px"; };
+/** A row changed: run it through the sheet rule (calendar-core.js) and repaint the texts. */
+function sheetInput(t) {
+  const f = S.form, k = t.dataset.f, v = t.value; if (!f || !f.sheet) return;
+  if (k === "day") S.form = C.sheetDay(f, v);
+  else if (k === "start") S.form = C.sheetStart(f, v);
+  else if (k === "end") S.form = C.sheetEnd(f, v);
+  else if (k === "endDay") S.form = C.sheetEndDay(f, v);
+  else if (k === "allDay") S.form = C.sheetAllDay(f, t.checked);
+  else if (k === "location" || k === "description") S.form = { ...f, [k]: v };
+  sheetPaint();
+}
+async function saveSheet() {
+  const ev = S.ev, ti = $("#pTitle"), f = { ...S.form, title: ti.value, calId: $("#pCal").value };
+  if (ev.isNew) {
+    const title = f.title.trim(); if (!title) { ti.focus(); return; }
+    panel("now"); document.body.classList.remove("popen");
+    const loc = f.location.trim();
+    await createEvent({ calId: f.calId, title, ...C.sheetWhen(f, S.tz), ...(loc ? { location: loc } : {}), ...(f.description.trim() ? { description: f.description } : {}), ...(f.kind ? { kind: f.kind } : {}) });
+    return;
+  }
+  const p = C.sheetPatch(ev, f, S.tz);
+  panel("now"); document.body.classList.remove("popen");
+  if (Object.keys(p).length) await patchEvent(ev, p, "Change");
+}
+/* The keyboard: on a phone it covers the bottom of the screen without shrinking the page, so while the sheet is open it
+   sits on top of the keyboard (visualViewport), and the box being typed in is scrolled into view. */
+function sheetFit() {
+  const p = $("#panel"), vv = window.visualViewport;
+  const kb = vv && sheetOn() && p.querySelector(".sheet") ? Math.max(0, Math.round(innerHeight - vv.height - vv.offsetTop)) : 0;
+  p.style.bottom = kb > 60 ? kb + "px" : ""; p.style.maxHeight = kb > 60 ? Math.round(vv.height - 8) + "px" : "";
+  const a = document.activeElement;
+  if (kb > 60 && a && a.closest?.(".sheet") && a.matches("input,textarea")) a.scrollIntoView({ block: "nearest" });
+}
+if (window.visualViewport) for (const n of ["resize", "scroll"]) visualViewport.addEventListener(n, sheetFit);
 async function saveEvent() {
+  if (S.form && S.form.sheet) return saveSheet();
   const ev = S.ev, ti = $("#pTitle"), title = ti.value.trim(), calId = $("#pCal").value, kind = S.form.kind, dur = S.form.dur;
   const len = ev.allDay ? 0 : Math.round((ev.e - ev.s) / 60000);
   if (ev.isNew) {
@@ -1202,7 +1323,7 @@ function wirePair() {
 /* ---------- controls ---------- */
 function setup() {
   document.addEventListener("click", function clickRouter(e) {
-    const t = e.target.closest("[data-railtog],[data-page],[data-n],[data-p],[data-key],[data-staff],[data-allday],[data-open],[data-acc],[data-skip],[data-go],[data-dur],[data-kind],button[data-look],#pSave,#pDel,#pAcc,#pSkip,#pairBtn");
+    const t = e.target.closest("[data-railtog],[data-page],[data-n],[data-p],[data-key],[data-staff],[data-allday],[data-open],[data-acc],[data-skip],[data-go],[data-dur],[data-kind],[data-sheet],button[data-look],#pSave,#pDel,#pAcc,#pSkip,#pX,#pairBtn");
     if (!t || t.closest(".ev")) return;
     const d = t.dataset;
     if (t.matches("button[data-look]")) setLook(d.look);
@@ -1220,7 +1341,9 @@ function setup() {
       else { document.body.classList.remove("popen"); if (S.n === "m") S.n = 3; goTo(g.allDay ? g.start : C.wall(g.s, S.tz).day); }
     }
     else if (d.dur) { S.form.dur = +d.dur; $$("[data-dur]").forEach((c) => c.setAttribute("aria-pressed", String(c === t))); }
-    else if ("kind" in d) { S.form.kind = d.kind; $$("[data-kind]").forEach((c) => c.setAttribute("aria-pressed", String(c === t))); }
+    else if ("kind" in d) { S.form.kind = d.kind; $$("[data-kind]").forEach((c) => c.setAttribute("aria-pressed", String(c === t))); if (S.form.sheet) { $('[data-v="types"]').hidden = true; sheetPaint(); } }
+    else if (d.sheet === "type") { const c = $('[data-v="types"]'); c.hidden = !c.hidden; }
+    else if (t.id === "pX") { panel("now"); document.body.classList.remove("popen"); }
     else if (t.id === "pSave") saveEvent();
     else if (t.id === "pDel") { const ev = S.ev; panel("now"); deleteEvent(ev); }
     else if (t.id === "pAcc") acceptSugg(S.ev, { calId: $("#pCal").value, title: $("#pTitle").value.trim() || S.ev.title });
@@ -1232,6 +1355,7 @@ function setup() {
     if (t.id === "railSw") { S.rail = t.checked; store.set("cal-rail", S.rail ? "1" : "0"); render(); }
     else if (t.id === "tz1") { S.tz = t.value; store.set("cal-tz", S.tz); S.months = {}; showLook(); render(); refresh(true); }
     else if (t.id === "tz2") { S.tz2 = t.value; store.set("cal-tz2", S.tz2); render(); }
+    else if (t.closest(".sheet") && (t.dataset.f || t.id === "pCal")) { if (t.id === "pCal") { S.form.calId = t.value; sheetPaint(); } else sheetInput(t); }
     else if (t.closest("#cals")) { const id = t.dataset.id; t.checked ? S.hidden.delete(id) : S.hidden.add(id); store.set("cal-hidden", JSON.stringify([...S.hidden])); render(); }
   });
   $("#todayBtn").onclick = goToday;
@@ -1252,6 +1376,11 @@ function setup() {
   };
   $("#panelBtn").onclick = () => { if (innerWidth <= 1100) { if (!document.body.classList.contains("popen")) panel("now"); document.body.classList.toggle("popen"); } else { document.body.classList.toggle("nopanel"); setTimeout(size, 300); } };
   $("#pClose").onclick = () => { panel("now"); document.body.classList.remove("popen"); if (innerWidth > 1100) { document.body.classList.add("nopanel"); setTimeout(size, 300); } };
+  /* the phone sheet: a box being typed in updates its row at once; a time or day box opens its picker on a click with a
+     mouse (a phone opens its own wheels); the box in focus stays above the keyboard */
+  $("#pbody").addEventListener("input", (e) => { const t = e.target; if (t.dataset.f && t.closest(".sheet")) { sheetInput(t); if (t.tagName === "TEXTAREA") grow(t); } });
+  $("#pbody").addEventListener("click", (e) => { const t = e.target; if (!TOUCH && t.matches("input.ov") && t.showPicker) try { t.showPicker(); } catch {} });
+  $("#pbody").addEventListener("focusin", (e) => { if (e.target.closest(".sheet")) setTimeout(sheetFit, 350); });
   $("#pbody").addEventListener("keydown", (e) => { if (e.target.id === "pTitle" && e.key === "Enter") { if (S.ev.ghost) $("#pAcc").click(); else saveEvent(); } });
   $("#newTask").onkeydown = async (e) => {
     const inp = e.target, v = inp.value.trim();

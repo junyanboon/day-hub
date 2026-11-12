@@ -328,6 +328,90 @@
     return { href: p.page + (search || "") + p.hash, label: p.label };
   }
 
+  /* ---- the event sheet on the phone (slice 02, Junyan 2026-11-12, d2 and d6: "the event sheet as editable rows").
+     The sheet keeps a form: {title, calId, kind, location, description, allDay, day, start, end, days, endDay}.
+     day is the start day ("YYYY-MM-DD"), start and end are wall times "HH:MM" in the calendar's main zone, days is
+     whole extra days beyond the next-day rule (0 for nearly every event), endDay is an all-day event's last day
+     (inclusive). An end at or before the start means the next day. Save sends sheetPatch: only what changed. ---- */
+  const toMin = (hhmm) => { const m = /^(\d{1,2}):(\d{2})/.exec(hhmm || ""); return m ? (+m[1] % 24) * 60 + +m[2] : null; };
+  const toHHMM = (min) => `${String(Math.floor(min / 60) % 24).padStart(2, "0")}:${String(min % 60).padStart(2, "0")}`;
+  const daysBetween = (a, b) => Math.round((civil(b) - civil(a)) / DAY);
+  /** An event as the calendar holds it → the sheet's form. */
+  function sheetForm(ev, tz) {
+    const f = { sheet: true, title: ev.title || "", calId: ev.calId, kind: ev.kind || "", location: ev.location || "",
+      description: ev.description || "", allDay: !!ev.allDay };
+    if (ev.allDay) {
+      const last = addDays(ev.end, -1);
+      return { ...f, day: ev.start, endDay: last < ev.start ? ev.start : last, start: "09:00", end: "10:00", days: 0 };
+    }
+    const a = wall(ev.s ?? Date.parse(ev.start), tz), b = wall(ev.e ?? Date.parse(ev.end), tz);
+    const days = Math.max(0, daysBetween(a.day, b.day) - (b.min <= a.min ? 1 : 0));
+    return { ...f, day: a.day, endDay: a.day, start: toHHMM(a.min), end: toHHMM(b.min), days };
+  }
+  /** A timed form's length in wall minutes (an end at or before the start is the next day). */
+  function sheetLength(f) {
+    const s = toMin(f.start), e = toMin(f.end);
+    return ((f.days || 0) + (e <= s ? 1 : 0)) * 1440 + e - s;
+  }
+  /** Starts changed to hhmm: the end moves with it so the length stays. A blank or broken time changes nothing. */
+  function sheetStart(f, hhmm) {
+    const ns = toMin(hhmm); if (ns == null) return f;
+    const tot = ns + sheetLength(f), em = tot % 1440;
+    return { ...f, start: toHHMM(ns), end: toHHMM(em), days: Math.max(0, Math.floor(tot / 1440) - (em <= ns ? 1 : 0)) };
+  }
+  const isDay = (day) => /^\d{4}-\d{2}-\d{2}$/.test(day || "");
+  /** Ends changed to hhmm, on its own. */
+  function sheetEnd(f, hhmm) { const ne = toMin(hhmm); return ne == null ? f : { ...f, end: toHHMM(ne) }; }
+  /** Day changed: a timed event keeps its wall times; an all-day event keeps how many days it spans. */
+  function sheetDay(f, day) {
+    if (!isDay(day)) return f;
+    return { ...f, day, endDay: f.allDay ? addDays(f.endDay, daysBetween(f.day, day)) : day };
+  }
+  /** An all-day event's last day changed (never before its first day). */
+  function sheetEndDay(f, day) { return isDay(day) ? { ...f, endDay: day < f.day ? f.day : day } : f; }
+  /** All-day on: the start day, one day long. Off: 9:00 AM for one hour, ready to change. */
+  function sheetAllDay(f, on) {
+    return on ? { ...f, allDay: true, endDay: f.day } : { ...f, allDay: false, start: "09:00", end: "10:00", days: 0, endDay: f.day };
+  }
+  /** The form's time fields → {allDay, start, end} as the backend takes them (all-day end is the day after). */
+  function sheetWhen(f, tz) {
+    if (f.allDay) return { allDay: true, start: f.day, end: addDays(f.endDay > f.day ? f.endDay : f.day, 1) };
+    const s = toMin(f.start), e = toMin(f.end);
+    const endDay = addDays(f.day, (f.days || 0) + (e <= s ? 1 : 0));
+    return { allDay: false, start: new Date(instant(f.day, s, tz)).toISOString(), end: new Date(instant(endDay, e, tz)).toISOString() };
+  }
+  /** Only what the form changed on the event, as PATCH fields (title, start, end, allDay, location, description,
+      toCalId, kind). {} when nothing changed. */
+  function sheetPatch(ev, f, tz) {
+    const out = {}, t = (f.title || "").trim();
+    if (t && t !== ev.title) out.title = t;
+    if (f.calId && f.calId !== ev.calId) out.toCalId = f.calId;
+    if ((f.kind || "") !== (ev.kind || "")) out.kind = f.kind || "";
+    const loc = (f.location || "").trim();
+    if (loc !== (ev.location || "").trim()) out.location = loc;
+    if ((f.description || "") !== (ev.description || "")) out.description = f.description || "";
+    const w = sheetWhen(f, tz);
+    if (w.allDay !== !!ev.allDay) Object.assign(out, w);
+    else if (w.allDay) { if (w.start !== ev.start || w.end !== ev.end) Object.assign(out, w); }
+    else if (Date.parse(w.start) !== Date.parse(ev.start) || Date.parse(w.end) !== Date.parse(ev.end)) { out.start = w.start; out.end = w.end; }
+    return out;
+  }
+
+  /** Notes that carry Google's formatting (HTML tags): shown read-only, so nothing is flattened. */
+  const notesRich = (s) => /<\/?[a-z][a-z0-9]*\b[^>]*>/i.test(s || "");
+  /** Formatted notes as plain text to read. */
+  function notesText(html) {
+    const ent = { amp: "&", lt: "<", gt: ">", quot: '"', "#39": "'", apos: "'", nbsp: " " };
+    return String(html || "").replace(/<br\s*\/?>/gi, "\n").replace(/<\/?(p|div|li|h\d)\b[^>]*>/gi, "\n").replace(/<[^>]*>/g, "")
+      .replace(/&(amp|lt|gt|quot|#39|apos|nbsp);/g, (_, k) => ent[k]).replace(/\n{3,}/g, "\n\n").trim();
+  }
+  const MON3 = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"], DOW3 = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  /** "2026-11-13" → "Fri, Nov 13" (the sheet's Day row). */
+  const dayText = (day) => `${DOW3[dowOf(day)]}, ${MON3[+day.slice(5, 7) - 1]} ${+day.slice(8, 10)}`;
+  /** Minutes after midnight → "1:45 PM" (the sheet's Starts and Ends rows). */
+  const clock = (min) => { const h = Math.floor(min / 60) % 24; return `${h % 12 || 12}:${String(min % 60).padStart(2, "0")} ${h < 12 ? "AM" : "PM"}`; };
+
   root.CalCore = { wall, instant, offset, addDays, dowOf, weekStart, isoWeek, addMonths, monthKey, monthsFor,
-    KINDS, kindOf, layout, pieces, coversDay, orderBetween, groupOf, dropTask, blockMinutes, hm, dur, SWIPE, swipeLock, swipeCommit, HOUR, pinchHeight, hourMin, pinchMinute, pinchScroll, cardFit, cardTime, startHour, LOOKS, lookId, startLook, LOOK_RESET, placeOf, sunTimes, sunHalf, lookFace, pageLink, homeFit };
+    KINDS, kindOf, layout, pieces, coversDay, orderBetween, groupOf, dropTask, blockMinutes, hm, dur, SWIPE, swipeLock, swipeCommit, HOUR, pinchHeight, hourMin, pinchMinute, pinchScroll, cardFit, cardTime, startHour, LOOKS, lookId, startLook, LOOK_RESET, placeOf, sunTimes, sunHalf, lookFace, pageLink, homeFit,
+    sheetForm, sheetWhen, sheetPatch, sheetLength, sheetStart, sheetEnd, sheetDay, sheetEndDay, sheetAllDay, notesRich, notesText, dayText, clock, toMin };
 })(typeof window !== "undefined" ? window : globalThis);
