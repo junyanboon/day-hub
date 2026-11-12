@@ -409,7 +409,11 @@
   const planGate = (it) => it.seed || String(it.id).startsWith("seed-")
     ? `Save this trip to Notion to plan days: press "⇪ Create in Notion" at the top of the trip.` : "";
 
-  const api = { pastedEntry, kindOf, missingInfo, needsConfirmFile, missLine, hideCopies, fieldOf, MISSING_FIELD, statusLook, dropPayload, tripDate, MTL, stayLines, planGate, planKind, planTag, cardLabel, planHtml, haversine, gpxPoints, gpxStats, dayIndex, localDay, dayPlan, pillOf, isStay, isHike, whenText, seedRows, SEED, fmtDur, tripKey, mergeTrips, splitTrips, isHomeTrip, localItems, whenLabel, destOf, mapStart };
+  /* The page to open at load (Junyan, 2026-11-12, t9, "9 yes"): "#trips" is the Trips page, where the calendar's
+     Travel tab sends you. */
+  const startView = (hash) => (/^#trips$/i.test(String(hash || "")) ? "trips" : null);
+
+  const api = { startView, pastedEntry, kindOf, missingInfo, needsConfirmFile, missLine, hideCopies, fieldOf, MISSING_FIELD, statusLook, dropPayload, tripDate, MTL, stayLines, planGate, planKind, planTag, cardLabel, planHtml, haversine, gpxPoints, gpxStats, dayIndex, localDay, dayPlan, pillOf, isStay, isHike, whenText, seedRows, SEED, fmtDur, tripKey, mergeTrips, splitTrips, isHomeTrip, localItems, whenLabel, destOf, mapStart };
   root.QuestTrips = api;
   if (typeof document === "undefined" || typeof window === "undefined") return;
 
@@ -678,7 +682,7 @@
     home.innerHTML = `<div class="hd"><h1>✈ Trips</h1><button class="btn" id="thNew">＋ New trip</button></div>
       <div class="tabs">${tabs.map(([k, n]) => `<button class="${S.homeTab === k ? "on" : ""}" data-ht="${k}">${k}<span class="n">${n}</span></button>`).join("")}</div>
       ${body}
-      ${S.live ? "" : `<div class="empty" style="margin-top:18px;font-size:12px">Notion is not reachable right now${S.note ? " (" + esc(S.note) + ")" : ""}, so only the saved copy shows.</div>`}`;
+      ${S.live || S.loading ? "" : `<div class="empty" style="margin-top:18px;font-size:12px">Notion is not reachable right now${S.note ? " (" + esc(S.note) + ")" : ""}, so only the saved copy shows.</div>`}`;
     home.querySelectorAll("[data-lurl]").forEach((b) => b.onclick = () => b.dataset.lurl && window.open(b.dataset.lurl, "_blank", "noopener"));
     if (S.homeTab === "Local") { if (!S.local) loadLocal(); else if (S.local.items.length || S.local.places.length) drawLocalMap(); }
     home.querySelectorAll("[data-ht]").forEach((b) => b.onclick = () => { S.homeTab = b.dataset.ht; showHome(); });
@@ -740,11 +744,13 @@
   /* loading */
   async function loadTrips() {
     S.trips = [{ name: MTL, start: SEED.start, end: SEED.end, icon: "🧳" }];
+    S.loading = true;   // no "Notion is not reachable" note while the first answer is on its way
     try {
       const d = await call("/quest/trips");
       S.live = true;
       S.trips = mergeTrips([...S.trips, ...(d.trips || []).map((t) => ({ ...t, icon: "🧳" }))]);
     } catch (e) { S.note = e.message; S.trips = mergeTrips(S.trips); }
+    S.loading = false;
     drawSide(document.body.classList.contains("trips-home") ? "trips" : navOn);
     if (document.body.classList.contains("trips-home")) showHome();
   }
@@ -1287,5 +1293,6 @@
   });
 
   drawSide("today");   // at once: the trips list only fills the Trips page, it never held up the sidebar (2026-11-09)
-  loadTrips();
+  loadTrips();   // puts the saved Montreal copy in at once, then redraws when Notion answers
+  if (startView(location.hash) === "trips") showHome();   // from the calendar's Travel tab
 })(typeof globalThis !== "undefined" ? globalThis : this);

@@ -13,7 +13,7 @@
 <meta name="apple-mobile-web-app-title" content="Calendar">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>Calendar</title>
-<script src="calendar-core.js?v=8"></script>
+<script src="calendar-core.js?v=9"></script>
 <script>
 /* The look saved on this device (the Look row in Settings; Studio when none) goes on here, before anything is drawn,
    so the page never opens in the wrong look first. Studio shows its day or night half by the sun in the calendar's
@@ -431,6 +431,8 @@ const API = qs.get("api") || "https://still.srv1948070.hstgr.cloud";
 const H = 56, SNAP = 15, WIN = 36, BACK = 14;
 /** A phone or tablet: the finger moves days through wireSwipe (never native sideways scrolling). */
 const TOUCH = matchMedia("(hover: none) and (pointer: coarse)").matches;
+/** Wide enough for Day Quest's desktop pages (quest-trips.js draws Trips from 768 px; under that it does nothing). */
+const WIDE = matchMedia("(min-width: 768px)");
 document.body.classList.toggle("touch", TOUCH);
 /* Safari in a tab may still pinch-zoom past user-scalable=no; its own gesture events stop that (touch only). */
 if (TOUCH) for (const g of ["gesturestart", "gesturechange"]) document.addEventListener(g, (e) => e.preventDefault(), { passive: false });
@@ -438,7 +440,7 @@ if (TOUCH) for (const g of ["gesturestart", "gesturechange"]) document.addEventL
    which shows this build, the phone's answers and a log of every day change with its cause. Until then CalHook.on is
    null and diag() does nothing. BUILD names this copy of the page, so a screenshot proves which copy ran: change it on
    every change to this page or calendar-readout.js (the date plus a letter). */
-const BUILD = "2026-11-12c no bounce";
+const BUILD = "2026-11-12d travel tab";
 const CalHook = window.CalHook = { BUILD, on: null };
 const diag = (kind, msg) => { if (CalHook.on) CalHook.on(kind, msg); };
 const $ = (s) => document.querySelector(s), $$ = (s) => [...document.querySelectorAll(s)];
@@ -967,7 +969,7 @@ function pEvent(ev) {
     ${canEdit ? "" : `<div class="meta">${esc(cal.name)} is read-only here.</div>`}
     <div class="r">${ev.ghost ? `<button class="btn" id="pSkip">Skip</button><span class="spacer"></span><button class="btn pri" id="pAcc">Accept</button>`
       : `${isNew || !canEdit ? "" : '<button class="btn del" id="pDel">Delete</button>'}${ev.htmlLink ? `<a class="meta" href="${esc(ev.htmlLink)}" target="_blank" rel="noopener">Open in Google</a>` : ""}<span class="spacer"></span>${canEdit ? '<button class="btn pri" id="pSave">Save</button>' : ""}`}</div>
-    ${!isNew && !ev.ghost && TYPES.includes(ev.k) ? `<button class="btn k-${ev.k}" data-page="${ev.k}" style="border-color:color-mix(in srgb,var(--c) 50%,transparent)">Open the ${esc(KNAME[ev.k])} page &#8250;</button>` : ""}`;
+    ${!isNew && !ev.ghost && TYPES.includes(ev.k) ? `<button class="btn k-${ev.k}" data-page="${ev.k}" style="border-color:color-mix(in srgb,var(--c) 50%,transparent)">${esc(WIDE.matches && C.pageLink(ev.k) ? C.pageLink(ev.k).label : `Open the ${KNAME[ev.k]} page`)} &#8250;</button>` : ""}`;
 }
 async function saveEvent() {
   const ev = S.ev, ti = $("#pTitle"), title = ti.value.trim(), calId = $("#pCal").value, kind = S.form.kind, dur = S.form.dur;
@@ -1048,6 +1050,10 @@ function renderPage() {
     <div class="card"><p class="lbl">This page</p><div style="color:var(--soft);line-height:1.5">The ${esc(KNAME[k])} page is being built as its own step. For now it shows your next blocks of this type; tap one to see it on the calendar.</div></div></div>`;
 }
 function showPage(k) {
+  /* t9 (Junyan, 2026-11-12, "9 yes"): a type whose page lives elsewhere (travel: Day Quest Trips) goes there, on a
+     wide screen only; a phone keeps this page because Day Quest has no Trips page there. ?api= carries over. */
+  const link = WIDE.matches && C.pageLink(k, location.search);
+  if (link) { location.href = link.href; return; }
   if (S.page === "cal" && $("#strip")) S.top = $("#view").scrollTop;
   S.page = k; document.body.classList.toggle("onpage", k !== "cal"); document.body.classList.remove("popen", "month");
   $("#page").hidden = k === "cal"; render();
