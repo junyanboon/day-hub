@@ -688,12 +688,12 @@ function shiftWall(ms, dDay, dMin) { const w = C.wall(ms, S.tz); return C.instan
    day: on the iPhone a page still gliding up or down kept lastScroll fresh, so goTo's landing fallback never ran
    and a dropped snap-back left the strip on the next day (Junyan, 2026-11-11: "changed dates when swiping up and
    down"). */
+let raf = 0, settle = 0, dragging = false, swiping = false, lastScroll = 0, lastLeft = -1, glideUntil = 0;
 /* On a phone the day is never read from where the strip sits sideways (Junyan, 2026-11-11: "jumping from Nov 11 to
    oct 28", then "It keeps jumping 2 weeks back now to Oct 14", day view). The strip starts 14 days (BACK) before the
    shown day; when it was rebuilt under a page still gliding up or down, the iPhone carried on its glide from a
    sideways position of 0, so the page read the strip's first day, 14 back, and rebuilt around it, again and again.
    Now on touch only a swipe or a button (goTo) changes S.cur; any other sideways move is put back (holdDay). */
-let raf = 0, settle = 0, dragging = false, swiping = false, lastScroll = 0, lastLeft = -1, glideUntil = 0;
 /** Touch: put the strip back on S.cur when it sits anywhere else and no finger or goTo is moving it. */
 function holdDay(v) {
   if (swiping || Date.now() < glideUntil || !dw) return;
@@ -831,6 +831,7 @@ function goTo(day, smooth = true) {
     settle = setTimeout(() => {
       glideUntil = 0; if (S.page !== "cal" || S.n === "m" || !$("#strip")) return;
       holdDay(v);   // land on the day even when the glide was dropped
+      if (swiping) return;   // never rebuild the strip under a finger; that swipe's end calls goTo, which rebuilds then
       const at = dayDiff(S.cur, S.win0);
       if (at < 4 || at > WIN - S.n - 4) { S.win0 = C.addDays(S.cur, -BACK); render(); refresh(); }
     }, smooth ? 700 : 0);

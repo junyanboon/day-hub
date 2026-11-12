@@ -108,6 +108,32 @@ try {
     const cur = await page.evaluate(() => S.cur);
     check(`day view: a rebuild under a gliding up/down scroll keeps the day (round ${round})`, cur === cur0 && b.day === a.day, `S.cur ${cur0} -> ${cur}, shown ${a.day} -> ${b.day}`);
   }
+  /* ---- a second swipe while goTo's edge rebuild is still waiting: goTo rebuilds the strip 700 ms after a swipe
+     when the day sits within 4 days of either end. If the next swipe is under the finger when that fires, the strip
+     must not be redrawn under it (the swipe's own left0 would be stale and the days would jump). ---- */
+  await open(1);
+  const nearEdge = await page.evaluate(() => {
+    const v = document.querySelector("#view"), d = stripDays[3];
+    S.cur = d; v.scrollLeft = 3 * dw; goTo(d);   // already there, so only the 700 ms rebuild timer is pending
+    return { day: d, win0: S.win0 };
+  });
+  await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x: 300, y: 500 }] });
+  for (const x of [290, 280, 270, 260]) { await sleep(20); await cdp.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [{ x, y: 500 }] }); }
+  const before = { ...(await shown()), win0: await page.evaluate(() => S.win0) };
+  await sleep(900);   // the rebuild timer fires with the finger still down
+  await cdp.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [{ x: 250, y: 500 }] });
+  await sleep(50);
+  const held = { ...(await shown()), win0: await page.evaluate(() => S.win0) };
+  check("day view: the edge rebuild waits while the next swipe is under the finger", held.win0 === nearEdge.win0 && held.day === before.day && Math.abs(held.left - (before.left + 10)) <= 2,
+    `win0 ${nearEdge.win0} -> ${held.win0}, day ${before.day} -> ${held.day}, left ${before.left} -> ${held.left}`);
+  await sleep(600);   // a slow 50 px nudge: no day change, so goTo puts the strip back and rebuilds then
+  await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+  await sleep(1100);
+  b = await shown();
+  const after = await page.evaluate(() => ({ cur: S.cur, win0: S.win0 }));
+  check("day view: after that finger lifts the day is kept and the strip is rebuilt around it", after.cur === nearEdge.day && b.day === nearEdge.day && after.win0 !== nearEdge.win0,
+    `S.cur ${after.cur}, shown ${b.day}, win0 ${nearEdge.win0} -> ${after.win0}`);
+
   // the iPhone's address bar grows and shrinks during a scroll, which resizes the page
   a = await shown();
   await page.setViewportSize({ width: 390, height: 760 }); await drag(200, 650, 200, 450, 300);
