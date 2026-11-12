@@ -23,12 +23,15 @@ white-space:pre-wrap;word-break:break-all;overflow:hidden;pointer-events:none;-w
 #readout button{pointer-events:auto;font:600 11px/1 -apple-system,sans-serif;background:#333;color:#fff;border:1px solid #666;border-radius:6px;padding:5px 9px}
 #readout .hd{color:#fff}#readout .geo{color:#bfe3ff}#readout #readoutLog{color:#ffe9a8}
 #readoutProbe{position:fixed;left:0;top:0;width:0;height:0;visibility:hidden;pointer-events:none;
-padding:env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px)}`;
+padding:env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px)}
+.readoutVh{position:fixed;left:0;top:0;width:0;visibility:hidden;pointer-events:none}`;
   const box = document.createElement("div"), probe = document.createElement("div");
   box.id = "readout"; box.setAttribute("data-noswipe", ""); box.hidden = true;
-  box.innerHTML = `<div class="rb"><button id="readoutPause">Pause</button><button id="readoutClose" aria-label="Close readout">x</button></div><div class="hd" id="readoutHead"></div><div class="geo" id="readoutGeo"></div><div id="readoutLog"></div>`;
+  box.innerHTML = `<div class="rb"><button id="readoutFill">Fill</button><button id="readoutTop">Top</button><button id="readoutPause">Pause</button><button id="readoutClose" aria-label="Close readout">x</button></div><div class="hd" id="readoutHead"></div><div class="geo" id="readoutGeo"></div><div id="readoutLog"></div>`;
   probe.id = "readoutProbe";
-  document.head.appendChild(css); document.body.append(box, probe);
+  /* one hidden bar per height unit, so the readout says what 100vh, 100dvh, 100lvh and 100svh come to on the phone */
+  const VH = ["vh", "dvh", "lvh", "svh"].map((u) => { const d = document.createElement("div"); d.className = "readoutVh"; d.style.height = "100" + u; return [u, d]; });
+  document.head.appendChild(css); document.body.append(box, probe, ...VH.map((x) => x[1]));
   const $ = (id) => document.getElementById(id);
   const r = (n) => (n == null || Number.isNaN(n) ? "-" : Math.round(n));
   const mm = (q) => { try { return matchMedia(q).matches ? "y" : "n"; } catch { return "?"; } };
@@ -84,10 +87,25 @@ padding:env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) env(safe-are
     return [`inner ${innerWidth}x${innerHeight}  docH ${document.documentElement.clientHeight}  screen ${screen.width}x${screen.height}`,
       `vv h ${vv ? r(vv.height) : "-"} offTop ${vv ? r(vv.offsetTop) : "-"} pageTop ${vv ? r(vv.pageTop) : "-"}  winY ${r(window.scrollY)} docTop ${r(document.scrollingElement && document.scrollingElement.scrollTop)}`,
       `safe t ${ins[0]} r ${ins[1]} b ${ins[2]} l ${ins[3]}`,
+      fitLine(),
+      `html h ${r(parseFloat(getComputedStyle(document.documentElement).height))} body h ${r(parseFloat(getComputedStyle(document.body).height))}  ${VH.map(([u, d]) => `100${u} ${r(d.getBoundingClientRect().height)}`).join(" ")}`,
+      `${rect(".drop")}  ${rect("#newTask")}`,
       `${rect(".app")}  ${rect(".bar")}  ${rect(".pane")}`,
       `${rect("#view")}  ${rect(".dhead")}  sc L ${v ? r(v.scrollLeft) : "-"} T ${v ? r(v.scrollTop) : "-"}`,
       `last ${lastDay}`,
       `cur ${st.cur} n ${st.n} win0 ${st.win0} dw ${r(st.dw)} slideX ${r(st.slideX)} shownX ${r(st.shown)} shown ${shownDay}`].join("\n");
+  }
+  /** The home screen fit (calendar.html homeFit): his two switches, the gap it stretched by, and which rule is on. */
+  function fitLine() {
+    if (!H.fit) return "fit - (this page has no home screen fit)";
+    const f = H.fit.get(), c = document.documentElement.classList, ls = (k) => { try { return localStorage.getItem(k); } catch { return null; } };
+    return `fit ${ls("cal-hsfill") || "auto"} gap ${f.gap} top ${f.top || "-"}  rules ${["hs", "hsclear", "hsfill"].filter((k) => c.contains(k)).join(" ") || "none"}`;
+  }
+  function labels() {
+    if (!H.fit) return;
+    const ls = (k) => { try { return localStorage.getItem(k); } catch { return null; } };
+    $("readoutFill").textContent = "Fill " + (ls("cal-hsfill") || "auto");
+    $("readoutTop").textContent = "Top " + (ls("cal-hstop") || "clear");
   }
   function paint() { if (!open) return; $("readoutHead").textContent = head(); if (!paused) $("readoutGeo").textContent = geo(); }
 
@@ -119,6 +137,12 @@ padding:env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) env(safe-are
   }
   function hide() { open = false; box.hidden = true; H.on = null; wire(false); clearInterval(timer); }
   $("readoutPause").onclick = (e) => { e.stopPropagation(); paused = !paused; e.target.textContent = paused ? "Resume" : "Pause"; if (!paused) paint(); };
+  /* his switches (home screen app only; they do nothing visible in a Safari tab): Fill auto > on > off, Top clear (default) > close */
+  $("readoutFill").onclick = (e) => { e.stopPropagation(); if (!H.fit) return; let v; try { v = localStorage.getItem("cal-hsfill"); } catch {}
+    H.fit.set("fill", { auto: "on", on: "off", off: "auto" }[v || "auto"] || "auto"); labels(); add(`FIT ${fitLine()}`); paint(); };
+  $("readoutTop").onclick = (e) => { e.stopPropagation(); if (!H.fit) return; let v; try { v = localStorage.getItem("cal-hstop"); } catch {}
+    H.fit.set("top", (v || "clear") === "clear" ? "close" : "clear"); labels(); add(`FIT ${fitLine()}`); paint(); };
+  labels();
   $("readoutClose").onclick = (e) => { e.stopPropagation(); hide(); };
   window.CalReadout = { toggle() { open ? hide() : show(); }, show, hide, cause };
   show();

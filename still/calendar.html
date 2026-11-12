@@ -13,7 +13,7 @@
 <meta name="apple-mobile-web-app-title" content="Calendar">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>Calendar</title>
-<script src="calendar-core.js?v=9"></script>
+<script src="calendar-core.js?v=12"></script>
 <script>
 /* The look saved on this device (the Look row in Settings; Studio when none) goes on here, before anything is drawn,
    so the page never opens in the wrong look first. Studio shows its day or night half by the sun in the calendar's
@@ -387,6 +387,21 @@ body.onpage .left,body.onpage .main,body.onpage .panel{display:none}
   div.month{grid-auto-rows:minmax(92px,1fr)}.mday{padding:4px 3px}.mday .p{font-size:10.5px;padding:1px}.mday .p .meta{display:none}
   .page{grid-column:1;padding:16px max(16px,env(safe-area-inset-right,0px)) 96px max(16px,env(safe-area-inset-left,0px))}
 }
+/* The iPhone home screen app only (2026-11-12): the page script puts html.hs on in a home screen app on a phone sized
+   touch screen with a top inset, and
+   html.hsfill with --hsgap when iOS lays the page out short (CalCore.homeFit, WebKit bug 301994). A Safari tab and a
+   desktop never get either class. --hstop is the top he picks in the readout: close (0) or clear (38px, below the
+   system blur that fades out near 100pt). */
+html.hs{--hstop:0px}
+html.hs.hsclear{--hstop:38px}
+html.hs body::before{height:calc(env(safe-area-inset-top,0px) + var(--hstop))}
+html.hs .app{padding-top:calc(env(safe-area-inset-top,0px) + var(--hstop))}
+html.hs body.month .left{top:calc(48px + env(safe-area-inset-top,0px) + var(--hstop))}
+html.hsfill{height:calc(100% + var(--hsgap,0px))}
+html.hsfill .drop{bottom:calc(-1 * var(--hsgap,0px))}
+html.hsfill .toast{bottom:calc(18px + env(safe-area-inset-bottom,0px) - var(--hsgap,0px))}
+html.hsfill .panel{bottom:calc(-1 * var(--hsgap,0px))}
+html.hsfill .modal{bottom:calc(-1 * var(--hsgap,0px))}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style></head>
 <body>
@@ -440,9 +455,34 @@ if (TOUCH) for (const g of ["gesturestart", "gesturechange"]) document.addEventL
    which shows this build, the phone's answers and a log of every day change with its cause. Until then CalHook.on is
    null and diag() does nothing. BUILD names this copy of the page, so a screenshot proves which copy ran: change it on
    every change to this page or calendar-readout.js (the date plus a letter). */
-const BUILD = "2026-11-12d travel tab";
+const BUILD = "2026-11-12g top clear";
 const CalHook = window.CalHook = { BUILD, on: null };
 const diag = (kind, msg) => { if (CalHook.on) CalHook.on(kind, msg); };
+/* The iPhone home screen app's fit (2026-11-12): html.hs in a home screen app on touch, html.hsfill and --hsgap when
+   iOS lays the page out short by the top inset (CalCore.homeFit). His two switches live in the readout and are kept
+   here: cal-hsfill (auto, on, off) and cal-hstop (clear, the default, or close). Measured again on every resize, turn and pageshow (iOS can report the inset as 0 on a cold start's first frame). */
+const homeFit = (() => {
+  const root = document.documentElement, probe = document.createElement("div");
+  probe.style.cssText = "position:fixed;left:0;top:0;width:0;height:0;visibility:hidden;pointer-events:none;padding-top:env(safe-area-inset-top,0px)";
+  let last = { gap: 0, top: null };
+  function apply() {
+    if (!probe.isConnected) document.body.appendChild(probe);
+    const standalone = matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+    const ls = (k) => { try { return localStorage.getItem(k); } catch { return null; } };
+    last = window.CalCore.homeFit({ standalone, touch: TOUCH, innerWidth, innerHeight, screenWidth: screen.width, screenHeight: screen.height,
+      safeTop: parseFloat(getComputedStyle(probe).paddingTop) || 0, fill: ls("cal-hsfill") || "auto", top: ls("cal-hstop") || "clear" });
+    root.classList.toggle("hs", last.top != null);
+    root.classList.toggle("hsclear", last.top === "clear");
+    root.classList.toggle("hsfill", last.gap > 0);
+    if (last.gap > 0) root.style.setProperty("--hsgap", last.gap + "px"); else root.style.removeProperty("--hsgap");
+    return last;
+  }
+  apply();
+  addEventListener("resize", apply); addEventListener("pageshow", apply); addEventListener("orientationchange", () => setTimeout(apply, 300));
+  return { apply, get: () => last,
+    set(key, value) { try { localStorage.setItem(key === "fill" ? "cal-hsfill" : "cal-hstop", value); } catch {} return apply(); } };
+})();
+CalHook.fit = homeFit;
 const $ = (s) => document.querySelector(s), $$ = (s) => [...document.querySelectorAll(s)];
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const store = { get(k) { try { return localStorage.getItem(k); } catch { return null; } },
@@ -1169,7 +1209,7 @@ function setup() {
 function readout() {
   if (window.CalReadout) { CalReadout.toggle(); return; }
   CalHook.state = () => ({ cur: S.cur, win0: S.win0, n: S.n, dw, slideX, shown: TOUCH && $("#strip") ? shownX() : null, touch: TOUCH, api: API });
-  const s = document.createElement("script"); s.src = "calendar-readout.js?v=2"; document.head.appendChild(s);
+  const s = document.createElement("script"); s.src = "calendar-readout.js?v=4"; document.head.appendChild(s);
 }
 function boot() { render(); loadSide(); refresh(); }
 setup(); boot();
