@@ -14,11 +14,13 @@
   const t0 = performance.now(), log = [];
   let lastDay = "none yet", paused = false, open = false, timer = 0, lastWinY = null, lastL = null, lastT = null;
   const css = document.createElement("style");
+  /* Taps go through the box to whatever is under it (the event sheet sits there on a phone); only its two buttons take
+     taps (Junyan, 2026-11-12: "when I click stuff nothing happens"). */
   css.textContent = `#readout{position:fixed;left:4px;right:4px;bottom:calc(64px + env(safe-area-inset-bottom,0px));max-height:52vh;z-index:2147483000;
 background:rgba(0,0,0,.84);color:#d6ffd6;font:10px/1.32 ui-monospace,Menlo,monospace;border-radius:8px;padding:5px 7px;
-white-space:pre-wrap;word-break:break-all;overflow:hidden;pointer-events:auto;-webkit-text-size-adjust:100%}
+white-space:pre-wrap;word-break:break-all;overflow:hidden;pointer-events:none;-webkit-text-size-adjust:100%}
 #readout .rb{display:flex;gap:6px;justify-content:flex-end;margin:-2px 0 2px}
-#readout button{font:600 11px/1 -apple-system,sans-serif;background:#333;color:#fff;border:1px solid #666;border-radius:6px;padding:5px 9px}
+#readout button{pointer-events:auto;font:600 11px/1 -apple-system,sans-serif;background:#333;color:#fff;border:1px solid #666;border-radius:6px;padding:5px 9px}
 #readout .hd{color:#fff}#readout .geo{color:#bfe3ff}#readout #readoutLog{color:#ffe9a8}
 #readoutProbe{position:fixed;left:0;top:0;width:0;height:0;visibility:hidden;pointer-events:none;
 padding:env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px)}`;

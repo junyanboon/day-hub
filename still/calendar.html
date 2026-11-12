@@ -219,6 +219,11 @@ body.touch .sc{overflow-x:hidden;touch-action:pan-y}
    text box is 16px on touch (the editor title keeps its 20px); manipulation stops the double-tap zoom everywhere. */
 body.touch input,body.touch select,body.touch textarea{font-size:16px}
 @media (hover:none) and (pointer:coarse){html,body{touch-action:manipulation}}
+/* No bounce on a phone (Junyan, 2026-11-12: "When I scroll up hard Sun 1 goes down butn ot the top bar"): iOS let the day
+   list rubber-band past its ends and carried the sticky day header with it. none stops the bounce and the hand-off to the
+   page, on the page itself and on every phone scroller: the day list and month view (.sc), the event sheet (.pbody), the
+   month picker (.left) and the full pages (.page). Touch only; the desktop keeps its own scrolling. */
+@media (hover:none) and (pointer:coarse){html,body,.sc,.sc.snap,.pbody,.left,.page{overscroll-behavior:none}}
 body.touch .sc.snap{scroll-snap-type:none}
 /* On touch the days sit in a pane that clips them sideways without scrolling (overflow-x:clip): the view has no
    sideways scroll range at all, so iOS has nothing to move during an up/down glide or a trackpad scroll. The
@@ -283,7 +288,8 @@ body.touch .pane{overflow-x:clip}
 .pip:hover{background:color-mix(in srgb,var(--k-studio) 45%,var(--bg))}
 .nowline{position:absolute;left:0;right:0;height:2px;background:var(--now);z-index:3;pointer-events:none}
 .nowline::before{content:"";position:absolute;left:-4px;top:-4px;width:10px;height:10px;border-radius:50%;background:var(--now);box-shadow:0 0 0 2px var(--bg)}
-.month{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));grid-template-rows:auto;grid-auto-rows:minmax(112px,1fr);min-height:100%}
+/* div.month, never bare .month: the phone month picker puts class "month" on the body (d20) */
+div.month{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));grid-template-rows:auto;grid-auto-rows:minmax(112px,1fr);min-height:100%}
 .mh{font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--faint);text-align:center;padding:8px 6px;border-bottom:1px solid var(--line);background:var(--bar);position:sticky;top:0;z-index:2}
 .mday{border-left:1px solid var(--hair);border-bottom:1px solid var(--hair);padding:5px;overflow:hidden;cursor:pointer;min-width:0}
 .mday:hover{background:var(--raise)}.mday .n{text-align:right;font-size:12.5px;margin-bottom:3px;font-variant-numeric:tabular-nums}.mday.out{opacity:.4}
@@ -378,7 +384,7 @@ body.onpage .left,body.onpage .main,body.onpage .panel{display:none}
   .grab{display:block;width:40px;height:4px;border-radius:2px;background:var(--raise2);margin:8px auto 0;flex:none}
   .pbody{min-width:0;padding-bottom:calc(84px + env(safe-area-inset-bottom,0px))}
   .dn{font-size:13px}
-  .month{grid-auto-rows:minmax(92px,1fr)}.mday{padding:4px 3px}.mday .p{font-size:10.5px;padding:1px}.mday .p .meta{display:none}
+  div.month{grid-auto-rows:minmax(92px,1fr)}.mday{padding:4px 3px}.mday .p{font-size:10.5px;padding:1px}.mday .p .meta{display:none}
   .page{grid-column:1;padding:16px max(16px,env(safe-area-inset-right,0px)) 96px max(16px,env(safe-area-inset-left,0px))}
 }
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
@@ -432,7 +438,7 @@ if (TOUCH) for (const g of ["gesturestart", "gesturechange"]) document.addEventL
    which shows this build, the phone's answers and a log of every day change with its cause. Until then CalHook.on is
    null and diag() does nothing. BUILD names this copy of the page, so a screenshot proves which copy ran: change it on
    every change to this page or calendar-readout.js (the date plus a letter). */
-const BUILD = "2026-11-12b no zoom";
+const BUILD = "2026-11-12c no bounce";
 const CalHook = window.CalHook = { BUILD, on: null };
 const diag = (kind, msg) => { if (CalHook.on) CalHook.on(kind, msg); };
 const $ = (s) => document.querySelector(s), $$ = (s) => [...document.querySelectorAll(s)];
@@ -1109,12 +1115,12 @@ function setup() {
   $("#mmPrev").onclick = () => { S.miniLock = true; S.mini = C.addMonths(S.mini, -1); renderMini(); };
   $("#mmNext").onclick = () => { S.miniLock = true; S.mini = C.addMonths(S.mini, 1); renderMini(); };
   $("#mini").onclick = function miniPick(e) { const b = e.target.closest("button"); if (!b) return; document.body.classList.remove("month"); S.miniLock = false; if (S.n === "m") { S.cur = b.dataset.k; render(); refresh(); } else goTo(S.n === 7 ? C.weekStart(b.dataset.k) : b.dataset.k); };
-  /* A lone tap opens or closes the month picker (phone), 350 ms later; a quick run of taps never does, and the fifth
-     opens or closes the readout. (The month picker also re-lays the page: body.month matches the month view's .month
-     grid rule, so the title moves under the finger; the readout's taps must not depend on it.) */
+  /* A lone tap opens or closes the month picker (phone), 350 ms later; a quick run of taps (each under 350 ms after the
+     last) never does, and the fifth opens or closes the readout. A tap after a pause is a lone tap again, so a second
+     tap a moment later closes the picker (d20, 2026-11-12). */
   let taps = [], tapT = 0;
   $("#title").onclick = function titleTap() {
-    const now = Date.now(); taps = taps.filter((t) => now - t < 2000); taps.push(now);
+    const now = Date.now(); if (taps.length && now - taps[taps.length - 1] > 350) taps = []; taps.push(now);
     clearTimeout(tapT);
     if (taps.length >= 5) { taps = []; readout(); return; }
     const n = taps.length;
@@ -1157,7 +1163,7 @@ function setup() {
 function readout() {
   if (window.CalReadout) { CalReadout.toggle(); return; }
   CalHook.state = () => ({ cur: S.cur, win0: S.win0, n: S.n, dw, slideX, shown: TOUCH && $("#strip") ? shownX() : null, touch: TOUCH, api: API });
-  const s = document.createElement("script"); s.src = "calendar-readout.js?v=1"; document.head.appendChild(s);
+  const s = document.createElement("script"); s.src = "calendar-readout.js?v=2"; document.head.appendChild(s);
 }
 function boot() { render(); loadSide(); refresh(); }
 setup(); boot();
