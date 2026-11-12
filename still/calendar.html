@@ -82,7 +82,7 @@
 --lift:#000000;--lift-k:1;
 /* an event that is over (earlier today, or a past day): its card fill, and its title (a share of the type colour
    mixed into --dim-ink); no see-through, so the title still reads at 4.5:1 or better */
---dim-fill:12%;--dim-title:20%;--dim-ink:var(--soft);
+--dim-fill:12%;--dim-title:20%;--dim-ink:var(--soft);--dim-time:var(--soft);
 /* the strip behind the iPhone clock in home-screen mode (only a light look needs one) */
 --status:transparent;
 /* block types: colour means type */
@@ -262,7 +262,7 @@ body.touch .sc.snap{scroll-snap-type:none}
    title still reads at 4.5:1 or better in every look (see-through washed it out on the cream look) */
 .ev.done:not(.ghost),.day.past .ev:not(.ghost){background:color-mix(in srgb,var(--c) var(--dim-fill),var(--bg));color:color-mix(in srgb,var(--c) var(--dim-title),var(--dim-ink))}
 .ev.done:not(.ghost):hover,.day.past .ev:not(.ghost):hover{background:color-mix(in srgb,var(--c) calc(var(--dim-fill) + 4%),var(--bg))}
-.ev.done small,.day.past .ev small{color:var(--faint)}.ev.done .ei,.day.past .ev .ei{opacity:.6}
+.ev.done small,.day.past .ev small{color:var(--dim-time)}.ev.done .ei,.day.past .ev .ei{opacity:.6}
 .strip.narrow .dn>span{display:flex;flex-direction:column;align-items:center;gap:2px;line-height:1.1}
 .strip.narrow .ev{padding:3px 3px 3px 6px;font-size:10.5px;line-height:1.2}.strip.narrow .ev .ei{display:none}
 .strip.narrow .ev b{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:4;white-space:normal;overflow-wrap:normal;-webkit-hyphens:auto;hyphens:auto}

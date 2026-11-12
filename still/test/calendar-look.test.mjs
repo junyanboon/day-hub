@@ -179,6 +179,10 @@ for (const id of faceIds) {
     for (const k of kinds) {
       const c = colour(vars, "k-" + k), card = mix(c, fill, bg), title = mix(c, tp, ink);
       assert.ok(contrast(title, card) >= 4.5, `${k} done: ${contrast(title, card).toFixed(2)}:1`);
+      // the same card under the pointer (4% more colour), and its time line in --dim-time
+      const hover = mix(c, fill + 0.04, bg), time = colour(vars, "dim-time");
+      assert.ok(contrast(title, hover) >= 4.5, `${k} done, hovered: ${contrast(title, hover).toFixed(2)}:1`);
+      assert.ok(contrast(time, hover) >= 4.5, `${k} done, its time: ${contrast(time, hover).toFixed(2)}:1`);
     }
   });
 
