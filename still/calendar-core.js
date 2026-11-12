@@ -245,6 +245,28 @@
     return { face: L.day ? f.face : L.id === "ink" ? null : L.id, theme: f.theme, scheme: f.scheme };
   }
 
+  /* ---- the iPhone home screen app's short page (2026-11-12). In a home screen app iOS 26 can lay the page out one
+     top inset shorter than the screen (his phone: inner 812 on an 874 screen, top inset 62) while drawing it from the
+     very top, so the bottom strip shows nothing (WebKit bug 301994).
+     homeFit says how far to stretch the page ({gap} in CSS px, 0 for none) and which top to use ({top}: "clear",
+     the default since d23, "close", or null outside a home screen app on touch, without a top inset, or on a screen bigger than a phone). fill is his switch: "auto" (default) stretches only when the
+     gap is the top inset, "on" any gap up to FILL_MAX, "off" never. iOS keeps screen.width/height upright, so the
+     screen's height is its long side when the window is taller than wide. */
+  const FILL_MAX = 80, PHONE_MAX = 600;
+  function homeFit({ standalone, touch, innerWidth, innerHeight, screenWidth, screenHeight, safeTop, fill = "auto", top = "clear" }) {
+    if (!standalone || !touch) return { gap: 0, top: null };
+    const tall = innerHeight >= innerWidth, screenH = tall ? Math.max(screenWidth, screenHeight) : Math.min(screenWidth, screenHeight);
+    const short = Math.round(screenH - innerHeight);
+    let gap = 0;
+    if (fill === "on") gap = short > 0 && short <= FILL_MAX ? short : 0;
+    else if (fill !== "off") gap = short > 0 && safeTop > 0 && Math.abs(short - safeTop) <= 2 ? short : 0;
+    /* The header gap is for a phone with a top inset only (reviewer, 2026-11-12): an Android installed app with no
+       inset, an iPad home screen app and a touch laptop keep the plain tab's header. Phone sized = the screen's short
+       side is PHONE_MAX or less. */
+    const phoneTop = safeTop > 0 && Math.min(screenWidth, screenHeight) <= PHONE_MAX;
+    return { gap, top: !phoneTop ? null : top === "close" ? "close" : "clear" };
+  }
+
   /* ---- words ---- */
   function hm(min) {
     const h = Math.floor(min / 60) % 24, m = min % 60;
@@ -267,5 +289,5 @@
   }
 
   root.CalCore = { wall, instant, offset, addDays, dowOf, weekStart, isoWeek, addMonths, monthKey, monthsFor,
-    KINDS, kindOf, layout, pieces, coversDay, orderBetween, groupOf, dropTask, blockMinutes, hm, dur, SWIPE, swipeLock, swipeCommit, LOOKS, lookId, startLook, LOOK_RESET, placeOf, sunTimes, sunHalf, lookFace, pageLink };
+    KINDS, kindOf, layout, pieces, coversDay, orderBetween, groupOf, dropTask, blockMinutes, hm, dur, SWIPE, swipeLock, swipeCommit, LOOKS, lookId, startLook, LOOK_RESET, placeOf, sunTimes, sunHalf, lookFace, pageLink, homeFit };
 })(typeof window !== "undefined" ? window : globalThis);
