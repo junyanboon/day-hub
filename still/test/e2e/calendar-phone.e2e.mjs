@@ -47,10 +47,14 @@ try {
     await Promise.all(sends);
     await sleep(1100);
   }
+  /** What the eye sees: the first day column whose left edge sits at the hour gutter's right edge. `left` is how far
+      the strip sits from its first day, read from the screen (native scrolling and a CSS slide both count). */
   const shown = () => page.evaluate(() => {
     const v = document.querySelector("#view"), days = [...document.querySelectorAll(".day")];
-    const w = days[0].getBoundingClientRect().width;
-    return { day: days[Math.round(v.scrollLeft / w)].dataset.day, top: Math.round(v.scrollTop), left: Math.round(v.scrollLeft), w };
+    const g = document.querySelector(".gut").getBoundingClientRect().right, w = days[0].getBoundingClientRect().width;
+    let best = days[0], d = Infinity;
+    for (const el of days) { const x = Math.abs(el.getBoundingClientRect().left - g); if (x < d) { d = x; best = el; } }
+    return { day: best.dataset.day, top: Math.round(v.scrollTop), left: Math.round(g - days[0].getBoundingClientRect().left), w };
   });
   async function open(n) {
     await page.addInitScript((n) => { localStorage.setItem("quest-key", "test"); localStorage.setItem("cal-n", n); }, String(n));
@@ -62,11 +66,37 @@ try {
   }
   const plus = (day, n) => new Date(Date.parse(day + "T12:00:00Z") + n * 86400000).toISOString().slice(0, 10);
 
-  /* ---- day view ---- */
+  /* ---- nothing native can move the days sideways (Junyan, 2026-11-11: "still gtliching on the phone with the fix").
+     On his iPhone, during a plain up/down scroll, iOS kept moving the strip's sideways position by 750 to 1950 px every
+     30 ms and the page snapped it back, a fight that blanked the event column. overflow-x:hidden still leaves a
+     sideways scroll range iOS can move. On touch the view must have no sideways range at all: a sideways scroll
+     position set from outside (as iOS did), or a sideways trackpad wheel (iPhone Mirroring), changes nothing. ---- */
   await open(1);
   let a = await shown();
-  await drag(200, 650, 240, 350, 450);
+  const range = await page.evaluate(() => { const v = document.querySelector("#view"); return { sw: v.scrollWidth, cw: v.clientWidth }; });
+  check("day view on touch: the view has no sideways scroll range", range.sw <= range.cw + 1, `scrollWidth ${range.sw}, clientWidth ${range.cw}`);
+  const forced = await page.evaluate(async () => {
+    const v = document.querySelector("#view"), seen = [];
+    for (const x of [3023, 4219, 3571, 0, 9999]) { v.scrollLeft = x; seen.push(Math.round(v.scrollLeft)); await new Promise((r) => setTimeout(r, 40)); }
+    return seen;
+  });
   let b = await shown();
+  check("day view on touch: a sideways position set from outside does not move the view", forced.every((x) => x === 0) && b.day === a.day && b.left === a.left, `scrollLeft ${forced.join(",")}, ${a.day} -> ${b.day}, left ${a.left} -> ${b.left}`);
+  await page.mouse.move(200, 500); await page.mouse.wheel(600, 0); await sleep(600);
+  b = await shown();
+  check("day view on touch: a sideways trackpad wheel does not move the day", b.day === a.day && b.left === a.left, `${a.day} -> ${b.day}, left ${a.left} -> ${b.left}`);
+  // the trackpad through iPhone Mirroring: every up/down scroll carries a small sideways part (dx -1 to -4)
+  const top0 = (await shown()).top;
+  for (const [dx, dy] of [[-3, -64], [-2, -14], [-1, -10], [-4, 60], [-3, 80], [-1, 40]]) { await page.mouse.wheel(dx, dy); await sleep(30); }
+  await sleep(600);
+  b = await shown();
+  check("day view on touch: trackpad up/down scrolls with a small sideways part keep the day", b.day === a.day && b.left === a.left && b.top !== top0, `${a.day} -> ${b.day}, left ${a.left} -> ${b.left}, top ${top0} -> ${b.top}`);
+
+  /* ---- day view ---- */
+  await open(1);
+  a = await shown();
+  await drag(200, 650, 240, 350, 450);
+  b = await shown();
   check("day view: an up/down scroll drifting 40 px right keeps the day", b.day === a.day, `${a.day} -> ${b.day}`);
   check("day view: that scroll really scrolled the hours (positive control)", b.top > a.top + 100, `scrollTop ${a.top} -> ${b.top}`);
   a = b; await drag(240, 300, 200, 600, 450); b = await shown();
@@ -83,6 +113,68 @@ try {
   check("day view: a quick 55 px flick goes to the next day", b.day === plus(a.day, 1), `${a.day} -> ${b.day}`);
   a = b; await drag(330, 818, 60, 818, 260); b = await shown();
   check("day view: a swipe on the New task box keeps the day", b.day === a.day, `${a.day} -> ${b.day}`);
+
+  /* ---- the two-week jump (Junyan, 2026-11-11: "jumping from Nov 11 to oct 28", then "It keeps jumping 2 weeks back
+     now to Oct 14", in the day view). The strip holds 36 days and starts 14 before the shown day. When the strip is
+     rebuilt (new events arrive, the edge rebuild) while the page is still gliding up or down, the iPhone carries on
+     its own glide from a sideways position of 0, the strip's first day. The page used to read the day from that
+     position, so it went 14 days back, rebuilt around that day, and did it again next time. Chrome restores the
+     position itself, so this plays the iPhone's part: rebuild mid-glide and put the sideways position at 0. ---- */
+  await open(1);
+  a = await shown();
+  const cur0 = await page.evaluate(() => S.cur);
+  for (let round = 1; round <= 2; round++) {
+    const glide2 = page.evaluate(() => new Promise((ok) => {
+      const v = document.querySelector("#view"); let n = 0;
+      const id = setInterval(() => {
+        v.scrollTop += 3;
+        if (n === 10) { render(); v.scrollLeft = 0; }   // the rebuild, and the glide going on from x = 0
+        if (++n > 60) { clearInterval(id); ok(); }
+      }, 16);
+    }));
+    await drag(200, 650, 205, 400, 400);
+    await glide2; await sleep(700);
+    b = await shown();
+    const cur = await page.evaluate(() => S.cur);
+    check(`day view: a rebuild under a gliding up/down scroll keeps the day (round ${round})`, cur === cur0 && b.day === a.day, `S.cur ${cur0} -> ${cur}, shown ${a.day} -> ${b.day}`);
+  }
+  /* ---- a second swipe while goTo's edge rebuild is still waiting: goTo rebuilds the strip 700 ms after a swipe
+     when the day sits within 4 days of either end. If the next swipe is under the finger when that fires, the strip
+     must not be redrawn under it (the swipe's own left0 would be stale and the days would jump). ---- */
+  await open(1);
+  const nearEdge = await page.evaluate(() => {
+    const v = document.querySelector("#view"), d = stripDays[3];
+    S.cur = d; v.scrollLeft = 3 * dw; goTo(d);   // already there, so only the 700 ms rebuild timer is pending
+    return { day: d, win0: S.win0 };
+  });
+  await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x: 300, y: 500 }] });
+  for (const x of [290, 280, 270, 260]) { await sleep(20); await cdp.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [{ x, y: 500 }] }); }
+  const before = { ...(await shown()), win0: await page.evaluate(() => S.win0) };
+  await sleep(900);   // the rebuild timer fires with the finger still down
+  await cdp.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [{ x: 250, y: 500 }] });
+  await sleep(50);
+  const held = { ...(await shown()), win0: await page.evaluate(() => S.win0) };
+  check("day view: the edge rebuild waits while the next swipe is under the finger", held.win0 === nearEdge.win0 && held.day === before.day && Math.abs(held.left - (before.left + 10)) <= 2,
+    `win0 ${nearEdge.win0} -> ${held.win0}, day ${before.day} -> ${held.day}, left ${before.left} -> ${held.left}`);
+  await sleep(600);   // a slow 50 px nudge: no day change, so goTo puts the strip back and rebuilds then
+  await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+  await sleep(1100);
+  b = await shown();
+  const after = await page.evaluate(() => ({ cur: S.cur, win0: S.win0 }));
+  check("day view: after that finger lifts the day is kept and the strip is rebuilt around it", after.cur === nearEdge.day && b.day === nearEdge.day && after.win0 !== nearEdge.win0,
+    `S.cur ${after.cur}, shown ${b.day}, win0 ${nearEdge.win0} -> ${after.win0}`);
+
+  // the iPhone's address bar grows and shrinks during a scroll, which resizes the page
+  a = await shown();
+  await page.setViewportSize({ width: 390, height: 760 }); await drag(200, 650, 200, 450, 300);
+  await page.setViewportSize({ width: 390, height: 844 }); await drag(200, 450, 200, 650, 300);
+  b = await shown();
+  check("day view: the page resizing during up/down scrolls keeps the day", b.day === a.day, `${a.day} -> ${b.day}`);
+  // scrolled hard into the top and bottom edges
+  a = await shown();
+  await flick(200, 300, 200, 800, 3); await flick(200, 300, 200, 800, 3); await flick(200, 800, 200, 100, 3); await flick(200, 800, 200, 100, 3);
+  b = await shown();
+  check("day view: flicks into the top and bottom edges keep the day", b.day === a.day, `${a.day} -> ${b.day}`);
 
   /* ---- a thumb scroll that starts with a sideways lean (Junyan, 2026-11-11: "changed dates when swiping up and
      down") ---- */
@@ -102,8 +194,8 @@ try {
   }
   // Chrome itself will not scroll a pan-y strip for a gesture whose first move leans sideways (the iPhone does), so
   // this checks the page's part: it must not grab the strip and slide the days under the finger.
-  await page.evaluate(() => { const v = document.querySelector("#view"), l0 = v.scrollLeft; window.__slid = 0;
-    v.addEventListener("scroll", () => { window.__slid = Math.max(window.__slid, Math.abs(v.scrollLeft - l0)); }); });
+  await page.evaluate(() => { const d0 = () => document.querySelector(".day").getBoundingClientRect().left, l0 = d0(); window.__slid = 0;
+    const tick = () => { window.__slid = Math.max(window.__slid, Math.round(Math.abs(d0() - l0))); requestAnimationFrame(tick); }; tick(); });
   await arc(200, 650, -13, -9, 140, 330);
   b = await shown();
   const slid = await page.evaluate(() => window.__slid);
