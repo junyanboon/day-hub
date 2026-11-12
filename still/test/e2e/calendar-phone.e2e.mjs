@@ -84,6 +84,42 @@ try {
   a = b; await drag(330, 818, 60, 818, 260); b = await shown();
   check("day view: a swipe on the New task box keeps the day", b.day === a.day, `${a.day} -> ${b.day}`);
 
+  /* ---- the two-week jump (Junyan, 2026-11-11: "jumping from Nov 11 to oct 28", then "It keeps jumping 2 weeks back
+     now to Oct 14", in the day view). The strip holds 36 days and starts 14 before the shown day. When the strip is
+     rebuilt (new events arrive, the edge rebuild) while the page is still gliding up or down, the iPhone carries on
+     its own glide from a sideways position of 0, the strip's first day. The page used to read the day from that
+     position, so it went 14 days back, rebuilt around that day, and did it again next time. Chrome restores the
+     position itself, so this plays the iPhone's part: rebuild mid-glide and put the sideways position at 0. ---- */
+  await open(1);
+  a = await shown();
+  const cur0 = await page.evaluate(() => S.cur);
+  for (let round = 1; round <= 2; round++) {
+    const glide2 = page.evaluate(() => new Promise((ok) => {
+      const v = document.querySelector("#view"); let n = 0;
+      const id = setInterval(() => {
+        v.scrollTop += 3;
+        if (n === 10) { render(); v.scrollLeft = 0; }   // the rebuild, and the glide going on from x = 0
+        if (++n > 60) { clearInterval(id); ok(); }
+      }, 16);
+    }));
+    await drag(200, 650, 205, 400, 400);
+    await glide2; await sleep(700);
+    b = await shown();
+    const cur = await page.evaluate(() => S.cur);
+    check(`day view: a rebuild under a gliding up/down scroll keeps the day (round ${round})`, cur === cur0 && b.day === a.day, `S.cur ${cur0} -> ${cur}, shown ${a.day} -> ${b.day}`);
+  }
+  // the iPhone's address bar grows and shrinks during a scroll, which resizes the page
+  a = await shown();
+  await page.setViewportSize({ width: 390, height: 760 }); await drag(200, 650, 200, 450, 300);
+  await page.setViewportSize({ width: 390, height: 844 }); await drag(200, 450, 200, 650, 300);
+  b = await shown();
+  check("day view: the page resizing during up/down scrolls keeps the day", b.day === a.day, `${a.day} -> ${b.day}`);
+  // scrolled hard into the top and bottom edges
+  a = await shown();
+  await flick(200, 300, 200, 800, 3); await flick(200, 300, 200, 800, 3); await flick(200, 800, 200, 100, 3); await flick(200, 800, 200, 100, 3);
+  b = await shown();
+  check("day view: flicks into the top and bottom edges keep the day", b.day === a.day, `${a.day} -> ${b.day}`);
+
   /* ---- a thumb scroll that starts with a sideways lean (Junyan, 2026-11-11: "changed dates when swiping up and
      down") ---- */
   await open(3);
