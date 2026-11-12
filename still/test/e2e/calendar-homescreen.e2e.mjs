@@ -60,7 +60,7 @@ try {
     const g = await geo(page);
     check("phone tab: no home screen class", g.cls === "", g.cls);
     check("phone tab: the page is the window's height", g.html === 812, String(g.html));
-    check("phone tab: the + New task bar sits on the window's bottom", g.drop && g.drop[1] === 812, JSON.stringify(g.drop));
+    check("phone tab: the page ends on the window's bottom, no + New task bar", g.app && g.app[1] === 812 && (!g.drop || g.drop[1] === 0), JSON.stringify([g.app, g.drop]));
     check("phone tab: the header still tucks 4px into the strip (as before)", g.app && g.bar && g.bar[0] === 58, JSON.stringify(g.bar));
     check("phone tab: no page errors", errors.length === 0, errors.join(" | "));
     await ctx.close(); }
@@ -82,7 +82,7 @@ try {
     let g = await geo(page);
     check("home screen app: html.hs, html.hsclear and html.hsfill are on, gap 62", g.cls === "hs hsclear hsfill" && g.gap === "62px", `${g.cls} ${g.gap}`);
     check("home screen app: the page is 874 tall (812 + 62)", g.html === 874, String(g.html));
-    check("home screen app: the + New task bar ends at the screen's bottom (874)", g.drop && g.drop[1] === 874, JSON.stringify(g.drop));
+    check("home screen app: the page ends at the screen's bottom (874)", g.app && g.app[1] === 874, JSON.stringify(g.app));
     check("home screen app, no saved choice: Top is clear, the header starts below the blur (100)", g.cls.includes("hsclear") && g.bar && g.bar[0] === 100 && g.strip === 100, `${g.cls} ${JSON.stringify(g.bar)} strip ${g.strip}`);
     check("no saved Top choice on the device", await page.evaluate(() => localStorage.getItem("cal-hstop") === null));
 
@@ -91,11 +91,11 @@ try {
     for (let i = 0; i < 5; i++) { await tap("#title"); await sleep(120); }
     await sleep(600);
     const text = await page.evaluate(() => document.querySelector("#readout")?.innerText || "");
-    check("readout shows BUILD 2026-11-12g top clear", /BUILD 2026-11-12g top clear/.test(text));
+    check("readout shows the BUILD (top clear)", /BUILD 2026-11-12\w top clear/.test(text));
     check("readout shows the fit line", /fit auto gap 62 top clear\s+rules hs hsclear hsfill/.test(text), (text.match(/\nfit [^\n]*/) || [""])[0]);
     check("the Top button says clear", (await page.textContent("#readoutTop")) === "Top clear");
     check("readout shows html and body heights and the four units", /html h 874 body h 874\s+100vh \d+ 100dvh \d+ 100lvh \d+ 100svh \d+/.test(text), (text.match(/html h [^\n]*/) || [""])[0]);
-    check("readout shows where the + New task bar sits", /\.drop \d+\.\.874/.test(text));
+    check("readout shows the + New task bar is hidden on a phone", /\.drop 0\.\.0/.test(text), (text.match(/\.drop [^ ]*/) || [""])[0]);
     await tap("#readoutTop"); await sleep(200);
     g = await geo(page);
     check("Top switch: close moves the header right under the 62pt strip", !g.cls.includes("hsclear") && g.bar && g.bar[0] === 62 && g.strip === 62, `${g.cls} ${JSON.stringify(g.bar)} strip ${g.strip}`);
@@ -107,7 +107,7 @@ try {
     await tap("#readoutFill"); await sleep(200);   // auto > on: same gap here
     await tap("#readoutFill"); await sleep(200);   // on > off
     g = await geo(page);
-    check("Fill switch: off puts the page back to 812", !g.cls.includes("hsfill") && g.html === 812 && g.drop[1] === 812, `${g.cls} ${g.html}`);
+    check("Fill switch: off puts the page back to 812", !g.cls.includes("hsfill") && g.html === 812 && g.app[1] === 812, `${g.cls} ${g.html}`);
     const kept = await page.evaluate(() => [localStorage.getItem("cal-hsfill"), localStorage.getItem("cal-hstop")].join(" "));
     check("the switches are kept on the device", kept === "off close", kept);
     check("home screen app: no page errors", errors.length === 0, errors.join(" | "));
@@ -116,7 +116,7 @@ try {
   /* ---- the home screen app where iOS already fills the screen: no stretch, top still clear ---- */
   { const { ctx, page } = await open({ standalone: true, viewport: { width: 402, height: 874 }, isMobile: true, hasTouch: true, screen: { width: 402, height: 874 }, safe: { top: 62, bottom: 34 } });
     const g = await geo(page);
-    check("already full: no stretch, top clear", g.cls === "hs hsclear" && g.html === 874 && g.drop[1] === 874, `${g.cls} ${g.html} ${JSON.stringify(g.drop)}`);
+    check("already full: no stretch, top clear", g.cls === "hs hsclear" && g.html === 874 && g.app[1] === 874, `${g.cls} ${g.html} ${JSON.stringify(g.app)}`);
     await ctx.close(); }
 } finally {
   await browser.close(); server.kill();
