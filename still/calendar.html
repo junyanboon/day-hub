@@ -392,7 +392,8 @@ body.onpage .left,body.onpage .main,body.onpage .panel{display:none}
   .panel:has(.sheet) .ptabs{display:none}
   .panel:has(.sheet) .pbody{padding-top:4px;gap:12px}
   .sheet{display:flex;flex-direction:column;gap:12px}
-  .shead{display:grid;grid-template-columns:72px 1fr 72px;align-items:center;min-height:44px}
+  .shead{display:grid;grid-template-columns:72px 1fr 72px;align-items:center;min-height:44px;position:sticky;top:0;z-index:2;background:var(--bar)}
+  .panel.kb{border-radius:0}.panel.kb .grab{display:none}.panel.kb .pbody{padding-bottom:16px}
   .shead b{text-align:center;font-size:16px}
   .shead .icon{justify-self:start;width:44px;height:44px;font-size:19px;margin-left:-10px}
   .shead .btn.pri{justify-self:end;padding:8px 16px;font-size:15px}
@@ -1203,10 +1204,13 @@ async function saveSheet() {
    sits on top of the keyboard (visualViewport), and the box being typed in is scrolled into view. */
 function sheetFit() {
   const p = $("#panel"), vv = window.visualViewport;
-  const kb = vv && sheetOn() && p.querySelector(".sheet") ? Math.max(0, Math.round(innerHeight - vv.height - vv.offsetTop)) : 0;
-  p.style.bottom = kb > 60 ? kb + "px" : ""; p.style.maxHeight = kb > 60 ? Math.round(vv.height - 8) + "px" : "";
+  const up = !!(vv && sheetOn() && p.querySelector(".sheet") && innerHeight - vv.height > 60);
+  p.classList.toggle("kb", up);
+  /* pin the sheet to the part of the screen the keyboard leaves (iOS may also slide the page up by offsetTop) */
+  p.style.top = up ? Math.round(vv.offsetTop) + "px" : ""; p.style.bottom = up ? "auto" : "";
+  p.style.height = p.style.maxHeight = up ? Math.round(vv.height) + "px" : "";
   const a = document.activeElement;
-  if (kb > 60 && a && a.closest?.(".sheet") && a.matches("input,textarea")) a.scrollIntoView({ block: "nearest" });
+  if (up && a && a.closest?.(".sheet") && a.matches("input,textarea")) a.scrollIntoView({ block: "nearest" });
 }
 if (window.visualViewport) for (const n of ["resize", "scroll"]) visualViewport.addEventListener(n, sheetFit);
 async function saveEvent() {
@@ -1345,7 +1349,7 @@ function setup() {
     else if (d.sheet === "type") { const c = $('[data-v="types"]'); c.hidden = !c.hidden; }
     else if (t.id === "pX") { panel("now"); document.body.classList.remove("popen"); }
     else if (t.id === "pSave") saveEvent();
-    else if (t.id === "pDel") { const ev = S.ev; panel("now"); deleteEvent(ev); }
+    else if (t.id === "pDel") { const ev = S.ev, sh = !!(S.form && S.form.sheet); panel("now"); if (sh) document.body.classList.remove("popen"); deleteEvent(ev); }
     else if (t.id === "pAcc") acceptSugg(S.ev, { calId: $("#pCal").value, title: $("#pTitle").value.trim() || S.ev.title });
     else if (t.id === "pSkip") skipSugg(S.ev);
     else if (t.id === "pairBtn") { document.body.classList.remove("popen"); const v = $("#view"); v.classList.remove("snap"); v.innerHTML = pairHTML(); wirePair(); }

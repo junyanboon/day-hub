@@ -194,6 +194,30 @@ try {
     check("Save creates it: title, 3:00 to 4:00 Toronto, the location, Joint Plans", !!b && b.title === "Sheet test" && torontoHM(b.start) === "03:00" && Date.parse(b.end) - Date.parse(b.start) === 3600000 && b.location === "Home" && b.calId === "joint" && b.allDay === false, JSON.stringify(b));
     check("the new event is on the calendar", await page.evaluate(() => [...document.querySelectorAll(".ev")].some((e) => /Sheet test/.test(e.textContent))));
     check("no page errors (new event)", !errors.length, errors.join("; "));
+
+    /* the keyboard: the sheet sits in the part of the screen the keyboard leaves, its top bar still showing (Junyan, 2026-11-12) */
+    await page.evaluate(() => { const ev = eventsFor(today(), C.addDays(today(), 7)).find((e) => e.title === "Sheet test"); panel("event", ev); }); await sleep(400);
+    const kb = await page.evaluate(() => {
+      Object.defineProperty(window, "visualViewport", { configurable: true, value: { height: innerHeight - 340, offsetTop: 90, width: innerWidth, addEventListener() {} } });
+      const inside = (sel) => { const p = $("#panel").getBoundingClientRect(), r = document.querySelector(sel).getBoundingClientRect(); return r.top >= p.top - 1 && r.bottom <= p.bottom + 1; };
+      $("#pTitle").focus(); sheetFit();
+      const p = $("#panel").getBoundingClientRect(), a = [Math.round(p.top), Math.round(p.bottom), inside("#pSave"), inside("#pTitle")];
+      document.querySelector('.sheet [data-f="description"]').focus(); sheetFit();
+      a.push(inside('.sheet [data-f="description"]'), inside("#pSave"));
+      delete window.visualViewport; sheetFit(); a.push($("#panel").style.top === "" && !$("#panel").classList.contains("kb"));
+      return a;
+    });
+    const vh = await page.evaluate(() => innerHeight);
+    check("keyboard up: the sheet fills the space above it, from the top", kb[0] === 90 && kb[1] === 90 + vh - 340, kb.join(","));
+    check("keyboard up on the title: Save and the title show", kb[2] && kb[3], kb.join(","));
+    check("keyboard up on the notes: the notes box and Save show", kb[4] && kb[5], kb.join(","));
+    check("keyboard down: the sheet goes back to its place", kb[6], kb.join(","));
+
+    /* Delete event closes the sheet back to the calendar, not to the Now panel (Junyan, 2026-11-12) */
+    await page.evaluate(() => document.activeElement?.blur());
+    await tap(page, "#pDel"); await sleep(600);
+    check("Delete event sends a DELETE and goes back to the calendar", sent.some((x) => x.m === "DELETE") && await page.evaluate(() => S.tab === "now" && !document.body.classList.contains("popen")));
+    check("the deleted event is gone", await page.evaluate(() => ![...document.querySelectorAll(".ev")].some((e) => /Sheet test/.test(e.textContent))));
     await ctx.close();
   }
 
