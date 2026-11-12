@@ -218,7 +218,13 @@ test("the top and bottom bars are solid: no blur, no see-through backgrounds, no
     const body = css.slice(css.indexOf(sel)).split("}")[0];
     assert.match(body, /background:var\(--bar\)/, `${sel} background`);
   }
-  assert.match(css, /\.drop\{[^}]*background:var\(--bar\)/, "the New task bar on a phone");
+});
+
+test("a phone has no New task bar at the bottom; the computer keeps its box (Junyan, 2026-11-12, d1)", () => {
+  const phone = css.slice(css.indexOf("@media (max-width:760px){"));
+  assert.match(phone.slice(0, phone.indexOf("\n}")), /\.drop\{display:none\}/, "hidden on a phone");
+  assert.match(css, /\.drop\{position:fixed;left:calc\(var\(--rail\) \+ 14px\)/, "the computer's box stays bottom left");
+  assert.match(phone, /\.sc\{padding-bottom:env\(safe-area-inset-bottom,0px\)\}/, "the hours no longer leave room for the bar");
 });
 
 test("the look is put on before the page is drawn, with its theme colour", () => {

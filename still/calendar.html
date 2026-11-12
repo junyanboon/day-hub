@@ -13,7 +13,7 @@
 <meta name="apple-mobile-web-app-title" content="Calendar">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>Calendar</title>
-<script src="calendar-core.js?v=12"></script>
+<script src="calendar-core.js?v=13"></script>
 <script>
 /* The look saved on this device (the Look row in Settings; Studio when none) goes on here, before anything is drawn,
    so the page never opens in the wrong look first. Studio shows its day or night half by the sun in the calendar's
@@ -28,6 +28,8 @@
     document.querySelector('meta[name="theme-color"]').content = f.theme;
     document.querySelector('meta[name="color-scheme"]').content = f.scheme;
   } catch (e) {}
+  /* the hour height this phone last pinched to (slice 01), so the day opens at that height, never 56 first */
+  try { document.documentElement.style.setProperty("--H", CalCore.startHour(localStorage, matchMedia("(hover: none) and (pointer: coarse)").matches) + "px"); } catch (e) {}
 })();
 </script>
 <!--
@@ -270,6 +272,8 @@ body.touch .pane{overflow-x:clip}
 .ev.tall b .t{overflow:visible}
 .ev small{display:block;color:color-mix(in srgb,var(--c) var(--ev-time-p),var(--ev-time));font-size:11px;font-variant-numeric:tabular-nums;white-space:nowrap;margin-top:1px}
 .ev.sm{padding-top:0;padding-bottom:0;display:flex;align-items:center}.ev.sm small{display:none}.ev.sm b{flex:1}
+/* the card's time: the start (.t1), or on a phone's tall card start and end, "1:45 to 2:15 pm" (.t2, slice 01) */
+.ev small .t2{display:none}body.touch .ev.tall small .t1{display:none}body.touch .ev.tall small .t2{display:inline}body.touch .ev.tall small{white-space:normal}.ev small .z2{display:block;color:var(--k-travel)}
 .ev .h{position:absolute;left:0;right:0;bottom:0;height:8px;cursor:ns-resize}
 .ev.ro{cursor:default}.ev.dragging{box-shadow:inset 3px 0 0 var(--c),0 8px 24px color-mix(in srgb,var(--lift) calc(50% * var(--lift-k)),transparent);z-index:6;opacity:.95;transition:none}
 .ev.ghost{box-shadow:none;border:1.5px dashed var(--c);background:color-mix(in srgb,var(--c) 8%,var(--bg))}.ev.ghost b .t::before{content:"Suggested: ";color:var(--soft);font-weight:500}
@@ -371,18 +375,47 @@ body.onpage .left,body.onpage .main,body.onpage .panel{display:none}
   .app,body.nopanel .app{grid-template-columns:minmax(0,1fr)}
   .rail,.left{display:none}
   body.month .left{display:flex;position:fixed;top:calc(56px + max(0px,calc(env(safe-area-inset-top,0px) - var(--tuck))) - min(8px,env(safe-area-inset-top,0px)));left:8px;right:8px;z-index:25;border:1px solid var(--line);border-radius:16px;background:var(--raise);box-shadow:0 16px 40px color-mix(in srgb,var(--lift) calc(50% * var(--lift-k)),transparent);padding:14px;max-height:70%}
-  .drop{left:0;right:0;bottom:0;width:auto;z-index:20;border-top:1px solid var(--line);background:var(--bar);box-shadow:0 -6px 14px -8px var(--drop);padding:8px max(14px,env(safe-area-inset-right,0px)) calc(8px + env(safe-area-inset-bottom,0px)) max(14px,env(safe-area-inset-left,0px))}
-  .dropbox{min-height:44px;padding:8px 14px}
+  /* no New task bar on a phone (Junyan, 2026-11-12, d1): the keyboard pushed it up and it covered the hours; tap an empty hour instead */
+  .drop{display:none}
   .dropbox kbd,.wk,.nav,.wide{display:none}.onlyphone{display:initial}
   .bar{padding:calc(8px - min(8px,env(safe-area-inset-top,0px))) 10px 8px max(16px,env(safe-area-inset-left,0px));gap:6px;flex-wrap:nowrap;min-height:calc(52px - min(8px,env(safe-area-inset-top,0px)))}
   .bar h1{font-size:22px;cursor:pointer;overflow:hidden;text-overflow:ellipsis}.bar h1 span,.status{display:none}
   .seg button{padding:6px 0;width:30px;text-align:center}
   .bar .btn{padding:6px 11px}
   #panelBtn{width:36px;height:36px;padding:0;font-size:18px}
-  .sc{padding-bottom:calc(64px + env(safe-area-inset-bottom,0px))}
+  .sc{padding-bottom:env(safe-area-inset-bottom,0px)}
   .panel{top:auto;left:0;width:auto;max-height:78%;border-radius:22px 22px 0 0;border:1px solid var(--line);transform:translateY(105%);padding-top:0;bottom:0}
   .grab{display:block;width:40px;height:4px;border-radius:2px;background:var(--raise2);margin:8px auto 0;flex:none}
   .pbody{min-width:0;padding-bottom:calc(84px + env(safe-area-inset-bottom,0px))}
+  /* the event sheet: one-line rows (slice 02). Every box in it is 16px or more so iOS never zooms (PR 133). The time
+     and day boxes lie unseen over their row text, so a tap opens the phone's own wheels and the row reads "1:45 PM". */
+  .panel:has(.sheet) .ptabs{display:none}
+  .panel:has(.sheet) .pbody{padding-top:4px;gap:12px;padding-bottom:calc(16px + env(safe-area-inset-bottom,0px))}
+  .sheet{display:flex;flex-direction:column;gap:12px}
+  .shead{display:grid;grid-template-columns:72px 1fr 72px;align-items:center;min-height:44px;position:sticky;top:0;z-index:2;background:var(--bar)}
+  .panel.kb{border-radius:0}.panel.kb .grab{display:none}.panel.kb .pbody{padding-bottom:16px}
+  .shead b{text-align:center;font-size:16px}
+  .shead .icon{justify-self:start;width:44px;height:44px;font-size:19px;margin-left:-10px}
+  .shead .btn.pri{justify-self:end;padding:8px 16px;font-size:15px}
+  .sheet .tinput{width:100%;background:none;border:0;border-radius:0;padding:4px 0 8px;border-bottom:1px solid var(--line)}
+  .rows{display:flex;flex-direction:column;background:var(--raise);border:1px solid var(--line);border-radius:14px;overflow:hidden;flex:none}
+  .srow{position:relative;display:flex;align-items:center;gap:12px;width:100%;min-height:46px;padding:0 14px;margin:0;border:0;border-top:1px solid var(--line);background:none;color:var(--ink);font-size:15px;text-align:left}
+  .rows>.srow:first-child{border-top:0}
+  .srow>span{width:76px;flex:none;color:var(--soft)}
+  .srow output{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .srow i{font-style:normal;color:var(--faint);font-size:18px}
+  .srow .ov{position:absolute;inset:0;width:100%;height:100%;opacity:0;font-size:16px;border:0;margin:0;padding:0;-webkit-appearance:none;appearance:none}
+  .srow .tx{flex:1;min-width:0;background:none;border:0;padding:13px 0;font-size:16px;line-height:1.3;color:var(--ink);outline:0}
+  .srow textarea.tx{resize:none;font-family:inherit;min-height:46px;max-height:40vh;overflow-y:auto}
+  .srow .tx::placeholder{color:var(--faint)}.srow .tx:disabled::placeholder{color:transparent}
+  .srow.sub{min-height:0;padding:0 14px 10px 102px;border-top:0;margin-top:-6px;font-size:12px;color:var(--faint)}
+  .snotes{flex:1;min-width:0;padding:13px 0;white-space:pre-wrap;overflow-wrap:anywhere;color:var(--soft);max-height:40vh;overflow-y:auto}
+  .srow .tog{appearance:none;-webkit-appearance:none;margin:0 0 0 auto;width:50px;height:30px;border-radius:15px;background:var(--raise2);border:1px solid var(--line);position:relative;flex:none;transition:background .15s}
+  .srow .tog::before{content:"";position:absolute;top:2px;left:2px;width:24px;height:24px;border-radius:50%;background:var(--ink);transition:transform .15s}
+  .srow .tog:checked{background:var(--accent)}.srow .tog:checked::before{transform:translateX(20px);background:var(--bg)}
+  .srow.del{color:var(--red);border-top:0}
+  .srow:disabled,.srow .tx:disabled,.srow .tog:disabled{opacity:1;color:inherit;-webkit-text-fill-color:currentColor}
+  .rows>.chips{padding:4px 14px 12px}
   .dn{font-size:13px}
   div.month{grid-auto-rows:minmax(92px,1fr)}.mday{padding:4px 3px}.mday .p{font-size:10.5px;padding:1px}.mday .p .meta{display:none}
   .page{grid-column:1;padding:16px max(16px,env(safe-area-inset-right,0px)) 96px max(16px,env(safe-area-inset-left,0px))}
@@ -443,7 +476,7 @@ html.hsfill .modal{bottom:calc(-1 * var(--hsgap,0px))}
 "use strict";
 const C = window.CalCore, qs = new URLSearchParams(location.search);
 const API = qs.get("api") || "https://still.srv1948070.hstgr.cloud";
-const H = 56, SNAP = 15, WIN = 36, BACK = 14;
+const SNAP = 15, WIN = 36, BACK = 14;
 /** A phone or tablet: the finger moves days through wireSwipe (never native sideways scrolling). */
 const TOUCH = matchMedia("(hover: none) and (pointer: coarse)").matches;
 /** Wide enough for Day Quest's desktop pages (quest-trips.js draws Trips from 768 px; under that it does nothing). */
@@ -455,7 +488,7 @@ if (TOUCH) for (const g of ["gesturestart", "gesturechange"]) document.addEventL
    which shows this build, the phone's answers and a log of every day change with its cause. Until then CalHook.on is
    null and diag() does nothing. BUILD names this copy of the page, so a screenshot proves which copy ran: change it on
    every change to this page or calendar-readout.js (the date plus a letter). */
-const BUILD = "2026-11-12g top clear";
+const BUILD = "2026-11-12j top clear, pinch and sheet";
 const CalHook = window.CalHook = { BUILD, on: null };
 const diag = (kind, msg) => { if (CalHook.on) CalHook.on(kind, msg); };
 /* The iPhone home screen app's fit (2026-11-12): html.hs in a home screen app on touch, html.hsfill and --hsgap when
@@ -504,7 +537,8 @@ const CACHE_KEY = "cal-app-cache-v1";
 const S = { tz: store.get("cal-tz") || DEVICE_TZ, tz2: store.get("cal-tz2") || "", n: store.get("cal-n") || "3",
   cur: null, win0: null, mini: null, miniLock: false, cals: [], hidden: new Set(JSON.parse(store.get("cal-hidden") || "[]")),
   months: {}, sugg: [], loading: new Set(), tab: "now", ev: null, form: null, page: "cal", rail: store.get("cal-rail") !== "0", top: null,
-  look: C.lookId(store.get("cal-look")) };
+  look: C.lookId(store.get("cal-look")),
+  h: C.startHour({ getItem: store.get }, TOUCH) };   // the hour height in px: 56 on a desktop; a phone's own pinched height (slice 01)
 S.n = S.n === "m" ? "m" : +S.n || 3;
 { let cur = null;   // every write to the shown day goes past the readout, with the call stack that made it
   Object.defineProperty(S, "cur", { enumerable: true, get: () => cur,
@@ -675,7 +709,11 @@ function head() {
 }
 
 /* ---------- main ---------- */
+/** A pinch in progress (wirePinch), its queued frame, a render() it held back, and the end of the quiet time after it
+    when a click from its fingers is dropped. */
+let pinch = null, pinchFrame = 0, pinchRender = false, pinchQuiet = 0;
 function render() {
+  if (pinch) { pinchRender = true; return; }   // never rebuild under two fingers; the pinch's end draws it (slice 01)
   head(); renderSide(); renderRail();
   const v = $("#view");
   if (!questKey()) { v.classList.remove("snap"); v.innerHTML = pairHTML(); wirePair(); return; }
@@ -689,13 +727,14 @@ const nowText = (min) => C.hm(min).replace(/ [ap]m$/, "").replace(/^(\d+)$/, "$1
 const two = () => !!S.tz2 && S.tz2 !== S.tz;
 let dw = 200, stripDays = [];
 function strip(v) {
-  const t = today(), nowW = C.wall(Date.now(), S.tz), nowY = nowW.min / 60 * H;
+  const t = today(), nowW = C.wall(Date.now(), S.tz), nowY = atMin(nowW.min);
+  v.style.setProperty("--H", S.h + "px");
   const days = stripDays = Array.from({ length: WIN }, (_, i) => C.addDays(S.win0, i));
   const evs = eventsFor(days[0], days[WIN - 1]), gh = ghosts();
   const allDay = [...evs.filter((e) => e.allDay), ...gh.filter((g) => g.allDay)];
   const timed = [...evs.filter((e) => !e.allDay), ...gh.filter((g) => !g.allDay)];
-  const hours = (tz) => { let s = ""; for (let h = 1; h < 24; h++) s += `<span style="top:${h * H}px">${C.hm(C.wall(C.instant(S.cur, h * 60, S.tz), tz).min)}</span>`; return s; };
-  let h = `<div class="gut"><div><div class="corner" title="Times in ${esc(zoneName(S.tz))}"><span>${esc(zoneName(S.tz))}</span></div><div class="hours">${hours(S.tz)}<span class="nowlbl" id="nowlbl" style="top:${nowY}px" ${days.includes(t) ? "" : "hidden"}>${nowText(nowW.min)}</span></div></div>
+  const hours = (tz) => { let s = ""; for (let h = 1; h < 24; h++) s += `<span style="top:calc(${h} * var(--H))">${C.hm(C.wall(C.instant(S.cur, h * 60, S.tz), tz).min)}</span>`; return s; };
+  let h = `<div class="gut"><div><div class="corner" title="Times in ${esc(zoneName(S.tz))}"><span>${esc(zoneName(S.tz))}</span></div><div class="hours">${hours(S.tz)}<span class="nowlbl" id="nowlbl" style="top:${nowY}" ${days.includes(t) ? "" : "hidden"}>${nowText(nowW.min)}</span></div></div>
     ${two() ? `<div class="second"><div class="corner" title="Times in ${esc(zoneName(S.tz2))}"><span>${esc(zoneName(S.tz2))}</span></div><div class="hours">${hours(S.tz2)}</div></div>` : ""}</div>`;
   for (const k of days) {
     const ad = allDay.filter((a) => C.coversDay(a, k)), ps = [], staff = [];
@@ -706,23 +745,23 @@ function strip(v) {
       <div class="dn"><span data-open="${k}">${DOW[C.dowOf(k)]} <b>${+k.slice(8)}</b></span>${staff.length ? `<button class="keys" data-staff="${k}" title="Studio shifts">🔑 ${staff.length}</button>` : ""}</div>
       <div class="shape" title="The shape of the day, 6 am to 10 pm">${shape}</div>
       ${ad.length <= 2 ? ad.map(pill).join("") : pill(ad[0]) + `<button class="pill more" data-allday="${k}">${ad.length - 1} more</button>`}</header><div class="col" data-day="${k}">`;
-    if (k === t) h += `<div class="shade" id="shade" style="height:${nowY}px"></div>`;
+    if (k === t) h += `<div class="shade" id="shade" style="height:${nowY}"></div>`;
     const rr = staff.length ? 22 : 4;
     for (const p of C.layout(ps)) {
-      const e = p.ev, cal = calOf(e.calId), ro = !e.ghost && !cal.writable, ht = Math.max((p.bot - p.top) / 60 * H, 19);
-      h += `<div class="ev k-${e.k} ${ht < 36 ? "sm" : ht >= 54 ? "tall" : ""} ${e.ghost ? "ghost" : ""} ${ro ? "ro" : ""} ${k === t && p.bot <= nowW.min ? "done" : ""} ${S.ev && keyOf(S.ev) === keyOf(e) ? "on" : ""}" role="button" tabindex="0" data-key="${esc(keyOf(e))}"
-        style="top:${p.top / 60 * H}px;height:${ht - 2}px;left:calc((100% - ${rr}px) * ${p.col / p.cols} + 2px);width:calc((100% - ${rr}px) * ${1 / p.cols} - 3px)" title="${esc(e.title)} · ${esc(cal.name)}">
-        <b>${KICON[e.k] && !e.title.includes(KICON[e.k]) ? `<span class="ei" aria-hidden="true">${KICON[e.k]}</span>` : ""}<span class="t">${esc(e.title)}</span></b><small>${C.hm(C.wall(e.s, S.tz).min)}${two() ? " · " + C.hm(C.wall(e.s, S.tz2).min) : ""}</small>${ro || e.ghost ? "" : '<span class="h"></span>'}</div>`;
+      const e = p.ev, cal = calOf(e.calId), ro = !e.ghost && !cal.writable, m = p.bot - p.top;
+      h += `<div class="ev k-${e.k} ${C.cardFit(m, S.h)} ${e.ghost ? "ghost" : ""} ${ro ? "ro" : ""} ${k === t && p.bot <= nowW.min ? "done" : ""} ${S.ev && keyOf(S.ev) === keyOf(e) ? "on" : ""}" role="button" tabindex="0" data-key="${esc(keyOf(e))}" data-m="${m}"
+        style="top:${atMin(p.top)};height:calc(max(${m / 60} * var(--H), 19px) - 2px);left:calc((100% - ${rr}px) * ${p.col / p.cols} + 2px);width:calc((100% - ${rr}px) * ${1 / p.cols} - 3px)" title="${esc(e.title)} · ${esc(cal.name)}">
+        <b>${KICON[e.k] && !e.title.includes(KICON[e.k]) ? `<span class="ei" aria-hidden="true">${KICON[e.k]}</span>` : ""}<span class="t">${esc(e.title)}</span></b><small><span class="t1">${C.hm(C.wall(e.s, S.tz).min)}${two() ? " · " + C.hm(C.wall(e.s, S.tz2).min) : ""}</span><span class="t2">${cardTimeOf(e, S.tz)}${two() ? `<span class="z2">${cardTimeOf(e, S.tz2)}</span>` : ""}</span></small>${ro || e.ghost ? "" : '<span class="h"></span>'}</div>`;
     }
-    for (const p of staff) h += `<button class="pip" data-key="${esc(p.id)}" title="${esc(p.ev.title)} · ${C.hm(p.top)}" style="top:${p.top / 60 * H}px;height:${Math.max(16, (p.bot - p.top) / 60 * H - 2)}px">${staffIcon(p.ev.title)}</button>`;
-    if (k === t) h += `<div class="nowline" id="nowline" style="top:${nowY}px"></div>`;
+    for (const p of staff) h += `<button class="pip" data-key="${esc(p.id)}" title="${esc(p.ev.title)} · ${C.hm(p.top)}" style="top:${atMin(p.top)};height:max(16px, calc(${(p.bot - p.top) / 60} * var(--H) - 2px))">${staffIcon(p.ev.title)}</button>`;
+    if (k === t) h += `<div class="nowline" id="nowline" style="top:${nowY}"></div>`;
     h += "</div></section>";
   }
   const keepTop = v.querySelector(".strip") ? v.scrollTop : S.top;
   v.classList.add("snap");
   v.innerHTML = `<div class="pane"><div class="strip" id="strip">${h}</div></div>`;
   size();
-  v.scrollTop = keepTop ?? Math.max(0, (days.includes(t) ? nowY : 8 * H) - 220);
+  v.scrollTop = keepTop ?? Math.max(0, (days.includes(t) ? nowW.min / 60 : 8) * S.h - 220);
   wireStrip(v);
 }
 function size() {
@@ -732,6 +771,7 @@ function size() {
   dw = (v.clientWidth - g) / S.n; st.style.setProperty("--dw", dw + "px");
   st.classList.toggle("narrow", dw < 72);
   fitHead();
+  if (TOUCH && !pinch) { const lo = hourLow(v); if (S.h < lo) setHour(lo, $$("#strip .ev[data-m]")); }   // a taller screen (a turn): the day never fits loosely
   if (TOUCH) slideTo(dayDiff(S.cur, S.win0) * dw); else v.scrollLeft = dayDiff(S.cur, S.win0) * dw;
 }
 /** The day header is as tall as the shown days need: one line, plus a row per all-day event (at most 2). */
@@ -742,10 +782,10 @@ function fitHead() {
   v.style.setProperty("--hh", ($("#strip")?.classList.contains("narrow") ? 52 : 46) + rows * 25 + "px");
 }
 function tickNow() {
-  const w = C.wall(Date.now(), S.tz), y = w.min / 60 * H;
-  for (const id of ["nowline", "nowlbl"]) { const el = document.getElementById(id); if (el) el.style.top = y + "px"; }
+  const w = C.wall(Date.now(), S.tz), y = atMin(w.min);
+  for (const id of ["nowline", "nowlbl"]) { const el = document.getElementById(id); if (el) el.style.top = y; }
   const l = $("#nowlbl"); if (l) l.textContent = nowText(w.min);
-  const sh = $("#shade"); if (sh) sh.style.height = y + "px";
+  const sh = $("#shade"); if (sh) sh.style.height = y;
 }
 const keyOf = (e) => (e.ghost ? "g|" : "e|") + e.calId + "|" + e.id;
 function findByKey(key) {
@@ -754,7 +794,7 @@ function findByKey(key) {
   for (const m of Object.values(S.months)) { const e = (m.events || []).find((x) => x.id === id && x.calId === calId); if (e) return norm(e); }
   return null;
 }
-const yToMin = (col, clientY) => Math.max(0, Math.min(1440 - SNAP, Math.floor((clientY - col.getBoundingClientRect().top) / H * 60 / SNAP) * SNAP));
+const yToMin = (col, clientY) => Math.max(0, Math.min(1440 - SNAP, Math.floor((clientY - col.getBoundingClientRect().top) / S.h * 60 / SNAP) * SNAP));
 /** Move an instant by whole days on the wall (DST safe) plus minutes. */
 function shiftWall(ms, dDay, dMin) { const w = C.wall(ms, S.tz); return C.instant(C.addDays(w.day, dDay), w.min, S.tz) + dMin * 60000; }
 
@@ -820,10 +860,10 @@ function wireStrip(v) {
         if (Math.abs(m.clientY - sy) > 4 || Math.abs(m.clientX - sx) > 4) moved = true;
         if (!moved) return;
         dragging = true; el.classList.add("dragging");
-        dMin = Math.round((m.clientY - sy) / H * 60 / SNAP) * SNAP;
+        dMin = Math.round((m.clientY - sy) / S.h * 60 / SNAP) * SNAP;
         dDay = S.n > 1 && !resize ? Math.round((m.clientX - sx) / dw) : 0;
-        if (resize) { const len = Math.max(SNAP, (ev.e - ev.s) / 60000 + dMin); el.style.height = (len / 60 * H - 2) + "px"; el.querySelector("small").textContent = C.dur(len); }
-        else { el.style.transform = `translate(${dDay * dw}px,${dMin / 60 * H}px)`; el.querySelector("small").textContent = C.hm(C.wall(shiftWall(ev.s, dDay, dMin), S.tz).min); }
+        if (resize) { const len = Math.max(SNAP, (ev.e - ev.s) / 60000 + dMin); el.style.height = (len / 60 * S.h - 2) + "px"; el.querySelector("small").textContent = C.dur(len); }
+        else { el.style.transform = `translate(${dDay * dw}px,${dMin / 60 * S.h}px)`; el.querySelector("small").textContent = C.hm(C.wall(shiftWall(ev.s, dDay, dMin), S.tz).min); }
       };
       el.onpointerup = () => {
         el.onpointermove = el.onpointerup = null; dragging = false;
@@ -842,7 +882,7 @@ function wireStrip(v) {
       const min = Math.floor(yToMin(col, e.clientY) / 30) * 30, s = C.instant(col.dataset.day, min, S.tz), cal = homeCal();
       if (!cal) { toast("No calendar you can write to", { bad: true }); return; }
       clearDraft();
-      const el = document.createElement("div"); el.className = "ev draft k-other"; el.style.cssText = `top:${min / 60 * H}px;height:${H - 2}px;left:2px;right:3px`;
+      const el = document.createElement("div"); el.className = "ev draft k-other"; el.style.cssText = `top:${atMin(min)};height:calc(var(--H) - 2px);left:2px;right:3px`;
       el.innerHTML = `<b><span class="t">New event</span></b><small>${C.hm(min)}</small>`; col.appendChild(el);
       panel("event", { isNew: true, id: "draft", calId: cal.id, title: "", s, e: s + 3600000, start: new Date(s).toISOString(), end: new Date(s + 3600000).toISOString(), k: "other" });
       $("#pTitle")?.focus();
@@ -869,6 +909,7 @@ function wireSwipe(v) {
   let g = null;
   const at = (e) => e.touches[0] || e.changedTouches[0];
   v.addEventListener("touchstart", (e) => {
+    if (g && g.lock === "x") goTo(g.cur0);   // a second finger mid swipe: the days slide back to where they were (slice 01)
     g = null;
     if (!TOUCH || S.page !== "cal" || S.n === "m" || !$("#strip") || e.touches.length !== 1 || swipeBlocked(e.target, v)) return;
     const t = at(e);
@@ -910,6 +951,72 @@ function wireSwipe(v) {
   v.addEventListener("touchend", swipeEnd);
   v.addEventListener("touchcancel", swipeEnd);
 }
+/* ---------- pinch stretches the hours (slice 01; Junyan, 2026-11-12, d1: "all I care about is having a very smooth
+   functional exprience") ----------
+   Two fingers on the day grid stretch or squeeze the hour rows, from the whole day on one screen up to 168px an hour.
+   Every time-based place in the strip (hour labels, grid lines, cards, shift pips, the now line and pill, the past
+   shade, the draft card) is a calc() on one CSS variable, --H on #view, so a pinch writes that one value, the cards'
+   sm and tall classes (each card carries its minutes in data-m) and the scroll position, at most once a frame, and
+   never rebuilds the strip. touch-action stays pan-y on the view (manipulation on the page): the browser never pinch
+   zooms there, and the pinch's touchmoves are cancelled so two fingers do not also scroll. When iOS will not let a
+   touchmove be cancelled (a scroll still gliding as the second finger lands), the pinch still runs and its scroll
+   write wins each frame. Lifting the fingers keeps the height on this phone (cal-hour) and opens nothing. */
+/** A time of day as a CSS length on the live hour height. */
+const atMin = (min) => `calc(${min / 60} * var(--H))`;
+/** A phone's tall card time in zone tz, "1:45 to 2:15 pm". */
+function cardTimeOf(e, tz) { return C.cardTime(C.wall(e.s, tz).min, C.wall(e.e, tz).min); }
+/** The day header's height as fitHead last set it (--hh on the view). */
+const headH = (v) => parseFloat(getComputedStyle(v).getPropertyValue("--hh")) || 46;
+/** The smallest hour height on this screen: the 24 hours fit between the day header and the bottom bar. */
+function hourLow(v) {
+  const cs = getComputedStyle(v);
+  return C.hourMin(v.clientHeight, headH(v), parseFloat(cs.paddingBottom) || 0);
+}
+/** Draw the hours `h` px tall without a rebuild: one variable, and each card's detail class only where it changes. */
+function setHour(h, cards) {
+  S.h = h; $("#view").style.setProperty("--H", h + "px");
+  for (const el of cards) { const f = C.cardFit(+el.dataset.m, h); el.classList.toggle("sm", f === "sm"); el.classList.toggle("tall", f === "tall"); }
+}
+function wirePinch(v) {
+  if (!TOUCH) return;
+  const fingers = (e) => { const [a, b] = e.touches; return { y: (a.clientY + b.clientY) / 2, d: Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY) }; };
+  function pinchStep() {
+    pinchFrame = 0; const p = pinch; if (!p) return;
+    const h = C.pinchHeight(p.h0, p.d0, p.d, p.lo, C.HOUR.max);
+    if (h !== S.h) setHour(h, p.cards);
+    v.scrollTop = C.pinchScroll(p.minute, p.y, p.head, h, p.sh0 + 24 * (h - p.h0) - p.ch);
+  }
+  v.addEventListener("touchstart", function pinchStart(e) {
+    if (pinch || e.touches.length !== 2 || S.page !== "cal" || S.n === "m" || !$("#strip")) return;
+    if (![...e.touches].every((t) => t.target.closest?.("#strip"))) return;
+    const m = fingers(e), top = v.getBoundingClientRect().top, head = headH(v);
+    clearTimeout(settle);   // no edge rebuild under the fingers; the pinch's end lays the strip again if one was due
+    pinch = { d0: m.d, d: m.d, h0: S.h, top, head, y: m.y - top, lo: Math.min(S.h, hourLow(v)), sh0: v.scrollHeight, ch: v.clientHeight,
+      minute: C.pinchMinute(v.scrollTop, m.y - top, head, S.h), cards: [...v.querySelectorAll("#strip .ev[data-m]")] };
+    diag("pinch", `start h ${Math.round(S.h)} at ${C.hm(Math.round(pinch.minute))}`);
+  }, { passive: true });
+  v.addEventListener("touchmove", function pinchMove(e) {
+    if (!pinch) return;
+    if (e.cancelable) e.preventDefault();   // two fingers stretch the hours; they never also scroll
+    if (e.touches.length < 2) return;       // one finger lifted: the height holds until the last one lifts
+    const m = fingers(e); pinch.d = m.d; pinch.y = m.y - pinch.top;
+    if (!pinchFrame) pinchFrame = requestAnimationFrame(pinchStep);
+  }, { passive: false });
+  const pinchEnd = (e) => {
+    if (!pinch || e.touches.length) return;
+    if (pinchFrame) { cancelAnimationFrame(pinchFrame); pinchStep(); }
+    diag("pinch", `end h ${Math.round(S.h)}`);
+    pinch = null; pinchQuiet = performance.now() + 450; S.top = v.scrollTop;
+    store.set("cal-hour", String(Math.round(S.h * 10) / 10));
+    if (pinchRender) { pinchRender = false; render(); }
+    const at = dayDiff(S.cur, S.win0);
+    if (at < 4 || at > WIN - S.n - 4) goTo(S.cur, false);   // an edge rebuild the pinch held back
+  };
+  v.addEventListener("touchend", pinchEnd);
+  v.addEventListener("touchcancel", pinchEnd);
+  // a pinch never opens an event or starts a new one: a click from its fingers is dropped
+  v.addEventListener("click", (e) => { if (pinch || performance.now() < pinchQuiet) { e.stopPropagation(); e.preventDefault(); } }, true);
+}
 function goTo(day, smooth = true) {
   const v = $("#view"), i = dayDiff(day, S.win0);
   if (TOUCH && S.n !== "m" && $("#strip") && i >= 0 && i <= WIN - S.n) {   // a phone: the day is set here, then the strip slides to it
@@ -941,7 +1048,7 @@ function setN(n) {
 function step(d) { if (S.n === "m") { S.cur = C.addMonths(S.cur, d); S.miniLock = false; render(); refresh(); } else goTo(C.addDays(S.cur, d * S.n)); }
 function goToday() {
   const t = today(); goTo(S.n === 7 ? C.weekStart(t) : S.n === "m" ? t : t);
-  if (S.n !== "m") $("#view").scrollTo({ top: Math.max(0, C.wall(Date.now(), S.tz).min / 60 * H - 220), behavior: "smooth" });
+  if (S.n !== "m") $("#view").scrollTo({ top: Math.max(0, C.wall(Date.now(), S.tz).min / 60 * S.h - 220), behavior: "smooth" });
 }
 function monthView(v) {
   const first = S.cur.slice(0, 8) + "01", s = C.weekStart(first), t = today(), mo = first.slice(5, 7);
@@ -992,6 +1099,8 @@ function pNow() {
     ${sug.length ? `<div><p class="lbl">Suggestions (${sug.length})</p>${sug.map((g) => `<div class="sugg"><b>${esc(g.title)}</b><span class="meta">${esc(whenText(g))} · from ${esc(g.by)}</span>${g.why ? `<span class="meta">${esc(g.why)}</span>` : ""}<div class="r"><button class="btn pri" data-acc="${esc(g.id)}">Accept</button><button class="btn" data-skip="${esc(g.id)}">Skip</button><button class="btn" data-go="${esc(g.id)}">Show</button></div></div>`).join("")}</div>` : ""}`;
 }
 function pEvent(ev) {
+  if (sheetOn()) return pSheet(ev);
+  if (S.form && S.form.sheet) S.form = null;
   const isNew = !!ev.isNew, cal = calOf(ev.calId), canEdit = ev.ghost || isNew || cal.writable;
   const len = ev.allDay ? 0 : Math.round((ev.e - ev.s) / 60000);
   const durs = [...new Set([15, 30, 45, 60, 90, 120, 180, len])].filter(Boolean).sort((a, b) => a - b);
@@ -1011,7 +1120,101 @@ function pEvent(ev) {
       : `${isNew || !canEdit ? "" : '<button class="btn del" id="pDel">Delete</button>'}${ev.htmlLink ? `<a class="meta" href="${esc(ev.htmlLink)}" target="_blank" rel="noopener">Open in Google</a>` : ""}<span class="spacer"></span>${canEdit ? '<button class="btn pri" id="pSave">Save</button>' : ""}`}</div>
     ${!isNew && !ev.ghost && TYPES.includes(ev.k) ? `<button class="btn k-${ev.k}" data-page="${ev.k}" style="border-color:color-mix(in srgb,var(--c) 50%,transparent)">${esc(WIDE.matches && C.pageLink(ev.k) ? C.pageLink(ev.k).label : `Open the ${KNAME[ev.k]} page`)} &#8250;</button>` : ""}`;
 }
+/* ---------- the phone's event sheet (slice 02, Junyan 2026-11-12, d2): one-line rows, 760px wide or less ----------
+   S.form holds the rows (calendar-core.js sheetForm); a change to a row updates S.form and repaints only the row texts,
+   so the box being typed in keeps its focus. Save sends only what changed (sheetPatch). Desktop keeps pEvent above. */
+const sheetOn = () => matchMedia("(max-width: 760px)").matches;
+function pSheet(ev) {
+  const isNew = !!ev.isNew, cal = calOf(ev.calId), canEdit = ev.ghost || isNew || cal.writable;
+  if (!S.form || !S.form.sheet) S.form = C.sheetForm(ev, S.tz);
+  const f = S.form, dis = canEdit && !ev.ghost ? "" : "disabled", guess = C.kindOf({ title: ev.title, calName: cal.name });
+  const writable = S.cals.filter((c) => c.writable || c.id === ev.calId);
+  const rich = C.notesRich(ev.description || "");
+  const row = (lbl, inner, x = "") => `<label class="srow" ${x}><span>${lbl}</span>${inner}</label>`;
+  const tx = sheetTexts(f, ev), out = (k) => `<output data-v="${k}">${esc(tx[k])}</output>`;
+  const pick = (type, key, lbl) => `${out(key)}<input class="ov" type="${type}" data-f="${key}" value="${esc(f[key])}" aria-label="${lbl}" ${dis}>`;
+  return `<div class="sheet">
+    <div class="shead"><button class="icon" id="pX" aria-label="Close">&#10005;</button><b>Event</b>${canEdit && !ev.ghost ? '<button class="btn pri" id="pSave">Save</button>' : "<span></span>"}</div>
+    ${ev.ghost ? `<div class="meta">Suggested by ${esc(ev.by)}${ev.why ? ": " + esc(ev.why) : ""}</div>` : ""}
+    <input class="tinput" id="pTitle" value="${esc(f.title)}" placeholder="Title" aria-label="Title" autocomplete="off" ${canEdit ? "" : "disabled"}>
+    <div class="rows">
+      ${row("Day", pick("date", "day", "Day"))}
+      ${row("Starts", pick("time", "start", "Starts"), `data-timed ${f.allDay ? "hidden" : ""}`)}
+      ${row("Ends", pick("time", "end", "Ends"), `data-timed ${f.allDay ? "hidden" : ""}`)}
+      ${two() ? `<div class="srow sub" data-v="tz2" data-timed ${f.allDay ? "hidden" : ""}>${esc(tx.tz2)}</div>` : ""}
+      ${row("Ends", pick("date", "endDay", "Last day"), `data-dayrow ${f.allDay ? "" : "hidden"}`)}
+      ${row("All-day", `<input class="tog" type="checkbox" role="switch" data-f="allDay" ${f.allDay ? "checked" : ""} aria-label="All-day" ${dis}>`)}
+      ${row("Location", `<input class="tx" type="text" data-f="location" value="${esc(f.location)}" placeholder="Add location" autocomplete="off" ${dis}>`)}
+      ${rich ? `<div class="srow"><span>Notes</span><div class="snotes">${esc(C.notesText(ev.description))}</div></div>`
+        : row("Notes", `<textarea class="tx" data-f="description" rows="${Math.min(8, f.description.split("\n").length)}" placeholder="Add notes" ${dis}>${esc(f.description)}</textarea>`)}
+      ${ev.ghost ? "" : `<button class="srow" data-sheet="type" ${dis}><span>Type</span>${out("kind")}<i>&#8250;</i></button>
+      <div class="chips" data-v="types" hidden><button class="chip k-${guess}" data-kind="" aria-pressed="${!f.kind}">Guess: ${esc(KNAME[guess])}</button>${C.KINDS.map(([k, n]) => `<button class="chip k-${k}" data-kind="${k}" aria-pressed="${f.kind === k}">${KICON[k] ? KICON[k] + " " : ""}${n}</button>`).join("")}</div>`}
+      ${row("Calendar", `${out("cal")}<i>&#8250;</i><select class="ov" id="pCal" aria-label="Calendar" ${canEdit ? "" : "disabled"}>${writable.map((c) => `<option value="${esc(c.id)}" ${c.id === f.calId ? "selected" : ""}>${esc(c.name)}</option>`).join("")}</select>`)}
+    </div>
+    ${isNew || !canEdit || ev.ghost ? "" : '<div class="rows"><button class="srow del" id="pDel">Delete event</button></div>'}
+    ${canEdit ? "" : `<div class="meta">${esc(cal.name)} is read-only here.</div>`}
+    ${ev.ghost ? `<div class="r"><button class="btn" id="pSkip">Skip</button><span class="spacer"></span><button class="btn pri" id="pAcc">Accept</button></div>` : ""}
+    ${ev.htmlLink ? `<a class="meta" href="${esc(ev.htmlLink)}" target="_blank" rel="noopener">Open in Google</a>` : ""}
+    ${!isNew && !ev.ghost && TYPES.includes(ev.k) ? `<button class="btn k-${ev.k}" data-page="${ev.k}" style="border-color:color-mix(in srgb,var(--c) 50%,transparent)">${esc(WIDE.matches && C.pageLink(ev.k) ? C.pageLink(ev.k).label : `Open the ${KNAME[ev.k]} page`)} &#8250;</button>` : ""}
+  </div>`;
+}
+/** The words in the sheet's rows for a form: "Fri, Nov 13", "1:45 PM", an end on a later day names that day. */
+function sheetTexts(f, ev) {
+  const endDay = C.addDays(f.day, Math.floor((C.toMin(f.start) + C.sheetLength(f)) / 1440)), w = C.sheetWhen(f, S.tz);
+  return { day: C.dayText(f.day), start: C.clock(C.toMin(f.start)), endDay: C.dayText(f.endDay),
+    end: C.clock(C.toMin(f.end)) + (endDay !== f.day ? " · " + C.dayText(endDay) : ""),
+    tz2: two() && !f.allDay ? `${zoneName(S.tz2)}: ${C.hm(C.wall(Date.parse(w.start), S.tz2).min)} to ${C.hm(C.wall(Date.parse(w.end), S.tz2).min)}` : "",
+    kind: KNAME[f.kind || C.kindOf({ title: ev.title, calName: calOf(ev.calId).name })], cal: calOf(f.calId).name };
+}
+function sheetPaint() {
+  const f = S.form, b = $("#pbody"); if (!f || !f.sheet || !b.querySelector(".sheet")) return;
+  const tx = sheetTexts(f, S.ev);
+  for (const o of b.querySelectorAll("[data-v]")) if (o.dataset.v in tx) o.textContent = tx[o.dataset.v];
+  for (const el of b.querySelectorAll(".ov[data-f]")) if (el !== document.activeElement && el.value !== f[el.dataset.f]) el.value = f[el.dataset.f];
+  b.querySelectorAll("[data-timed]").forEach((x) => { x.hidden = f.allDay; });
+  b.querySelectorAll("[data-dayrow]").forEach((x) => { x.hidden = !f.allDay; });
+  b.querySelectorAll("textarea[data-f]").forEach(grow);
+}
+const grow = (t) => { t.style.height = "auto"; t.style.height = t.scrollHeight + "px"; };
+/** A row changed: run it through the sheet rule (calendar-core.js) and repaint the texts. */
+function sheetInput(t) {
+  const f = S.form, k = t.dataset.f, v = t.value; if (!f || !f.sheet) return;
+  if (k === "day") S.form = C.sheetDay(f, v);
+  else if (k === "start") S.form = C.sheetStart(f, v);
+  else if (k === "end") S.form = C.sheetEnd(f, v);
+  else if (k === "endDay") S.form = C.sheetEndDay(f, v);
+  else if (k === "allDay") S.form = C.sheetAllDay(f, t.checked);
+  else if (k === "location" || k === "description") S.form = { ...f, [k]: v };
+  sheetPaint();
+}
+async function saveSheet() {
+  const ev = S.ev, ti = $("#pTitle"), f = { ...S.form, title: ti.value, calId: $("#pCal").value };
+  if (ev.isNew) {
+    const title = f.title.trim(); if (!title) { ti.focus(); return; }
+    panel("now"); document.body.classList.remove("popen");
+    const loc = f.location.trim();
+    await createEvent({ calId: f.calId, title, ...C.sheetWhen(f, S.tz), ...(loc ? { location: loc } : {}), ...(f.description.trim() ? { description: f.description } : {}), ...(f.kind ? { kind: f.kind } : {}) });
+    return;
+  }
+  const p = C.sheetPatch(ev, f, S.tz);
+  panel("now"); document.body.classList.remove("popen");
+  if (Object.keys(p).length) await patchEvent(ev, p, "Change");
+}
+/* The keyboard: on a phone it covers the bottom of the screen without shrinking the page, so while the sheet is open it
+   sits on top of the keyboard (visualViewport), and the box being typed in is scrolled into view. */
+function sheetFit() {
+  const p = $("#panel"), vv = window.visualViewport;
+  const up = !!(vv && sheetOn() && p.querySelector(".sheet") && innerHeight - vv.height > 60);
+  p.classList.toggle("kb", up);
+  /* pin the sheet to the part of the screen the keyboard leaves (iOS may also slide the page up by offsetTop) */
+  p.style.top = up ? Math.round(vv.offsetTop) + "px" : ""; p.style.bottom = up ? "auto" : "";
+  p.style.height = p.style.maxHeight = up ? Math.round(vv.height) + "px" : "";
+  const a = document.activeElement;
+  if (up && a && a.closest?.(".sheet") && a.matches("input,textarea")) a.scrollIntoView({ block: "nearest" });
+}
+if (window.visualViewport) for (const n of ["resize", "scroll"]) visualViewport.addEventListener(n, sheetFit);
 async function saveEvent() {
+  if (S.form && S.form.sheet) return saveSheet();
   const ev = S.ev, ti = $("#pTitle"), title = ti.value.trim(), calId = $("#pCal").value, kind = S.form.kind, dur = S.form.dur;
   const len = ev.allDay ? 0 : Math.round((ev.e - ev.s) / 60000);
   if (ev.isNew) {
@@ -1124,7 +1327,7 @@ function wirePair() {
 /* ---------- controls ---------- */
 function setup() {
   document.addEventListener("click", function clickRouter(e) {
-    const t = e.target.closest("[data-railtog],[data-page],[data-n],[data-p],[data-key],[data-staff],[data-allday],[data-open],[data-acc],[data-skip],[data-go],[data-dur],[data-kind],button[data-look],#pSave,#pDel,#pAcc,#pSkip,#pairBtn");
+    const t = e.target.closest("[data-railtog],[data-page],[data-n],[data-p],[data-key],[data-staff],[data-allday],[data-open],[data-acc],[data-skip],[data-go],[data-dur],[data-kind],[data-sheet],button[data-look],#pSave,#pDel,#pAcc,#pSkip,#pX,#pairBtn");
     if (!t || t.closest(".ev")) return;
     const d = t.dataset;
     if (t.matches("button[data-look]")) setLook(d.look);
@@ -1142,9 +1345,11 @@ function setup() {
       else { document.body.classList.remove("popen"); if (S.n === "m") S.n = 3; goTo(g.allDay ? g.start : C.wall(g.s, S.tz).day); }
     }
     else if (d.dur) { S.form.dur = +d.dur; $$("[data-dur]").forEach((c) => c.setAttribute("aria-pressed", String(c === t))); }
-    else if ("kind" in d) { S.form.kind = d.kind; $$("[data-kind]").forEach((c) => c.setAttribute("aria-pressed", String(c === t))); }
+    else if ("kind" in d) { S.form.kind = d.kind; $$("[data-kind]").forEach((c) => c.setAttribute("aria-pressed", String(c === t))); if (S.form.sheet) { $('[data-v="types"]').hidden = true; sheetPaint(); } }
+    else if (d.sheet === "type") { const c = $('[data-v="types"]'); c.hidden = !c.hidden; }
+    else if (t.id === "pX") { panel("now"); document.body.classList.remove("popen"); }
     else if (t.id === "pSave") saveEvent();
-    else if (t.id === "pDel") { const ev = S.ev; panel("now"); deleteEvent(ev); }
+    else if (t.id === "pDel") { const ev = S.ev, sh = !!(S.form && S.form.sheet); panel("now"); if (sh) document.body.classList.remove("popen"); deleteEvent(ev); }
     else if (t.id === "pAcc") acceptSugg(S.ev, { calId: $("#pCal").value, title: $("#pTitle").value.trim() || S.ev.title });
     else if (t.id === "pSkip") skipSugg(S.ev);
     else if (t.id === "pairBtn") { document.body.classList.remove("popen"); const v = $("#view"); v.classList.remove("snap"); v.innerHTML = pairHTML(); wirePair(); }
@@ -1154,6 +1359,7 @@ function setup() {
     if (t.id === "railSw") { S.rail = t.checked; store.set("cal-rail", S.rail ? "1" : "0"); render(); }
     else if (t.id === "tz1") { S.tz = t.value; store.set("cal-tz", S.tz); S.months = {}; showLook(); render(); refresh(true); }
     else if (t.id === "tz2") { S.tz2 = t.value; store.set("cal-tz2", S.tz2); render(); }
+    else if (t.closest(".sheet") && (t.dataset.f || t.id === "pCal")) { if (t.id === "pCal") { S.form.calId = t.value; sheetPaint(); } else sheetInput(t); }
     else if (t.closest("#cals")) { const id = t.dataset.id; t.checked ? S.hidden.delete(id) : S.hidden.add(id); store.set("cal-hidden", JSON.stringify([...S.hidden])); render(); }
   });
   $("#todayBtn").onclick = goToday;
@@ -1174,6 +1380,11 @@ function setup() {
   };
   $("#panelBtn").onclick = () => { if (innerWidth <= 1100) { if (!document.body.classList.contains("popen")) panel("now"); document.body.classList.toggle("popen"); } else { document.body.classList.toggle("nopanel"); setTimeout(size, 300); } };
   $("#pClose").onclick = () => { panel("now"); document.body.classList.remove("popen"); if (innerWidth > 1100) { document.body.classList.add("nopanel"); setTimeout(size, 300); } };
+  /* the phone sheet: a box being typed in updates its row at once; a time or day box opens its picker on a click with a
+     mouse (a phone opens its own wheels); the box in focus stays above the keyboard */
+  $("#pbody").addEventListener("input", (e) => { const t = e.target; if (t.dataset.f && t.closest(".sheet")) { sheetInput(t); if (t.tagName === "TEXTAREA") grow(t); } });
+  $("#pbody").addEventListener("click", (e) => { const t = e.target; if (!TOUCH && t.matches("input.ov") && t.showPicker) try { t.showPicker(); } catch {} });
+  $("#pbody").addEventListener("focusin", (e) => { if (e.target.closest(".sheet")) setTimeout(sheetFit, 350); });
   $("#pbody").addEventListener("keydown", (e) => { if (e.target.id === "pTitle" && e.key === "Enter") { if (S.ev.ghost) $("#pAcc").click(); else saveEvent(); } });
   $("#newTask").onkeydown = async (e) => {
     const inp = e.target, v = inp.value.trim();
@@ -1199,7 +1410,7 @@ function setup() {
     else return;
     e.preventDefault();
   });
-  wireSwipe($("#view"));
+  wireSwipe($("#view")); wirePinch($("#view"));
   addEventListener("resize", function onResize() { size(); });
   addEventListener("focus", () => { if (S.tab !== "event" && questKey()) { refresh(); loadSide(); } });
   setInterval(() => { showLook(); tickNow(); if (S.tab === "now" && S.page === "cal" && !dragging) paintPanel(); renderRail(); }, 30000);
@@ -1208,7 +1419,7 @@ function setup() {
 /** Open or close the hidden readout; its script loads the first time only. */
 function readout() {
   if (window.CalReadout) { CalReadout.toggle(); return; }
-  CalHook.state = () => ({ cur: S.cur, win0: S.win0, n: S.n, dw, slideX, shown: TOUCH && $("#strip") ? shownX() : null, touch: TOUCH, api: API });
+  CalHook.state = () => ({ cur: S.cur, win0: S.win0, n: S.n, dw, slideX, shown: TOUCH && $("#strip") ? shownX() : null, touch: TOUCH, api: API, h: S.h });
   const s = document.createElement("script"); s.src = "calendar-readout.js?v=4"; document.head.appendChild(s);
 }
 function boot() { render(); loadSide(); refresh(); }

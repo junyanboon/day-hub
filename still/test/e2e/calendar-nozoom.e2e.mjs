@@ -49,7 +49,8 @@ try {
 
   /* ---- every text box is 16px or more: the main page, the event editor, settings ---- */
   let s = await sizes(page);
-  check("phone, calendar: no text box under 16px", s.length > 0 && !small(s).length, fmt(small(s)) || fmt(s));
+  // the phone has no New task bar any more (d1, 2026-11-12), so the main page may have no text box at all
+  check("phone, calendar: no text box under 16px", !small(s).length, fmt(small(s)) || fmt(s) || "no text box shown");
   await page.evaluate(() => document.querySelector(".ev").click()); await sleep(700);
   s = await sizes(page);
   check("phone, event editor: no text box under 16px", s.some((x) => x.id === "pTitle") && !small(s).length, fmt(small(s)) || fmt(s));
