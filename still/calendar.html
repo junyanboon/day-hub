@@ -390,7 +390,7 @@ body.onpage .left,body.onpage .main,body.onpage .panel{display:none}
   /* the event sheet: one-line rows (slice 02). Every box in it is 16px or more so iOS never zooms (PR 133). The time
      and day boxes lie unseen over their row text, so a tap opens the phone's own wheels and the row reads "1:45 PM". */
   .panel:has(.sheet) .ptabs{display:none}
-  .panel:has(.sheet) .pbody{padding-top:4px;gap:12px}
+  .panel:has(.sheet) .pbody{padding-top:4px;gap:12px;padding-bottom:calc(16px + env(safe-area-inset-bottom,0px))}
   .sheet{display:flex;flex-direction:column;gap:12px}
   .shead{display:grid;grid-template-columns:72px 1fr 72px;align-items:center;min-height:44px;position:sticky;top:0;z-index:2;background:var(--bar)}
   .panel.kb{border-radius:0}.panel.kb .grab{display:none}.panel.kb .pbody{padding-bottom:16px}
