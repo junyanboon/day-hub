@@ -211,7 +211,8 @@ kbd{font:inherit;font-size:11px;border:1px solid var(--line);background:var(--ra
 .sc{flex:1;min-height:0;overflow:auto;position:relative;scrollbar-width:none;background:var(--bg)}.sc::-webkit-scrollbar{display:none}
 .sc.snap{scroll-snap-type:x mandatory;scroll-padding-left:var(--gut);overscroll-behavior-x:contain}
 /* a finger moves days through the swipe rules in the page script (calendar-core.js swipeLock / swipeCommit), never
-   through native sideways scrolling, which snapped to the next day on any sideways drift (2026-11-11) */
+   through native sideways scrolling, which snapped to the next day on any sideways drift (2026-11-11). These two
+   rules are a backstop now: the clipped .pane below leaves the view no sideways range to scroll. */
 body.touch .sc{overflow-x:hidden;touch-action:pan-y}
 body.touch .sc.snap{scroll-snap-type:none}
 /* On touch the days sit in a pane that clips them sideways without scrolling (overflow-x:clip): the view has no
@@ -692,10 +693,9 @@ const yToMin = (col, clientY) => Math.max(0, Math.min(1440 - SNAP, Math.floor((c
 /** Move an instant by whole days on the wall (DST safe) plus minutes. */
 function shiftWall(ms, dDay, dMin) { const w = C.wall(ms, S.tz); return C.instant(C.addDays(w.day, dDay), w.min, S.tz) + dMin * 60000; }
 
-/* lastScroll is the last time the strip moved sideways. An up/down scroll never counts, and never changes the
-   day: on the iPhone a page still gliding up or down kept lastScroll fresh, so goTo's landing fallback never ran
-   and a dropped snap-back left the strip on the next day (Junyan, 2026-11-11: "changed dates when swiping up and
-   down"). */
+/* Desktop only (no touch): the days scroll sideways natively with snapping, and onscroll reads the day from
+   scrollLeft. lastScroll is the last time the strip moved sideways; an up/down scroll never counts and never changes
+   the day, so goTo's landing fallback still runs after a plain up/down scroll. */
 let raf = 0, settle = 0, dragging = false, swiping = false, lastScroll = 0, lastLeft = -1, slideX = 0;
 /* On a phone the days never scroll sideways natively (Junyan, 2026-11-11: "jumping from Nov 11 to oct 28", then
    "still gtliching on the phone with the fix"). The strip starts 14 days (BACK) before the shown day; during an
@@ -710,6 +710,13 @@ function slideTo(x, ms = 0) {
   slideX = x;
   st.style.transition = gut.style.transition = ms ? `transform ${ms}ms cubic-bezier(.2,.7,.2,1)` : "none";
   st.style.transform = `translateX(${-x}px)`; gut.style.transform = `translateX(${x}px)`;
+}
+/** Touch: how far the strip sits from its first day on screen right now, partway through a slide too (slideX is
+    where the slide is going). */
+function shownX() {
+  const st = $("#strip"); if (!st) return slideX;
+  const m = new DOMMatrixReadOnly(getComputedStyle(st).transform);
+  return -m.m41;
 }
 function wireStrip(v) {
   v.onscroll = () => {
@@ -780,9 +787,10 @@ const clearDraft = () => $$(".ev.draft").forEach((d) => d.remove());
 /* A finger swipe between days (Junyan, 2026-11-11: "it changes days when I'm in the day view very easily").
    The strip was one native scroller in both directions with x snapping (.sc.snap), so on the iPhone, which does
    not lock a scroll to one direction, an up/down scroll that drifted sideways snapped to the next day.
-   On touch screens the strip no longer scrolls sideways by itself (body.touch .sc); this follows the finger
-   instead, decides the direction in the first 10 px (C.swipeLock) and changes days only on a clear sideways
-   swipe or flick (C.swipeCommit). Up/down stays the browser's own scroll. Same for 1, 3 and 7 days. */
+   On touch screens the view has no sideways scroll range at all (body.touch .pane clips) and the strip moves only
+   by slideTo's transform; this follows the finger, decides the direction in the first 10 px (C.swipeLock) and
+   changes days only on a clear sideways swipe or flick (C.swipeCommit). Up/down stays the browser's own scroll.
+   Same for 1, 3 and 7 days. */
 function swipeBlocked(target, v) {
   if (dragging || target.closest("input,textarea,select,.drop,.panel,.modal,.dragging,[data-noswipe]")) return true;
   for (let el = target; el && el !== v; el = el.parentElement) {   // a strip of its own that scrolls sideways
@@ -812,6 +820,9 @@ function wireSwipe(v) {
     if (g.lock === "y") { g = null; swiping = false; return; }   // a scroll: the browser has it, and it never changes the day
     if (g.lock !== "x") return;
     if (e.cancelable) e.preventDefault();
+    if (!g.held) {   // a swipe that starts while the days still slide: the row stops where it is on screen, not where it was going
+      g.held = true; g.left0 = shownX() + dx;
+    }
     slideTo(Math.max(0, Math.min((WIN - S.n) * dw, g.left0 - dx)));   // the days follow the finger
     const now = performance.now();
     g.pts.push({ x: t.clientX, t: now });

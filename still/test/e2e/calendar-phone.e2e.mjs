@@ -233,6 +233,78 @@ try {
   a = b; await drag(320, 500, 120, 505, 260); b = await shown();
   check("7 days: a clear swipe left goes to the next week", b.day === plus(a.day, 7), `${a.day} -> ${b.day}`);
 
+  /* ---- a second swipe that starts while the days are still sliding (the 260 ms slide after a swipe). The row must
+     carry on from where it is on screen, not hop to where the slide was going (reviewer of PR 130, 2026-11-11). The
+     page's own touchmove sits on #view; a capture listener on window reads the row just before it and a bubbling
+     one just after, so any hop the page makes inside one move shows as a jump bigger than the finger's step. ---- */
+  await open(1);
+  a = await shown();
+  await page.evaluate(() => {
+    const left = () => { const days = document.querySelectorAll(".day"); return document.querySelector(".gut").getBoundingClientRect().right - days[0].getBoundingClientRect().left; };
+    window.__hops = []; let pre = 0;
+    addEventListener("touchmove", () => { pre = left(); }, { capture: true, passive: true });
+    addEventListener("touchmove", (e) => { window.__hops.push({ pre: Math.round(pre), post: Math.round(left()), x: Math.round(e.touches[0]?.clientX ?? 0) }); }, { passive: true });
+  });
+  {
+    const T = (type, pts) => cdp.send("Input.dispatchTouchEvent", { type, touchPoints: pts });
+    // swipe 1: a fast 180 px flick left, sent back to back
+    await Promise.all([T("touchStart", [{ x: 320, y: 500 }]), ...[275, 230, 185, 140].map((x) => T("touchMove", [{ x, y: 500 }])), T("touchEnd", [])]);
+    await page.evaluate(() => { window.__hops = []; });
+    // swipe 2, inside the slide: 12 px steps, one after the other (Chrome merges moves sent back to back)
+    await T("touchStart", [{ x: 320, y: 500 }]);
+    for (const x of [308, 296, 284, 272, 260, 248, 236, 224, 212, 200, 188, 176, 164]) await T("touchMove", [{ x, y: 500 }]);
+    await T("touchEnd", []);
+    await sleep(1100);
+  }
+  const hops = await page.evaluate(() => window.__hops);
+  // the row may move inside one move only by as much as the finger moved since the move before (2 px slack)
+  const worst = Math.max(0, ...hops.map((h, i) => Math.abs(h.post - h.pre) - Math.abs(h.x - (i ? hops[i - 1].x : 320))));
+  b = await shown();
+  check("day view: a swipe started while the days still slide follows the finger with no hop", hops.length >= 5 && worst <= 2, `${hops.length} moves, worst jump past the finger ${worst} px`);
+  check("day view: those two quick swipes land two days on", b.day === plus(a.day, 2) && Math.min(b.left % b.w, b.w - b.left % b.w) <= 2, `${a.day} -> ${b.day}, left ${b.left}`);
+
+  /* ---- the buttons on touch: Today, back and forward, and 1 / 3 / 7 / M. The arrows are hidden at phone width
+     but show on a touch tablet, so they are pressed through their own click handler here. ---- */
+  await open(1);
+  const start = await shown();
+  const offDay = (s) => { const r = ((s.left % s.w) + s.w) % s.w; return Math.min(r, s.w - r); };   // px from the nearest day edge
+  const lands = (s, day) => s.day === day && offDay(s) <= 2;
+  await drag(300, 500, 120, 510, 260); await drag(300, 500, 120, 510, 260);
+  a = await shown();
+  await page.click("#todayBtn"); await sleep(800); b = await shown();
+  check("touch: after two swipes, Today goes back to today", a.day === plus(start.day, 2) && lands(b, start.day), `${start.day} -> ${a.day} -> ${b.day}, left ${b.left}`);
+  await page.evaluate(() => document.querySelector("#next").click()); await sleep(800); b = await shown();
+  check("touch: the forward arrow goes a day on", lands(b, plus(start.day, 1)), `${b.day}, left ${b.left}`);
+  await page.evaluate(() => { document.querySelector("#prev").click(); document.querySelector("#prev").click(); }); await sleep(800); b = await shown();
+  check("touch: the back arrow twice goes two days back", lands(b, plus(start.day, -1)), `${b.day}, left ${b.left}`);
+  const seg = async (n) => { await page.click(`.seg button[data-n="${n}"]`); await sleep(800); };
+  await seg(3); b = await shown();
+  const cur3 = await page.evaluate(() => S.cur);
+  check("touch: switching to 3 days shows the same first day", cur3 === plus(start.day, -1) && lands(b, cur3), `S.cur ${cur3}, shown ${b.day}, left ${b.left}`);
+  await page.evaluate(() => document.querySelector("#next").click()); await sleep(800); b = await shown();
+  check("touch: in 3 days the forward arrow goes 3 days on", lands(b, plus(cur3, 3)), `${b.day}, left ${b.left}`);
+  await seg(7); b = await shown();
+  const cur7 = await page.evaluate(() => S.cur);
+  check("touch: switching to 7 days starts on the Monday", new Date(cur7 + "T12:00:00Z").getUTCDay() === 1 && lands(b, cur7), `S.cur ${cur7}, shown ${b.day}, left ${b.left}`);
+  await seg("m");
+  check("touch: switching to M shows the month", await page.evaluate(() => !!document.querySelector(".month") && !document.querySelector("#strip")));
+  await seg(1); b = await shown();
+  const cur1 = await page.evaluate(() => S.cur);
+  const range1 = await page.evaluate(() => { const v = document.querySelector("#view"); return v.scrollWidth - v.clientWidth; });
+  check("touch: back to 1 day from M shows S.cur with no sideways range", lands(b, cur1) && range1 <= 1, `S.cur ${cur1}, shown ${b.day}, left ${b.left}, range ${range1}`);
+  a = b; await drag(300, 500, 120, 510, 260); b = await shown();
+  check("touch: and a swipe still works after all that switching", lands(b, plus(a.day, 1)), `${a.day} -> ${b.day}, left ${b.left}`);
+
+  /* ---- a rotation after a swipe: the strip is laid out again for the new width and stays on the day ---- */
+  await open(1);
+  a = await shown(); await drag(300, 500, 120, 510, 260); const swiped = await shown();
+  await page.setViewportSize({ width: 844, height: 390 }); await sleep(600); b = await shown();
+  check("touch: turning the phone sideways after a swipe keeps the day", swiped.day === plus(a.day, 1) && lands(b, swiped.day) && Math.abs(b.w - swiped.w) > 20, `${swiped.day} -> ${b.day}, left ${b.left}, w ${Math.round(swiped.w)} -> ${Math.round(b.w)}`);
+  await page.setViewportSize({ width: 390, height: 844 }); await sleep(600); b = await shown();
+  check("touch: and turning it back keeps the day", lands(b, swiped.day), `${b.day}, left ${b.left}`);
+  a = b; await drag(110, 500, 300, 495, 260); b = await shown();
+  check("touch: a swipe after the turn goes back a day", lands(b, plus(a.day, -1)), `${a.day} -> ${b.day}, left ${b.left}`);
+
   /* ---- a clean top and bottom edge ---- */
   await open(1);
   const edge = await page.evaluate(() => [".bar", ".dhead", ".corner", ".drop"].map((s) => {
@@ -292,6 +364,23 @@ try {
   check("after the one reset his tap is kept on the next load", l.face === "velvet" && l.saved === "velvet", JSON.stringify(l));
   check("no page errors in the Studio checks", errors2.length === 0, errors2.join(" | "));
   await ctx2.close();
+
+  /* ---- desktop is unchanged: no touch, so the days still scroll sideways natively with snapping, and a sideways
+     trackpad scroll still changes the day ---- */
+  const ctx3 = await browser.newContext({ viewport: { width: 1280, height: 800 }, timezoneId: "America/Toronto",
+    storageState: { cookies: [], origins: [{ origin: BASE, localStorage: [{ name: "cal-n", value: "1" }, { name: "quest-key", value: "test" }] }] } });
+  const p3 = await ctx3.newPage();
+  const errors3 = []; p3.on("pageerror", (e) => errors3.push(e.message));
+  await p3.goto(URL_); await p3.waitForSelector(".ev"); await sleep(600);
+  const d0 = await p3.evaluate(() => ({ cur: S.cur, touch: document.body.classList.contains("touch"), snap: getComputedStyle(document.querySelector("#view")).scrollSnapType, range: document.querySelector("#view").scrollWidth - document.querySelector("#view").clientWidth }));
+  await p3.mouse.move(700, 500);
+  for (let i = 0; i < 6; i++) { await p3.mouse.wheel(120, 0); await sleep(30); }
+  await sleep(1200);
+  const d1 = await p3.evaluate(() => ({ cur: S.cur, left: document.querySelector("#view").scrollLeft, dw }));
+  check("desktop: no touch, the days snap-scroll sideways natively", !d0.touch && /x/.test(d0.snap) && /mandatory/.test(d0.snap) && d0.range > 100, JSON.stringify(d0));
+  check("desktop: a sideways trackpad scroll changes the day and snaps onto a day", d1.cur > d0.cur && Math.abs(d1.left / d1.dw - Math.round(d1.left / d1.dw)) < 0.02, `${d0.cur} -> ${d1.cur}, scrollLeft ${Math.round(d1.left)}, dw ${Math.round(d1.dw)}`);
+  check("no page errors in the desktop checks", errors3.length === 0, errors3.join(" | "));
+  await ctx3.close();
 } finally {
   await browser.close(); server.kill();
 }
