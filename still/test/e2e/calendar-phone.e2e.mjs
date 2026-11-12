@@ -47,10 +47,14 @@ try {
     await Promise.all(sends);
     await sleep(1100);
   }
+  /** What the eye sees: the first day column whose left edge sits at the hour gutter's right edge. `left` is how far
+      the strip sits from its first day, read from the screen (native scrolling and a CSS slide both count). */
   const shown = () => page.evaluate(() => {
     const v = document.querySelector("#view"), days = [...document.querySelectorAll(".day")];
-    const w = days[0].getBoundingClientRect().width;
-    return { day: days[Math.round(v.scrollLeft / w)].dataset.day, top: Math.round(v.scrollTop), left: Math.round(v.scrollLeft), w };
+    const g = document.querySelector(".gut").getBoundingClientRect().right, w = days[0].getBoundingClientRect().width;
+    let best = days[0], d = Infinity;
+    for (const el of days) { const x = Math.abs(el.getBoundingClientRect().left - g); if (x < d) { d = x; best = el; } }
+    return { day: best.dataset.day, top: Math.round(v.scrollTop), left: Math.round(g - days[0].getBoundingClientRect().left), w };
   });
   async function open(n) {
     await page.addInitScript((n) => { localStorage.setItem("quest-key", "test"); localStorage.setItem("cal-n", n); }, String(n));
@@ -62,11 +66,37 @@ try {
   }
   const plus = (day, n) => new Date(Date.parse(day + "T12:00:00Z") + n * 86400000).toISOString().slice(0, 10);
 
-  /* ---- day view ---- */
+  /* ---- nothing native can move the days sideways (Junyan, 2026-11-11: "still gtliching on the phone with the fix").
+     On his iPhone, during a plain up/down scroll, iOS kept moving the strip's sideways position by 750 to 1950 px every
+     30 ms and the page snapped it back, a fight that blanked the event column. overflow-x:hidden still leaves a
+     sideways scroll range iOS can move. On touch the view must have no sideways range at all: a sideways scroll
+     position set from outside (as iOS did), or a sideways trackpad wheel (iPhone Mirroring), changes nothing. ---- */
   await open(1);
   let a = await shown();
-  await drag(200, 650, 240, 350, 450);
+  const range = await page.evaluate(() => { const v = document.querySelector("#view"); return { sw: v.scrollWidth, cw: v.clientWidth }; });
+  check("day view on touch: the view has no sideways scroll range", range.sw <= range.cw + 1, `scrollWidth ${range.sw}, clientWidth ${range.cw}`);
+  const forced = await page.evaluate(async () => {
+    const v = document.querySelector("#view"), seen = [];
+    for (const x of [3023, 4219, 3571, 0, 9999]) { v.scrollLeft = x; seen.push(Math.round(v.scrollLeft)); await new Promise((r) => setTimeout(r, 40)); }
+    return seen;
+  });
   let b = await shown();
+  check("day view on touch: a sideways position set from outside does not move the view", forced.every((x) => x === 0) && b.day === a.day && b.left === a.left, `scrollLeft ${forced.join(",")}, ${a.day} -> ${b.day}, left ${a.left} -> ${b.left}`);
+  await page.mouse.move(200, 500); await page.mouse.wheel(600, 0); await sleep(600);
+  b = await shown();
+  check("day view on touch: a sideways trackpad wheel does not move the day", b.day === a.day && b.left === a.left, `${a.day} -> ${b.day}, left ${a.left} -> ${b.left}`);
+  // the trackpad through iPhone Mirroring: every up/down scroll carries a small sideways part (dx -1 to -4)
+  const top0 = (await shown()).top;
+  for (const [dx, dy] of [[-3, -64], [-2, -14], [-1, -10], [-4, 60], [-3, 80], [-1, 40]]) { await page.mouse.wheel(dx, dy); await sleep(30); }
+  await sleep(600);
+  b = await shown();
+  check("day view on touch: trackpad up/down scrolls with a small sideways part keep the day", b.day === a.day && b.left === a.left && b.top !== top0, `${a.day} -> ${b.day}, left ${a.left} -> ${b.left}, top ${top0} -> ${b.top}`);
+
+  /* ---- day view ---- */
+  await open(1);
+  a = await shown();
+  await drag(200, 650, 240, 350, 450);
+  b = await shown();
   check("day view: an up/down scroll drifting 40 px right keeps the day", b.day === a.day, `${a.day} -> ${b.day}`);
   check("day view: that scroll really scrolled the hours (positive control)", b.top > a.top + 100, `scrollTop ${a.top} -> ${b.top}`);
   a = b; await drag(240, 300, 200, 600, 450); b = await shown();
@@ -164,8 +194,8 @@ try {
   }
   // Chrome itself will not scroll a pan-y strip for a gesture whose first move leans sideways (the iPhone does), so
   // this checks the page's part: it must not grab the strip and slide the days under the finger.
-  await page.evaluate(() => { const v = document.querySelector("#view"), l0 = v.scrollLeft; window.__slid = 0;
-    v.addEventListener("scroll", () => { window.__slid = Math.max(window.__slid, Math.abs(v.scrollLeft - l0)); }); });
+  await page.evaluate(() => { const d0 = () => document.querySelector(".day").getBoundingClientRect().left, l0 = d0(); window.__slid = 0;
+    const tick = () => { window.__slid = Math.max(window.__slid, Math.round(Math.abs(d0() - l0))); requestAnimationFrame(tick); }; tick(); });
   await arc(200, 650, -13, -9, 140, 330);
   b = await shown();
   const slid = await page.evaluate(() => window.__slid);
