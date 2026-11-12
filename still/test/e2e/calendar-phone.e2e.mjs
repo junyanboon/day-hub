@@ -121,9 +121,42 @@ try {
   check("apple-touch-icon is 180x180", icons.touch === "180x180", String(icons.touch));
   check("an SVG favicon and a PNG fallback", !!icons.svg && /^\d+x\d+$/.test(icons.png || ""), `${icons.svg} / ${icons.png}`);
   check("the web manifest has 192, 512 and a maskable 512, all loading", !!icons.man && ["192x192=192x192", "512x512=512x512", "512x512 maskable=512x512"].every((x) => icons.man.icons.includes(x)), JSON.stringify(icons.man?.icons));
-  check("theme colour matches the header in the page and the manifest", !!icons.theme && icons.man?.theme === icons.theme && icons.man?.bg === icons.theme, `${icons.theme} / ${icons.man?.theme} / ${icons.man?.bg}`);
+  const barHex = await page.evaluate(() => "#" + getComputedStyle(document.querySelector(".bar")).backgroundColor.match(/\d+/g).slice(0, 3).map((n) => (+n).toString(16).padStart(2, "0")).join(""));
+  check("theme colour matches the header, and the manifest opens on Studio's night charcoal", !!icons.theme && icons.theme === barHex && icons.man?.theme === "#262626" && icons.man?.bg === "#1c1c1c", `${icons.theme} / bar ${barHex} / ${icons.man?.theme} / ${icons.man?.bg}`);
   check("apple-mobile-web-app-capable is set", icons.capable === "yes");
   check("no page errors", errors.length === 0, errors.join(" | "));
+
+  /* ---- Studio follows the sun (Junyan, 2026-11-11: "the calendar mode with the night mode for when it's night") ----
+     A phone that saved Stage Lights while he tried looks, with a fixed Toronto clock on 2026-11-11 (sunset 4:56 pm). */
+  const ctx2 = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, timezoneId: "America/Toronto",
+    storageState: { cookies: [], origins: [{ origin: BASE, localStorage: [{ name: "cal-look", value: "stage" }, { name: "quest-key", value: "test" }] }] } });
+  const p2 = await ctx2.newPage();
+  const errors2 = []; p2.on("pageerror", (e) => errors2.push(e.message));
+  await p2.addInitScript(() => { requestAnimationFrame(() => { window.__firstLook = document.documentElement.dataset.look; window.__firstBg = getComputedStyle(document.body).backgroundColor; }); });
+  await p2.clock.install({ time: new Date("2026-11-11T11:30:00-05:00") });
+  await p2.goto(URL_); await sleep(800);
+  const look = () => p2.evaluate(() => ({ face: document.documentElement.dataset.look || null, theme: document.querySelector('meta[name="theme-color"]').content,
+    saved: localStorage.getItem("cal-look"), reset: localStorage.getItem("cal-look-reset"), first: window.__firstLook, firstBg: window.__firstBg }));
+  let l = await look();
+  check("a phone with an old saved look opens in Studio once, the day half at 11:30 am", l.face === "studio-day" && l.saved === null && !!l.reset, JSON.stringify(l));
+  check("the day half is on before the first paint (no flash)", l.first === "studio-day" && l.firstBg === "rgb(255, 253, 249)", `${l.first} ${l.firstBg}`);
+  check("theme-color is the day half's header", l.theme === "#fffdf9", l.theme);
+  await p2.clock.fastForward("05:25:00");   // 4:55 pm, a minute before sunset
+  l = await look();
+  check("still the day half a minute before sunset", l.face === "studio-day", l.face);
+  await p2.clock.fastForward("00:02:00");   // 4:57 pm: the 30 s timer fires with the page open
+  l = await look();
+  check("crossing sunset with the page open flips to the night half, no reload", l.face === "studio-night" && l.theme === "#262626", JSON.stringify(l));
+  await p2.evaluate(() => { document.querySelector('button[data-look="velvet"]') || (document.querySelector("#panelBtn").click(), document.querySelector('[data-p="set"]').click()); });
+  await sleep(300);
+  await p2.click('button[data-look="velvet"]');
+  l = await look();
+  check("a tap on Velvet & Brass puts it on and saves it", l.face === "velvet" && l.saved === "velvet", JSON.stringify(l));
+  await p2.reload(); await sleep(600);
+  l = await look();
+  check("after the one reset his tap is kept on the next load", l.face === "velvet" && l.saved === "velvet", JSON.stringify(l));
+  check("no page errors in the Studio checks", errors2.length === 0, errors2.join(" | "));
+  await ctx2.close();
 } finally {
   await browser.close(); server.kill();
 }
