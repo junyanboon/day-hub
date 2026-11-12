@@ -238,7 +238,7 @@ test("the look is put on before the page is drawn, with its theme colour", () =>
   assert.match(s, /localStorage\.getItem\("cal-tz"\)/, "the calendar's own time zone picks the city");
   assert.doesNotMatch(html.slice(html.indexOf("</head>")), /<script src="calendar-core\.js/, "loaded once");
   const v = /calendar-core\.js\?v=(\d+)"/.exec(head);
-  assert.ok(v && +v[1] >= 12, "the stamp moved on, so a phone does not keep the old core");
+  assert.ok(v && +v[1] >= 14, "the stamp moved on, so a phone does not keep the old core");
 });
 
 test("Studio's night half is a neutral charcoal like his picture, with the same coral family as the day half", () => {

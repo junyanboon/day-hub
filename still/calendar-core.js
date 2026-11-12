@@ -293,10 +293,14 @@
      gap is the top inset, "on" any gap up to FILL_MAX, "off" never. iOS keeps screen.width/height upright, so the
      screen's height is its long side when the window is taller than wide. */
   const FILL_MAX = 80, PHONE_MAX = 600;
-  function homeFit({ standalone, touch, innerWidth, innerHeight, screenWidth, screenHeight, safeTop, fill = "auto", top = "clear" }) {
+  /* docHeight (2026-11-12h) is document.documentElement.clientHeight, the height iOS laid the page out at. The gap is
+     measured from it, not from innerHeight: on iOS 26 a stretched html also grows innerHeight (812 to 874 on his phone)
+     while docH stays 812, so a second measure after the stretch still finds gap 62. Missing or 0: innerHeight. */
+  function homeFit({ standalone, touch, innerWidth, innerHeight, docHeight, screenWidth, screenHeight, safeTop, fill = "auto", top = "clear" }) {
     if (!standalone || !touch) return { gap: 0, top: null };
-    const tall = innerHeight >= innerWidth, screenH = tall ? Math.max(screenWidth, screenHeight) : Math.min(screenWidth, screenHeight);
-    const short = Math.round(screenH - innerHeight);
+    const viewH = docHeight > 0 ? docHeight : innerHeight;
+    const tall = viewH >= innerWidth, screenH = tall ? Math.max(screenWidth, screenHeight) : Math.min(screenWidth, screenHeight);
+    const short = Math.round(screenH - viewH);
     let gap = 0;
     if (fill === "on") gap = short > 0 && short <= FILL_MAX ? short : 0;
     else if (fill !== "off") gap = short > 0 && safeTop > 0 && Math.abs(short - safeTop) <= 2 ? short : 0;
@@ -304,7 +308,15 @@
        inset, an iPad home screen app and a touch laptop keep the plain tab's header. Phone sized = the screen's short
        side is PHONE_MAX or less. */
     const phoneTop = safeTop > 0 && Math.min(screenWidth, screenHeight) <= PHONE_MAX;
-    return { gap, top: !phoneTop ? null : top === "close" ? "close" : "clear" };
+    return { gap, top: !phoneTop ? null : top === "close" ? "close" : "clear", screenH };
+  }
+  /* homeShift (2026-11-12h): how far the bottom-pinned boxes (.drop, .toast, .panel, .modal) still have to move down
+     once the page is stretched. pinnedBottom is where a position:fixed;bottom:0 box really ends, measured after the
+     stretch. On iOS 26 the fixed layer grows with the window, so it ends at the screen's bottom and the shift is 0;
+     where the window stays short (Chrome, an older iOS) it ends gap px early and the shift is the gap. Clamped 0..gap. */
+  function homeShift({ gap, screenH, pinnedBottom }) {
+    if (!(gap > 0)) return 0;
+    return Math.min(gap, Math.max(0, Math.round(screenH - pinnedBottom)));
   }
 
   /* ---- words ---- */
@@ -412,6 +424,6 @@
   const clock = (min) => { const h = Math.floor(min / 60) % 24; return `${h % 12 || 12}:${String(min % 60).padStart(2, "0")} ${h < 12 ? "AM" : "PM"}`; };
 
   root.CalCore = { wall, instant, offset, addDays, dowOf, weekStart, isoWeek, addMonths, monthKey, monthsFor,
-    KINDS, kindOf, layout, pieces, coversDay, orderBetween, groupOf, dropTask, blockMinutes, hm, dur, SWIPE, swipeLock, swipeCommit, HOUR, pinchHeight, hourMin, pinchMinute, pinchScroll, cardFit, cardTime, startHour, LOOKS, lookId, startLook, LOOK_RESET, placeOf, sunTimes, sunHalf, lookFace, pageLink, homeFit,
+    KINDS, kindOf, layout, pieces, coversDay, orderBetween, groupOf, dropTask, blockMinutes, hm, dur, SWIPE, swipeLock, swipeCommit, HOUR, pinchHeight, hourMin, pinchMinute, pinchScroll, cardFit, cardTime, startHour, LOOKS, lookId, startLook, LOOK_RESET, placeOf, sunTimes, sunHalf, lookFace, pageLink, homeFit, homeShift,
     sheetForm, sheetWhen, sheetPatch, sheetLength, sheetStart, sheetEnd, sheetDay, sheetEndDay, sheetAllDay, notesRich, notesText, dayText, clock, toMin };
 })(typeof window !== "undefined" ? window : globalThis);

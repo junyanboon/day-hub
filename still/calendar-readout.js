@@ -99,7 +99,7 @@ padding:env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) env(safe-are
   function fitLine() {
     if (!H.fit) return "fit - (this page has no home screen fit)";
     const f = H.fit.get(), c = document.documentElement.classList, ls = (k) => { try { return localStorage.getItem(k); } catch { return null; } };
-    return `fit ${ls("cal-hsfill") || "auto"} gap ${f.gap} top ${f.top || "-"}  rules ${["hs", "hsclear", "hsfill"].filter((k) => c.contains(k)).join(" ") || "none"}`;
+    return `fit ${ls("cal-hsfill") || "auto"} gap ${f.gap} shift ${f.shift ?? "-"} top ${f.top || "-"}  rules ${["hs", "hsclear", "hsfill"].filter((k) => c.contains(k)).join(" ") || "none"}`;
   }
   function labels() {
     if (!H.fit) return;
