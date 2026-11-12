@@ -255,6 +255,17 @@
     return h ? `${h} h${m ? ` ${m} min` : ""}` : `${m} min`;
   }
 
+  /* Where a block type's page lives when it is not the calendar's own page (Junyan, 2026-11-12, t9, "9 yes"): the
+     Travel tab opens the Day Quest Trips page now that the trip is planned. Day Quest has no link to one trip yet, so
+     this is the Trips list. Every other type keeps the calendar's page (null). search is the calendar's own
+     location.search, so ?api= goes along word for word: {href, label} for the page and its button. */
+  const PAGE_LINKS = { travel: { page: "quest.html", hash: "#trips", label: "Open Trips in Day Quest" } };
+  function pageLink(kind, search) {
+    if (!Object.prototype.hasOwnProperty.call(PAGE_LINKS, kind)) return null;
+    const p = PAGE_LINKS[kind];
+    return { href: p.page + (search || "") + p.hash, label: p.label };
+  }
+
   root.CalCore = { wall, instant, offset, addDays, dowOf, weekStart, isoWeek, addMonths, monthKey, monthsFor,
-    KINDS, kindOf, layout, pieces, coversDay, orderBetween, groupOf, dropTask, blockMinutes, hm, dur, SWIPE, swipeLock, swipeCommit, LOOKS, lookId, startLook, LOOK_RESET, placeOf, sunTimes, sunHalf, lookFace };
+    KINDS, kindOf, layout, pieces, coversDay, orderBetween, groupOf, dropTask, blockMinutes, hm, dur, SWIPE, swipeLock, swipeCommit, LOOKS, lookId, startLook, LOOK_RESET, placeOf, sunTimes, sunHalf, lookFace, pageLink };
 })(typeof window !== "undefined" ? window : globalThis);
