@@ -363,7 +363,7 @@ body.onpage .left,body.onpage .main,body.onpage .panel{display:none}
 .ttabs .tlink{border-radius:8px;color:var(--soft);font-weight:500;text-decoration:none;white-space:nowrap}
 /* Stopgap until the Trips page is ported into the calendar (Junyan, 2026-11-13, d6: "6 yes, hide"): Local and + New trip
    (class tdq) lead to Day Quest's Trips view, which is off under 768 px (quest-trips.js, WIDE = min-width: 768px), so a
-   phone hides them. The exact opposite of that rule, so the two never disagree. To undo: delete this line and the tdq classes. */
+   phone hides them. The exact opposite of that rule, so the two never disagree. To undo: delete this line, the tdq classes and the phone branches in test/e2e/calendar-trips.e2e.mjs. */
 @media not all and (min-width:768px){.tdq{display:none!important}}
 .tcards{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:16px;align-items:start;max-width:1100px}
 .tcard{display:flex;flex-direction:column;gap:6px;border-color:color-mix(in srgb,var(--c) 22%,var(--line))}

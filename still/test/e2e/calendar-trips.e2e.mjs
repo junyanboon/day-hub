@@ -13,6 +13,7 @@ import { spawn } from "node:child_process";
 import path from "node:path";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
+import { readFileSync } from "node:fs";
 
 const require = createRequire(path.join(process.env.PW_DIR || process.cwd(), "x.js"));
 const { chromium } = require("playwright-core");
@@ -115,6 +116,9 @@ try {
   }
   // The edge: Day Quest's Trips view is off under 768 px (quest-trips.js, WIDE), so the calendar hides the two links
   // exactly there. 767 px: hidden. 768 px: shown.
+  // read Day Quest's own switch from quest-trips.js, so a change to its width breaks this check
+  const wide = /const WIDE = window\.matchMedia\("\(min-width: (\d+)px\)"\)/.exec(readFileSync(path.join(here, "../../quest-trips.js"), "utf8"));
+  check("quest-trips.js still switches Day Quest's Trips view on at 768 px", wide?.[1] === "768", wide?.[0]);
   for (const w of [767, 768]) {
     const ctx = await browser.newContext({ viewport: { width: w, height: 900 }, timezoneId: "America/Toronto" });
     const page = await ctx.newPage();
@@ -123,9 +127,9 @@ try {
     await page.goto(URL_); await page.waitForSelector('#rail [data-page="travel"]', { state: "attached" }); await sleep(400);
     await page.evaluate(() => document.querySelector('#rail [data-page="travel"]').click()); await sleep(400);
     const vis = await page.evaluate((src) => { const shown = eval(src); return [shown(document.querySelector("#page .ttabs .tlink")), shown(document.querySelector("#page #tripNew"))]; }, shown.toString());
-    const quest = await page.evaluate(() => matchMedia("(min-width: 768px)").matches);
-    check(`${w} px: Local and + New trip ${w < 768 ? "hidden" : "shown"}, matching Day Quest's own Trips switch`,
-      JSON.stringify(vis) === JSON.stringify([quest, quest]) && quest === (w >= 768), JSON.stringify({ vis, quest }));
+    const on = w >= +(wide?.[1] || 768);   // Day Quest's Trips view runs at this width
+    check(`${w} px: Local and + New trip ${on ? "shown" : "hidden"}, the same as Day Quest's Trips view (${on ? "on" : "off"})`,
+      JSON.stringify(vis) === JSON.stringify([on, on]), JSON.stringify(vis));
     await ctx.close();
   }
   // Day Quest's side of the two links: #trips-local opens its Trips page on the Local tab (computer width, where its
