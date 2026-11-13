@@ -416,6 +416,8 @@
   const api = { startView, pastedEntry, kindOf, missingInfo, needsConfirmFile, missLine, hideCopies, fieldOf, MISSING_FIELD, statusLook, dropPayload, tripDate, MTL, stayLines, planGate, planKind, planTag, cardLabel, planHtml, haversine, gpxPoints, gpxStats, dayIndex, localDay, dayPlan, pillOf, isStay, isHike, whenText, seedRows, SEED, fmtDur, tripKey, mergeTrips, splitTrips, isHomeTrip, localItems, whenLabel, destOf, mapStart };
   root.QuestTrips = api;
   if (typeof document === "undefined" || typeof window === "undefined") return;
+  /* The calendar's Trips page loads this file with data-helpers for the pure helpers above only (2026-11-13). */
+  if (document.currentScript && document.currentScript.dataset && "helpers" in document.currentScript.dataset) return;
 
   /* ── page wiring (desktop only) ───────────────────────────────────── */
   const WIDE = window.matchMedia("(min-width: 768px)");

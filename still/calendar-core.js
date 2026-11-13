@@ -329,15 +329,19 @@
     return h ? `${h} h${m ? ` ${m} min` : ""}` : `${m} min`;
   }
 
-  /* Where a block type's page lives when it is not the calendar's own page (Junyan, 2026-11-12, t9, "9 yes"): the
-     Travel tab opens the Day Quest Trips page now that the trip is planned. Day Quest has no link to one trip yet, so
-     this is the Trips list. Every other type keeps the calendar's page (null). search is the calendar's own
-     location.search, so ?api= goes along word for word: {href, label} for the page and its button. */
-  const PAGE_LINKS = { travel: { page: "quest.html", hash: "#trips", label: "Open Trips in Day Quest" } };
-  function pageLink(kind, search) {
-    if (!Object.prototype.hasOwnProperty.call(PAGE_LINKS, kind)) return null;
-    const p = PAGE_LINKS[kind];
-    return { href: p.page + (search || "") + p.hash, label: p.label };
+  /* The Trips page (Junyan, 2026-11-13: "I want it to stay on the calendar app", replacing t9's jump to Day Quest).
+     upcoming is Day Quest's own split (QuestTrips.splitTrips(...).upcoming, soonest first) and when is its whenLabel,
+     so the calendar shows the same trips Day Quest's Trips view does. One row per trip: {title, dates, when}, dates
+     like "Nov 12 to Nov 17, 2026" (the year once when both days share it). */
+  const TRIP_MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  function tripRows(upcoming, when) {
+    const md = (d) => `${TRIP_MON[+d.slice(5, 7) - 1]} ${+d.slice(8, 10)}`;
+    return (upcoming || []).map((t) => {
+      const s = String(t.start || "").slice(0, 10), e = String(t.end || t.start || "").slice(0, 10);
+      const dates = !s ? "No dates yet" : e === s ? `${md(s)}, ${s.slice(0, 4)}`
+        : e.slice(0, 4) === s.slice(0, 4) ? `${md(s)} to ${md(e)}, ${s.slice(0, 4)}` : `${md(s)}, ${s.slice(0, 4)} to ${md(e)}, ${e.slice(0, 4)}`;
+      return { title: `${t.icon || "🧳"} ${t.name}`, dates, when: when ? when(t) : "" };
+    });
   }
 
   /* ---- the event sheet on the phone (slice 02, Junyan 2026-11-12, d2 and d6: "the event sheet as editable rows").
@@ -424,6 +428,6 @@
   const clock = (min) => { const h = Math.floor(min / 60) % 24; return `${h % 12 || 12}:${String(min % 60).padStart(2, "0")} ${h < 12 ? "AM" : "PM"}`; };
 
   root.CalCore = { wall, instant, offset, addDays, dowOf, weekStart, isoWeek, addMonths, monthKey, monthsFor,
-    KINDS, kindOf, layout, pieces, coversDay, orderBetween, groupOf, dropTask, blockMinutes, hm, dur, SWIPE, swipeLock, swipeCommit, HOUR, pinchHeight, hourMin, pinchMinute, pinchScroll, cardFit, cardTime, startHour, LOOKS, lookId, startLook, LOOK_RESET, placeOf, sunTimes, sunHalf, lookFace, pageLink, homeFit, homeShift,
+    KINDS, kindOf, layout, pieces, coversDay, orderBetween, groupOf, dropTask, blockMinutes, hm, dur, SWIPE, swipeLock, swipeCommit, HOUR, pinchHeight, hourMin, pinchMinute, pinchScroll, cardFit, cardTime, startHour, LOOKS, lookId, startLook, LOOK_RESET, placeOf, sunTimes, sunHalf, lookFace, tripRows, homeFit, homeShift,
     sheetForm, sheetWhen, sheetPatch, sheetLength, sheetStart, sheetEnd, sheetDay, sheetEndDay, sheetAllDay, notesRich, notesText, dayText, clock, toMin };
 })(typeof window !== "undefined" ? window : globalThis);

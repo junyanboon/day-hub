@@ -46,6 +46,15 @@ const readBody = (req) => new Promise((ok) => { let s = ""; req.on("data", (c) =
 http.createServer(async (req, res) => {
   const u = new URL(req.url, "http://x");
   if (req.method === "OPTIONS") return send(res, 200, {});
+  /* still-api's trip list as Day Quest's Trips view and the calendar's Trips page read it (fixed dates, no Notion) */
+  if (u.pathname === "/quest/trips") {
+    if (req.headers["x-quest-key"] !== "test") return send(res, 401, { error: "wrong pairing code (the dev server's code is: test)" });
+    return send(res, 200, { trips: [
+      { name: "2026 Montreal Birthday", start: "2026-11-12", end: "2026-11-17" },
+      { name: "2027 🇧🇷 Brazil Carnaval", start: "2027-02-12", end: "2027-02-20" },
+      { name: "2025 Egypt", start: "2025-03-01", end: "2025-03-09" },
+    ] });
+  }
   if (u.pathname.startsWith("/planner/")) {
     if (req.headers["x-quest-key"] !== "test") return send(res, 401, { error: "wrong pairing code (the dev server's code is: test)" });
     const b = req.method === "GET" || req.method === "DELETE" ? {} : await readBody(req);

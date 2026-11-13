@@ -13,7 +13,8 @@
 <meta name="apple-mobile-web-app-title" content="Calendar">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>Calendar</title>
-<script src="calendar-core.js?v=14"></script>
+<script src="calendar-core.js?v=15"></script>
+<script src="quest-trips.js?v=20261113a" data-helpers></script>
 <script>
 /* The look saved on this device (the Look row in Settings; Studio when none) goes on here, before anything is drawn,
    so the page never opens in the wrong look first. Studio shows its day or night half by the sun in the calendar's
@@ -486,8 +487,6 @@ const API = qs.get("api") || "https://still.srv1948070.hstgr.cloud";
 const SNAP = 15, WIN = 36, BACK = 14;
 /** A phone or tablet: the finger moves days through wireSwipe (never native sideways scrolling). */
 const TOUCH = matchMedia("(hover: none) and (pointer: coarse)").matches;
-/** Wide enough for Day Quest's desktop pages (quest-trips.js draws Trips from 768 px; under that it does nothing). */
-const WIDE = matchMedia("(min-width: 768px)");
 document.body.classList.toggle("touch", TOUCH);
 /* Safari in a tab may still pinch-zoom past user-scalable=no; its own gesture events stop that (touch only). */
 if (TOUCH) for (const g of ["gesturestart", "gesturechange"]) document.addEventListener(g, (e) => e.preventDefault(), { passive: false });
@@ -495,7 +494,7 @@ if (TOUCH) for (const g of ["gesturestart", "gesturechange"]) document.addEventL
    which shows this build, the phone's answers and a log of every day change with its cause. Until then CalHook.on is
    null and diag() does nothing. BUILD names this copy of the page, so a screenshot proves which copy ran: change it on
    every change to this page or calendar-readout.js (the date plus a letter). */
-const BUILD = "2026-11-12l keyboard sheet";
+const BUILD = "2026-11-13a trips page";
 const CalHook = window.CalHook = { BUILD, on: null };
 const diag = (kind, msg) => { if (CalHook.on) CalHook.on(kind, msg); };
 /* The iPhone home screen app's fit (2026-11-12): html.hs in a home screen app on touch, html.hsfill and --hsgap when
@@ -1146,7 +1145,7 @@ function pEvent(ev) {
     ${canEdit ? "" : `<div class="meta">${esc(cal.name)} is read-only here.</div>`}
     <div class="r">${ev.ghost ? `<button class="btn" id="pSkip">Skip</button><span class="spacer"></span><button class="btn pri" id="pAcc">Accept</button>`
       : `${isNew || !canEdit ? "" : '<button class="btn del" id="pDel">Delete</button>'}${ev.htmlLink ? `<a class="meta" href="${esc(ev.htmlLink)}" target="_blank" rel="noopener">Open in Google</a>` : ""}<span class="spacer"></span>${canEdit ? '<button class="btn pri" id="pSave">Save</button>' : ""}`}</div>
-    ${!isNew && !ev.ghost && TYPES.includes(ev.k) ? `<button class="btn k-${ev.k}" data-page="${ev.k}" style="border-color:color-mix(in srgb,var(--c) 50%,transparent)">${esc(WIDE.matches && C.pageLink(ev.k) ? C.pageLink(ev.k).label : `Open the ${KNAME[ev.k]} page`)} &#8250;</button>` : ""}`;
+    ${!isNew && !ev.ghost && TYPES.includes(ev.k) ? `<button class="btn k-${ev.k}" data-page="${ev.k}" style="border-color:color-mix(in srgb,var(--c) 50%,transparent)">${esc(`Open the ${KNAME[ev.k]} page`)} &#8250;</button>` : ""}`;
 }
 /* ---------- the phone's event sheet (slice 02, Junyan 2026-11-12, d2): one-line rows, 760px wide or less ----------
    S.form holds the rows (calendar-core.js sheetForm); a change to a row updates S.form and repaints only the row texts,
@@ -1183,7 +1182,7 @@ function pSheet(ev) {
     ${canEdit ? "" : `<div class="meta">${esc(cal.name)} is read-only here.</div>`}
     ${ev.ghost ? `<div class="r"><button class="btn" id="pSkip">Skip</button><span class="spacer"></span><button class="btn pri" id="pAcc">Accept</button></div>` : ""}
     ${ev.htmlLink ? `<a class="meta" href="${esc(ev.htmlLink)}" target="_blank" rel="noopener">Open in Google</a>` : ""}
-    ${!isNew && !ev.ghost && TYPES.includes(ev.k) ? `<button class="btn k-${ev.k}" data-page="${ev.k}" style="border-color:color-mix(in srgb,var(--c) 50%,transparent)">${esc(WIDE.matches && C.pageLink(ev.k) ? C.pageLink(ev.k).label : `Open the ${KNAME[ev.k]} page`)} &#8250;</button>` : ""}
+    ${!isNew && !ev.ghost && TYPES.includes(ev.k) ? `<button class="btn k-${ev.k}" data-page="${ev.k}" style="border-color:color-mix(in srgb,var(--c) 50%,transparent)">${esc(`Open the ${KNAME[ev.k]} page`)} &#8250;</button>` : ""}
   </div>`;
 }
 /** The words in the sheet's rows for a form: "Fri, Nov 13", "1:45 PM", an end on a later day names that day. */
@@ -1316,15 +1315,37 @@ function renderPage() {
   const up = all.filter((e) => (e.allDay ? e.end > t : e.e > now)).sort((a, b) => (a.allDay ? Date.parse(a.start) : a.s) - (b.allDay ? Date.parse(b.start) : b.s)).slice(0, 6);
   let dots = ""; for (let i = 0; i < 7; i++) { const d = C.addDays(ws, i); dots += `<i class="${on(d) ? (d < t ? "did" : d === t ? "tod" : "plan") : ""}" title="${DOW[C.dowOf(d)]}">${"MTWTFSS"[i]}</i>`; }
   const pg = $("#page"); pg.className = "page k-" + k;
+  if (k === "travel") { pg.innerHTML = tripsPage(dots, up); return; }
   pg.innerHTML = `<div class="phead"><button class="btn" data-page="cal">&#8249; Calendar</button><span class="pi">${KICON[k]}</span><div style="min-width:0"><h2>${esc(KNAME[k])}</h2><div class="meta">Will be filled from ${esc(KFROM[k])}</div></div><span class="spacer"></span><div class="wkd" aria-label="This week">${dots}</div></div>
     <div class="pgrid"><div class="card"><p class="lbl">Next ${esc(KNAME[k])} blocks</p>${up.map((e) => rowHTML(e, true)).join("") || '<span class="meta">None planned. Add one on the calendar.</span>'}</div>
     <div class="card"><p class="lbl">This page</p><div style="color:var(--soft);line-height:1.5">The ${esc(KNAME[k])} page is being built as its own step. For now it shows your next blocks of this type; tap one to see it on the calendar.</div></div></div>`;
 }
+/* The Trips page (Junyan, 2026-11-13): the plane's own page in the calendar, the same look as Deep Work. Its trips are
+   the ones Day Quest's Trips view shows: still-api /quest/trips merged with Day Quest's saved Montreal copy, split by
+   Day Quest's own splitTrips (quest-trips.js, loaded with data-helpers so its sidebar never draws here). Read only:
+   adding or changing a trip stays in Day Quest. */
+function tripsPage(dots, up) {
+  const T = window.QuestTrips, k = "travel";
+  const rows = T ? C.tripRows(T.splitTrips(S.trips || [], today()).upcoming, T.whenLabel) : [];
+  const trip = (r) => `<div class="row trip" style="grid-template-columns:minmax(0,1fr) auto"><span><b>${esc(r.title)}</b> <small>${esc(r.dates)}</small></span><small>${esc(r.when)}</small></div>`;
+  return `<div class="phead"><button class="btn" data-page="cal">&#8249; Calendar</button><span class="pi">${KICON[k]}</span><div style="min-width:0"><h2>Trips</h2><div class="meta">From ${esc(KFROM[k])}</div></div><span class="spacer"></span><div class="wkd" aria-label="This week">${dots}</div></div>
+    <div class="pgrid"><div class="card"><p class="lbl">Upcoming trips</p>${rows.map(trip).join("") || `<span class="meta">${S.tripsLoading ? "Loading trips…" : "Nothing coming up."}</span>`}</div>
+    <div class="card"><p class="lbl">Next ${esc(KNAME[k])} blocks</p>${up.map((e) => rowHTML(e, true)).join("") || '<span class="meta">None planned. Add one on the calendar.</span>'}</div></div>`;
+}
+/** Loads the trip list once per visit to the page: the saved copy at once, then still-api's list merged in. */
+async function loadTrips() {
+  const T = window.QuestTrips; if (!T || S.tripsLoading) return;
+  if (!S.trips) S.trips = T.mergeTrips([{ name: T.MTL, start: T.SEED.start, end: T.SEED.end, icon: "🧳" }]);
+  S.tripsLoading = true;
+  try { const d = await api("/quest/trips"); S.trips = T.mergeTrips([{ name: T.MTL, start: T.SEED.start, end: T.SEED.end, icon: "🧳" }, ...(d.trips || []).map((t) => ({ ...t, icon: "🧳" }))]); }
+  catch (e) { diag("trips", e.message); }
+  S.tripsLoading = false;
+  if (S.page === "travel") render();
+}
 function showPage(k) {
-  /* t9 (Junyan, 2026-11-12, "9 yes"): a type whose page lives elsewhere (travel: Day Quest Trips) goes there, on a
-     wide screen only; a phone keeps this page because Day Quest has no Trips page there. ?api= carries over. */
-  const link = WIDE.matches && C.pageLink(k, location.search);
-  if (link) { location.href = link.href; return; }
+  /* Every type stays in the calendar (Junyan, 2026-11-13: "I want it to stay on the calendar app"; t9's jump to
+     Day Quest Trips is gone). The plane's page lists his trips (tripsPage). */
+  if (k === "travel") loadTrips();
   if (S.page === "cal" && $("#strip")) S.top = $("#view").scrollTop;
   S.page = k; document.body.classList.toggle("onpage", k !== "cal"); document.body.classList.remove("popen", "month");
   $("#page").hidden = k === "cal"; render();

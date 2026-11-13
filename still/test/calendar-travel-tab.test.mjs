@@ -1,8 +1,10 @@
 // node --test still/test/calendar-travel-tab.test.mjs
-// Junyan, 2026-11-12 (t9, "9 yes"): the calendar's Travel tab opens the Day Quest Trips page once the trip is planned.
-// The Montreal trip is planned, so the Travel tab and an event's "Open the Travel page" go to quest.html#trips, and
-// Day Quest opens on its Trips page when the address ends in #trips. Day Quest has no link to one trip yet, so every
-// travel event lands on the Trips list (one click from its trip).
+// Junyan, 2026-11-13: "When I hit the travel icon it is goign to the day quest rather than staying on the calendar app.
+// I want it to stay on the calendar app." This replaces t9 (2026-11-12, "9 yes"), which sent the Travel tab to Day
+// Quest's Trips page on a wide screen. The plane now opens the calendar's own Trips page, the same in-app page as
+// Deep Work, listing his trips from the same data Day Quest's Trips view reads (still-api /quest/trips, with Day
+// Quest's saved Montreal copy until the server answers). The live browser check is
+// still/test/e2e/calendar-trips.e2e.mjs.
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
@@ -11,31 +13,53 @@ import { fileURLToPath } from "node:url";
 import "../calendar-core.js";
 
 const C = globalThis.CalCore;
+const src = fs.readFileSync(fileURLToPath(new URL("../quest-trips.js", import.meta.url)), "utf8");
 const ctx = {}; ctx.globalThis = ctx;
-vm.runInNewContext(fs.readFileSync(fileURLToPath(new URL("../quest-trips.js", import.meta.url)), "utf8"), ctx);
+vm.runInNewContext(src, ctx);
 const T = ctx.QuestTrips;
 
-test("the Travel kind's page is the Day Quest Trips page, with its own button label", () => {
-  assert.deepEqual({ ...C.pageLink("travel", "") }, { href: "quest.html#trips", label: "Open Trips in Day Quest" });
+test("no block type sends the calendar out to another app any more", () => {
+  for (const [k] of C.KINDS) assert.equal(typeof C.pageLink === "function" ? C.pageLink(k, "") : null, null, k);
 });
 
-test("the calendar's ?api= goes along to Day Quest, word for word", () => {
-  assert.equal(C.pageLink("travel", "?api=http://localhost:8787").href, "quest.html?api=http://localhost:8787#trips");
-  assert.equal(C.pageLink("travel", "?api=x$&y$'z").href, "quest.html?api=x$&y$'z#trips", "a $ in the address is kept as is");
-  assert.equal(C.pageLink("travel").href, "quest.html#trips");
+test("the Trips page lists the saved Montreal trip as Now on 2026-11-13", () => {
+  const seed = [{ name: T.MTL, start: T.SEED.start, end: T.SEED.end, icon: "🧳" }];
+  const rows = C.tripRows(T.splitTrips(T.mergeTrips(seed), "2026-11-13").upcoming, T.whenLabel);
+  assert.deepEqual([...rows].map((r) => ({ ...r })), [{ title: "🧳 2026 🇨🇦 Montreal Birthday", dates: "Nov 12 to Nov 17, 2026", when: "Now" }]);
 });
 
-test("every other kind keeps the calendar's own page", () => {
-  for (const [k] of C.KINDS) if (k !== "travel") assert.equal(C.pageLink(k, ""), null, k);
-  assert.equal(C.pageLink(undefined, ""), null);
-  assert.equal(C.pageLink("constructor", ""), null);
+test("Trips rows: soonest first, past trips and Toronto left out, dates across a year end", () => {
+  const list = [
+    { name: "2027 🇧🇷 Brazil Carnaval", start: "2027-02-12", end: "2027-02-20" },
+    { name: "2026 🇨🇦 Montreal Birthday", start: "2026-11-12", end: "2026-11-17" },
+    { name: "2025 Egypt", start: "2025-03-01", end: "2025-03-09" },
+    { name: "Toronto", start: "2026-11-01", end: "2026-12-31" },
+    { name: "2026 New Year", start: "2026-12-30", end: "2027-01-02" },
+    { name: "Day trip", start: "2026-11-20", end: "2026-11-20" },
+  ];
+  const rows = C.tripRows(T.splitTrips(T.mergeTrips(list), "2026-11-13").upcoming, T.whenLabel);
+  assert.deepEqual([...rows].map((r) => [r.title, r.dates, r.when]), [
+    ["🧳 2026 🇨🇦 Montreal Birthday", "Nov 12 to Nov 17, 2026", "Now"],
+    ["🧳 Day trip", "Nov 20, 2026", "7 days away"],
+    ["🧳 2026 New Year", "Dec 30, 2026 to Jan 2, 2027", "47 days away"],
+    ["🧳 2027 🇧🇷 Brazil Carnaval", "Feb 12 to Feb 20, 2027", "91 days away"],
+  ]);
 });
 
-test("Day Quest opens on the Trips page when the address ends in #trips", () => {
+test("the calendar can load quest-trips.js for its helpers without Day Quest's sidebar drawing on it", () => {
+  const touched = [];
+  const doc = new Proxy({ currentScript: { dataset: { helpers: "" } } }, {
+    get(o, p) { if (p in o) return o[p]; touched.push(String(p)); return () => { throw new Error("document." + String(p) + " used"); }; },
+  });
+  const win = { matchMedia: () => ({ matches: true, addEventListener() {} }), localStorage: { getItem: () => "" } };
+  const c = { document: doc, window: win, location: { search: "", hash: "" } }; c.globalThis = c;
+  assert.doesNotThrow(() => vm.runInNewContext(src, c));
+  assert.equal(typeof c.QuestTrips.splitTrips, "function");
+  assert.deepEqual(touched, []);
+});
+
+test("Day Quest still opens on its own Trips page when the address ends in #trips", () => {
   assert.equal(T.startView("#trips"), "trips");
   assert.equal(T.startView("#Trips"), "trips");
-});
-
-test("any other address opens Day Quest on Today as before", () => {
   for (const h of ["", "#", "#pair=abc123", "#tripsx", "#gym"]) assert.equal(T.startView(h), null, h);
 });
