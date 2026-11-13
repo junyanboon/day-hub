@@ -19,7 +19,7 @@ vm.runInNewContext(src, ctx);
 const T = ctx.QuestTrips;
 
 test("no block type sends the calendar out to another app any more", () => {
-  for (const [k] of C.KINDS) assert.equal(typeof C.pageLink === "function" ? C.pageLink(k, "") : null, null, k);
+  assert.equal(C.pageLink, undefined, "t9's link to Day Quest Trips is gone from CalCore");
 });
 
 test("the Trips page lists the saved Montreal trip as Now on 2026-11-13", () => {

@@ -1327,7 +1327,7 @@ function renderPage() {
 function tripsPage(dots, up) {
   const T = window.QuestTrips, k = "travel";
   const rows = T ? C.tripRows(T.splitTrips(S.trips || [], today()).upcoming, T.whenLabel) : [];
-  const trip = (r) => `<div class="row trip" style="grid-template-columns:minmax(0,1fr) auto"><span><b>${esc(r.title)}</b> <small>${esc(r.dates)}</small></span><small>${esc(r.when)}</small></div>`;
+  const trip = (r) => `<div class="row" style="grid-template-columns:minmax(0,1fr) auto"><span><b>${esc(r.title)}</b> <small>${esc(r.dates)}</small></span><small>${esc(r.when)}</small></div>`;
   return `<div class="phead"><button class="btn" data-page="cal">&#8249; Calendar</button><span class="pi">${KICON[k]}</span><div style="min-width:0"><h2>Trips</h2><div class="meta">From ${esc(KFROM[k])}</div></div><span class="spacer"></span><div class="wkd" aria-label="This week">${dots}</div></div>
     <div class="pgrid"><div class="card"><p class="lbl">Upcoming trips</p>${rows.map(trip).join("") || `<span class="meta">${S.tripsLoading ? "Loading trips…" : "Nothing coming up."}</span>`}</div>
     <div class="card"><p class="lbl">Next ${esc(KNAME[k])} blocks</p>${up.map((e) => rowHTML(e, true)).join("") || '<span class="meta">None planned. Add one on the calendar.</span>'}</div></div>`;
@@ -1335,9 +1335,10 @@ function tripsPage(dots, up) {
 /** Loads the trip list once per visit to the page: the saved copy at once, then still-api's list merged in. */
 async function loadTrips() {
   const T = window.QuestTrips; if (!T || S.tripsLoading) return;
-  if (!S.trips) S.trips = T.mergeTrips([{ name: T.MTL, start: T.SEED.start, end: T.SEED.end, icon: "🧳" }]);
+  const saved = { name: T.MTL, start: T.SEED.start, end: T.SEED.end };
+  if (!S.trips) S.trips = T.mergeTrips([saved]);
   S.tripsLoading = true;
-  try { const d = await api("/quest/trips"); S.trips = T.mergeTrips([{ name: T.MTL, start: T.SEED.start, end: T.SEED.end, icon: "🧳" }, ...(d.trips || []).map((t) => ({ ...t, icon: "🧳" }))]); }
+  try { const d = await api("/quest/trips"); S.trips = T.mergeTrips([saved, ...(d.trips || [])]); }
   catch (e) { diag("trips", e.message); }
   S.tripsLoading = false;
   if (S.page === "travel") render();
