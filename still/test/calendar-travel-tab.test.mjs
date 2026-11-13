@@ -22,28 +22,51 @@ test("no block type sends the calendar out to another app any more", () => {
   assert.equal(C.pageLink, undefined, "t9's link to Day Quest Trips is gone from CalCore");
 });
 
-test("the Trips page lists the saved Montreal trip as Now on 2026-11-13", () => {
-  const seed = [{ name: T.MTL, start: T.SEED.start, end: T.SEED.end, icon: "🧳" }];
-  const rows = C.tripRows(T.splitTrips(T.mergeTrips(seed), "2026-11-13").upcoming, T.whenLabel);
-  assert.deepEqual([...rows].map((r) => ({ ...r })), [{ title: "🧳 2026 🇨🇦 Montreal Birthday", dates: "Nov 12 to Nov 17, 2026", when: "Now" }]);
+/* Look A (Junyan, 2026-11-13, d3: "3A"): one card per trip with Day Quest's own chips. The numbers are the ones
+   still-api /quest/trips sends (need, booked, bookings), kept through mergeTrips. */
+const SAMPLE = [
+  { name: "2026 🇨🇦 Montreal Birthday", start: "2026-11-12", end: "2026-11-17", need: 3, booked: 7, bookings: 43 },
+  { name: "2027 🇧🇷 Brazil Carnaval", start: "2027-01-02", end: "2027-02-07", booked: 13, bookings: 14 },
+  { name: "2025 Egypt", start: "2025-03-01", end: "2025-03-09", bookings: 1 },
+  { name: "2024 Lisbon", start: "2024-05-01", end: "2024-05-01" },
+  { name: "Toronto", start: "2026-11-01", end: "2026-12-31", bookings: 9 },
+  { name: "2023 Oaxaca" },
+  { name: "Someday Japan" },
+];
+const cards = () => C.tripCards(T.splitTrips(T.mergeTrips(SAMPLE), "2026-11-13"), T.whenLabel);
+const plain = (list) => [...list].map((c) => ({ name: c.name, title: c.title, dates: c.dates, chips: [...c.chips].map((x) => [x.cls, x.text]) }));
+
+test("Upcoming: the two cards of look A, every chip with its wording, soonest first", () => {
+  assert.deepEqual(plain(cards().upcoming), [
+    { name: "2026 🇨🇦 Montreal Birthday", title: "🧳 2026 🇨🇦 Montreal Birthday", dates: "Nov 12, 2026 to Nov 17, 2026",
+      chips: [["now", "Now"], ["need", "3 to book"], ["paid", "7 booked"], ["", "43 bookings"]] },
+    { name: "2027 🇧🇷 Brazil Carnaval", title: "🧳 2027 🇧🇷 Brazil Carnaval", dates: "Jan 2, 2027 to Feb 7, 2027",
+      chips: [["", "50 days away"], ["paid", "13 booked"], ["", "14 bookings"]] },
+  ]);
 });
 
-test("Trips rows: soonest first, past trips and Toronto left out, dates across a year end", () => {
-  const list = [
-    { name: "2027 🇧🇷 Brazil Carnaval", start: "2027-02-12", end: "2027-02-20" },
-    { name: "2026 🇨🇦 Montreal Birthday", start: "2026-11-12", end: "2026-11-17" },
-    { name: "2025 Egypt", start: "2025-03-01", end: "2025-03-09" },
-    { name: "Toronto", start: "2026-11-01", end: "2026-12-31" },
-    { name: "2026 New Year", start: "2026-12-30", end: "2027-01-02" },
-    { name: "Day trip", start: "2026-11-20", end: "2026-11-20" },
-  ];
-  const rows = C.tripRows(T.splitTrips(T.mergeTrips(list), "2026-11-13").upcoming, T.whenLabel);
-  assert.deepEqual([...rows].map((r) => [r.title, r.dates, r.when]), [
-    ["🧳 2026 🇨🇦 Montreal Birthday", "Nov 12 to Nov 17, 2026", "Now"],
-    ["🧳 Day trip", "Nov 20, 2026", "7 days away"],
-    ["🧳 2026 New Year", "Dec 30, 2026 to Jan 2, 2027", "47 days away"],
-    ["🧳 2027 🇧🇷 Brazil Carnaval", "Feb 12 to Feb 20, 2027", "91 days away"],
+test("Past: newest first with days ago, a one-day trip shows one date, one booking is singular, Toronto is never a trip", () => {
+  const c = cards();
+  assert.deepEqual(plain(c.past), [
+    { name: "2025 Egypt", title: "🧳 2025 Egypt", dates: "Mar 1, 2025 to Mar 9, 2025", chips: [["", "614 days ago"], ["", "1 booking"]] },
+    { name: "2024 Lisbon", title: "🧳 2024 Lisbon", dates: "May 1, 2024", chips: [["", "926 days ago"]] },
+    { name: "2023 Oaxaca", title: "🧳 2023 Oaxaca", dates: "No dates yet", chips: [] },
   ]);
+  assert.deepEqual(plain(c.needsDates), [{ name: "Someday Japan", title: "🧳 Someday Japan", dates: "No dates yet", chips: [] }]);
+  assert.deepEqual({ ...c.counts }, { upcoming: 2, past: 4 }, "Past counts the undated trips too, as Day Quest's tab does");
+});
+
+test("a trip's own icon wins over the suitcase", () => {
+  const c = C.tripCards(T.splitTrips([{ name: "Ski week", icon: "⛷️", start: "2026-12-01", end: "2026-12-05" }], "2026-11-13"), T.whenLabel);
+  assert.equal(c.upcoming[0].title, "⛷️ Ski week");
+});
+
+test("Local and + New trip are plain links to Day Quest's own Local tab and new-trip flow, ?api= carried along", () => {
+  assert.deepEqual({ ...C.tripLinks("?api=http%3A%2F%2Flocalhost%3A8806") }, {
+    local: "quest.html?api=http%3A%2F%2Flocalhost%3A8806#trips-local",
+    add: "quest.html?api=http%3A%2F%2Flocalhost%3A8806#trips-new",
+  });
+  assert.deepEqual({ ...C.tripLinks("") }, { local: "quest.html#trips-local", add: "quest.html#trips-new" });
 });
 
 test("the calendar can load quest-trips.js for its helpers without Day Quest's sidebar drawing on it", () => {
@@ -58,8 +81,10 @@ test("the calendar can load quest-trips.js for its helpers without Day Quest's s
   assert.deepEqual(touched, []);
 });
 
-test("Day Quest still opens on its own Trips page when the address ends in #trips", () => {
+test("Day Quest opens on its Trips page, its Local tab or its new-trip flow from the address", () => {
   assert.equal(T.startView("#trips"), "trips");
   assert.equal(T.startView("#Trips"), "trips");
-  for (const h of ["", "#", "#pair=abc123", "#tripsx", "#gym"]) assert.equal(T.startView(h), null, h);
+  assert.equal(T.startView("#trips-local"), "local", "the calendar's Local tab lands on Day Quest's Local tab");
+  assert.equal(T.startView("#trips-new"), "new", "the calendar's + New trip starts Day Quest's new-trip flow");
+  for (const h of ["", "#", "#pair=abc123", "#tripsx", "#gym", "#trips-localx", "#trips-"]) assert.equal(T.startView(h), null, h);
 });

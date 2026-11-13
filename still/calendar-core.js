@@ -329,20 +329,30 @@
     return h ? `${h} h${m ? ` ${m} min` : ""}` : `${m} min`;
   }
 
-  /* The Trips page (Junyan, 2026-11-13: "I want it to stay on the calendar app", replacing t9's jump to Day Quest).
-     upcoming is Day Quest's own split (QuestTrips.splitTrips(...).upcoming, soonest first) and when is its whenLabel,
-     so the calendar shows the same trips Day Quest's Trips view does. One row per trip: {title, dates, when}, dates
-     like "Nov 12 to Nov 17, 2026" (the year once when both days share it). */
+  /* The Trips page (Junyan, 2026-11-13: "I want it to stay on the calendar app", replacing t9's jump to Day Quest),
+     drawn as look A (d3: "3A"): one card per trip with Day Quest's own chips. split is Day Quest's own
+     QuestTrips.splitTrips(...) and when is its whenLabel, so the calendar shows the trips, counts and chips Day Quest's
+     Trips view does. A card is {name, title, dates, chips: [{cls, text}]}; name is the trip's Notion name, kept so a
+     card can open its trip later without a change here. cls is "now", "need", "paid" or "" (grey). */
   const TRIP_MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-  function tripRows(upcoming, when) {
-    const md = (d) => `${TRIP_MON[+d.slice(5, 7) - 1]} ${+d.slice(8, 10)}`;
-    return (upcoming || []).map((t) => {
-      const s = String(t.start || "").slice(0, 10), e = String(t.end || t.start || "").slice(0, 10);
-      const dates = !s ? "No dates yet" : e === s ? `${md(s)}, ${s.slice(0, 4)}`
-        : e.slice(0, 4) === s.slice(0, 4) ? `${md(s)} to ${md(e)}, ${s.slice(0, 4)}` : `${md(s)}, ${s.slice(0, 4)} to ${md(e)}, ${e.slice(0, 4)}`;
-      return { title: `${t.icon || "🧳"} ${t.name}`, dates, when: when ? when(t) : "" };
-    });
+  function tripCard(t, when) {
+    const day = (d) => `${TRIP_MON[+d.slice(5, 7) - 1]} ${+d.slice(8, 10)}, ${d.slice(0, 4)}`;
+    const s = String(t.start || "").slice(0, 10), e = String(t.end || t.start || "").slice(0, 10);
+    const chips = [];
+    if (s && when) chips.push({ cls: t.now ? "now" : "", text: when(t) });
+    if (+t.need) chips.push({ cls: "need", text: `${+t.need} to book` });
+    if (+t.booked) chips.push({ cls: "paid", text: `${+t.booked} booked` });
+    if (t.bookings != null) chips.push({ cls: "", text: `${+t.bookings} booking${+t.bookings === 1 ? "" : "s"}` });
+    return { name: t.name, title: `${t.icon || "🧳"} ${t.name}`, dates: !s ? "No dates yet" : e === s ? day(s) : `${day(s)} to ${day(e)}`, chips };
   }
+  function tripCards(split, when) {
+    const sp = split || {}, card = (t) => tripCard(t, when);
+    const upcoming = (sp.upcoming || []).map(card), past = (sp.past || []).map(card), needsDates = (sp.needsDates || []).map(card);
+    return { upcoming, past, needsDates, counts: { upcoming: upcoming.length, past: past.length + needsDates.length } };
+  }
+  /* Local and + New trip stay in Day Quest (Junyan, 2026-11-13, d4: "4 no"): plain links to its Local tab and its
+     new-trip flow (QuestTrips.startView reads the hash). search is the calendar's location.search, so ?api= goes along. */
+  const tripLinks = (search) => ({ local: `quest.html${search || ""}#trips-local`, add: `quest.html${search || ""}#trips-new` });
 
   /* ---- the event sheet on the phone (slice 02, Junyan 2026-11-12, d2 and d6: "the event sheet as editable rows").
      The sheet keeps a form: {title, calId, kind, location, description, allDay, day, start, end, days, endDay}.
@@ -428,6 +438,6 @@
   const clock = (min) => { const h = Math.floor(min / 60) % 24; return `${h % 12 || 12}:${String(min % 60).padStart(2, "0")} ${h < 12 ? "AM" : "PM"}`; };
 
   root.CalCore = { wall, instant, offset, addDays, dowOf, weekStart, isoWeek, addMonths, monthKey, monthsFor,
-    KINDS, kindOf, layout, pieces, coversDay, orderBetween, groupOf, dropTask, blockMinutes, hm, dur, SWIPE, swipeLock, swipeCommit, HOUR, pinchHeight, hourMin, pinchMinute, pinchScroll, cardFit, cardTime, startHour, LOOKS, lookId, startLook, LOOK_RESET, placeOf, sunTimes, sunHalf, lookFace, tripRows, homeFit, homeShift,
+    KINDS, kindOf, layout, pieces, coversDay, orderBetween, groupOf, dropTask, blockMinutes, hm, dur, SWIPE, swipeLock, swipeCommit, HOUR, pinchHeight, hourMin, pinchMinute, pinchScroll, cardFit, cardTime, startHour, LOOKS, lookId, startLook, LOOK_RESET, placeOf, sunTimes, sunHalf, lookFace, tripCards, tripLinks, homeFit, homeShift,
     sheetForm, sheetWhen, sheetPatch, sheetLength, sheetStart, sheetEnd, sheetDay, sheetEndDay, sheetAllDay, notesRich, notesText, dayText, clock, toMin };
 })(typeof window !== "undefined" ? window : globalThis);

@@ -50,9 +50,9 @@ http.createServer(async (req, res) => {
   if (u.pathname === "/quest/trips") {
     if (req.headers["x-quest-key"] !== "test") return send(res, 401, { error: "wrong pairing code (the dev server's code is: test)" });
     return send(res, 200, { trips: [
-      { name: "2026 Montreal Birthday", start: "2026-11-12", end: "2026-11-17" },
-      { name: "2027 🇧🇷 Brazil Carnaval", start: "2027-02-12", end: "2027-02-20" },
-      { name: "2025 Egypt", start: "2025-03-01", end: "2025-03-09" },
+      { name: "2026 Montreal Birthday", start: "2026-11-12", end: "2026-11-17", need: 3, booked: 7, bookings: 43 },
+      { name: "2027 🇧🇷 Brazil Carnaval", start: "2027-01-02", end: "2027-02-07", booked: 13, bookings: 14 },
+      { name: "2025 Egypt", start: "2025-03-01", end: "2025-03-09", bookings: 6 },
     ] });
   }
   if (u.pathname.startsWith("/planner/")) {
