@@ -92,8 +92,18 @@ padding:env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) env(safe-are
       `${rect(".drop")}  ${rect("#newTask")}`,
       `${rect(".app")}  ${rect(".bar")}  ${rect(".pane")}`,
       `${rect("#view")}  ${rect(".dhead")}  sc L ${v ? r(v.scrollLeft) : "-"} T ${v ? r(v.scrollTop) : "-"}`,
+      kbLine(),
       `last ${lastDay}`,
       `cur ${st.cur} n ${st.n} win0 ${st.win0} dw ${r(st.dw)} slideX ${r(st.slideX)} shownX ${r(st.shown)} shown ${shownDay}`].join("\n");
+  }
+  /** The keyboard over the event sheet (BUILD 2026-11-12l): on or off, the visual viewport (height@offsetTop), where the
+      sheet sits, its top padding, its header row (x, Event, Save) and the Title. Good on the phone: head starts at or
+      below pad, and pad is 100 in the home screen app with Top clear. */
+  function kbLine() {
+    const p = document.getElementById("panel"), vv = window.visualViewport;
+    const on = !!(p && p.classList.contains("kb"));
+    const span = (el) => { if (!el) return "-"; const b = el.getBoundingClientRect(); return `${r(b.top)}..${r(b.bottom)}`; };
+    return `kb ${on ? "on" : "off"} vv ${vv ? r(vv.height) + "@" + r(vv.offsetTop) : "-"} sheet ${span(p)} pad ${p ? r(parseFloat(getComputedStyle(p).paddingTop)) : "-"} head ${span(document.querySelector(".shead"))} title ${span(document.getElementById("pTitle"))}`;
   }
   /** The home screen fit (calendar.html homeFit): his two switches, the gap it stretched by, and which rule is on. */
   function fitLine() {

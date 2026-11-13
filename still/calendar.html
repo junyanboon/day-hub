@@ -393,7 +393,11 @@ body.onpage .left,body.onpage .main,body.onpage .panel{display:none}
   .panel:has(.sheet) .pbody{padding-top:4px;gap:12px;padding-bottom:calc(16px + env(safe-area-inset-bottom,0px))}
   .sheet{display:flex;flex-direction:column;gap:12px}
   .shead{display:grid;grid-template-columns:72px 1fr 72px;align-items:center;min-height:44px;position:sticky;top:0;z-index:2;background:var(--bar)}
-  .panel.kb{border-radius:0}.panel.kb .grab{display:none}.panel.kb .pbody{padding-bottom:16px}
+  /* keyboard up (sheetFit pins the sheet to the visual viewport, which starts at the screen's very top): the sheet pads
+     its top by the status strip, so x, Event, Save and the Title never sit under the clock (Junyan, 2026-11-12: "Event
+     title also gets pushed into the blur"); a home screen app adds its clear strip below (html.hs .panel.kb). A box
+     scrolled into view stops below the sticky header row (scroll-padding-top). */
+  .panel.kb{border-radius:0;padding-top:env(safe-area-inset-top,0px)}.panel.kb .grab{display:none}.panel.kb .pbody{padding-bottom:16px;scroll-padding-top:56px}
   .shead b{text-align:center;font-size:16px}
   .shead .icon{justify-self:start;width:44px;height:44px;font-size:19px;margin-left:-10px}
   .shead .btn.pri{justify-self:end;padding:8px 16px;font-size:15px}
@@ -431,6 +435,7 @@ html.hs{--hstop:0px}
 html.hs.hsclear{--hstop:38px}
 html.hs body::before{height:calc(env(safe-area-inset-top,0px) + var(--hstop))}
 html.hs .app{padding-top:calc(env(safe-area-inset-top,0px) + var(--hstop))}
+html.hs .panel.kb{padding-top:calc(env(safe-area-inset-top,0px) + var(--hstop))}
 html.hs body.month .left{top:calc(48px + env(safe-area-inset-top,0px) + var(--hstop))}
 html.hsfill{height:calc(100% + var(--hsgap,0px))}
 html.hsfill .drop{bottom:calc(-1 * var(--hsshift,0px))}
@@ -490,7 +495,7 @@ if (TOUCH) for (const g of ["gesturestart", "gesturechange"]) document.addEventL
    which shows this build, the phone's answers and a log of every day change with its cause. Until then CalHook.on is
    null and diag() does nothing. BUILD names this copy of the page, so a screenshot proves which copy ran: change it on
    every change to this page or calendar-readout.js (the date plus a letter). */
-const BUILD = "2026-11-12k bottom bar";
+const BUILD = "2026-11-12l keyboard sheet";
 const CalHook = window.CalHook = { BUILD, on: null };
 const diag = (kind, msg) => { if (CalHook.on) CalHook.on(kind, msg); };
 /* The iPhone home screen app's fit (2026-11-12): html.hs in a home screen app on touch, html.hsfill and --hsgap when
@@ -1443,7 +1448,7 @@ function setup() {
 function readout() {
   if (window.CalReadout) { CalReadout.toggle(); return; }
   CalHook.state = () => ({ cur: S.cur, win0: S.win0, n: S.n, dw, slideX, shown: TOUCH && $("#strip") ? shownX() : null, touch: TOUCH, api: API, h: S.h });
-  const s = document.createElement("script"); s.src = "calendar-readout.js?v=5"; document.head.appendChild(s);
+  const s = document.createElement("script"); s.src = "calendar-readout.js?v=6"; document.head.appendChild(s);
 }
 function boot() { render(); loadSide(); refresh(); }
 setup(); boot();

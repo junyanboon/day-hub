@@ -126,7 +126,7 @@ try {
     for (let i = 0; i < 5; i++) { await tap("#title"); await sleep(120); }
     await sleep(600);
     const text = await page.evaluate(() => document.querySelector("#readout")?.innerText || "");
-    check("readout shows BUILD 2026-11-12k bottom bar", /BUILD 2026-11-12k bottom bar/.test(text));
+    check("readout shows BUILD 2026-11-12l keyboard sheet", /BUILD 2026-11-12l keyboard sheet/.test(text));
     check("readout shows the fit line", /fit auto gap 62 shift 62 top clear\s+rules hs hsclear hsfill/.test(text), (text.match(/\nfit [^\n]*/) || [""])[0]);
     check("the Top button says clear", (await page.textContent("#readoutTop")) === "Top clear");
     check("readout shows html and body heights and the four units", /html h 874 body h 874\s+100vh \d+ 100dvh \d+ 100lvh \d+ 100svh \d+/.test(text), (text.match(/html h [^\n]*/) || [""])[0]);
