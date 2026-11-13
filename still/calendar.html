@@ -361,6 +361,10 @@ body.onpage .left,body.onpage .main,body.onpage .panel{display:none}
 .seg.ttabs button,.seg.ttabs .tlink{padding:5px 12px;font-size:14px;width:auto;flex:none}
 .ttabs small{margin-left:6px;opacity:.75;font-weight:500}
 .ttabs .tlink{border-radius:8px;color:var(--soft);font-weight:500;text-decoration:none;white-space:nowrap}
+/* Stopgap until the Trips page is ported into the calendar (Junyan, 2026-11-13, d6: "6 yes, hide"): Local and + New trip
+   (class tdq) lead to Day Quest's Trips view, which is off under 768 px (quest-trips.js, WIDE = min-width: 768px), so a
+   phone hides them. The exact opposite of that rule, so the two never disagree. To undo: delete this line and the tdq classes. */
+@media not all and (min-width:768px){.tdq{display:none!important}}
 .tcards{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:16px;align-items:start;max-width:1100px}
 .tcard{display:flex;flex-direction:column;gap:6px;border-color:color-mix(in srgb,var(--c) 22%,var(--line))}
 .tcard .t{font-family:var(--display);font-size:18px;font-weight:700;letter-spacing:-.01em}
@@ -510,7 +514,7 @@ if (TOUCH) for (const g of ["gesturestart", "gesturechange"]) document.addEventL
    which shows this build, the phone's answers and a log of every day change with its cause. Until then CalHook.on is
    null and diag() does nothing. BUILD names this copy of the page, so a screenshot proves which copy ran: change it on
    every change to this page or calendar-readout.js (the date plus a letter). */
-const BUILD = "2026-11-13b trips look A";
+const BUILD = "2026-11-13c trips phone no Local";
 const CalHook = window.CalHook = { BUILD, on: null };
 const diag = (kind, msg) => { if (CalHook.on) CalHook.on(kind, msg); };
 /* The iPhone home screen app's fit (2026-11-12): html.hs in a home screen app on touch, html.hsfill and --hsgap when
@@ -1339,7 +1343,7 @@ function renderPage() {
 /* The Trips page (Junyan, 2026-11-13), look A (d3: "3A"): the plane's own page in the calendar. Its trips are the ones
    Day Quest's Trips view shows: still-api /quest/trips merged with Day Quest's saved Montreal copy, split by Day
    Quest's own splitTrips (quest-trips.js, loaded with data-helpers so its sidebar never draws here). Upcoming and Past
-   switch here; Local and + New trip are links to Day Quest (d4: "4 no"). Read only: no map and no Notion write here.
+   switch here; Local and + New trip are links to Day Quest (d4: "4 no"), hidden on a phone (class tdq, d6). Read only: no map and no Notion write here.
    A card is a plain block for now; it carries data-trip (the Notion name) so opening a trip can be added later. */
 function tripsPage() {
   const T = window.QuestTrips, k = "travel";
@@ -1350,12 +1354,12 @@ function tripsPage() {
   const wait = S.tripsLoading ? "Loading trips…" : "";
   const body = tab === "past"
     ? (c.past.length ? grid(c.past) : !c.needsDates.length ? `<div class="meta">${wait || "No past trips yet."}</div>` : "") + (c.needsDates.length ? `<p class="lbl tsub">Needs dates</p>${grid(c.needsDates)}` : "")
-    : c.upcoming.length ? grid(c.upcoming) : `<div class="meta">${wait || "Nothing coming up. Start one with + New trip."}</div>`;
+    : c.upcoming.length ? grid(c.upcoming) : `<div class="meta">${wait || 'Nothing coming up.<span class="tdq"> Start one with + New trip.</span>'}</div>`;
   const tabs = `<div class="seg ttabs" role="group" aria-label="Trips">
     <button data-triptab="upcoming" aria-pressed="${tab === "upcoming"}">Upcoming<small>${c.counts.upcoming}</small></button>
     <button data-triptab="past" aria-pressed="${tab === "past"}">Past<small>${c.counts.past}</small></button>
-    <a class="tlink" href="${esc(links.local)}">Local</a></div>`;
-  return `<div class="phead"><button class="btn" data-page="cal">&#8249; Calendar</button><span class="pi">${KICON[k]}</span><div style="min-width:0"><h2>Trips</h2><div class="meta">From ${esc(KFROM[k])}</div></div><span class="spacer"></span><a class="btn" id="tripNew" href="${esc(links.add)}">+ New trip</a></div>
+    <a class="tlink tdq" href="${esc(links.local)}">Local</a></div>`;
+  return `<div class="phead"><button class="btn" data-page="cal">&#8249; Calendar</button><span class="pi">${KICON[k]}</span><div style="min-width:0"><h2>Trips</h2><div class="meta">From ${esc(KFROM[k])}</div></div><span class="spacer"></span><a class="btn tdq" id="tripNew" href="${esc(links.add)}">+ New trip</a></div>
     ${tabs}${body}`;
 }
 /** Loads the trip list once per visit to the page: the saved copy at once, then still-api's list merged in. */
