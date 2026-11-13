@@ -14,7 +14,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>Calendar</title>
 <script src="calendar-core.js?v=16"></script>
-<script src="quest-trips.js?v=20261113b" data-helpers></script>
+<script src="quest-trips.js?v=20261113c" data-helpers></script>
 <script>
 /* The look saved on this device (the Look row in Settings; Studio when none) goes on here, before anything is drawn,
    so the page never opens in the wrong look first. Studio shows its day or night half by the sun in the calendar's
@@ -1325,13 +1325,13 @@ async function skipSugg(g) {
 
 /* ---------- a block type's own page (its real content comes in later tickets) ---------- */
 function renderPage() {
+  if (S.page === "travel") { const pg = $("#page"); pg.className = "page k-travel"; pg.innerHTML = tripsPage(); return; }
   const k = S.page, t = today(), now = Date.now(), ws = C.weekStart(t);
   const all = eventsFor(ws, C.addDays(t, 21)).filter((e) => e.k === k && !isStaff(e));
   const on = (d) => all.some((e) => (e.allDay ? C.coversDay(e, d) : C.wall(e.s, S.tz).day === d));
   const up = all.filter((e) => (e.allDay ? e.end > t : e.e > now)).sort((a, b) => (a.allDay ? Date.parse(a.start) : a.s) - (b.allDay ? Date.parse(b.start) : b.s)).slice(0, 6);
   let dots = ""; for (let i = 0; i < 7; i++) { const d = C.addDays(ws, i); dots += `<i class="${on(d) ? (d < t ? "did" : d === t ? "tod" : "plan") : ""}" title="${DOW[C.dowOf(d)]}">${"MTWTFSS"[i]}</i>`; }
   const pg = $("#page"); pg.className = "page k-" + k;
-  if (k === "travel") { pg.innerHTML = tripsPage(); return; }
   pg.innerHTML = `<div class="phead"><button class="btn" data-page="cal">&#8249; Calendar</button><span class="pi">${KICON[k]}</span><div style="min-width:0"><h2>${esc(KNAME[k])}</h2><div class="meta">Will be filled from ${esc(KFROM[k])}</div></div><span class="spacer"></span><div class="wkd" aria-label="This week">${dots}</div></div>
     <div class="pgrid"><div class="card"><p class="lbl">Next ${esc(KNAME[k])} blocks</p>${up.map((e) => rowHTML(e, true)).join("") || '<span class="meta">None planned. Add one on the calendar.</span>'}</div>
     <div class="card"><p class="lbl">This page</p><div style="color:var(--soft);line-height:1.5">The ${esc(KNAME[k])} page is being built as its own step. For now it shows your next blocks of this type; tap one to see it on the calendar.</div></div></div>`;
@@ -1343,7 +1343,7 @@ function renderPage() {
    A card is a plain block for now; it carries data-trip (the Notion name) so opening a trip can be added later. */
 function tripsPage() {
   const T = window.QuestTrips, k = "travel";
-  const c = T ? C.tripCards(T.splitTrips(S.trips || [], today()), T.whenLabel) : { upcoming: [], past: [], needsDates: [], counts: { upcoming: 0, past: 0 } };
+  const c = C.tripCards(T && T.splitTrips(S.trips || [], today()), T && T.whenLabel);
   const links = C.tripLinks(location.search), tab = S.tripTab === "past" ? "past" : "upcoming";
   const card = (r) => `<div class="card tcard" data-trip="${esc(r.name)}"><div class="t">${esc(r.title)}</div><div class="s">${esc(r.dates)}</div>${r.chips.length ? `<div class="tchips">${r.chips.map((x) => `<span${x.cls ? ` class="${x.cls}"` : ""}>${esc(x.text)}</span>`).join("")}</div>` : ""}</div>`;
   const grid = (list) => `<div class="tcards">${list.map(card).join("")}</div>`;

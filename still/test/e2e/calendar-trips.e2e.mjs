@@ -110,6 +110,7 @@ try {
     await page2.waitForFunction(() => document.body.classList.contains("trips-home"), null, { timeout: 8000 }).catch(() => {});
     await sleep(300);
     check("Day Quest: #trips-new asks for the new trip's name", /Trip name/.test(asked), asked);
+    check("Day Quest: #trips-new is dropped from the address, so a reload does not ask again", new URL(page2.url()).hash === "#trips", page2.url());
     await ctx.close();
   }
 } finally {

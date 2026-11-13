@@ -1300,5 +1300,5 @@
   const start = startView(location.hash);   // from the calendar's Trips page
   if (start === "local") S.homeTab = "Local";
   if (start) showHome();
-  if (start === "new") newTrip();
+  if (start === "new") { history.replaceState(null, "", location.pathname + location.search + "#trips"); newTrip(); }   // a reload never asks again
 })(typeof globalThis !== "undefined" ? globalThis : this);
