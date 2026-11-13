@@ -342,7 +342,7 @@ div.month{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));grid-templa
 .lk-chip::after{content:"";position:absolute;left:6px;right:6px;top:calc(30% + 6px);height:2px;border-radius:1px;background:var(--lk-acc)}
 .lk-nm{display:block;min-height:2.4em}
 .look[aria-pressed=true]{color:var(--ink);font-weight:600}.look[aria-pressed=true] .lk-chip{box-shadow:0 0 0 2px var(--bar),0 0 0 4px var(--accent)}
-.grab{display:none}
+.grab,.scrim{display:none}
 .modal{position:fixed;inset:0;background:color-mix(in srgb,var(--lift) calc(50% * var(--lift-k)),transparent);z-index:80;display:grid;place-items:center;padding:16px}
 .modal .card{background:var(--raise);max-width:340px;display:flex;flex-direction:column;gap:10px;box-shadow:0 16px 50px color-mix(in srgb,var(--lift) calc(55% * var(--lift-k)),transparent)}
 .toast{position:fixed;bottom:calc(18px + env(safe-area-inset-bottom,0px));left:50%;transform:translate(-50%,20px);background:var(--raise2);border:1px solid var(--line);padding:8px 16px;border-radius:999px;font-size:12.5px;z-index:70;opacity:0;transition:.25s;pointer-events:none;white-space:nowrap;max-width:92vw;overflow:hidden;text-overflow:ellipsis;box-shadow:0 8px 24px color-mix(in srgb,var(--lift) calc(40% * var(--lift-k)),transparent)}
@@ -680,7 +680,14 @@ body.onpk .drop{display:none}
   #panelBtn{width:36px;height:36px;padding:0;font-size:18px}
   .sc{padding-bottom:env(safe-area-inset-bottom,0px)}
   .panel{top:auto;left:0;width:auto;max-height:78%;border-radius:22px 22px 0 0;border:1px solid var(--line);transform:translateY(105%);padding-top:0;bottom:0}
-  .grab{display:block;width:40px;height:4px;border-radius:2px;background:var(--raise2);margin:8px auto 0;flex:none}
+  /* the two ways out of a phone sheet, no x (Junyan, 2026-11-12: "just me pressing the long dash at the top is good
+     neough or clicking off the menu should close it"): the dash is drawn 40 x 4 but takes a tap 120 x 44, and a clear
+     cover behind the open sheet takes a tap anywhere outside it, so that tap closes the sheet and does nothing else.
+     Both close the way x did (closeSheet): unsaved typing is dropped. The desktop side panel keeps its x. */
+  .grab{display:block;position:relative;width:120px;height:44px;margin:0 auto;padding:0;border:0;border-radius:0;background:none;flex:none;cursor:pointer;-webkit-tap-highlight-color:transparent}
+  .grab::before{content:"";position:absolute;left:40px;top:12px;width:40px;height:4px;border-radius:2px;background:var(--raise2)}
+  body.popen .scrim{display:block;position:fixed;inset:0;z-index:29;cursor:pointer;-webkit-tap-highlight-color:transparent}
+  #pClose{display:none}
   .pbody{min-width:0;padding-bottom:calc(84px + env(safe-area-inset-bottom,0px))}
   /* the event sheet: one-line rows (slice 02). Every box in it is 16px or more so iOS never zooms (PR 133). The time
      and day boxes lie unseen over their row text, so a tap opens the phone's own wheels and the row reads "1:45 PM". */
@@ -689,12 +696,11 @@ body.onpk .drop{display:none}
   .sheet{display:flex;flex-direction:column;gap:12px}
   .shead{display:grid;grid-template-columns:72px 1fr 72px;align-items:center;min-height:44px;position:sticky;top:0;z-index:2;background:var(--bar)}
   /* keyboard up (sheetFit pins the sheet to the visual viewport, which starts at the screen's very top): the sheet pads
-     its top by the status strip, so x, Event, Save and the Title never sit under the clock (Junyan, 2026-11-12: "Event
+     its top by the status strip, so the dash, Event, Save and the Title never sit under the clock (Junyan, 2026-11-12: "Event
      title also gets pushed into the blur"); a home screen app adds its clear strip below (html.hs .panel.kb). A box
      scrolled into view stops below the sticky header row (scroll-padding-top). */
-  .panel.kb{border-radius:0;padding-top:env(safe-area-inset-top,0px)}.panel.kb .grab{display:none}.panel.kb .pbody{padding-bottom:16px;scroll-padding-top:56px}
+  .panel.kb{border-radius:0;padding-top:env(safe-area-inset-top,0px)}.panel.kb .pbody{padding-bottom:16px;scroll-padding-top:56px}
   .shead b{text-align:center;font-size:16px}
-  .shead .icon{justify-self:start;width:44px;height:44px;font-size:19px;margin-left:-10px}
   .shead .btn.pri{justify-self:end;padding:8px 16px;font-size:15px}
   .sheet .tinput{width:100%;background:none;border:0;border-radius:0;padding:4px 0 8px;border-bottom:1px solid var(--line)}
   .rows{display:flex;flex-direction:column;background:var(--raise);border:1px solid var(--line);border-radius:14px;overflow:hidden;flex:none}
@@ -737,6 +743,7 @@ html.hsfill .drop{bottom:calc(-1 * var(--hsshift,0px))}
 html.hsfill .toast{bottom:calc(18px + env(safe-area-inset-bottom,0px) - var(--hsshift,0px))}
 html.hsfill .panel{bottom:calc(-1 * var(--hsshift,0px))}
 html.hsfill .modal{bottom:calc(-1 * var(--hsshift,0px))}
+html.hsfill body.popen .scrim{bottom:calc(-1 * var(--hsshift,0px))}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style></head>
 <body>
@@ -762,8 +769,9 @@ html.hsfill .modal{bottom:calc(-1 * var(--hsshift,0px))}
     </div>
     <div class="sc" id="view"></div>
   </div>
+  <div class="scrim" id="scrim" aria-hidden="true"></div>
   <aside class="panel" id="panel">
-    <span class="grab"></span>
+    <button class="grab" id="pGrab" aria-label="Close"></button>
     <div class="ptabs" role="group" aria-label="Panel">
       <button data-p="now">Now</button><button data-p="set">Settings</button><button data-p="keys">Shortcuts</button>
       <span class="spacer"></span><button id="pClose" aria-label="Close panel">&#10005;</button>
@@ -1394,6 +1402,9 @@ function monthView(v) {
 }
 
 /* ---------- the right panel: Now, event details, Settings, Shortcuts ---------- */
+/** Close the phone sheet (event or menu): the dash or a tap outside. Unsaved typing is dropped and a
+    half-made new event is removed, as the old x did (Junyan, 2026-11-12, the dash and a tap outside replace the x). */
+function closeSheet() { panel("now"); document.body.classList.remove("popen"); }
 function panel(tab, ev) {
   if (tab !== "event") clearDraft();
   S.tab = tab; S.ev = ev || null; S.form = null;
@@ -1463,7 +1474,7 @@ function pSheet(ev) {
   const tx = sheetTexts(f, ev), out = (k) => `<output data-v="${k}">${esc(tx[k])}</output>`;
   const pick = (type, key, lbl) => `${out(key)}<input class="ov" type="${type}" data-f="${key}" value="${esc(f[key])}" aria-label="${lbl}" ${dis}>`;
   return `<div class="sheet">
-    <div class="shead"><button class="icon" id="pX" aria-label="Close">&#10005;</button><b>Event</b>${canEdit && !ev.ghost ? '<button class="btn pri" id="pSave">Save</button>' : "<span></span>"}</div>
+    <div class="shead"><span></span><b>Event</b>${canEdit && !ev.ghost ? '<button class="btn pri" id="pSave">Save</button>' : "<span></span>"}</div>
     ${ev.ghost ? `<div class="meta">Suggested by ${esc(ev.by)}${ev.why ? ": " + esc(ev.why) : ""}</div>` : ""}
     <input class="tinput" id="pTitle" value="${esc(f.title)}" placeholder="Title" aria-label="Title" autocomplete="off" ${canEdit ? "" : "disabled"}>
     <div class="rows">
@@ -2207,8 +2218,7 @@ function wirePair() {
 /* ---------- controls ---------- */
 function setup() {
   document.addEventListener("click", function clickRouter(e) {
-    const t = e.target.closest("[data-railtog],[data-pkday],[data-page],[data-n],[data-p],[data-key],[data-staff],[data-allday],[data-open],[data-acc],[data-skip],[data-go],[data-dur],[data-kind],[data-sheet],[data-triptab],button[data-look],#pSave,#pDel,#pAcc,#pSkip,#pX,#pairBtn");
-    if (!t || t.closest(".ev")) return;
+    const t = e.target.closest("[data-railtog],[data-pkday],[data-page],[data-n],[data-p],[data-key],[data-staff],[data-allday],[data-open],[data-acc],[data-skip],[data-go],[data-dur],[data-kind],[data-sheet],[data-triptab],button[data-look],#pSave,#pDel,#pAcc,#pSkip,#pGrab,#pairBtn");    if (!t || t.closest(".ev")) return;
     const d = t.dataset;
     if (t.matches("button[data-look]")) setLook(d.look);
     else if ("railtog" in d) { document.body.classList.toggle("railopen"); renderRail(); setTimeout(size, 260); }
@@ -2229,7 +2239,7 @@ function setup() {
     else if (d.dur) { S.form.dur = +d.dur; $$("[data-dur]").forEach((c) => c.setAttribute("aria-pressed", String(c === t))); }
     else if ("kind" in d) { S.form.kind = d.kind; $$("[data-kind]").forEach((c) => c.setAttribute("aria-pressed", String(c === t))); if (S.form.sheet) { $('[data-v="types"]').hidden = true; sheetPaint(); } }
     else if (d.sheet === "type") { const c = $('[data-v="types"]'); c.hidden = !c.hidden; }
-    else if (t.id === "pX") { panel("now"); document.body.classList.remove("popen"); }
+    else if (t.id === "pGrab") closeSheet();
     else if (t.id === "pSave") saveEvent();
     else if (t.id === "pDel") { const ev = S.ev, sh = !!(S.form && S.form.sheet); panel("now"); if (sh) document.body.classList.remove("popen"); deleteEvent(ev); }
     else if (t.id === "pAcc") acceptSugg(S.ev, { calId: $("#pCal").value, title: $("#pTitle").value.trim() || S.ev.title });
@@ -2261,6 +2271,7 @@ function setup() {
     tapT = setTimeout(() => { if (n === 1 && innerWidth <= 760) document.body.classList.toggle("month"); }, 350);
   };
   $("#panelBtn").onclick = () => { if (innerWidth <= 1100) { if (!document.body.classList.contains("popen")) panel("now"); document.body.classList.toggle("popen"); } else { document.body.classList.toggle("nopanel"); setTimeout(size, 300); } };
+  $("#scrim").onclick = closeSheet;
   $("#pClose").onclick = () => { panel("now"); document.body.classList.remove("popen"); if (innerWidth > 1100) { document.body.classList.add("nopanel"); setTimeout(size, 300); } };
   /* the phone sheet: a box being typed in updates its row at once; a time or day box opens its picker on a click with a
      mouse (a phone opens its own wheels); the box in focus stays above the keyboard */
