@@ -409,13 +409,16 @@
   const planGate = (it) => it.seed || String(it.id).startsWith("seed-")
     ? `Save this trip to Notion to plan days: press "⇪ Create in Notion" at the top of the trip.` : "";
 
-  /* The page to open at load (Junyan, 2026-11-12, t9, "9 yes"): "#trips" is the Trips page, where the calendar's
-     Travel tab sends you. */
-  const startView = (hash) => (/^#trips$/i.test(String(hash || "")) ? "trips" : null);
+  /* The page to open at load (Junyan, 2026-11-12, t9, "9 yes"): "#trips" is the Trips page. The calendar's Trips page
+     links "#trips-local" (the Local tab) and "#trips-new" (+ New trip), which stay in Day Quest (2026-11-13, d4: "4 no"). */
+  const START_VIEWS = { "#trips": "trips", "#trips-local": "local", "#trips-new": "new" };
+  const startView = (hash) => { const h = String(hash || "").toLowerCase(); return Object.prototype.hasOwnProperty.call(START_VIEWS, h) ? START_VIEWS[h] : null; };
 
   const api = { startView, pastedEntry, kindOf, missingInfo, needsConfirmFile, missLine, hideCopies, fieldOf, MISSING_FIELD, statusLook, dropPayload, tripDate, MTL, stayLines, planGate, planKind, planTag, cardLabel, planHtml, haversine, gpxPoints, gpxStats, dayIndex, localDay, dayPlan, pillOf, isStay, isHike, whenText, seedRows, SEED, fmtDur, tripKey, mergeTrips, splitTrips, isHomeTrip, localItems, whenLabel, destOf, mapStart };
   root.QuestTrips = api;
   if (typeof document === "undefined" || typeof window === "undefined") return;
+  /* The calendar's Trips page loads this file with data-helpers for the pure helpers above only (2026-11-13). */
+  if (document.currentScript && document.currentScript.dataset && "helpers" in document.currentScript.dataset) return;
 
   /* ── page wiring (desktop only) ───────────────────────────────────── */
   const WIDE = window.matchMedia("(min-width: 768px)");
@@ -1294,5 +1297,8 @@
 
   drawSide("today");   // at once: the trips list only fills the Trips page, it never held up the sidebar (2026-11-09)
   loadTrips();   // puts the saved Montreal copy in at once, then redraws when Notion answers
-  if (startView(location.hash) === "trips") showHome();   // from the calendar's Travel tab
+  const start = startView(location.hash);   // from the calendar's Trips page
+  if (start === "local") S.homeTab = "Local";
+  if (start) showHome();
+  if (start === "new") { history.replaceState(null, "", location.pathname + location.search + "#trips"); newTrip(); }   // a reload never asks again
 })(typeof globalThis !== "undefined" ? globalThis : this);
