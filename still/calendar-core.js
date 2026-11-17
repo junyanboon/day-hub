@@ -740,8 +740,12 @@
     }
     /** The button on a Road Trip trip that had its bags before food existed: food from the template, bags untouched. */
     function startFood(list) { const rec = roadTrip(list); if (rec && foodReady() && !rec.food) { rec.food = foodCopy(); save(); } }
-    /** Where an item is in a list's food: [group, index], or null. */
-    const findFood = (F, id) => { for (const g of FOODIDS) { const i = (F[g] || []).findIndex((x) => x.id === id); if (i >= 0) return [g, i]; } return null; };
+    /** Where an item is in a list's food: {F, g, i} (the list, its group, its index), or null. */
+    const foodAt = (list, id) => {
+      const F = foodOf(list); if (!F) return null;
+      for (const g of FOODIDS) { const i = (F[g] || []).findIndex((x) => x.id === id); if (i >= 0) return { F, g, i }; }
+      return null;
+    };
 
     /** "+ Add, then Enter": to the end of that group, Day before as in the mock (Buy on arrival has no pill). On a
         trip, an add to Every road trip, Kitchen gear or Before you go also goes onto the template (d27), once. */
@@ -758,17 +762,17 @@
       return id;
     }
     /** ×: off this list only. On a trip the template keeps it; on the Road Trip list it leaves the template. */
-    function foodRemove(list, id) { const F = foodOf(list), at = F && findFood(F, id); if (at) { F[at[0]].splice(at[1], 1); save(); } }
+    function foodRemove(list, id) { const at = foodAt(list, id); if (at) { at.F[at.g].splice(at.i, 1); save(); } }
     /** A tick: that trip's own. The template has none. */
     function foodTick(list, id, done) {
-      const F = list === "road" ? null : foodOf(list), at = F && findFood(F, id); if (!at) return;
-      const x = F[at[0]][at[1]]; if (done) x.d = 1; else delete x.d;
+      const at = list === "road" ? null : foodAt(list, id); if (!at) return;
+      const x = at.F[at.g][at.i]; if (done) x.d = 1; else delete x.d;
       save();
     }
     /** A pill: when to do it, on this list only. Buy on arrival takes none. */
     function foodWhen(list, id, when) {
-      const F = foodOf(list), at = F && findFood(F, id); if (!at || at[0] === "buy" || !(when in ORDER)) return;
-      F[at[0]][at[1]].w = when; save();
+      const at = foodAt(list, id); if (!at || at.g === "buy" || !(when in ORDER)) return;
+      at.F[at.g][at.i].w = when; save();
     }
     /** The pill menu's choices, the same as the bags'. */
     const foodWhens = () => WHEN.map(([id, label]) => ({ id, label }));
