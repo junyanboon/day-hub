@@ -527,6 +527,8 @@ body.onpage .left,body.onpage .main,body.onpage .panel{display:none}
   .pk-list{grid-template-columns:repeat(auto-fill,minmax(200px,1fr));overflow:visible}
 }
 @media (max-width:900px){ .pk-cols,.pk-tray .pk-rows{grid-template-columns:minmax(0,1fr)} }
+/* the New task bar would sit over the board; the mock has none */
+body.onpk .drop{display:none}
 /* computer only (d14): no Packing button, and no Packing page, under 768 px */
 @media (max-width:767.98px){ #rail .pk-rail{display:none} }
 
@@ -1500,7 +1502,7 @@ function showPage(k) {
   if (k === "packing" && !WIDE.matches) return;   // computer only (d14)
   if (S.page === "packing") packLeave();
   if (S.page === "cal" && $("#strip")) S.top = $("#view").scrollTop;
-  S.page = k; document.body.classList.toggle("onpage", k !== "cal"); document.body.classList.remove("popen", "month");
+  S.page = k; document.body.classList.toggle("onpage", k !== "cal"); document.body.classList.toggle("onpk", k === "packing"); document.body.classList.remove("popen", "month");
   $("#page").hidden = k === "cal"; render();
   if (k !== "cal") $("#page").scrollTop = 0;
 }
