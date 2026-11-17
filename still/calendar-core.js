@@ -443,6 +443,7 @@
   const BAGS = [["away", "Away Carry-on", "🧳"], ["nomatic", "Nomatic Travel Pack", "🎒"], ["sling", "Sling / On my Person", "👝"]];
   const WHEN = [["week", "Week before"], ["day", "Day before"], ["leave", "On leaving"], ["none", "No time yet"]];
   const PILL = { week: "Week before", day: "Day before", leave: "On leaving", none: "When?" };
+  const ORDER = { week: 0, day: 1, leave: 2, none: 3 };
   /* First guesses at where his Notion tags and places go; he fixes the rest by dragging. */
   const BAGMAP = { "Carry-On": "away", "Backpack": "nomatic", "Worn": "sling" };
   const WHENMAP = { "1 Week Before": "week", "1 Day Before": "day", "Upon Departure": "leave" };
@@ -511,7 +512,8 @@
       const name = String(t.name).replace(EMOJIS, " ").replace(YEAR, " ").replace(/\s+/g, " ").trim();
       const id = tripId(t), c = count(id);
       return { id, icon: icon || t.icon || "🧳", name: name || String(t.name), dates: dates(t, today),
-        label: coming ? trips.whenLabel(t) : "", now: !!(coming && t.now), has: !!tripOf(id), done: c.done, total: c.total };
+        label: coming ? trips.whenLabel(t) : "", now: !!(coming && t.now), has: !!tripOf(id), done: c.done, total: c.total,
+        packed: tripOf(id) ? `${c.done} of ${c.total} packed` : "No list yet" };
     }
     const cards = (today) => { const sp = split(today); return { up: sp.up.map((t) => card(t, true, today)), past: sp.past.map((t) => card(t, false, today)) }; };
     const cardOf = (list, today) => { const c = cards(today); return c.up.concat(c.past).find((x) => x.id === list) || null; };
@@ -572,14 +574,24 @@
         open: up.length ? { list: up[0].id, tab: "up" } : { list: "all", tab: "mine" } };
     }
 
-    function board(list) {
-      const mine = on(list);
-      const row = (o) => ({ id: o.id, icon: o.i, name: o.n, qty: o.q, when: o.when, pill: PILL[o.when], done: false });
-      const top = mine.filter((o) => !o.bag);
+    /** The board for one list: the filter row with whole counts, To place (newest first), the three bags in
+        packing order, and what is left out. `when` narrows every list to one time; `hide` drops packed items. */
+    function board(list, opts) {
+      const { when = "any", hide = false } = opts || {};
+      const mine = on(list), rec = tripOf(list), ticks = rec ? rec.ticks : {};
+      const row = (o) => ({ id: o.id, icon: o.i, name: o.n, qty: o.q, when: o.when, pill: PILL[o.when], done: !!ticks[o.id] });
+      const vis = (arr) => arr.filter((o) => (when === "any" || o.when === when) && !(hide && ticks[o.id]));
+      const top = mine.filter((o) => !o.bag), topRows = vis(top);
       return {
+        ticks: !!rec,
         chips: [{ id: "any", label: "Everything", n: mine.length }].concat(WHEN.map(([id, label]) => ({ id, label, n: mine.filter((o) => o.when === id).length }))),
-        top: { total: top.length, rows: top.map(row) },
-        bags: BAGS.map(([id, name, icon]) => { const arr = mine.filter((o) => o.bag === id); return { id, icon, name, total: arr.length, done: 0, rows: arr.map(row) }; }),
+        top: { total: top.length, rows: topRows.map(row), hint: topRows.length ? "" : top.length ? "Nothing here for this filter." : "Nothing waiting. Everything has a bag." },
+        bags: BAGS.map(([id, name, icon]) => {
+          const arr = mine.filter((o) => o.bag === id), done = arr.filter((o) => ticks[o.id]).length;
+          const rows = vis(arr).map((o, i) => [o, i]).sort((x, y) => (ORDER[x[0].when] - ORDER[y[0].when]) || (x[1] - y[1])).map((x) => row(x[0]));
+          return { id, icon, name, total: arr.length, done, count: rec ? `${done} of ${arr.length}` : String(arr.length), rows,
+            hint: rows.length ? "" : !arr.length ? "Drag items here." : hide && when === "any" ? "All packed." : "Nothing here for this filter." };
+        }),
         out: list === "all" ? [] : D.items.filter((o) => !onOf(list)[o.id]).map((o) => ({ id: o.id, icon: o.i, name: o.n })),
       };
     }
@@ -600,7 +612,16 @@
     /** A click in the side panel: the item is on this list again, in the bag it had. */
     function bring(list, id) { if (byId(id) && list !== "all" && (isMine(list) || tripOf(list))) { onOf(list)[id] = 1; save(); } }
 
-    return { ready, seed, sync, picker, head, choices, board, start, move, bring };
+    /** A tick on a trip's list. Ticks are that trip's own; My lists have none. */
+    function tick(list, id, packed) {
+      const rec = tripOf(list); if (!rec || !byId(id)) return;
+      if (packed) rec.ticks[id] = 1; else delete rec.ticks[id];
+      save();
+    }
+    /** When to pack an item: one per item, the same on every trip. */
+    function setWhen(id, when) { const o = byId(id); if (o && when in ORDER) { o.when = when; save(); } }
+
+    return { ready, seed, sync, picker, head, choices, board, start, move, bring, tick, setWhen };
   }
 
   root.CalCore.packing = packing;

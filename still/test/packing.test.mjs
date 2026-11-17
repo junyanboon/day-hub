@@ -198,3 +198,71 @@ test("dragging puts an item in a bag or back in To place, the same on every trip
   assert.ok(ids(p.board(MTL, {}).bags[2].rows).includes(left), "dragged from the side panel onto a bag: on the trip, in that bag");
   assert.equal(p.board(MTL, {}).chips[0].n, 38);
 });
+
+const names = (rows) => rows.map((r) => r.name);
+const idOf = (p, list, name) => { const b = p.board(list, {}); return b.top.rows.concat(...b.bags.map((x) => x.rows)).find((r) => r.name === name).id; };
+
+test("inside a bag items sit in packing order: Week before, Day before, On leaving, then no time yet", () => {
+  assert.deepEqual(names(open().board("all", {}).bags[0].rows), ["Packed Shoes", "Money Belt", "Bathing suit", "Pants / Shorts", "Shirts", "Socks",
+    "Underwear", "Elephant Sheet", "Supplements", "Flatten water bottle", "Food", "Shelf-stable backup snacks", "Waterproof Phone Case", "Exercise Equipment"]);
+});
+
+test("the when pill: picking a time saves at once, moves the item in its bag, and is the same on every trip", () => {
+  const p = open(), id = idOf(p, "all", "Exercise Equipment");
+  p.setWhen(id, "leave");
+  const away = p.board("all", {}).bags[0].rows;
+  assert.deepEqual(names(away).slice(-3), ["Shelf-stable backup snacks", "Exercise Equipment", "Waterproof Phone Case"]);
+  assert.deepEqual([away[12].when, away[12].pill], ["leave", "On leaving"]);
+  assert.deepEqual(p.board("all", {}).chips.map((c) => c.n), [94, 19, 4, 15, 56]);
+  assert.equal(p.board("brazil", {}).bags[0].rows.find((r) => r.id === id).pill, "On leaving");
+  p.setWhen(id, "sometime");
+  assert.equal(p.board("all", {}).bags[0].rows[12].when, "leave", "only the four times");
+  p.setWhen(id, "none");
+  assert.equal(p.board("all", {}).bags[0].rows.find((r) => r.id === id).pill, "When?");
+});
+
+test("ticks are kept per trip: ticking on Montreal Birthday ticks it nowhere else, and My lists have no ticks", () => {
+  const p = open();
+  p.start(BRAZIL, "road");
+  const socks = idOf(p, MTL, "Socks"), before = names(p.board(MTL, {}).bags[0].rows);
+  p.tick(MTL, socks, true);
+  const b = p.board(MTL, {}), away = b.bags[0];
+  assert.equal(b.ticks, true);
+  assert.deepEqual([away.total, away.done, away.count], [10, 1, "1 of 10"]);
+  assert.equal(away.rows.find((r) => r.id === socks).done, true);
+  assert.deepEqual(names(away.rows), before, "a packed item stays where it is");
+  const there = p.board(BRAZIL, {}).bags[0];
+  assert.deepEqual([there.done, there.count, there.rows.find((r) => r.id === socks).done], [0, "0 of 10", false]);
+  assert.deepEqual(p.picker({ today: TODAY }).up.map((c) => [c.name, c.done, c.total, c.packed]),
+    [["Montreal Birthday", 1, 37, "1 of 37 packed"], ["Brazil Carnaval", 0, 37, "0 of 37 packed"]]);
+  assert.equal(p.picker({ today: TODAY }).past[0].packed, "No list yet");
+  p.tick("road", socks, true);
+  const road = p.board("road", {});
+  assert.deepEqual([road.ticks, road.bags[0].count, road.bags[0].done, road.bags[0].rows.find((r) => r.id === socks).done], [false, "10", 0, false]);
+  p.tick(MTL, socks, false);
+  assert.equal(p.board(MTL, {}).bags[0].done, 0);
+});
+
+test("the filter shows only those items in every list; Hide packed hides ticked ones; the counts stay whole", () => {
+  const p = open();
+  assert.deepEqual(p.board(MTL, {}).chips.map((c) => c.n), [37, 12, 1, 13, 11]);
+  assert.deepEqual([p.board(MTL, {}).top.total, ...p.board(MTL, {}).bags.map((x) => x.total)], [13, 10, 6, 8]);
+  let b = p.board(MTL, { when: "day" });
+  assert.deepEqual(names(b.bags[0].rows), ["Food"]);
+  assert.deepEqual([b.bags[0].total, b.bags[0].count, b.top.total], [10, "0 of 10", 13]);
+  assert.deepEqual(b.chips.map((c) => c.n), [37, 12, 1, 13, 11]);
+  assert.deepEqual([b.top.rows.length, b.top.hint, b.bags[1].rows.length, b.bags[1].hint], [0, "Nothing here for this filter.", 0, "Nothing here for this filter."]);
+  b = p.board(MTL, { when: "leave" });
+  assert.deepEqual(names(b.top.rows), ["Combination Lock", "Bhuta Shuddhi"]);
+  assert.equal(b.top.hint, "");
+  p.tick(MTL, idOf(p, MTL, "Food"), true);
+  b = p.board(MTL, { hide: true });
+  assert.deepEqual([b.bags[0].rows.length, b.bags[0].total, b.bags[0].done, names(b.bags[0].rows).includes("Food")], [9, 10, 1, false]);
+  assert.equal(p.board(MTL, { when: "day", hide: true }).bags[0].hint, "Nothing here for this filter.");
+  for (const r of p.board(MTL, {}).bags[0].rows) p.tick(MTL, r.id, true);
+  assert.equal(p.board(MTL, { hide: true }).bags[0].hint, "All packed.");
+  assert.equal(p.board("road", { hide: true }).bags[0].rows.length, 10, "My lists have nothing to hide");
+  p.start(EGYPT, "empty");
+  b = p.board(EGYPT, {});
+  assert.deepEqual([b.top.hint, b.bags[0].hint], ["Nothing waiting. Everything has a bag.", "Drag items here."]);
+});
