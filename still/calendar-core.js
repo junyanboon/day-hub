@@ -54,11 +54,14 @@
   /* ---- block types (2026-11-10, one-system ticket 026): eleven kinds of block, each with its own colour,
      helper and page, plus "other". Guessed from the title, first match wins; a hand-set kind wins over the guess. ---- */
   const KINDS = [["deep", "Deep Work"], ["studio", "Studio On-Site"], ["yoga", "Yoga"], ["gym", "Gym"], ["dance", "Dance"],
-    ["cook", "Culinary"], ["travel", "Travel"], ["social", "Social"], ["errand", "Errands"], ["wind", "Wind Down"],
+    ["cook", "Culinary"], ["travel", "Travel"], ["pack", "Packing"], ["social", "Social"], ["errand", "Errands"], ["wind", "Wind Down"],
     ["rest", "Rest"], ["other", "Other"]];
   /* Hand-set kinds saved before the eleven types (ex, food, out, work). "ex" is guessed again: gym or dance. */
   const OLD_KIND = { food: "cook", out: "travel", work: "studio" };
+  /* Packing (slice 02, Junyan 2026-11-16, d23: "p1 yes"): "pack" anywhere in the title, any case, so "Pack for FICTION
+     stay", "Unpack", and also "backpack" and "Packers". First, so "Pack for the trip" is Packing, not Travel. */
   const RX = [
+    ["pack", /pack/i],
     ["deep", /\b(work block|deep work|focus block|focus time)\b/i],
     ["wind", /\b(wind.?down|bedtime)\b/i],
     ["rest", /\b(isha kriya|yoga nidra|nidra|nsdr)\b/i],
@@ -424,7 +427,7 @@
   const clock = (min) => { const h = Math.floor(min / 60) % 24; return `${h % 12 || 12}:${String(min % 60).padStart(2, "0")} ${h < 12 ? "AM" : "PM"}`; };
 
   root.CalCore = { wall, instant, offset, addDays, dowOf, weekStart, isoWeek, addMonths, monthKey, monthsFor,
-    KINDS, kindOf, layout, pieces, coversDay, orderBetween, groupOf, dropTask, blockMinutes, hm, dur, SWIPE, swipeLock, swipeCommit, HOUR, pinchHeight, hourMin, pinchMinute, pinchScroll, cardFit, cardTime, startHour, LOOKS, lookId, startLook, LOOK_RESET, placeOf, sunTimes, sunHalf, lookFace, pageLink, homeFit, homeShift,
+    KINDS, guessKind, kindOf, layout, pieces, coversDay, orderBetween, groupOf, dropTask, blockMinutes, hm, dur, SWIPE, swipeLock, swipeCommit, HOUR, pinchHeight, hourMin, pinchMinute, pinchScroll, cardFit, cardTime, startHour, LOOKS, lookId, startLook, LOOK_RESET, placeOf, sunTimes, sunHalf, lookFace, pageLink, homeFit, homeShift,
     sheetForm, sheetWhen, sheetPatch, sheetLength, sheetStart, sheetEnd, sheetDay, sheetEndDay, sheetAllDay, notesRich, notesText, dayText, clock, toMin };
 })(typeof window !== "undefined" ? window : globalThis);
 
@@ -667,7 +670,17 @@
       return D.items.filter((o) => !onOf(list)[o.id] && o.n.toLowerCase().includes(q)).map((o) => o.id);
     }
 
-    return { ready, seed, sync, picker, head, choices, board, start, move, bring, tick, setWhen, untickAll, add, rename, remove, found };
+    /** Where a Packing block opens the page (slice 02, d23): the trip whose dates hold the block's day, else the next
+        trip coming up after it, by Day Quest's own rules (the home trip and undated trips never count). The tab is
+        that trip's tab as of today. null when no trip fits or none was read yet: the page opens as it does today. */
+    function openFor(day, today) {
+      if (!seen || !/^\d{4}-\d{2}-\d{2}$/.test(String(day))) return null;
+      const t = trips.splitTrips(trips.mergeTrips(seen), day).upcoming[0];
+      if (!t) return null;
+      const list = tripId(t);
+      return { list, tab: split(today).up.some((x) => tripId(x) === list) ? "up" : "past" };
+    }
+    return { ready, seed, sync, openFor, picker, head, choices, board, start, move, bring, tick, setWhen, untickAll, add, rename, remove, found };
   }
 
   root.CalCore.packing = packing;
