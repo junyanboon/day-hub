@@ -221,6 +221,18 @@ test("the when pill: picking a time saves at once, moves the item in its bag, an
   assert.equal(p.board("all", {}).bags[0].rows.find((r) => r.id === id).pill, "When?");
 });
 
+test("one click on a Bags pill moves it on: Week before, Day before, On leaving, When?, then round again, the same on every trip (d30)", () => {
+  const p = open(), id = idOf(p, "all", "Exercise Equipment");
+  p.setWhen(id, "week");
+  const pill = (list) => p.board(list, {}).bags.flatMap((b) => b.rows).find((r) => r.id === id);
+  const seen = [];
+  for (let i = 0; i < 4; i++) { p.cycleWhen(id); seen.push([pill("all").when, pill("all").pill]); }
+  assert.deepEqual(seen, [["day", "Day before"], ["leave", "On leaving"], ["none", "When?"], ["week", "Week before"]]);
+  p.cycleWhen(id);
+  assert.equal(pill("brazil").pill, "Day before", "one when per item, on every trip");
+  p.cycleWhen("no-such-item");
+});
+
 test("ticks are kept per trip: ticking on Montreal Birthday ticks it nowhere else, and My lists have no ticks", () => {
   const p = open();
   p.start(BRAZIL, "road");

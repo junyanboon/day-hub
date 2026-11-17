@@ -555,7 +555,9 @@
       const copy = {};
       if (src === "all") D.items.forEach((o) => { copy[o.id] = 1; });
       else if (src !== "empty") Object.assign(copy, onOf(src));
-      D.trips[list.slice(2)] = { on: copy, ticks: {}, from: src, fromName: isMine(src) || src === "empty" ? "" : nameOf(src) };
+      const rec = { on: copy, ticks: {}, from: src, fromName: isMine(src) || src === "empty" ? "" : nameOf(src) };
+      if (src === "road" && D.food) rec.food = foodCopy();
+      D.trips[list.slice(2)] = rec;
       save();
     }
     const fromLabel = (rec) => rec.from === "all" ? "all your items" : rec.from === "empty" ? "an empty list"
@@ -640,7 +642,14 @@
       save();
     }
     /** When to pack an item: one per item, the same on every trip. */
+    /** The when after this one on a pill: Week before, Day before, On leaving, When?, then round again. */
+    const nextWhen = (when) => WHEN[(WHEN.findIndex((w) => w[0] === when) + 1) % WHEN.length][0];
     function setWhen(id, when) { const o = byId(id); if (o && when in ORDER) { o.when = when; save(); } }
+    /** One click on a Bags pill moves it to the next when: Week before, Day before, On leaving, When?, then round
+        again (Junyan, d30: the same as Food). Still one per item, the same on every trip. */
+    function cycleWhen(id) {
+      const o = byId(id); if (o) setWhen(id, nextWhen(o.when));
+    }
 
     /** Starts a trip's ticks again; the items stay. */
     function untickAll(list) { const rec = tripOf(list); if (rec) { rec.ticks = {}; save(); } }
@@ -694,7 +703,95 @@
       const list = tripId(t);
       return { list, tab: split(today).up.some((x) => tripId(x) === list) ? "up" : "past" };
     }
-    return { ready, seed, sync, openFor, picker, head, choices, board, start, move, bring, tick, setWhen, untickAll, add, rename, remove, found };
+    /* ---------- Road trip food (slice 03, Junyan 2026-11-17, "26 yes, 27 yes", restyled to mock v5 on "29 yes"; tests:
+       still/test/packing-food.test.mjs). Food is its own list (his words: "Just make it it's own list"), never in the
+       bags. The Road Trip list holds the template (D.food); a trip started from it gets its own copy (rec.food), with
+       its own ticks and pills. No amounts anywhere ("I'll decide the quantities"): a name is kept as typed. */
+    /* Each group's id, title and icon tile. Mock v5 (d29, "three column design in the same way as the bags"): no
+       subtitles ("random words ... that are no necessary"). */
+    const FOODS = [["steps", "Before you go", "📝"], ["every", "Every road trip", "🥣"], ["trip", "This trip", "🍚"],
+      ["gear", "Kitchen gear", "🍳"], ["buy", "Buy on arrival", "🛒"], ["cooler", "Cooler", "🧊"]];
+    const FOODIDS = FOODS.map((g) => g[0]);
+    /* The Food count on the switch: what gets packed. Before you go are steps and Buy on arrival is bought there. */
+    const COUNTED = ["every", "trip", "gear", "cooler"];
+    /* d27: an add here also goes onto the Road Trip template, so future road trips start with it. */
+    const CARRY = ["steps", "every", "gear"];
+    const foodReady = () => !!(D && D.food);
+    const fid = () => { const id = "f" + (D.fnext || 1); D.fnext = (D.fnext || 1) + 1; return id; };
+    /** A copy of the template for one trip: same names and pills, new ids, nothing ticked. */
+    const foodCopy = () => { const o = {}; FOODIDS.forEach((g) => { o[g] = (D.food[g] || []).map((x) => ({ id: fid(), n: x.n, w: x.w })); }); return o; };
+
+    /** First load of the food template onto the Road Trip list. Does nothing once there is one. */
+    function seedFood(json) {
+      if (!D || D.food) return false;
+      D.food = {};
+      FOODIDS.forEach((g) => { D.food[g] = ((json || {})[g] || []).map((x) => ({ id: fid(), n: String(x.n || "").trim(), w: g === "buy" ? "" : (x.w in ORDER ? x.w : "none") })).filter((x) => x.n); });
+      save();
+      return true;
+    }
+    /** The food list a page shows for this list: the template on the Road Trip list, a trip's own copy, or null
+        (no Food switch) for any other list or a trip not started from the Road Trip list. */
+    const roadTrip = (list) => { const rec = tripOf(list); return rec && rec.from === "road" ? rec : null; };
+    const foodOf = (list) => (!foodReady() ? null : list === "road" ? D.food : (roadTrip(list) || {}).food || null);
+
+    /** The Food view: six groups as mock v5 draws them, each with "N of M" on a trip and its size on the template. */
+    function food(list) {
+      if (!foodReady() || !(list === "road" || roadTrip(list))) return null;
+      const F = foodOf(list), ticks = list !== "road";
+      if (!F) return { started: false, ticks, count: 0, groups: [], button: "Start food from your Road Trip list" };
+      const groups = FOODS.map(([id, title, icon]) => {
+        const arr = F[id] || [], done = ticks ? arr.filter((x) => x.d).length : 0;
+        return { id, title, icon, pill: id !== "buy", total: arr.length, done, count: ticks ? `${done} of ${arr.length}` : String(arr.length),
+          empty: id === "cooler" ? "Empty. No ice packs." : "Nothing yet.",
+          rows: arr.map((x) => ({ id: x.id, name: x.n, when: id === "buy" ? "" : x.w, pill: id === "buy" ? "" : PILL[x.w] || PILL.none, done: ticks && !!x.d })) };
+      });
+      return { started: true, ticks, count: COUNTED.reduce((n, g) => n + (F[g] || []).length, 0), groups };
+    }
+    /** The button on a Road Trip trip that had its bags before food existed: food from the template, bags untouched. */
+    function startFood(list) { const rec = roadTrip(list); if (rec && foodReady() && !rec.food) { rec.food = foodCopy(); save(); } }
+    /** Where an item is in a list's food: {F, g, i} (the list, its group, its index), or null. */
+    const foodAt = (list, id) => {
+      const F = foodOf(list); if (!F) return null;
+      for (const g of FOODIDS) { const i = (F[g] || []).findIndex((x) => x.id === id); if (i >= 0) return { F, g, i }; }
+      return null;
+    };
+
+    /** "+ Add, then Enter": to the end of that group, Day before as in the mock (Buy on arrival has no pill). On a
+        trip, an add to Every road trip, Kitchen gear or Before you go also goes onto the template (d27), once. */
+    function foodAdd(list, group, text) {
+      const F = foodOf(list), n = String(text || "").trim();
+      if (!F || !FOODIDS.includes(group) || !n) return null;
+      const w = group === "buy" ? "" : "day", id = fid();
+      (F[group] = F[group] || []).push({ id, n, w });
+      if (F !== D.food && CARRY.includes(group)) {
+        const T = (D.food[group] = D.food[group] || []);
+        if (!T.some((x) => x.n.toLowerCase() === n.toLowerCase())) T.push({ id: fid(), n, w });
+      }
+      save();
+      return id;
+    }
+    /** ×: off this list only. On a trip the template keeps it; on the Road Trip list it leaves the template. */
+    function foodRemove(list, id) { const at = foodAt(list, id); if (at) { at.F[at.g].splice(at.i, 1); save(); } }
+    /** A tick: that trip's own. The template has none. */
+    function foodTick(list, id, done) {
+      const at = list === "road" ? null : foodAt(list, id); if (!at) return;
+      const x = at.F[at.g][at.i]; if (done) x.d = 1; else delete x.d;
+      save();
+    }
+    /** A pill: when to do it, on this list only. Buy on arrival takes none. */
+    function foodWhen(list, id, when) {
+      const at = foodAt(list, id); if (!at || at.g === "buy" || !(when in ORDER)) return;
+      at.F[at.g][at.i].w = when; save();
+    }
+    /** One click on a pill moves it to the next when: Week before, Day before, On leaving, When?, then round again
+        (Junyan after mock v5: "I just click it and it changes the pill"). This list only. */
+    function foodCycle(list, id) {
+      const at = foodAt(list, id); if (!at || at.g === "buy") return;
+      foodWhen(list, id, nextWhen(at.F[at.g][at.i].w));
+    }
+
+    return { ready, seed, sync, openFor, picker, head, choices, board, start, move, bring, tick, setWhen, cycleWhen, untickAll, add, rename, remove, found,
+      foodReady, seedFood, food, startFood, foodAdd, foodRemove, foodTick, foodWhen, foodCycle };
   }
 
   root.CalCore.packing = packing;
