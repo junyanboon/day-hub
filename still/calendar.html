@@ -13,7 +13,7 @@
 <meta name="apple-mobile-web-app-title" content="Calendar">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>Calendar</title>
-<script src="calendar-core.js?v=23"></script>
+<script src="calendar-core.js?v=24"></script>
 <script src="quest-trips.js?v=20261113c" data-helpers></script>
 <script>
 /* The look saved on this device (the Look row in Settings; Studio when none) goes on here, before anything is drawn,
@@ -491,7 +491,6 @@ body.onpage .left,body.onpage .main,body.onpage .panel{display:none}
 .pk-it:hover{box-shadow:var(--lift);transform:translateY(-1px);z-index:2}
 .pk-it.pk-nock{grid-template-columns:20px minmax(0,1fr) auto}
 .pk-it.pk-drag{opacity:.35}
-.pk-it.pk-open{z-index:30}
 .pk-ck{appearance:none;-webkit-appearance:none;width:20px;height:20px;border-radius:50%;border:1.6px solid color-mix(in srgb,var(--faint) 62%,transparent);background:none;margin:0;cursor:pointer;display:grid;place-items:center;flex:none;transition:background .12s,border-color .12s}
 .pk-ck::after{content:"";width:9px;height:5px;border-left:2px solid var(--pk-white);border-bottom:2px solid var(--pk-white);transform:rotate(-45deg) translate(1px,-1px);opacity:0}
 .pk-ck:hover{border-color:var(--ok);background:color-mix(in srgb,var(--ok) 12%,transparent)}
@@ -514,11 +513,6 @@ body.onpage .left,body.onpage .main,body.onpage .panel{display:none}
 .pk-pill:hover{border-color:currentColor}
 .pk-pill.w-none{background:none;border:1px dashed color-mix(in srgb,var(--faint) 55%,transparent);color:var(--faint);font-weight:500}
 .pk-pill.w-none:hover{border-style:solid;color:var(--ink)}
-.pk-menu{position:absolute;right:6px;top:calc(100% + 4px);z-index:40;background:var(--bar);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:6px;display:grid;gap:2px;min-width:176px;cursor:default}
-.pk-menu p{margin:2px 8px 4px;font-size:11.5px;text-transform:uppercase;letter-spacing:.07em;color:var(--faint);font-weight:650}
-.pk-menu button{border:0;background:none;border-radius:9px;padding:6px 8px;display:flex;align-items:center;justify-content:space-between;gap:10px;text-align:left}
-.pk-menu button:hover{background:var(--raise)}
-.pk-menu button b{font-weight:700;color:var(--ok)}
 .pk-shelf{position:sticky;top:14px;background:var(--bar);border:1.5px solid var(--line);border-radius:18px;padding:12px 10px 10px;min-width:0;box-shadow:var(--card);
   display:grid;grid-template-rows:auto auto auto minmax(0,1fr);max-height:820px;transition:border-color .12s,background .12s,box-shadow .12s}
 .pk-shelf h3{margin:0;padding:2px 6px 0;font-family:var(--display);font-size:15.5px;font-weight:700;letter-spacing:-.012em;display:flex;align-items:baseline;gap:8px}
@@ -710,7 +704,7 @@ if (TOUCH) for (const g of ["gesturestart", "gesturechange"]) document.addEventL
    which shows this build, the phone's answers and a log of every day change with its cause. Until then CalHook.on is
    null and diag() does nothing. BUILD names this copy of the page, so a screenshot proves which copy ran: change it on
    every change to this page or calendar-readout.js (the date plus a letter). */
-const BUILD = "2026-11-17d road trip food pills";
+const BUILD = "2026-11-17e one click pills";
 const CalHook = window.CalHook = { BUILD, on: null };
 const diag = (kind, msg) => { if (CalHook.on) CalHook.on(kind, msg); };
 /* The iPhone home screen app's fit (2026-11-12): html.hs in a home screen app on touch, html.hsfill and --hsgap when
@@ -1594,7 +1588,7 @@ function showPage(k) {
 const PKT = window.QuestTrips;
 const PK = PKT ? C.packing({ store, trips: PKT }) : null;
 const P = { list: null, tab: "up", allPast: false, choose: false, when: "any", hide: false, shelf: true, find: "",
-  menu: null, fresh: false, del: null, edit: null, loading: false, loaded: false, error: "", drag: null, view: "bags" };
+  fresh: false, del: null, edit: null, loading: false, loaded: false, error: "", drag: null, view: "bags" };
 /** Dates on this page are Toronto's (d20), whatever zone the calendar shows. */
 const pkToday = () => C.wall(Date.now(), "America/Toronto").day;
 const pkOpen = () => S.page === "packing" && $("#page").classList.contains("pk");
@@ -1644,7 +1638,7 @@ function packShow() {
   packDraw();
   packLoad();
 }
-function packLeave() { P.menu = P.del = P.edit = null; P.fresh = false; P.drag = null; P.loaded = false; }
+function packLeave() { P.del = P.edit = null; P.fresh = false; P.drag = null; P.loaded = false; }
 function packDraw() {
   const pg = $("#page"); pg.className = "page pk";
   const top = `<div class="pk-head"><button class="pk-btn" data-page="cal">&#8249; Calendar</button><div class="pk-pi" aria-hidden="true">🧳</div><h2>Packing</h2></div>`;
@@ -1684,13 +1678,11 @@ function packDraw() {
       : `<span class="pk-name" data-pkname="${esc(o.id)}" title="${esc(o.name)}. Double-click to rename.">${esc(o.name)}${o.qty !== "1" ? `<small>×${esc(o.qty)}</small>` : ""}</span>`;
     const tail = P.del === o.id
       ? `<span class="pk-ask">Delete? <button class="pk-btn pk-sm pk-danger" data-pkact="del-yes">Yes</button><button class="pk-btn pk-sm" data-pkact="del-no">No</button></span>`
-      : `<button class="pk-pill w-${o.when}" data-pkpill="${esc(o.id)}" aria-haspopup="true" aria-expanded="${P.menu === o.id}" title="Click to change when you pack this">${esc(o.pill)}</button>
+      : `<button class="pk-pill w-${o.when}" data-pkpill="${esc(o.id)}" title="Click for the next when">${esc(o.pill)}</button>
          <button class="pk-rm" data-pkout="${esc(o.id)}" title="${all ? "Delete for good" : "Leave out of " + esc(name)}" aria-label="${all ? "Delete" : "Leave out"}: ${esc(o.name)}">×</button>`;
-    const menu = P.menu === o.id ? `<div class="pk-menu" role="menu"><p>Pack it</p>` + b.chips.slice(1).map((c) =>
-      `<button role="menuitem" data-pkwhen="${esc(c.id)}"><span class="pk-pill w-${esc(c.id)}">${esc(c.label)}</span>${o.when === c.id ? "<b>✓</b>" : ""}</button>`).join("") + `</div>` : "";
-    return `<div class="pk-it${b.ticks ? "" : " pk-nock"}${o.done ? " pk-done" : ""}${P.menu === o.id ? " pk-open" : ""}" draggable="${P.edit === o.id ? "false" : "true"}" data-pkid="${esc(o.id)}">
+    return `<div class="pk-it${b.ticks ? "" : " pk-nock"}${o.done ? " pk-done" : ""}" draggable="${P.edit === o.id ? "false" : "true"}" data-pkid="${esc(o.id)}">
       ${b.ticks ? `<input type="checkbox" class="pk-ck" data-pktick="${esc(o.id)}" ${o.done ? "checked" : ""} aria-label="Packed: ${esc(o.name)}">` : ""}
-      <span class="pk-ic${o.icon ? "" : " pk-none"}" aria-hidden="true">${o.icon ? esc(o.icon) : "•"}</span>${nm}${tail}${menu}</div>`;
+      <span class="pk-ic${o.icon ? "" : " pk-none"}" aria-hidden="true">${o.icon ? esc(o.icon) : "•"}</span>${nm}${tail}</div>`;
   };
   const chips = b.chips.map((c) => `<button class="pk-chip${c.id === "any" ? "" : " w-" + esc(c.id)}" data-pkfilter="${esc(c.id)}" aria-pressed="${P.when === c.id}">${c.id === "any" ? "" : "<i></i>"}${esc(c.label)} <small>${c.n}</small></button>`).join("");
   const total = b.chips[0].n;
@@ -1762,21 +1754,17 @@ function wirePacking() {
   const pg = $("#page"), on = () => pkOpen() && PK && PK.ready();
   pg.addEventListener("click", (e) => {
     if (!on()) return;
-    /* a click anywhere but the open menu or its pill closes the menu */
-    const shut = !!P.menu && !e.target.closest(".pk-menu") && !e.target.closest("[data-pkpill]");
-    if (shut) P.menu = null;
-    const b = e.target.closest("button"); if (!b) { if (shut) packDraw(); return; }
+    const b = e.target.closest("button"); if (!b) return;
     const d = b.dataset;
-    if (d.pklist) { P.list = d.pklist; P.menu = P.del = P.edit = null; P.fresh = P.choose = false; P.find = ""; }
+    if (d.pklist) { P.list = d.pklist; P.del = P.edit = null; P.fresh = P.choose = false; P.find = ""; }
     else if (d.pktab) P.tab = d.pktab;
     else if (d.pkstart) { PK.start(P.list, d.pkstart); P.choose = false; }
-    else if (d.pkact === "restart") { P.choose = true; P.menu = P.del = P.edit = null; }
+    else if (d.pkact === "restart") { P.choose = true; P.del = P.edit = null; }
     else if (d.pkact === "keep") P.choose = false;
     else if (d.pkact === "allpast") P.allPast = true;
-    else if (d.pkfilter) { P.when = d.pkfilter; P.menu = null; }
-    else if (d.pkpill) P.menu = P.menu === d.pkpill ? null : d.pkpill;
-    else if (d.pkwhen) { const id = b.closest("[data-pkid]")?.dataset.pkid; if (id) PK.setWhen(id, d.pkwhen); P.menu = null; }
-    else if (d.pkout) { if (P.list === "all") { P.del = d.pkout; P.menu = null; } else PK.move(P.list, d.pkout, "out"); }
+    else if (d.pkfilter) P.when = d.pkfilter;
+    else if (d.pkpill) PK.cycleWhen(d.pkpill);
+    else if (d.pkout) { if (P.list === "all") P.del = d.pkout; else PK.move(P.list, d.pkout, "out"); }
     else if (d.pkin) PK.bring(P.list, d.pkin);
     else if (d.pkact === "del-no") P.del = null;
     else if (d.pkact === "del-yes") { PK.remove(P.del); P.del = null; }
@@ -1785,11 +1773,11 @@ function wirePacking() {
     else if (d.pkact === "fresh-yes") { PK.untickAll(P.list); P.fresh = false; }
     else if (d.pkact === "shelf") P.shelf = !P.shelf;
     /* the Food view (slice 03) */
-    else if (d.pkview) { P.view = d.pkview; P.menu = P.del = P.edit = null; P.fresh = false; }
+    else if (d.pkview) { P.view = d.pkview; P.del = P.edit = null; P.fresh = false; }
     else if (d.pkact === "food-start") PK.startFood(P.list);
     else if (d.pkfpill) PK.foodCycle(P.list, d.pkfpill);
-    else if (d.pkfrm) { PK.foodRemove(P.list, d.pkfrm); P.menu = null; }
-    else { if (shut) packDraw(); return; }   // "‹ Calendar" and the rail are the calendar's own (clickRouter)
+    else if (d.pkfrm) PK.foodRemove(P.list, d.pkfrm);
+    else return;   // "‹ Calendar" and the rail are the calendar's own (clickRouter)
     packDraw();
   });
   pg.addEventListener("change", (e) => {
@@ -1805,8 +1793,8 @@ function wirePacking() {
     e.preventDefault();
     if (PK.add(P.list, $("#pkAdd").value)) { packDraw(); $("#pkAdd").focus(); }
   });
-  pg.addEventListener("dblclick", (e) => { const n = on() && e.target.closest("[data-pkname]"); if (n) { P.edit = n.dataset.pkname; P.menu = null; packDraw(); } });
-  /* Escape closes an open menu, rename or delete ask first; with none open it leaves the page as on every page */
+  pg.addEventListener("dblclick", (e) => { const n = on() && e.target.closest("[data-pkname]"); if (n) { P.edit = n.dataset.pkname; packDraw(); } });
+  /* Escape closes an open rename or delete ask first; with none open it leaves the page as on every page */
   pg.addEventListener("keydown", (e) => {
     if (!on()) return;
     if (e.target.id === "pkRen" && e.key === "Enter") { e.preventDefault(); packRename(); return; }
@@ -1817,7 +1805,7 @@ function wirePacking() {
       if (PK.foodAdd(P.list, g, e.target.value)) { packDraw(); const box = $(`[data-pkfadd="${g}"]`); if (box) box.focus(); }
       return;
     }
-    if (e.key === "Escape" && (P.menu || P.edit || P.del || P.fresh)) { e.stopPropagation(); P.menu = P.edit = P.del = null; P.fresh = false; packDraw(); }
+    if (e.key === "Escape" && (P.edit || P.del || P.fresh)) { e.stopPropagation(); P.edit = P.del = null; P.fresh = false; packDraw(); }
   });
   pg.addEventListener("focusout", (e) => { if (on() && e.target.id === "pkRen" && P.edit) packRename(); });
   /* drag an item between To place, the three bags and the side panel */

@@ -642,7 +642,14 @@
       save();
     }
     /** When to pack an item: one per item, the same on every trip. */
+    /** The when after this one on a pill: Week before, Day before, On leaving, When?, then round again. */
+    const nextWhen = (when) => WHEN[(WHEN.findIndex((w) => w[0] === when) + 1) % WHEN.length][0];
     function setWhen(id, when) { const o = byId(id); if (o && when in ORDER) { o.when = when; save(); } }
+    /** One click on a Bags pill moves it to the next when: Week before, Day before, On leaving, When?, then round
+        again (Junyan, d30: the same as Food). Still one per item, the same on every trip. */
+    function cycleWhen(id) {
+      const o = byId(id); if (o) setWhen(id, nextWhen(o.when));
+    }
 
     /** Starts a trip's ticks again; the items stay. */
     function untickAll(list) { const rec = tripOf(list); if (rec) { rec.ticks = {}; save(); } }
@@ -780,11 +787,10 @@
         (Junyan after mock v5: "I just click it and it changes the pill"). This list only. */
     function foodCycle(list, id) {
       const at = foodAt(list, id); if (!at || at.g === "buy") return;
-      const ids = WHEN.map((w) => w[0]), x = at.F[at.g][at.i];
-      foodWhen(list, id, ids[(ids.indexOf(x.w) + 1) % ids.length]);
+      foodWhen(list, id, nextWhen(at.F[at.g][at.i].w));
     }
 
-    return { ready, seed, sync, openFor, picker, head, choices, board, start, move, bring, tick, setWhen, untickAll, add, rename, remove, found,
+    return { ready, seed, sync, openFor, picker, head, choices, board, start, move, bring, tick, setWhen, cycleWhen, untickAll, add, rename, remove, found,
       foodReady, seedFood, food, startFood, foodAdd, foodRemove, foodTick, foodWhen, foodCycle };
   }
 

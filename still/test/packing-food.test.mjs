@@ -293,11 +293,18 @@ test("food stays computer only (d14): its styles sit inside the Packing page's p
 });
 
 test("the BUILD label names this copy, with a new stamp for the changed core", () => {
-  assert.match(html, /const BUILD = "2026-11-17d road trip food pills";/);
-  assert.match(html, /calendar-core\.js\?v=23"/);
+  assert.match(html, /const BUILD = "2026-11-17e one click pills";/);
+  assert.match(html, /calendar-core\.js\?v=24"/);
 });
 
 test("the page's own script still parses", () => {
   const scripts = [...html.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/g)].map((m) => m[1]).filter((s) => s.trim());
   for (const s of scripts) assert.doesNotThrow(() => new vm.Script(s), SyntaxError);
+});
+
+test("no when menu anywhere on the Packing page: a Bags pill moves on with one click too (Junyan, d30)", () => {
+  const html = file("../calendar.html");
+  assert.ok(!html.includes("pk-menu") && !html.includes("data-pkwhen") && !html.includes("PK.setWhen("), "the menu and its picks are gone");
+  assert.ok(html.includes("PK.cycleWhen("), "the Bags pill click calls cycleWhen");
+  assert.ok(!html.includes("aria-haspopup"), "a pill no longer opens anything");
 });
