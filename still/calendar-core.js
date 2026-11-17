@@ -510,12 +510,15 @@
     function card(t, coming, today) {
       let icon = "";
       for (const n of t.aliases || [t.name]) { const m = EMOJI.exec(n); if (m) { icon = m[0]; break; } }
-      const name = String(t.name).replace(EMOJIS, " ").replace(YEAR, " ").replace(/\s+/g, " ").trim();
       const id = tripId(t), c = count(id);
-      return { id, icon: icon || t.icon || "🧳", name: name || String(t.name), dates: dates(t, today),
+      return { id, icon: icon || t.icon || "🧳", name: shortName(t), dates: dates(t, today),
         label: coming ? trips.whenLabel(t) : "", now: !!(coming && t.now), has: !!tripOf(id), done: c.done, total: c.total,
         packed: tripOf(id) ? `${c.done} of ${c.total} packed` : "No list yet" };
     }
+    /** A trip's name without its flag or year: "2026 🇪🇬 Egypt" is "Egypt". */
+    function shortName(t) { return String(t.name).replace(EMOJIS, " ").replace(YEAR, " ").replace(/\s+/g, " ").trim() || String(t.name); }
+    /** The short name of the trip behind a list id, or "" when no trip read has that key. */
+    const nameOf = (list) => { const t = trips.mergeTrips(seen || []).find((x) => tripId(x) === list); return t ? shortName(t) : ""; };
     const cards = (today) => { const sp = split(today); return { up: sp.up.map((t) => card(t, true, today)), past: sp.past.map((t) => card(t, false, today)) }; };
     const cardOf = (list, today) => { const c = cards(today); return c.up.concat(c.past).find((x) => x.id === list) || null; };
 
@@ -535,11 +538,11 @@
       const copy = {};
       if (src === "all") D.items.forEach((o) => { copy[o.id] = 1; });
       else if (src !== "empty") Object.assign(copy, onOf(src));
-      D.trips[list.slice(2)] = { on: copy, ticks: {}, from: src, fromName: isMine(src) || src === "empty" ? "" : (cardOf(src, "2000-01-01") || {}).name || "" };
+      D.trips[list.slice(2)] = { on: copy, ticks: {}, from: src, fromName: isMine(src) || src === "empty" ? "" : nameOf(src) };
       save();
     }
     const fromLabel = (rec) => rec.from === "all" ? "all your items" : rec.from === "empty" ? "an empty list"
-      : isMine(rec.from) ? `your ${mineName(rec.from)} list` : (cardOf(rec.from, "2000-01-01") || {}).name || rec.fromName || "another trip";
+      : isMine(rec.from) ? `your ${mineName(rec.from)} list` : nameOf(rec.from) || rec.fromName || "another trip";
 
     const items = (n) => `${n} ${n === 1 ? "item" : "items"}`;
     /** Which of My lists a new trip most likely starts from: Brazil in its name, a ski icon or a ski place. */
@@ -570,7 +573,7 @@
     function picker({ today, picked, allPast }) {
       const { up, past } = cards(today), CUT = 8;
       const all = !!allPast || past.length <= CUT || past.findIndex((c) => c.id === picked) >= CUT;
-      const mine = MINE.map(([id, name, icon]) => ({ id, icon, name, total: on(id).length }));
+      const mine = MINE.map(([id, name, icon]) => ({ id, icon, name, total: on(id).length, size: items(on(id).length) }));
       return { up, past: all ? past : past.slice(0, CUT), more: !all, mine, counts: { up: up.length, past: past.length, mine: mine.length },
         open: up.length ? { list: up[0].id, tab: "up" } : { list: "all", tab: "mine" } };
     }

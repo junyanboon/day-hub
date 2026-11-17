@@ -13,7 +13,7 @@
 <meta name="apple-mobile-web-app-title" content="Calendar">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>Calendar</title>
-<script src="calendar-core.js?v=17"></script>
+<script src="calendar-core.js?v=18"></script>
 <script src="quest-trips.js?v=20261113c" data-helpers></script>
 <script>
 /* The look saved on this device (the Look row in Settings; Studio when none) goes on here, before anything is drawn,
@@ -1558,7 +1558,7 @@ function packDraw() {
     <span class="pk-tf">${c.label ? `<span class="pk-bdg${c.now ? " pk-now" : ""}">${esc(c.label)}</span>` : "<span></span>"}<span class="pk-tp${c.has ? "" : " pk-no"}">${esc(c.packed)}</span></span>
     <span class="pk-tb"><i style="width:${c.has && c.total ? Math.round(100 * c.done / c.total) : 0}%"></i></span></button>`;
   const tab = (k, l, n) => `<button class="pk-tab" data-pktab="${k}" aria-pressed="${P.tab === k}">${l} <small>${n}</small></button>`;
-  const cards = P.tab === "mine" ? pk.mine.map((m) => `<button class="pk-trip" data-pklist="${m.id}" aria-pressed="${m.id === P.list}"><span class="pk-te" aria-hidden="true">${m.icon}</span><span class="pk-tn">${esc(m.name)}</span><span class="pk-tc">${m.total} items</span></button>`).join("")
+  const cards = P.tab === "mine" ? pk.mine.map((m) => `<button class="pk-trip" data-pklist="${esc(m.id)}" aria-pressed="${m.id === P.list}"><span class="pk-te" aria-hidden="true">${esc(m.icon)}</span><span class="pk-tn">${esc(m.name)}</span><span class="pk-tc">${esc(m.size)}</span></button>`).join("")
     : P.tab === "up" ? (pk.up.length ? pk.up.map(card).join("") : `<div class="pk-hint">No trips coming up.</div>`)
     : (pk.past.length ? pk.past.map(card).join("") : `<div class="pk-hint">No past trips yet.</div>`) + (pk.more ? `<button class="pk-more" data-pkact="allpast">Show all ${pk.counts.past}</button>` : "");
   const head = top + `<div class="pk-tabs" role="group" aria-label="Trips">${tab("up", "Coming up", pk.counts.up)}${tab("past", "Past", pk.counts.past)}<span class="pk-grow"></span>${tab("mine", "My lists", pk.counts.mine)}</div>
@@ -1584,12 +1584,12 @@ function packDraw() {
       : `<button class="pk-pill w-${o.when}" data-pkpill="${esc(o.id)}" aria-haspopup="true" aria-expanded="${P.menu === o.id}" title="Click to change when you pack this">${esc(o.pill)}</button>
          <button class="pk-rm" data-pkout="${esc(o.id)}" title="${all ? "Delete for good" : "Leave out of " + esc(name)}" aria-label="${all ? "Delete" : "Leave out"}: ${esc(o.name)}">×</button>`;
     const menu = P.menu === o.id ? `<div class="pk-menu" role="menu"><p>Pack it</p>` + b.chips.slice(1).map((c) =>
-      `<button role="menuitem" data-pkwhen="${c.id}"><span class="pk-pill w-${c.id}">${esc(c.label)}</span>${o.when === c.id ? "<b>✓</b>" : ""}</button>`).join("") + `</div>` : "";
+      `<button role="menuitem" data-pkwhen="${esc(c.id)}"><span class="pk-pill w-${esc(c.id)}">${esc(c.label)}</span>${o.when === c.id ? "<b>✓</b>" : ""}</button>`).join("") + `</div>` : "";
     return `<div class="pk-it${b.ticks ? "" : " pk-nock"}${o.done ? " pk-done" : ""}${P.menu === o.id ? " pk-open" : ""}" draggable="${P.edit === o.id ? "false" : "true"}" data-pkid="${esc(o.id)}">
       ${b.ticks ? `<input type="checkbox" class="pk-ck" data-pktick="${esc(o.id)}" ${o.done ? "checked" : ""} aria-label="Packed: ${esc(o.name)}">` : ""}
       <span class="pk-ic${o.icon ? "" : " pk-none"}" aria-hidden="true">${o.icon ? esc(o.icon) : "•"}</span>${nm}${tail}${menu}</div>`;
   };
-  const chips = b.chips.map((c) => `<button class="pk-chip${c.id === "any" ? "" : " w-" + c.id}" data-pkfilter="${c.id}" aria-pressed="${P.when === c.id}">${c.id === "any" ? "" : "<i></i>"}${esc(c.label)} <small>${c.n}</small></button>`).join("");
+  const chips = b.chips.map((c) => `<button class="pk-chip${c.id === "any" ? "" : " w-" + esc(c.id)}" data-pkfilter="${esc(c.id)}" aria-pressed="${P.when === c.id}">${c.id === "any" ? "" : "<i></i>"}${esc(c.label)} <small>${c.n}</small></button>`).join("");
   const total = b.chips[0].n;
   const fresh = mine ? "" : P.fresh
     ? `<span class="pk-askline">Untick all ${total} on ${esc(name)}? <button class="pk-btn pk-sm pk-danger" data-pkact="fresh-yes">Untick</button><button class="pk-btn pk-sm" data-pkact="fresh-no">Keep</button></span>`
@@ -1601,7 +1601,7 @@ function packDraw() {
     <form class="pk-add" id="pkAddF"><span class="pk-plus" aria-hidden="true">+</span><input id="pkAdd" placeholder="Add an item, then press Enter" autocomplete="off" aria-label="Add an item"><kbd aria-hidden="true">Enter ↵</kbd></form>
     ${b.top.rows.length ? `<div class="pk-rows">${b.top.rows.map(row).join("")}</div>` : `<div class="pk-hint">${esc(b.top.hint)}</div>`}</section>`;
   const bags = b.bags.map((g) => `<section class="pk-well" data-pkdrop="${g.id}">
-    <div class="pk-wh"><span class="pk-em" aria-hidden="true">${g.icon}</span><span class="pk-nm">${esc(g.name)}</span><span class="pk-ct">${esc(g.count)}</span></div>
+    <div class="pk-wh"><span class="pk-em" aria-hidden="true">${esc(g.icon)}</span><span class="pk-nm">${esc(g.name)}</span><span class="pk-ct">${esc(g.count)}</span></div>
     <div class="pk-thin"><i style="width:${b.ticks && g.total ? Math.round(100 * g.done / g.total) : 0}%"></i></div>
     ${g.rows.length ? `<div class="pk-rows">${g.rows.map(row).join("")}</div>` : `<div class="pk-hint">${esc(g.hint)}</div>`}</section>`).join("");
   const where = mine ? "list" : "trip";

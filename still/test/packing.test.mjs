@@ -392,3 +392,17 @@ test("a store that cannot be read or holds rubbish still gives a page that opens
   q.seed(SEED); q.sync(TRIPS, TODAY);
   assert.equal(q.picker({ today: TODAY }).up[0].packed, "0 of 37 packed", "it still works for this visit");
 });
+
+test("a My lists card says how many items in plain words: 1 item, 2 items", () => {
+  const one = [{ ...SEED[0], types: ["Skiing"] }, { ...SEED[1], types: ["Travel"] }, { ...SEED[2], types: ["Travel"] }];
+  const p = C.packing({ store: mem(), trips: T }); p.seed(one);
+  assert.deepEqual(p.picker({ today: TODAY }).mine.map((m) => [m.id, m.size]),
+    [["all", "3 items"], ["brazil", "0 items"], ["road", "2 items"], ["ski", "1 item"]]);
+});
+
+test("a trip started from a past trip's list says so, by that trip's name", () => {
+  const p = open();
+  p.start(EGYPT, "all");
+  p.start(BRAZIL, EGYPT);
+  assert.match(p.head(BRAZIL, TODAY).sub, /started from Egypt$/);
+});
