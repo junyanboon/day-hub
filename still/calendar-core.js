@@ -776,11 +776,16 @@
       const at = foodAt(list, id); if (!at || at.g === "buy" || !(when in ORDER)) return;
       at.F[at.g][at.i].w = when; save();
     }
-    /** The pill menu's choices, the same as the bags'. */
-    const foodWhens = () => WHEN.map(([id, label]) => ({ id, label }));
+    /** One click on a pill moves it to the next when: Week before, Day before, On leaving, When?, then round again
+        (Junyan after mock v5: "I just click it and it changes the pill"). This list only. */
+    function foodCycle(list, id) {
+      const at = foodAt(list, id); if (!at || at.g === "buy") return;
+      const ids = WHEN.map((w) => w[0]), x = at.F[at.g][at.i];
+      foodWhen(list, id, ids[(ids.indexOf(x.w) + 1) % ids.length]);
+    }
 
     return { ready, seed, sync, openFor, picker, head, choices, board, start, move, bring, tick, setWhen, untickAll, add, rename, remove, found,
-      foodReady, seedFood, food, startFood, foodAdd, foodRemove, foodTick, foodWhen, foodWhens };
+      foodReady, seedFood, food, startFood, foodAdd, foodRemove, foodTick, foodWhen, foodCycle };
   }
 
   root.CalCore.packing = packing;

@@ -202,7 +202,25 @@ test("a pill changes when, on this trip only; Buy on arrival takes no pill", () 
   const berries = grp(p.food(MTL), "buy").rows[0];
   p.foodWhen(MTL, berries.id, "week");
   assert.equal(grp(p.food(MTL), "buy").rows[0].pill, "");
-  assert.deepEqual(p.foodWhens().map((w) => [w.id, w.label]), [["week", "Week before"], ["day", "Day before"], ["leave", "On leaving"], ["none", "No time yet"]]);
+});
+
+test("one click on a pill moves it on: Week before, Day before, On leaving, When?, then round again; saved per trip", () => {
+  const store = mem(), p = open(store);
+  const pillOf = (q, list) => grp(q.food(list), "every").rows[1];
+  const sv = pillOf(p, MTL);
+  assert.deepEqual([sv.when, sv.pill], ["none", "When?"]);
+  const seen = [];
+  for (let i = 0; i < 4; i++) { p.foodCycle(MTL, sv.id); const r = pillOf(p, MTL); seen.push([r.when, r.pill]); }
+  assert.deepEqual(seen, [["week", "Week before"], ["day", "Day before"], ["leave", "On leaving"], ["none", "When?"]], "four clicks get back to the start");
+  p.foodCycle(MTL, sv.id);
+  const again = C.packing({ store, trips: T }); again.sync(TRIPS, TODAY);
+  assert.equal(pillOf(again, MTL).when, "week", "kept in this browser after a reload");
+  assert.equal(pillOf(again, "road").when, "none", "this trip only: the template keeps its pill");
+  const berries = grp(p.food(MTL), "buy").rows[0];
+  p.foodCycle(MTL, berries.id);
+  assert.equal(grp(p.food(MTL), "buy").rows[0].pill, "", "Buy on arrival takes no pill");
+  const tpl = pillOf(p, "road"); p.foodCycle("road", tpl.id);
+  assert.equal(pillOf(p, "road").when, "week", "the template's own pills cycle the same way");
 });
 
 test("bags untouched: the whole bag side reads the same after a full round of food", () => {
@@ -246,9 +264,9 @@ test("the page loads the food template from food-seed.json before his trips, so 
 });
 
 test("the page has the Bags | Food switch, the button, the six groups, + Add, ticks, pills and ×, all wired to the rules", () => {
-  for (const s of ["🧳 Bags", "🥣 Food", "data-pkview", "data-pkact=\"food-start\"", "data-pkfadd", "Add, then Enter", "data-pkftick", "data-pkfpill", "data-pkfwhen", "data-pkfrm"])
+  for (const s of ["🧳 Bags", "🥣 Food", "data-pkview", "data-pkact=\"food-start\"", "data-pkfadd", "Add, then Enter", "data-pkftick", "data-pkfpill", "data-pkfrm"])
     assert.ok(html.includes(s), s);
-  for (const s of ["PK.food(", "PK.startFood(", "PK.foodAdd(", "PK.foodTick(", "PK.foodWhen(", "PK.foodRemove(", "PK.foodWhens("])
+  for (const s of ["PK.food(", "PK.startFood(", "PK.foodAdd(", "PK.foodTick(", "PK.foodCycle(", "PK.foodRemove("])
     assert.ok(html.includes(s), s);
 });
 
@@ -257,6 +275,7 @@ test("mock v5 (d29): Food is laid out like the Bags, with the Bags' own wells, r
   for (const s of ["pk-well", "pk-wh", "pk-em", "pk-ct", "pk-cols", "pk-rows", "pk-it", "pk-rm", "pk-add", "pk-plus"])
     assert.ok(fn.includes(s), s);
   assert.ok(fn.includes("Add a to-do, then press Enter"), "Before you go adds like To place");
+  assert.ok(!fn.includes("pk-menu") && !fn.includes("data-pkfwhen") && !html.includes("PK.foodWhens("), "a pill changes on one click, no menu (Junyan after v5)");
   assert.ok(fn.includes("Add, then Enter"), "every column adds at the bottom");
   assert.ok(!/\.sub\b/.test(fn), "no subtitles");
   assert.ok(!fn.includes("pk-fsteps") && !fn.includes("pk-fside") && !fn.includes("pk-frm"), "the v3 layout is gone");
@@ -274,8 +293,8 @@ test("food stays computer only (d14): its styles sit inside the Packing page's p
 });
 
 test("the BUILD label names this copy, with a new stamp for the changed core", () => {
-  assert.match(html, /const BUILD = "2026-11-17c road trip food v5";/);
-  assert.match(html, /calendar-core\.js\?v=22"/);
+  assert.match(html, /const BUILD = "2026-11-17d road trip food pills";/);
+  assert.match(html, /calendar-core\.js\?v=23"/);
 });
 
 test("the page's own script still parses", () => {

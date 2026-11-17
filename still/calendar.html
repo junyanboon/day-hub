@@ -13,7 +13,7 @@
 <meta name="apple-mobile-web-app-title" content="Calendar">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>Calendar</title>
-<script src="calendar-core.js?v=22"></script>
+<script src="calendar-core.js?v=23"></script>
 <script src="quest-trips.js?v=20261113c" data-helpers></script>
 <script>
 /* The look saved on this device (the Look row in Settings; Studio when none) goes on here, before anything is drawn,
@@ -710,7 +710,7 @@ if (TOUCH) for (const g of ["gesturestart", "gesturechange"]) document.addEventL
    which shows this build, the phone's answers and a log of every day change with its cause. Until then CalHook.on is
    null and diag() does nothing. BUILD names this copy of the page, so a screenshot proves which copy ran: change it on
    every change to this page or calendar-readout.js (the date plus a letter). */
-const BUILD = "2026-11-17c road trip food v5";
+const BUILD = "2026-11-17d road trip food pills";
 const CalHook = window.CalHook = { BUILD, on: null };
 const diag = (kind, msg) => { if (CalHook.on) CalHook.on(kind, msg); };
 /* The iPhone home screen app's fit (2026-11-12): html.hs in a home screen app on touch, html.hsfill and --hsgap when
@@ -1723,20 +1723,18 @@ function packDraw() {
 /** The Food view (slice 03, mock v5, d29): laid out like the Bags. Before you go is a wide well across the top like
     To place, its add box first and its to-dos three across. Then Every road trip, This trip and Kitchen gear in three
     columns, and Buy on arrival and Cooler below. Each has its icon tile, count and "+ Add, then Enter"; every item a
-    tick (on a trip), a pill (not on Buy on arrival) and × on hover. The rules are CalCore.packing's food (tests:
+    tick (on a trip), a pill that moves on with each click (not on Buy on arrival) and × on hover. The rules are CalCore.packing's food (tests:
     still/test/packing-food.test.mjs). */
 function packFood(f) {
   if (!f.started) return `<section class="pk-fstart"><p>This trip had its bags before food was added. Your bags and ticks stay as they are.</p>
     <button class="pk-btn" data-pkact="food-start">${esc(f.button)}</button></section>`;
-  const G = Object.fromEntries(f.groups.map((g) => [g.id, g])), whens = PK.foodWhens();
+  const G = Object.fromEntries(f.groups.map((g) => [g.id, g]));
   const item = (g, o) => {
-    const menu = P.menu === o.id ? `<div class="pk-menu" role="menu"><p>When</p>` + whens.map((w) =>
-      `<button role="menuitem" data-pkfwhen="${esc(w.id)}"><span class="pk-pill w-${esc(w.id)}">${esc(w.label)}</span>${o.when === w.id ? "<b>✓</b>" : ""}</button>`).join("") + `</div>` : "";
-    return `<div class="pk-it pk-fit${f.ticks ? "" : " pk-nock"}${o.done ? " pk-done" : ""}${P.menu === o.id ? " pk-open" : ""}" data-pkfid="${esc(o.id)}">
+    return `<div class="pk-it pk-fit${f.ticks ? "" : " pk-nock"}${o.done ? " pk-done" : ""}" data-pkfid="${esc(o.id)}">
       ${f.ticks ? `<input type="checkbox" class="pk-ck" data-pkftick="${esc(o.id)}" ${o.done ? "checked" : ""} aria-label="${g.id === "buy" ? "Bought" : "Done"}: ${esc(o.name)}">` : ""}
       <span class="pk-fnm">${esc(o.name)}</span>
-      ${g.pill ? `<button class="pk-pill w-${esc(o.when)}" data-pkfpill="${esc(o.id)}" aria-haspopup="true" aria-expanded="${P.menu === o.id}" title="Click to change when">${esc(o.pill)}</button>` : ""}
-      <button class="pk-rm" data-pkfrm="${esc(o.id)}" title="Remove from this ${f.ticks ? "trip" : "list"}" aria-label="Remove: ${esc(o.name)}">×</button>${menu}</div>`;
+      ${g.pill ? `<button class="pk-pill w-${esc(o.when)}" data-pkfpill="${esc(o.id)}" title="Click for the next when">${esc(o.pill)}</button>` : ""}
+      <button class="pk-rm" data-pkfrm="${esc(o.id)}" title="Remove from this ${f.ticks ? "trip" : "list"}" aria-label="Remove: ${esc(o.name)}">×</button></div>`;
   };
   /* wide: the big add box on top, like To place; otherwise the dashed one at the bottom of a column. */
   const add = (g, hint, wide) => `<label class="pk-add${wide ? "" : " pk-fadd"}"><span class="pk-plus" aria-hidden="true">+</span><input data-pkfadd="${esc(g.id)}" placeholder="${esc(hint)}" autocomplete="off" aria-label="Add to ${esc(g.title)}"></label>`;
@@ -1765,7 +1763,7 @@ function wirePacking() {
   pg.addEventListener("click", (e) => {
     if (!on()) return;
     /* a click anywhere but the open menu or its pill closes the menu */
-    const shut = !!P.menu && !e.target.closest(".pk-menu") && !e.target.closest("[data-pkpill],[data-pkfpill]");
+    const shut = !!P.menu && !e.target.closest(".pk-menu") && !e.target.closest("[data-pkpill]");
     if (shut) P.menu = null;
     const b = e.target.closest("button"); if (!b) { if (shut) packDraw(); return; }
     const d = b.dataset;
@@ -1789,8 +1787,7 @@ function wirePacking() {
     /* the Food view (slice 03) */
     else if (d.pkview) { P.view = d.pkview; P.menu = P.del = P.edit = null; P.fresh = false; }
     else if (d.pkact === "food-start") PK.startFood(P.list);
-    else if (d.pkfpill) P.menu = P.menu === d.pkfpill ? null : d.pkfpill;
-    else if (d.pkfwhen) { const id = b.closest("[data-pkfid]")?.dataset.pkfid; if (id) PK.foodWhen(P.list, id, d.pkfwhen); P.menu = null; }
+    else if (d.pkfpill) PK.foodCycle(P.list, d.pkfpill);
     else if (d.pkfrm) { PK.foodRemove(P.list, d.pkfrm); P.menu = null; }
     else { if (shut) packDraw(); return; }   // "‹ Calendar" and the rail are the calendar's own (clickRouter)
     packDraw();
