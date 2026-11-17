@@ -266,3 +266,129 @@ test("the filter shows only those items in every list; Hide packed hides ticked 
   b = p.board(EGYPT, {});
   assert.deepEqual([b.top.hint, b.bags[0].hint], ["Nothing waiting. Everything has a bag.", "Drag items here."]);
 });
+
+test("the add box: one line adds an item at the top of To place; x3 at the end is the count", () => {
+  const p = open();
+  const id = p.add(MTL, "Trail mix x3");
+  const top = p.board(MTL, {}).top;
+  assert.deepEqual([top.total, top.rows[0].id, top.rows[0].name, top.rows[0].qty, top.rows[0].icon, top.rows[0].pill], [14, id, "Trail mix", "3", "", "When?"]);
+  const two = p.add(MTL, "  Passport copy ");
+  assert.deepEqual(names(p.board(MTL, {}).top.rows).slice(0, 2), ["Passport copy", "Trail mix"], "newest first");
+  assert.equal(p.board(MTL, {}).top.rows[0].qty, "1");
+  assert.notEqual(two, id);
+  assert.equal(p.add(MTL, "   "), null, "an empty line adds nothing");
+  assert.equal(p.board(MTL, {}).top.total, 15);
+  const q = (text) => { const id2 = p.add("all", text), r = p.board("all", {}).top.rows.find((x) => x.id === id2); return [r.icon, r.name, r.qty]; };
+  assert.deepEqual(q("Gum ×12"), ["", "Gum", "12"]);
+  assert.deepEqual(q("Gel x 2"), ["", "Gel", "2"]);
+  assert.deepEqual(q("Xbox"), ["", "Xbox", "1"]);
+  assert.deepEqual(q("🥜 Peanuts x2"), ["🥜", "Peanuts", "2"], "an emoji in front is its icon, as on the Notion items");
+  assert.equal(p.add(BRAZIL, "Sunscreen"), null, "a trip with no list has no board to add to");
+  assert.equal(p.board("all", {}).chips[0].n, 100);
+});
+
+test("an item added on a trip is on that trip and in All items only; on one of My lists, on that list; on All items, there only", () => {
+  const p = open();
+  p.start(BRAZIL, "brazil");
+  const onIt = (list, id) => ids(p.board(list, {}).top.rows).includes(id);
+  const a = p.add(MTL, "Trail mix");
+  assert.deepEqual([MTL, "all", "road", "brazil", BRAZIL].map((l) => onIt(l, a)), [true, true, false, false, false]);
+  const b = p.add("ski", "Hand warmers");
+  assert.deepEqual(["ski", "all", "road", MTL].map((l) => onIt(l, b)), [true, true, false, false]);
+  const c = p.add("all", "Umbrella");
+  assert.deepEqual(["all", "ski", "road", "brazil", MTL, BRAZIL].map((l) => onIt(l, c)), [true, false, false, false, false, false]);
+  assert.equal(p.board("all", {}).chips[0].n, 97);
+});
+
+test("renaming: the same x3 rule for the count, an empty name keeps the old one", () => {
+  const p = open(), id = idOf(p, MTL, "Socks");
+  const row = () => { const r = p.board(MTL, {}).bags[0].rows.find((x) => x.id === id); return [r.icon, r.name, r.qty]; };
+  assert.deepEqual(row(), ["🧦", "Socks", "6"]);
+  assert.equal(p.board(MTL, {}).bags[0].rows.find((x) => x.id === id).edit, "Socks x6", "what the rename box opens with");
+  p.rename(id, "Wool socks x8");
+  assert.deepEqual(row(), ["🧦", "Wool socks", "8"]);
+  assert.equal(p.board("all", {}).bags[0].rows.find((x) => x.id === id).name, "Wool socks", "one name everywhere");
+  p.rename(id, "Wool socks");
+  assert.deepEqual(row(), ["🧦", "Wool socks", "1"]);
+  assert.equal(p.board(MTL, {}).bags[0].rows.find((x) => x.id === id).edit, "Wool socks");
+  p.rename(id, "   ");
+  assert.deepEqual(row(), ["🧦", "Wool socks", "1"]);
+  p.rename(id, "🧶 Wool socks x2");
+  assert.deepEqual(row(), ["🧶", "Wool socks", "2"]);
+});
+
+test("deleting on All items removes the item for good, from every trip and list", () => {
+  const p = open(), id = idOf(p, MTL, "Socks");
+  p.tick(MTL, id, true);
+  p.remove(id);
+  assert.equal(p.board("all", {}).chips[0].n, 93);
+  assert.deepEqual([p.board(MTL, {}).chips[0].n, p.board(MTL, {}).bags[0].done, p.board("road", {}).chips[0].n, p.board("brazil", {}).chips[0].n], [36, 0, 36, 71]);
+  assert.ok(!ids(p.board(MTL, {}).out).includes(id), "not left out either: gone");
+  assert.equal(p.picker({ today: TODAY }).up[0].packed, "0 of 36 packed");
+});
+
+test("Start fresh unticks the whole trip and nothing else; Start over clears its ticks too", () => {
+  const p = open();
+  p.start(BRAZIL, "road");
+  for (const r of p.board(MTL, {}).bags[0].rows) { p.tick(MTL, r.id, true); p.tick(BRAZIL, r.id, true); }
+  assert.equal(p.picker({ today: TODAY }).up[0].packed, "10 of 37 packed");
+  p.untickAll(MTL);
+  assert.deepEqual(p.picker({ today: TODAY }).up.map((c) => c.packed), ["0 of 37 packed", "10 of 37 packed"]);
+  assert.equal(p.board(MTL, {}).chips[0].n, 37, "the items stay");
+  p.start(BRAZIL, "ski");
+  assert.equal(p.picker({ today: TODAY }).up[1].packed, "0 of 36 packed");
+});
+
+test("Find an item narrows what is left out, whatever the case", () => {
+  const p = open();
+  assert.equal(p.found(MTL, "").length, 57);
+  const hit = p.found(MTL, " SKI ");
+  assert.deepEqual(p.board(MTL, {}).out.filter((o) => hit.includes(o.id)).map((o) => o.name).sort(),
+    ["Ski Gear", "Ski Goggles", "Ski Helmet", "Ski Helmet", "Ski Jacket", "Ski Mitts", "Ski Socks", "Skis, Boots, Poles & Straps"]);
+  assert.deepEqual(p.found(MTL, "zzz"), []);
+  assert.deepEqual(p.found("all", "ski"), [], "All items leaves nothing out");
+});
+
+test("everything is kept: a page opened later on the same browser sees the same lists, ticks and trips, with no network", () => {
+  const store = mem(), p = open(store);
+  p.start(BRAZIL, "brazil");
+  const socks = idOf(p, MTL, "Socks");
+  p.tick(MTL, socks, true);
+  p.setWhen(socks, "day");
+  p.move(MTL, socks, "sling");
+  const added = p.add(MTL, "Trail mix x3");
+  p.move(BRAZIL, idOf(p, BRAZIL, "Passport"), "out");
+  const later = C.packing({ store, trips: T });   // no seed, no sync: the network is off
+  assert.equal(later.ready(), true);
+  assert.equal(later.seed(SEED), false, "the Notion copy is read once; after that the app owns its copy");
+  const k = later.picker({ today: TODAY });
+  assert.deepEqual(k.up.map((c) => [c.name, c.dates, c.label, c.packed]),
+    [["Montreal Birthday", "Nov 12 to 17", "Now", "1 of 38 packed"], ["Brazil Carnaval", "Jan 3 to Feb 7, 2027", "51 days away", "0 of 71 packed"]]);
+  assert.equal(k.counts.past, 5);
+  const r = later.board(MTL, {}).bags[2].rows.find((x) => x.id === socks);
+  assert.deepEqual([r.done, r.when], [true, "day"]);
+  assert.deepEqual([later.board(MTL, {}).top.rows[0].id, later.board(MTL, {}).top.rows[0].qty], [added, "3"]);
+  assert.notEqual(later.add(MTL, "Gum"), added, "a new item never reuses an id");
+});
+
+test("a list is saved under the trip's key: a respelled trip keeps it, and a trip that is no longer returned keeps it too", () => {
+  const store = mem(), p = open(store);
+  p.tick(MTL, idOf(p, MTL, "Socks"), true);
+  p.sync(TRIPS.slice(1), TODAY);   // Montreal is not returned this time
+  assert.deepEqual(p.picker({ today: TODAY }).up.map((c) => c.name), ["Brazil Carnaval"]);
+  p.sync([{ name: "2026 🇨🇦 Montréal Birthday", start: "2026-11-12", end: "2026-11-17" }, ...TRIPS.slice(1)], TODAY);
+  const c = C.packing({ store, trips: T }).picker({ today: TODAY }).up[0];
+  assert.deepEqual([c.name, c.packed], ["Montréal Birthday", "1 of 37 packed"]);
+});
+
+test("a store that cannot be read or holds rubbish still gives a page that opens", () => {
+  const bad = { get: () => "{not json", set: () => {} };
+  const p = C.packing({ store: bad, trips: T });
+  assert.equal(p.ready(), false);
+  assert.deepEqual(p.picker({ today: TODAY }).counts, { up: 0, past: 0, mine: 4 });
+  assert.deepEqual(p.board("all", {}).chips[0].n, 0);
+  const thrower = { get: () => { throw new Error("blocked"); }, set: () => { throw new Error("full"); } };
+  const q = C.packing({ store: thrower, trips: T });
+  q.seed(SEED); q.sync(TRIPS, TODAY);
+  assert.equal(q.picker({ today: TODAY }).up[0].packed, "0 of 37 packed", "it still works for this visit");
+});

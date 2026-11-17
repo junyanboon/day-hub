@@ -468,7 +468,8 @@
     try { const v = JSON.parse(store.get(KEY) || "null"); if (v && Array.isArray(v.items) && v.mine && v.trips) D = v; } catch (e) {}
     let seen = null;   // the trip list as last read, kept so the page opens with no network
     try { const v = JSON.parse(store.get(SEEN) || "null"); if (Array.isArray(v)) seen = v; } catch (e) {}
-    const save = () => store.set(KEY, JSON.stringify(D));
+    /* A browser that blocks storage still gets a working page for this visit. */
+    const save = () => { try { store.set(KEY, JSON.stringify(D)); } catch (e) {} };
     const ready = () => !!D;
 
     /** First load: the Notion copy becomes his items and My lists. Does nothing once a copy is kept. */
@@ -496,7 +497,7 @@
     /** His trips as just read (Day Quest's saved copy and still-api's list): remembered as the last good list. */
     function sync(list, today) {
       seen = (list || []).map((t) => ({ name: t.name, start: t.start || "", end: t.end || "", icon: t.icon || "" }));
-      store.set(SEEN, JSON.stringify(seen));
+      try { store.set(SEEN, JSON.stringify(seen)); } catch (e) {}
       first(today);
     }
     const tripId = (t) => "t:" + (trips.tripKey(t.name) || t.name);
@@ -579,7 +580,7 @@
     function board(list, opts) {
       const { when = "any", hide = false } = opts || {};
       const mine = on(list), rec = tripOf(list), ticks = rec ? rec.ticks : {};
-      const row = (o) => ({ id: o.id, icon: o.i, name: o.n, qty: o.q, when: o.when, pill: PILL[o.when], done: !!ticks[o.id] });
+      const row = (o) => ({ id: o.id, icon: o.i, name: o.n, qty: o.q, edit: o.n + (o.q !== "1" ? " x" + o.q : ""), when: o.when, pill: PILL[o.when], done: !!ticks[o.id] });
       const vis = (arr) => arr.filter((o) => (when === "any" || o.when === when) && !(hide && ticks[o.id]));
       const top = mine.filter((o) => !o.bag), topRows = vis(top);
       return {
@@ -621,7 +622,49 @@
     /** When to pack an item: one per item, the same on every trip. */
     function setWhen(id, when) { const o = byId(id); if (o && when in ORDER) { o.when = when; save(); } }
 
-    return { ready, seed, sync, picker, head, choices, board, start, move, bring, tick, setWhen };
+    /** Starts a trip's ticks again; the items stay. */
+    function untickAll(list) { const rec = tripOf(list); if (rec) { rec.ticks = {}; save(); } }
+
+    /** One line of text as an item: an emoji in front is its icon, "x3" or "×3" at the end is its count. */
+    function parse(text) {
+      let t = String(text || "").trim(), i = "";
+      const lead = LEAD.exec(t); if (lead) { i = lead[1]; t = lead[2].trim(); }
+      const m = /^(.*?)\s+[x×]\s?(\d+)$/i.exec(t);
+      return m ? { i, n: m[1].trim(), q: String(+m[2] || 1) } : { i, n: t, q: "1" };
+    }
+    /** The add box: the item lands at the top of To place, on this list (and in All items). On All items it is in
+        All items only. Gives its id, or null when nothing was added. */
+    function add(list, text) {
+      if (!D || !(list === "all" || isMine(list) || tripOf(list))) return null;
+      const p = parse(text); if (!p.n) return null;
+      const id = "a" + (D.next || 1); D.next = (D.next || 1) + 1;
+      D.items.unshift({ id, i: p.i, n: p.n, q: p.q, bag: "", when: "none" });
+      if (list !== "all") onOf(list)[id] = 1;
+      save();
+      return id;
+    }
+    /** A new name, with the same count rule. An empty name keeps the old one; a new emoji in front changes the icon. */
+    function rename(id, text) {
+      const o = byId(id), p = parse(text); if (!o || !p.n) return;
+      o.n = p.n; o.q = p.q; if (p.i) o.i = p.i;
+      save();
+    }
+    /** Delete for good (from All items): the item leaves every list and every trip, ticks included. */
+    function remove(id) {
+      if (!byId(id)) return;
+      D.items = D.items.filter((o) => o.id !== id);
+      for (const k in D.mine) delete D.mine[k][id];
+      for (const k in D.trips) { delete D.trips[k].on[id]; delete D.trips[k].ticks[id]; }
+      save();
+    }
+    /** Find an item: the ids of the left-out items whose name holds the text, whatever the case. */
+    function found(list, text) {
+      if (!D || list === "all") return [];
+      const q = String(text || "").trim().toLowerCase();
+      return D.items.filter((o) => !onOf(list)[o.id] && o.n.toLowerCase().includes(q)).map((o) => o.id);
+    }
+
+    return { ready, seed, sync, picker, head, choices, board, start, move, bring, tick, setWhen, untickAll, add, rename, remove, found };
   }
 
   root.CalCore.packing = packing;
