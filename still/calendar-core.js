@@ -54,11 +54,14 @@
   /* ---- block types (2026-11-10, one-system ticket 026): eleven kinds of block, each with its own colour,
      helper and page, plus "other". Guessed from the title, first match wins; a hand-set kind wins over the guess. ---- */
   const KINDS = [["deep", "Deep Work"], ["studio", "Studio On-Site"], ["yoga", "Yoga"], ["gym", "Gym"], ["dance", "Dance"],
-    ["cook", "Culinary"], ["travel", "Travel"], ["social", "Social"], ["errand", "Errands"], ["wind", "Wind Down"],
+    ["cook", "Culinary"], ["travel", "Travel"], ["pack", "Packing"], ["social", "Social"], ["errand", "Errands"], ["wind", "Wind Down"],
     ["rest", "Rest"], ["other", "Other"]];
   /* Hand-set kinds saved before the eleven types (ex, food, out, work). "ex" is guessed again: gym or dance. */
   const OLD_KIND = { food: "cook", out: "travel", work: "studio" };
+  /* Packing (slice 02, Junyan 2026-11-16, d23: "p1 yes"): "pack" anywhere in the title, any case, so "Pack for FICTION
+     stay", "Unpack", and also "backpack" and "Packers". First, so "Pack for the trip" is Packing, not Travel. */
   const RX = [
+    ["pack", /pack/i],
     ["deep", /\b(work block|deep work|focus block|focus time)\b/i],
     ["wind", /\b(wind.?down|bedtime)\b/i],
     ["rest", /\b(isha kriya|yoga nidra|nidra|nsdr)\b/i],
@@ -438,6 +441,261 @@
   const clock = (min) => { const h = Math.floor(min / 60) % 24; return `${h % 12 || 12}:${String(min % 60).padStart(2, "0")} ${h < 12 ? "AM" : "PM"}`; };
 
   root.CalCore = { wall, instant, offset, addDays, dowOf, weekStart, isoWeek, addMonths, monthKey, monthsFor,
-    KINDS, kindOf, layout, pieces, coversDay, orderBetween, groupOf, dropTask, blockMinutes, hm, dur, SWIPE, swipeLock, swipeCommit, HOUR, pinchHeight, hourMin, pinchMinute, pinchScroll, cardFit, cardTime, startHour, LOOKS, lookId, startLook, LOOK_RESET, placeOf, sunTimes, sunHalf, lookFace, tripCards, tripLinks, homeFit, homeShift,
+    KINDS, guessKind, kindOf, layout, pieces, coversDay, orderBetween, groupOf, dropTask, blockMinutes, hm, dur, SWIPE, swipeLock, swipeCommit, HOUR, pinchHeight, hourMin, pinchMinute, pinchScroll, cardFit, cardTime, startHour, LOOKS, lookId, startLook, LOOK_RESET, placeOf, sunTimes, sunHalf, lookFace, tripCards, tripLinks, homeFit, homeShift,
     sheetForm, sheetWhen, sheetPatch, sheetLength, sheetStart, sheetEnd, sheetDay, sheetEndDay, sheetAllDay, notesRich, notesText, dayText, clock, toMin };
+})(typeof window !== "undefined" ? window : globalThis);
+
+/* The Packing page's rules (slice 01, Junyan 2026-11-13, d22: "22 yes"), with no page in them: still/test/packing.test.mjs.
+   His Notion Packing List is copied in once (seed); after that this copy is the list, and nothing here writes to
+   Notion (d10). Everything is kept through the store passed in ({get(key) → text or null, set(key, text)}), today the
+   browser (d16), so a server copy can take its place later without a change to the page.
+   A list id is "all", "brazil", "road" or "ski" (My lists: what a new trip starts from), or "t:" + the trip's key
+   (Day Quest's tripKey of its name) for a trip's own list and ticks. A bag and a when belong to the item, the same
+   on every trip. The trip rules themselves (which trips, coming up or past, "51 days away") are Day Quest's own,
+   passed in as trips (quest-trips.js: tripKey, mergeTrips, splitTrips, whenLabel). */
+(function (root) {
+  "use strict";
+  const KEY = "packing-v1", SEEN = "packing-trips-v1";
+  const MINE = [["all", "All items", "🌍"], ["brazil", "Brazil", "🌴"], ["road", "Road Trip", "🚗"], ["ski", "Skiing", "⛷️"]];
+  const BAGS = [["away", "Away Carry-on", "🧳"], ["nomatic", "Nomatic Travel Pack", "🎒"], ["sling", "Sling / On my Person", "👝"]];
+  const WHEN = [["week", "Week before"], ["day", "Day before"], ["leave", "On leaving"], ["none", "No time yet"]];
+  const PILL = { week: "Week before", day: "Day before", leave: "On leaving", none: "When?" };
+  const ORDER = { week: 0, day: 1, leave: 2, none: 3 };
+  /* First guesses at where his Notion tags and places go; he fixes the rest by dragging. */
+  const BAGMAP = { "Carry-On": "away", "Backpack": "nomatic", "Worn": "sling" };
+  const WHENMAP = { "1 Week Before": "week", "1 Day Before": "day", "Upon Departure": "leave" };
+  const TAG = { brazil: "International", road: "Travel", ski: "Skiing" };
+  const EMOJI = /\p{Regional_Indicator}{2}|\p{Extended_Pictographic}(?:️|\p{Emoji_Modifier}|‍\p{Extended_Pictographic}️?)*/u;
+  const LEAD = new RegExp("^(" + EMOJI.source + ")\\s*(.*)$", "u"), EMOJIS = new RegExp(EMOJI.source, "gu");
+  const YEAR = /\b(19|20)\d\d\b/;
+  const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+  /** A trip's dates in his words: "Nov 12 to 17", "Jan 3 to Feb 7, 2027" (the year only when it is not this year),
+      "Dec 21, 2024" for one day, the year alone for an undated trip filed by the year in its name. */
+  function dates(t, today) {
+    const s = String(t.start || "").slice(0, 10), e = String(t.end || t.start || "").slice(0, 10);
+    if (!s) return t.sortKey ? t.sortKey.slice(0, 4) : "No dates yet";
+    const a = s.split("-").map(Number), b = e.split("-").map(Number), yr = b[0] === +String(today).slice(0, 4) ? "" : ", " + b[0];
+    if (s === e) return `${MON[a[1] - 1]} ${a[2]}${yr}`;
+    return `${MON[a[1] - 1]} ${a[2]} to ${a[1] === b[1] && a[0] === b[0] ? "" : MON[b[1] - 1] + " "}${b[2]}${yr}`;
+  }
+
+  function packing({ store, trips }) {
+    let D = null;
+    try { const v = JSON.parse(store.get(KEY) || "null"); if (v && Array.isArray(v.items) && v.mine && v.trips) D = v; } catch (e) {}
+    let seen = null;   // the trip list as last read, kept so the page opens with no network
+    try { const v = JSON.parse(store.get(SEEN) || "null"); if (Array.isArray(v)) seen = v; } catch (e) {}
+    /* A browser that blocks storage still gets a working page for this visit. */
+    const save = () => { try { store.set(KEY, JSON.stringify(D)); } catch (e) {} };
+    const ready = () => !!D;
+
+    /** First load: the Notion copy becomes his items and My lists. Does nothing once a copy is kept. */
+    function seed(rows, today) {
+      if (D) return false;
+      D = { v: 1, next: 1, items: [], mine: { brazil: {}, road: {}, ski: {} }, trips: {} };
+      (rows || []).forEach((r, i) => {
+        const id = "n" + i, m = LEAD.exec(String(r.name || "").trim());
+        D.items.push({ id, i: m ? m[1] : "", n: m ? m[2] : String(r.name || "").trim(), q: String(r.qty || "1"), bag: BAGMAP[r.loc] || "", when: WHENMAP[r.when] || "none" });
+        for (const k in TAG) if ((r.types || []).includes(TAG[k])) D.mine[k][id] = 1;
+      });
+      save();
+      if (today) first(today);
+      return true;
+    }
+    /** Once, when both his items and his trips are in: the trip he is on starts from the Road Trip list, so he lands
+        on a full board. Every other trip waits for him to pick what it starts from. */
+    function first(today) {
+      if (!D || !seen || D.first) return;
+      D.first = 1;
+      const now = split(today).up.find((t) => t.now);
+      if (now && !tripOf(tripId(now))) start(tripId(now), "road"); else save();
+    }
+
+    /** His trips as just read (Day Quest's saved copy and still-api's list): remembered as the last good list. */
+    function sync(list, today) {
+      seen = (list || []).map((t) => ({ name: t.name, start: t.start || "", end: t.end || "", icon: t.icon || "" }));
+      try { store.set(SEEN, JSON.stringify(seen)); } catch (e) {}
+      first(today);
+    }
+    const tripId = (t) => "t:" + (trips.tripKey(t.name) || t.name);
+    /** Coming up and Past by Day Quest's own rules; a trip with no dates and no year in its name closes Past. */
+    function split(today) {
+      const sp = trips.splitTrips(trips.mergeTrips(seen || []), today);
+      return { up: [...sp.upcoming], past: [...sp.past, ...sp.needsDates] };
+    }
+    /** One trip card: its flag or icon (from its name; a suitcase when it has none) and its name without the year. */
+    function card(t, coming, today) {
+      let icon = "";
+      for (const n of t.aliases || [t.name]) { const m = EMOJI.exec(n); if (m) { icon = m[0]; break; } }
+      const id = tripId(t), c = count(id);
+      return { id, icon: icon || t.icon || "🧳", name: shortName(t), dates: dates(t, today),
+        label: coming ? trips.whenLabel(t) : "", now: !!(coming && t.now), has: !!tripOf(id), done: c.done, total: c.total,
+        packed: tripOf(id) ? `${c.done} of ${c.total} packed` : "No list yet" };
+    }
+    /** A trip's name without its flag or year: "2026 🇪🇬 Egypt" is "Egypt". */
+    function shortName(t) { return String(t.name).replace(EMOJIS, " ").replace(YEAR, " ").replace(/\s+/g, " ").trim() || String(t.name); }
+    /** The short name of the trip behind a list id, or "" when no trip read has that key. */
+    const nameOf = (list) => { const t = trips.mergeTrips(seen || []).find((x) => tripId(x) === list); return t ? shortName(t) : ""; };
+    const cards = (today) => { const sp = split(today); return { up: sp.up.map((t) => card(t, true, today)), past: sp.past.map((t) => card(t, false, today)) }; };
+    const cardOf = (list, today) => { const c = cards(today); return c.up.concat(c.past).find((x) => x.id === list) || null; };
+
+    const isMine = (list) => MINE.some((m) => m[0] === list);
+    const mineName = (list) => (MINE.find((m) => m[0] === list) || [])[1] || "";
+    /** A trip's own list: {on, ticks, from, fromName}, or null while it has none. */
+    const tripOf = (list) => (D && String(list).slice(0, 2) === "t:" && D.trips[String(list).slice(2)]) || null;
+    const onOf = (list) => (isMine(list) ? D.mine[list] : (tripOf(list) || {}).on) || {};
+    const on = (list) => (!D ? [] : list === "all" ? D.items : D.items.filter((o) => onOf(list)[o.id]));
+    const ticksOf = (list) => (tripOf(list) || {}).ticks || {};
+    const count = (list) => { const arr = on(list), t = ticksOf(list); return { total: arr.length, done: arr.filter((o) => t[o.id]).length }; };
+
+    /** Starts a trip's list (or starts it over) from one of My lists, another trip's list, or empty: a copy of what
+        is on the source at this moment, with no ticks. After that the trip's list is its own. */
+    function start(list, src) {
+      if (!D || String(list).slice(0, 2) !== "t:") return;
+      const copy = {};
+      if (src === "all") D.items.forEach((o) => { copy[o.id] = 1; });
+      else if (src !== "empty") Object.assign(copy, onOf(src));
+      D.trips[list.slice(2)] = { on: copy, ticks: {}, from: src, fromName: isMine(src) || src === "empty" ? "" : nameOf(src) };
+      save();
+    }
+    const fromLabel = (rec) => rec.from === "all" ? "all your items" : rec.from === "empty" ? "an empty list"
+      : isMine(rec.from) ? `your ${mineName(rec.from)} list` : nameOf(rec.from) || rec.fromName || "another trip";
+
+    const items = (n) => `${n} ${n === 1 ? "item" : "items"}`;
+    /** Which of My lists a new trip most likely starts from: Brazil in its name, a ski icon or a ski place. */
+    const guess = (c) => /bra[sz]il/i.test(c.name) ? "brazil" : (c.icon.indexOf("⛷") === 0 || /ski|tremblant|massif|killington/i.test(c.name)) ? "ski" : "";
+    /** What a trip's list can start from (or start over from): My lists, then every other trip that has a list. */
+    function choices(list, today) {
+      const c = cards(today), all = c.up.concat(c.past), me = all.find((x) => x.id === list) || { name: "", icon: "" };
+      const has = !!tripOf(list), best = has ? "" : guess(me);
+      return {
+        title: `Start the ${me.name} list${has ? " over" : ""}`,
+        sub: has ? `This swaps its ${items(count(list).total)} and clears its ticks.` : "Pick what it starts from. You can add or leave out items after.",
+        lists: MINE.slice(1).concat([MINE[0]]).map(([id, name, icon]) => ({ id, icon, name: id === "all" ? name : `${name} list`, count: items(on(id).length), best: id === best })),
+        trips: all.filter((x) => x.id !== list && x.has).map((x) => ({ id: x.id, icon: x.icon, name: x.name, count: items(x.total) })),
+        keep: has,
+      };
+    }
+
+    /** The one line under the cards that names the picked list. */
+    function head(list, today) {
+      if (list === "all") return { title: "All items", sub: "Everything you pack with.", has: true, kind: "all" };
+      if (isMine(list)) return { title: `${mineName(list)} list`, sub: "New trips can start from this list.", has: true, kind: "mine" };
+      const c = cardOf(list, today) || { name: "", dates: "", label: "" }, rec = tripOf(list);
+      return { title: c.name, sub: [c.dates, c.label, rec && rec.from ? "started from " + fromLabel(rec) : ""].filter(Boolean).join(" · "), has: !!rec, kind: "trip" };
+    }
+
+    /** The trip picker: Coming up, Past (the newest 8 until he asks for all, or picks one further back) and My lists,
+        and where the page opens: the trip he is on, else the next one coming up, else All items. */
+    function picker({ today, picked, allPast }) {
+      const { up, past } = cards(today), CUT = 8;
+      const all = !!allPast || past.length <= CUT || past.findIndex((c) => c.id === picked) >= CUT;
+      const mine = MINE.map(([id, name, icon]) => ({ id, icon, name, total: on(id).length, size: items(on(id).length) }));
+      return { up, past: all ? past : past.slice(0, CUT), more: !all, mine, counts: { up: up.length, past: past.length, mine: mine.length },
+        open: up.length ? { list: up[0].id, tab: "up" } : { list: "all", tab: "mine" } };
+    }
+
+    /** The board for one list: the filter row with whole counts, To place (newest first), the three bags in
+        packing order, and what is left out. `when` narrows every list to one time; `hide` drops packed items. */
+    function board(list, opts) {
+      const { when = "any", hide = false } = opts || {};
+      const mine = on(list), rec = tripOf(list), ticks = rec ? rec.ticks : {};
+      const row = (o) => ({ id: o.id, icon: o.i, name: o.n, qty: o.q, edit: o.n + (o.q !== "1" ? " x" + o.q : ""), when: o.when, pill: PILL[o.when], done: !!ticks[o.id] });
+      const vis = (arr) => arr.filter((o) => (when === "any" || o.when === when) && !(hide && ticks[o.id]));
+      const top = mine.filter((o) => !o.bag), topRows = vis(top);
+      return {
+        ticks: !!rec,
+        chips: [{ id: "any", label: "Everything", n: mine.length }].concat(WHEN.map(([id, label]) => ({ id, label, n: mine.filter((o) => o.when === id).length }))),
+        top: { total: top.length, rows: topRows.map(row), hint: topRows.length ? "" : top.length ? "Nothing here for this filter." : "Nothing waiting. Everything has a bag." },
+        bags: BAGS.map(([id, name, icon]) => {
+          const arr = mine.filter((o) => o.bag === id), done = arr.filter((o) => ticks[o.id]).length;
+          const rows = vis(arr).map((o, i) => [o, i]).sort((x, y) => (ORDER[x[0].when] - ORDER[y[0].when]) || (x[1] - y[1])).map((x) => row(x[0]));
+          return { id, icon, name, total: arr.length, done, count: rec ? `${done} of ${arr.length}` : String(arr.length), rows,
+            hint: rows.length ? "" : !arr.length ? "Drag items here." : hide && when === "any" ? "All packed." : "Nothing here for this filter." };
+        }),
+        out: list === "all" ? [] : D.items.filter((o) => !onOf(list)[o.id]).map((o) => ({ id: o.id, icon: o.i, name: o.n })),
+      };
+    }
+
+    const byId = (id) => (D ? D.items.find((o) => o.id === id) : null);
+    /** A drop. "out" leaves the item out of this list (never out of All items). A bag id, or "top" for To place,
+        puts it there for every trip, brings it onto this list, and moves it to the top of To place's order. */
+    function move(list, id, target) {
+      const o = byId(id); if (!o || !(isMine(list) || tripOf(list))) return;
+      if (target === "out") { if (list !== "all") delete onOf(list)[id]; }
+      else {
+        o.bag = target === "top" ? "" : target;
+        if (list !== "all") onOf(list)[id] = 1;
+        D.items = [o].concat(D.items.filter((x) => x !== o));
+      }
+      save();
+    }
+    /** A click in the side panel: the item is on this list again, in the bag it had. */
+    function bring(list, id) { if (byId(id) && list !== "all" && (isMine(list) || tripOf(list))) { onOf(list)[id] = 1; save(); } }
+
+    /** A tick on a trip's list. Ticks are that trip's own; My lists have none. */
+    function tick(list, id, packed) {
+      const rec = tripOf(list); if (!rec || !byId(id)) return;
+      if (packed) rec.ticks[id] = 1; else delete rec.ticks[id];
+      save();
+    }
+    /** When to pack an item: one per item, the same on every trip. */
+    function setWhen(id, when) { const o = byId(id); if (o && when in ORDER) { o.when = when; save(); } }
+
+    /** Starts a trip's ticks again; the items stay. */
+    function untickAll(list) { const rec = tripOf(list); if (rec) { rec.ticks = {}; save(); } }
+
+    /** One line of text as an item: an emoji in front is its icon, "x3" or "×3" at the end is its count. */
+    function parse(text) {
+      let t = String(text || "").trim(), i = "";
+      const lead = LEAD.exec(t); if (lead) { i = lead[1]; t = lead[2].trim(); }
+      const m = /^(.*?)\s+[x×]\s?(\d+)$/i.exec(t);
+      return m ? { i, n: m[1].trim(), q: String(+m[2] || 1) } : { i, n: t, q: "1" };
+    }
+    /** The add box: the item lands at the top of To place, on this list (and in All items). On All items it is in
+        All items only. Gives its id, or null when nothing was added. */
+    function add(list, text) {
+      if (!D || !(list === "all" || isMine(list) || tripOf(list))) return null;
+      const p = parse(text); if (!p.n) return null;
+      const id = "a" + (D.next || 1); D.next = (D.next || 1) + 1;
+      D.items.unshift({ id, i: p.i, n: p.n, q: p.q, bag: "", when: "none" });
+      if (list !== "all") onOf(list)[id] = 1;
+      save();
+      return id;
+    }
+    /** A new name, with the same count rule. An empty name keeps the old one; a new emoji in front changes the icon. */
+    function rename(id, text) {
+      const o = byId(id), p = parse(text); if (!o || !p.n) return;
+      o.n = p.n; o.q = p.q; if (p.i) o.i = p.i;
+      save();
+    }
+    /** Delete for good (from All items): the item leaves every list and every trip, ticks included. */
+    function remove(id) {
+      if (!byId(id)) return;
+      D.items = D.items.filter((o) => o.id !== id);
+      for (const k in D.mine) delete D.mine[k][id];
+      for (const k in D.trips) { delete D.trips[k].on[id]; delete D.trips[k].ticks[id]; }
+      save();
+    }
+    /** Find an item: the ids of the left-out items whose name holds the text, whatever the case. */
+    function found(list, text) {
+      if (!D || list === "all") return [];
+      const q = String(text || "").trim().toLowerCase();
+      return D.items.filter((o) => !onOf(list)[o.id] && o.n.toLowerCase().includes(q)).map((o) => o.id);
+    }
+
+    /** Where a Packing block opens the page (slice 02, d23): the trip whose dates hold the block's day, else the next
+        trip coming up after it, by Day Quest's own rules (the home trip and undated trips never count). The tab is
+        that trip's tab as of today. null when no trip fits or none was read yet: the page opens as it does today. */
+    function openFor(day, today) {
+      if (!seen || !/^\d{4}-\d{2}-\d{2}$/.test(String(day))) return null;
+      const t = trips.splitTrips(trips.mergeTrips(seen), day).upcoming[0];
+      if (!t) return null;
+      const list = tripId(t);
+      return { list, tab: split(today).up.some((x) => tripId(x) === list) ? "up" : "past" };
+    }
+    return { ready, seed, sync, openFor, picker, head, choices, board, start, move, bring, tick, setWhen, untickAll, add, rename, remove, found };
+  }
+
+  root.CalCore.packing = packing;
 })(typeof window !== "undefined" ? window : globalThis);
