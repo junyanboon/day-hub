@@ -263,6 +263,8 @@ test("mock v5 (d29): Food is laid out like the Bags, with the Bags' own wells, r
   const nm = (html.match(/\.pk-fnm\{[^}]*\}/) || [""])[0];
   assert.match(nm, /overflow-wrap:anywhere/, "names wrap");
   assert.doesNotMatch(nm, /ellipsis|nowrap/, "names are never cut off");
+  const title = (html.match(/\.pk-food \.pk-wh \.pk-nm\{[^}]*\}/) || [""])[0];
+  assert.match(title, /white-space:normal/, "group titles wrap too, never cut off");
 });
 
 test("food stays computer only (d14): its styles sit inside the Packing page's pk- block, nothing for the phone", () => {

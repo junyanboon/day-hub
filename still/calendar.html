@@ -556,6 +556,7 @@ body.onpage .left,body.onpage .main,body.onpage .panel{display:none}
 .pk-fseg button[aria-pressed=true]{background:var(--bar);color:var(--ink);box-shadow:var(--card)}
 .pk-fseg small{color:var(--faint);font-weight:600;margin-left:6px;font-variant-numeric:tabular-nums}
 .pk-food{display:grid;gap:14px}
+.pk-food .pk-wh .pk-nm{white-space:normal;overflow-wrap:anywhere}
 .pk-ftop .pk-rows{grid-template-columns:repeat(3,minmax(0,1fr));gap:6px 14px}
 .pk-it.pk-fit{grid-template-columns:20px minmax(0,1fr) auto;cursor:default}
 .pk-it.pk-fit.pk-nock{grid-template-columns:minmax(0,1fr) auto}
@@ -1737,7 +1738,8 @@ function packFood(f) {
       ${g.pill ? `<button class="pk-pill w-${esc(o.when)}" data-pkfpill="${esc(o.id)}" aria-haspopup="true" aria-expanded="${P.menu === o.id}" title="Click to change when">${esc(o.pill)}</button>` : ""}
       <button class="pk-rm" data-pkfrm="${esc(o.id)}" title="Remove from this ${f.ticks ? "trip" : "list"}" aria-label="Remove: ${esc(o.name)}">×</button>${menu}</div>`;
   };
-  const add = (g, hint, top) => `<label class="pk-add${top ? "" : " pk-fadd"}"><span class="pk-plus" aria-hidden="true">+</span><input data-pkfadd="${esc(g.id)}" placeholder="${hint}" autocomplete="off" aria-label="Add to ${esc(g.title)}"></label>`;
+  /* wide: the big add box on top, like To place; otherwise the dashed one at the bottom of a column. */
+  const add = (g, hint, wide) => `<label class="pk-add${wide ? "" : " pk-fadd"}"><span class="pk-plus" aria-hidden="true">+</span><input data-pkfadd="${esc(g.id)}" placeholder="${esc(hint)}" autocomplete="off" aria-label="Add to ${esc(g.title)}"></label>`;
   const head = (g) => `<div class="pk-wh"><span class="pk-em" aria-hidden="true">${esc(g.icon)}</span><span class="pk-nm">${esc(g.title)}</span><span class="pk-ct">${esc(g.count)}</span></div>`;
   const rows = (g) => g.rows.length ? `<div class="pk-rows">${g.rows.map((o) => item(g, o)).join("")}</div>` : "";
   const well = (g) => `<section class="pk-well${g.id === "buy" ? " pk-fbuy" : ""}">${head(g)}${rows(g) || `<div class="pk-fempty">${esc(g.empty)}</div>`}${add(g, "Add, then Enter")}</section>`;
