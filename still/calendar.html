@@ -13,7 +13,8 @@
 <meta name="apple-mobile-web-app-title" content="Calendar">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>Calendar</title>
-<script src="calendar-core.js?v=14"></script>
+<script src="calendar-core.js?v=17"></script>
+<script src="quest-trips.js?v=20261113c" data-helpers></script>
 <script>
 /* The look saved on this device (the Look row in Settings; Studio when none) goes on here, before anything is drawn,
    so the page never opens in the wrong look first. Studio shows its day or night half by the sun in the calendar's
@@ -361,6 +362,174 @@ body.onpage .left,body.onpage .main,body.onpage .panel{display:none}
 .wkd .tod{border:2px solid var(--c);color:var(--ink)}.wkd .plan{border:1px dashed var(--c);color:var(--soft)}
 .onlyphone{display:none}
 
+/* the Packing page (slice 01, Junyan 2026-11-13, d22: "22 yes" to mock version 4): computer only (d14), the mock's one
+   cream look in every calendar look (d18), so its colours are set here on the page and every class starts pk- */
+:root{--pk-bg:#faf6ef;--pk-bar:#fffdf9;--pk-raise:#f3ece1;--pk-raise2:#e8dfd1;--pk-line:rgba(96,72,40,.16);--pk-hair:rgba(96,72,40,.09);--pk-ink:#1f1b16;--pk-soft:#5e554a;--pk-faint:#736a5e;--pk-accent:#d24a22;--pk-ok:#14946a;--pk-bad:#c42b3c;--pk-week-bg:#dde7f8;--pk-week-ink:#1e4a9c;--pk-day-bg:#f8e6bf;--pk-day-ink:#7a4e00;--pk-leave-bg:#f9dbcd;--pk-leave-ink:#a53412;--pk-card:0 1px 0 rgba(96,72,40,.05),0 1px 2px rgba(60,40,10,.06);--pk-lift:0 6px 16px rgba(60,40,10,.12),0 1px 3px rgba(60,40,10,.10);--pk-shadow:0 14px 36px rgba(60,40,10,.18),0 2px 6px rgba(60,40,10,.12);--pk-font:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,sans-serif;--pk-display:"SF Pro Display",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;--pk-white:#fff;--pk-on:#43c79b;--pk-on-ink:#06281c;--pk-now-ink:#0b6b4c;--pk-glass:rgba(255,255,255,.12);--pk-glass2:rgba(255,255,255,.14);--pk-dim:rgba(250,246,239,.72);--pk-knob:rgba(0,0,0,.25)}
+.page.pk{--bg:var(--pk-bg);--bar:var(--pk-bar);--raise:var(--pk-raise);--raise2:var(--pk-raise2);--line:var(--pk-line);--hair:var(--pk-hair);--ink:var(--pk-ink);--soft:var(--pk-soft);--faint:var(--pk-faint);--accent:var(--pk-accent);--ok:var(--pk-ok);--bad:var(--pk-bad);--week-bg:var(--pk-week-bg);--week-ink:var(--pk-week-ink);--day-bg:var(--pk-day-bg);--day-ink:var(--pk-day-ink);--leave-bg:var(--pk-leave-bg);--leave-ink:var(--pk-leave-ink);--card:var(--pk-card);--lift:var(--pk-lift);--shadow:var(--pk-shadow);--font:var(--pk-font);--display:var(--pk-display);
+  background:var(--bg);color:var(--ink);font-family:var(--font);font-size:14px;padding:26px 32px 64px;color-scheme:light}
+.pk button:focus-visible,.pk input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.pk small{font-size:inherit}
+.pk-btn{border:1px solid var(--line);background:var(--bar);border-radius:10px;padding:7px 12px;white-space:nowrap}
+.pk-btn:hover{background:var(--raise)}
+.pk-btn.pk-sm{padding:4px 10px;font-size:13px}
+.pk-btn.pk-danger{color:var(--bad)}
+.pk-quiet{border:0;background:none;color:var(--soft);padding:4px 6px;border-radius:8px;white-space:nowrap}
+.pk-quiet:hover{background:var(--raise);color:var(--ink)}
+.pk-head{display:flex;align-items:center;gap:14px;margin-bottom:22px}
+.pk-pi{width:48px;height:48px;border-radius:15px;display:grid;place-items:center;font-size:25px;flex:none;background:var(--bar);box-shadow:inset 0 0 0 1px var(--line)}
+.pk-head h2{font-family:var(--display);font-size:30px;font-weight:750;margin:0;letter-spacing:-.025em;line-height:1.1}
+.pk-tabs{display:flex;flex-wrap:wrap;gap:2px 24px;border-bottom:1px solid var(--line);margin:0 0 14px}
+.pk-tab{border:0;background:none;padding:6px 2px 11px;color:var(--soft);font-weight:600;font-size:15px;border-bottom:2.5px solid transparent;margin-bottom:-1px;display:inline-flex;gap:7px;align-items:baseline;white-space:nowrap}
+.pk-tab small{font-size:12.5px;font-weight:600;color:var(--faint);font-variant-numeric:tabular-nums}
+.pk-tab:hover{color:var(--ink)}
+.pk-tab[aria-pressed=true]{color:var(--ink);border-bottom-color:var(--accent)}
+.pk-trips{display:grid;grid-template-columns:repeat(auto-fill,minmax(216px,1fr));gap:12px;margin:0 0 20px}
+.pk-trip{position:relative;text-align:left;border:1px solid var(--line);background:var(--bar);border-radius:16px;padding:12px 14px 16px;
+  display:grid;grid-template-columns:38px minmax(0,1fr);gap:2px 11px;align-items:center;box-shadow:var(--card);overflow:hidden;transition:transform .12s,box-shadow .12s}
+.pk-trip:hover{transform:translateY(-1px);box-shadow:var(--lift)}
+.pk-trip .pk-te{grid-row:1 / 3;width:38px;height:38px;border-radius:11px;background:var(--raise);display:grid;place-items:center;font-size:20px}
+.pk-trip .pk-tn{font-family:var(--display);font-size:16.5px;font-weight:700;letter-spacing:-.015em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pk-trip .pk-tc{font-size:12.5px;color:var(--faint);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pk-trip .pk-tf{grid-column:1 / 3;display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:9px;min-width:0}
+.pk-trip .pk-tp{font-size:12.5px;color:var(--soft);font-variant-numeric:tabular-nums;white-space:nowrap;font-weight:550}
+.pk-trip .pk-tp.pk-no{color:var(--faint);font-weight:450}
+.pk-bdg{font-size:11.5px;font-weight:700;border-radius:99px;padding:2px 9px;background:var(--raise);color:var(--soft);white-space:nowrap}
+.pk-bdg.pk-now{background:color-mix(in srgb,var(--ok) 16%,var(--bar));color:var(--pk-now-ink)}
+.pk-trip .pk-tb{position:absolute;left:0;right:0;bottom:0;height:4px;background:var(--raise)}
+.pk-trip .pk-tb i{display:block;height:100%;background:var(--ok);border-radius:0 4px 4px 0}
+.pk-trip[aria-pressed=true]{background:var(--ink);border-color:var(--ink);color:var(--bg);box-shadow:var(--lift)}
+.pk-trip[aria-pressed=true] .pk-te{background:var(--pk-glass)}
+.pk-trip[aria-pressed=true] .pk-tc,.pk-trip[aria-pressed=true] .pk-tp{color:var(--pk-dim)}
+.pk-trip[aria-pressed=true] .pk-bdg{background:var(--pk-glass2);color:var(--bg)}
+.pk-trip[aria-pressed=true] .pk-bdg.pk-now{background:var(--pk-on);color:var(--pk-on-ink)}
+.pk-trip[aria-pressed=true] .pk-tb{background:var(--pk-glass2)}
+.pk-trip[aria-pressed=true] .pk-tb i{background:var(--pk-on)}
+.pk-more{border:1.5px dashed var(--line);background:none;border-radius:16px;color:var(--soft);font-weight:600;min-height:64px}
+.pk-more:hover{background:var(--raise);color:var(--ink)}
+.pk-thead{display:flex;align-items:center;gap:6px 14px;flex-wrap:wrap;margin:0 0 14px}
+.pk-thead .pk-tt{min-width:0;flex:1 1 260px}
+.pk-thead b{display:block;font-family:var(--display);font-size:21px;font-weight:750;letter-spacing:-.02em;line-height:1.2}
+.pk-thead .pk-ts{display:block;color:var(--faint);font-size:13px;margin-top:2px}
+.pk-choose{background:var(--raise);border-radius:18px;padding:22px 20px 18px}
+.pk-choose h3{margin:0;font-family:var(--display);font-size:19px;font-weight:750;letter-spacing:-.018em}
+.pk-choose p{margin:4px 0 16px;color:var(--soft)}
+.pk-choose .pk-or{margin:18px 0 10px;font-size:11.5px;text-transform:uppercase;letter-spacing:.07em;color:var(--faint);font-weight:650}
+.pk-opts{display:grid;grid-template-columns:repeat(auto-fill,minmax(216px,1fr));gap:10px}
+.pk-opt{position:relative;text-align:left;border:1.5px solid var(--hair);background:var(--bar);border-radius:14px;padding:11px 13px;display:grid;grid-template-columns:34px minmax(0,1fr);gap:1px 11px;align-items:center;box-shadow:var(--card)}
+.pk-opt:hover{border-color:var(--ink);box-shadow:var(--lift)}
+.pk-opt .pk-te{grid-row:1 / 3;width:34px;height:34px;border-radius:10px;background:var(--raise);display:grid;place-items:center;font-size:18px}
+.pk-opt b{font-family:var(--display);font-size:15.5px;font-weight:700;letter-spacing:-.012em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pk-opt small{font-size:12.5px;color:var(--faint);font-variant-numeric:tabular-nums}
+.pk-opt.pk-best{border-color:var(--accent)}
+.pk-opt.pk-best::after{content:"Best guess";position:absolute;top:-9px;right:12px;background:var(--accent);color:var(--pk-white);font-size:11px;font-weight:700;border-radius:99px;padding:1px 9px}
+.pk-cfoot{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:16px}
+.pk-tools{display:flex;align-items:center;gap:10px 14px;flex-wrap:wrap;margin:0 0 18px}
+.pk-seg{display:inline-flex;flex-wrap:wrap;gap:2px;padding:3px;background:var(--raise);border-radius:13px;box-shadow:inset 0 0 0 1px var(--hair)}
+.pk-chip{border:0;background:none;border-radius:10px;padding:6px 12px 6px 10px;display:inline-flex;align-items:center;gap:7px;color:var(--soft);white-space:nowrap;font-weight:550}
+.pk-chip i{width:8px;height:8px;border-radius:50%;background:var(--pc,var(--faint));flex:none}
+.pk-chip small{color:var(--faint);font-weight:500;font-variant-numeric:tabular-nums;font-size:12.5px}
+.pk-chip:hover{color:var(--ink)}
+.pk-chip[aria-pressed=true]{background:var(--pb,var(--bar));color:var(--pc,var(--ink));font-weight:700;box-shadow:var(--card)}
+.pk-chip[aria-pressed=true] small{color:inherit;opacity:.75}
+.pk .w-week{--pb:var(--week-bg);--pc:var(--week-ink)}
+.pk .w-day{--pb:var(--day-bg);--pc:var(--day-ink)}
+.pk .w-leave{--pb:var(--leave-bg);--pc:var(--leave-ink)}
+.pk-chip.w-none i{background:none;box-shadow:inset 0 0 0 1.5px var(--faint)}
+.pk-chip.w-none[aria-pressed=true]{background:var(--bar);color:var(--ink)}
+.pk-grow{flex:1 1 20px}
+.pk-sw{display:inline-flex;align-items:center;gap:8px;color:var(--soft);white-space:nowrap;cursor:pointer}
+.pk-sw input{appearance:none;-webkit-appearance:none;width:34px;height:20px;border-radius:99px;background:var(--raise2);margin:0;position:relative;cursor:pointer;transition:background .15s;flex:none}
+.pk-sw input::after{content:"";position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:var(--pk-white);box-shadow:0 1px 2px var(--pk-knob);transition:transform .15s}
+.pk-sw input:checked{background:var(--ok)}
+.pk-sw input:checked::after{transform:translateX(14px)}
+.pk-askline{display:inline-flex;align-items:center;gap:6px;color:var(--soft);white-space:nowrap}
+.pk-body{display:grid;grid-template-columns:minmax(0,1fr);gap:18px;align-items:start}
+.pk-body.pk-side{grid-template-columns:minmax(0,1fr) 268px}
+.pk-board{min-width:0;display:grid;gap:14px}
+.pk-well{background:var(--raise);border:1.5px solid transparent;border-radius:18px;padding:10px;min-width:0;transition:border-color .12s,background .12s,box-shadow .12s}
+.pk-dragging [data-pkdrop]{border-color:var(--line);border-style:dashed}
+.pk [data-pkdrop].pk-over{border-color:var(--accent)!important;border-style:solid!important;background:color-mix(in srgb,var(--accent) 7%,var(--raise));box-shadow:0 0 0 4px color-mix(in srgb,var(--accent) 12%,transparent)}
+.pk-wh{display:flex;align-items:center;gap:10px;padding:4px 6px 10px}
+.pk-wh .pk-em{width:34px;height:34px;border-radius:11px;background:var(--bar);box-shadow:var(--card);display:grid;place-items:center;font-size:18px;flex:none}
+.pk-wh .pk-nm{flex:1;min-width:0;font-family:var(--display);font-size:15.5px;font-weight:700;letter-spacing:-.012em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pk-wh .pk-nm small{display:block;font-family:var(--font);font-size:12px;font-weight:450;letter-spacing:0;color:var(--faint);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pk-wh .pk-ct{font-size:12.5px;font-weight:600;color:var(--soft);font-variant-numeric:tabular-nums;white-space:nowrap;background:var(--bar);border-radius:99px;padding:3px 9px;box-shadow:inset 0 0 0 1px var(--hair)}
+.pk-thin{height:4px;border-radius:99px;background:var(--raise2);margin:-2px 6px 10px;overflow:hidden}
+.pk-thin i{display:block;height:100%;background:var(--ok);border-radius:99px;transition:width .2s}
+.pk-rows{display:grid;gap:6px}
+.pk-tray .pk-rows{grid-template-columns:repeat(3,minmax(0,1fr));gap:6px 14px}
+.pk-cols{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;align-items:start}
+.pk-hint{color:var(--faint);padding:14px 10px;font-size:13px;text-align:center;border:1.5px dashed var(--line);border-radius:12px}
+.pk-add{display:flex;align-items:center;gap:10px;margin:0 0 10px;padding:0 8px 0 14px;background:var(--bar);border:1.5px solid var(--line);border-radius:13px;box-shadow:var(--card)}
+.pk-add:focus-within{border-color:var(--ink)}
+.pk-add .pk-plus{color:var(--accent);font-size:20px;line-height:1;font-weight:500}
+.pk-add input{flex:1;min-width:0;border:0;background:none;padding:12px 0;outline:none;font-size:15px}
+.pk-add input::placeholder{color:var(--faint)}
+.pk-add kbd{font:600 11.5px var(--font);color:var(--faint);border:1px solid var(--line);border-radius:6px;padding:2px 7px;background:var(--bg)}
+.pk-it{position:relative;display:grid;grid-template-columns:20px 20px minmax(0,1fr) auto;gap:8px;align-items:center;min-height:40px;padding:5px 9px 5px 10px;
+  background:var(--bar);border:1px solid var(--hair);border-radius:12px;box-shadow:var(--card);cursor:grab;transition:box-shadow .12s,transform .12s}
+.pk-it:hover{box-shadow:var(--lift);transform:translateY(-1px);z-index:2}
+.pk-it.pk-nock{grid-template-columns:20px minmax(0,1fr) auto}
+.pk-it.pk-drag{opacity:.35}
+.pk-it.pk-open{z-index:30}
+.pk-ck{appearance:none;-webkit-appearance:none;width:20px;height:20px;border-radius:50%;border:1.6px solid color-mix(in srgb,var(--faint) 62%,transparent);background:none;margin:0;cursor:pointer;display:grid;place-items:center;flex:none;transition:background .12s,border-color .12s}
+.pk-ck::after{content:"";width:9px;height:5px;border-left:2px solid var(--pk-white);border-bottom:2px solid var(--pk-white);transform:rotate(-45deg) translate(1px,-1px);opacity:0}
+.pk-ck:hover{border-color:var(--ok);background:color-mix(in srgb,var(--ok) 12%,transparent)}
+.pk-ck:checked{background:var(--ok);border-color:var(--ok)}
+.pk-ck:checked::after{opacity:1}
+.pk-it .pk-ic{text-align:center;font-size:15px;line-height:1}
+.pk-it .pk-ic.pk-none{color:var(--line)}
+.pk-it .pk-name{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;font-weight:500}
+.pk-it .pk-name small{color:var(--faint);margin-left:6px;font-weight:600;font-variant-numeric:tabular-nums;font-size:12.5px}
+.pk-it.pk-done{background:color-mix(in srgb,var(--bar) 55%,var(--raise));box-shadow:none}
+.pk-it.pk-done .pk-name{color:var(--faint);text-decoration:line-through;text-decoration-color:var(--line)}
+.pk-it.pk-done>.pk-ic,.pk-it.pk-done>.pk-pill{opacity:.45}
+.pk-it input.pk-ren{width:100%;border:1px solid var(--ink);background:var(--bg);border-radius:7px;padding:3px 6px}
+.pk-it .pk-rm{position:absolute;top:-7px;right:-7px;width:20px;height:20px;border-radius:50%;border:1px solid var(--line);background:var(--bar);color:var(--soft);
+  font-size:14px;line-height:1;padding:0;display:grid;place-items:center;box-shadow:var(--card);opacity:0;pointer-events:none;transition:opacity .1s}
+.pk-it:hover .pk-rm,.pk-it .pk-rm:focus-visible{opacity:1;pointer-events:auto}
+.pk-it .pk-rm:hover{background:var(--bad);border-color:var(--bad);color:var(--pk-white)}
+.pk-it .pk-ask{display:flex;gap:5px;align-items:center;color:var(--soft);font-size:12.5px;white-space:nowrap}
+.pk-pill{border:1px solid transparent;border-radius:999px;padding:3px 10px;font-size:12px;font-weight:650;white-space:nowrap;background:var(--pb);color:var(--pc);line-height:1.35}
+.pk-pill:hover{border-color:currentColor}
+.pk-pill.w-none{background:none;border:1px dashed color-mix(in srgb,var(--faint) 55%,transparent);color:var(--faint);font-weight:500}
+.pk-pill.w-none:hover{border-style:solid;color:var(--ink)}
+.pk-menu{position:absolute;right:6px;top:calc(100% + 4px);z-index:40;background:var(--bar);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:6px;display:grid;gap:2px;min-width:176px;cursor:default}
+.pk-menu p{margin:2px 8px 4px;font-size:11.5px;text-transform:uppercase;letter-spacing:.07em;color:var(--faint);font-weight:650}
+.pk-menu button{border:0;background:none;border-radius:9px;padding:6px 8px;display:flex;align-items:center;justify-content:space-between;gap:10px;text-align:left}
+.pk-menu button:hover{background:var(--raise)}
+.pk-menu button b{font-weight:700;color:var(--ok)}
+.pk-shelf{position:sticky;top:14px;background:var(--bar);border:1.5px solid var(--line);border-radius:18px;padding:12px 10px 10px;min-width:0;box-shadow:var(--card);
+  display:grid;grid-template-rows:auto auto auto minmax(0,1fr);max-height:820px;transition:border-color .12s,background .12s,box-shadow .12s}
+.pk-shelf h3{margin:0;padding:2px 6px 0;font-family:var(--display);font-size:15.5px;font-weight:700;letter-spacing:-.012em;display:flex;align-items:baseline;gap:8px}
+.pk-shelf h3 small{font-family:var(--font);font-size:12.5px;font-weight:600;color:var(--faint);font-variant-numeric:tabular-nums}
+.pk-shelf .pk-sub{margin:2px 6px 10px;color:var(--faint);font-size:12.5px}
+.pk-find{display:flex;align-items:center;gap:8px;margin:0 2px 8px;padding:0 10px;background:var(--bg);border:1px solid var(--line);border-radius:10px}
+.pk-find:focus-within{border-color:var(--ink)}
+.pk-find span{color:var(--faint);font-size:13px}
+.pk-find input{flex:1;min-width:0;border:0;background:none;padding:7px 0;outline:none}
+.pk-list{overflow:auto;display:grid;gap:1px;align-content:start;margin:0 -4px;padding:0 4px 2px}
+.pk-sh{border:0;background:none;border-radius:9px;padding:6px 8px;display:grid;grid-template-columns:20px minmax(0,1fr) auto;gap:8px;align-items:center;text-align:left;color:var(--soft);cursor:grab;width:100%;min-height:32px}
+.pk-sh[hidden]{display:none}
+.pk-sh .pk-ic{text-align:center;font-size:14px}
+.pk-sh .pk-ic.pk-none{color:var(--line)}
+.pk-sh .pk-n{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.pk-sh b{font-weight:600;font-size:12px;color:var(--accent);opacity:0;white-space:nowrap}
+.pk-sh:hover{background:var(--raise);color:var(--ink)}
+.pk-sh:hover b,.pk-sh:focus-visible b{opacity:1}
+.pk-sh.pk-drag{opacity:.35}
+.pk-nomatch{color:var(--faint);font-size:13px;padding:10px 8px}
+.pk-nomatch[hidden]{display:none}
+.pk-msg{color:var(--soft);padding:20px 4px}
+@media (max-width:1180px){
+  .pk-body.pk-side{grid-template-columns:minmax(0,1fr)}
+  .pk-shelf{position:static;max-height:none}
+  .pk-list{grid-template-columns:repeat(auto-fill,minmax(200px,1fr));overflow:visible}
+}
+@media (max-width:900px){ .pk-cols,.pk-tray .pk-rows{grid-template-columns:minmax(0,1fr)} }
+/* computer only (d14): no Packing button, and no Packing page, under 768 px */
+@media (max-width:767.98px){ #rail .pk-rail{display:none} }
+
 @media (max-width:1320px){.wk{display:none}}
 @media (max-width:1100px){
   .app,body.nopanel .app{grid-template-columns:var(--rail) 230px minmax(0,1fr)}
@@ -495,7 +664,7 @@ if (TOUCH) for (const g of ["gesturestart", "gesturechange"]) document.addEventL
    which shows this build, the phone's answers and a log of every day change with its cause. Until then CalHook.on is
    null and diag() does nothing. BUILD names this copy of the page, so a screenshot proves which copy ran: change it on
    every change to this page or calendar-readout.js (the date plus a letter). */
-const BUILD = "2026-11-12l keyboard sheet";
+const BUILD = "2026-11-16a packing page";
 const CalHook = window.CalHook = { BUILD, on: null };
 const diag = (kind, msg) => { if (CalHook.on) CalHook.on(kind, msg); };
 /* The iPhone home screen app's fit (2026-11-12): html.hs in a home screen app on touch, html.hsfill and --hsgap when
@@ -707,7 +876,9 @@ function renderRail() {
   const cur = curEvent();
   $("#rail").innerHTML = `<button data-railtog aria-label="Wider or narrower sidebar" title="Show names"><span class="ic">${document.body.classList.contains("railopen") ? "«" : "»"}</span><span class="nm">Day Hub</span></button>
     <button data-page="cal" aria-pressed="${S.page === "cal"}" title="Calendar"><span class="ic">📅</span><span class="nm">Calendar</span></button><hr>` +
-    TYPES.map((k) => `<button class="k-${k} ${cur && cur.k === k ? "live" : ""}" data-page="${k}" aria-pressed="${S.page === k}" title="${KNAME[k]}"><span class="ic">${KICON[k]}</span><span class="nm">${KNAME[k]}</span></button>`).join("");
+    TYPES.map((k) => `<button class="k-${k} ${cur && cur.k === k ? "live" : ""}" data-page="${k}" aria-pressed="${S.page === k}" title="${KNAME[k]}"><span class="ic">${KICON[k]}</span><span class="nm">${KNAME[k]}</span></button>` +
+      /* the Packing page's own button, right after Travel (d17); hidden under 768 px by CSS (d14) */
+      (k === "travel" ? `<button class="pk-rail" data-page="packing" aria-pressed="${S.page === "packing"}" title="Packing"><span class="ic">🧳</span><span class="nm">Packing</span></button>` : "")).join("");
 }
 function renderSide() {
   $("#cals").innerHTML = S.cals.map((c) => `<label class="${S.hidden.has(c.id) ? "off" : ""}" style="--c:${esc(c.color)}"><input type="checkbox" data-id="${esc(c.id)}" ${S.hidden.has(c.id) ? "" : "checked"}>${esc(c.name)}${c.writable ? "" : ' <span class="meta">read-only</span>'}${c.ok === false ? ` <span class="err" title="${esc(c.error)}">not readable</span>` : ""}</label>`).join("") || '<span class="meta">Pair to see your calendars.</span>';
@@ -744,6 +915,7 @@ function render() {
   if (pinch) { pinchRender = true; return; }   // never rebuild under two fingers; the pinch's end draws it (slice 01)
   head(); renderSide(); renderRail();
   const v = $("#view");
+  if (S.page === "packing") { packShow(); return; }   // the Packing page keeps its lists in this browser, so it opens unpaired too
   if (!questKey()) { v.classList.remove("snap"); v.innerHTML = pairHTML(); wirePair(); return; }
   if (S.page !== "cal") { renderPage(); return; }
   if (S.n === "m") { v.classList.remove("snap"); monthView(v); } else strip(v);
@@ -1325,10 +1497,204 @@ function showPage(k) {
      wide screen only; a phone keeps this page because Day Quest has no Trips page there. ?api= carries over. */
   const link = WIDE.matches && C.pageLink(k, location.search);
   if (link) { location.href = link.href; return; }
+  if (k === "packing" && !WIDE.matches) return;   // computer only (d14)
+  if (S.page === "packing") packLeave();
   if (S.page === "cal" && $("#strip")) S.top = $("#view").scrollTop;
   S.page = k; document.body.classList.toggle("onpage", k !== "cal"); document.body.classList.remove("popen", "month");
   $("#page").hidden = k === "cal"; render();
   if (k !== "cal") $("#page").scrollTop = 0;
+}
+
+/* ---------- the Packing page (slice 01, Junyan 2026-11-13, d22: "22 yes" to mock version 4) ----------
+   Computer only (d14). The rules are CalCore.packing (tests: still/test/packing.test.mjs); this draws them and passes
+   his clicks back. His lists stay in this browser (d16) and nothing writes to Notion (d10). Trips are read only, from
+   GET /quest/trips like Day Quest's Trips page, and the last good list is kept so the page opens with no network. */
+const PKT = window.QuestTrips;
+const PK = PKT ? C.packing({ store, trips: PKT }) : null;
+const P = { list: null, tab: "up", allPast: false, choose: false, when: "any", hide: false, shelf: true, find: "",
+  menu: null, fresh: false, del: null, edit: null, loading: false, loaded: false, error: "", drag: null };
+/** Dates on this page are Toronto's (d20), whatever zone the calendar shows. */
+const pkToday = () => C.wall(Date.now(), "America/Toronto").day;
+const pkOpen = () => S.page === "packing" && $("#page").classList.contains("pk");
+async function packLoad() {
+  if (P.loading || P.loaded || !PK) return;
+  P.loading = true; P.error = "";
+  try {
+    if (!PK.ready()) {
+      const r = await fetch("packing-seed.json?v=1", { cache: "no-store" });
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      PK.seed(await r.json(), pkToday());
+    }
+  } catch (e) { P.error = "Your packing list did not load (" + e.message + "). Check the connection and open Packing again."; }
+  if (questKey()) {
+    try {
+      const d = await api("/quest/trips");
+      /* the same list Day Quest builds: its own saved Montreal trip, then still-api's trips */
+      PK.sync([{ name: PKT.MTL, start: PKT.SEED.start, end: PKT.SEED.end, icon: "🧳" }, ...(d.trips || []).map((t) => ({ ...t, icon: "🧳" }))], pkToday());
+    } catch (e) { toast("Trips not refreshed: " + e.message + ". Showing the last ones read.", { bad: true }); }
+  }
+  P.loading = false; P.loaded = !P.error;
+  if (S.page === "packing") packDraw();
+}
+/** render() on the Packing page: draw it, but never under a box he is typing in. */
+function packShow() {
+  const pg = $("#page"), a = document.activeElement;
+  if (pkOpen() && a && pg.contains(a) && a.matches("input")) return;
+  packDraw();
+  packLoad();
+}
+function packLeave() { P.menu = P.del = P.edit = null; P.fresh = false; P.drag = null; P.loaded = false; }
+function packDraw() {
+  const pg = $("#page"); pg.className = "page pk";
+  const top = `<div class="pk-head"><button class="pk-btn" data-page="cal">&#8249; Calendar</button><div class="pk-pi" aria-hidden="true">🧳</div><h2>Packing</h2></div>`;
+  if (!PK) { pg.innerHTML = top + `<p class="pk-msg">The trips helper did not load. Reload the page.</p>`; return; }
+  if (!PK.ready()) { pg.innerHTML = top + `<p class="pk-msg">${esc(P.error || "Loading your packing list…")}</p>`; return; }
+  const t = pkToday(), pk = PK.picker({ today: t, picked: P.list, allPast: P.allPast });
+  if (!P.list) { P.list = pk.open.list; P.tab = pk.open.tab; }
+  const h = PK.head(P.list, t), mine = h.kind !== "trip", all = P.list === "all";
+  const card = (c) => `<button class="pk-trip" data-pklist="${esc(c.id)}" aria-pressed="${c.id === P.list}"><span class="pk-te" aria-hidden="true">${esc(c.icon)}</span><span class="pk-tn">${esc(c.name)}</span><span class="pk-tc">${esc(c.dates)}</span>
+    <span class="pk-tf">${c.label ? `<span class="pk-bdg${c.now ? " pk-now" : ""}">${esc(c.label)}</span>` : "<span></span>"}<span class="pk-tp${c.has ? "" : " pk-no"}">${esc(c.packed)}</span></span>
+    <span class="pk-tb"><i style="width:${c.has && c.total ? Math.round(100 * c.done / c.total) : 0}%"></i></span></button>`;
+  const tab = (k, l, n) => `<button class="pk-tab" data-pktab="${k}" aria-pressed="${P.tab === k}">${l} <small>${n}</small></button>`;
+  const cards = P.tab === "mine" ? pk.mine.map((m) => `<button class="pk-trip" data-pklist="${m.id}" aria-pressed="${m.id === P.list}"><span class="pk-te" aria-hidden="true">${m.icon}</span><span class="pk-tn">${esc(m.name)}</span><span class="pk-tc">${m.total} items</span></button>`).join("")
+    : P.tab === "up" ? (pk.up.length ? pk.up.map(card).join("") : `<div class="pk-hint">No trips coming up.</div>`)
+    : (pk.past.length ? pk.past.map(card).join("") : `<div class="pk-hint">No past trips yet.</div>`) + (pk.more ? `<button class="pk-more" data-pkact="allpast">Show all ${pk.counts.past}</button>` : "");
+  const head = top + `<div class="pk-tabs" role="group" aria-label="Trips">${tab("up", "Coming up", pk.counts.up)}${tab("past", "Past", pk.counts.past)}<span class="pk-grow"></span>${tab("mine", "My lists", pk.counts.mine)}</div>
+    <div class="pk-trips">${cards}</div>
+    <div class="pk-thead"><div class="pk-tt"><b>${esc(h.title)}</b><span class="pk-ts">${esc(h.sub)}</span></div>
+      ${!mine && h.has && !P.choose ? `<button class="pk-quiet" data-pkact="restart">Start over</button>` : ""}</div>`;
+  if (!h.has || P.choose) {
+    const ch = PK.choices(P.list, t);
+    const opt = (o) => `<button class="pk-opt${o.best ? " pk-best" : ""}" data-pkstart="${esc(o.id)}"><span class="pk-te" aria-hidden="true">${esc(o.icon)}</span><b>${esc(o.name)}</b><small>${esc(o.count)}</small></button>`;
+    pg.innerHTML = head + `<section class="pk-choose"><h3>${esc(ch.title)}</h3><p>${esc(ch.sub)}</p>
+      <div class="pk-opts">${ch.lists.map(opt).join("")}</div>
+      ${ch.trips.length ? `<p class="pk-or">Or copy a trip</p><div class="pk-opts">${ch.trips.map(opt).join("")}</div>` : ""}
+      <div class="pk-cfoot"><button class="pk-btn pk-sm" data-pkstart="empty">Start empty</button>${ch.keep ? `<button class="pk-btn pk-sm" data-pkact="keep">Keep my list</button>` : ""}</div></section>`;
+    return;
+  }
+  const b = PK.board(P.list, { when: P.when, hide: P.hide && !mine }), name = h.title, side = !all && P.shelf;
+  const row = (o) => {
+    const nm = P.edit === o.id
+      ? `<input class="pk-ren" id="pkRen" value="${esc(o.edit)}" aria-label="Item name">`
+      : `<span class="pk-name" data-pkname="${esc(o.id)}" title="${esc(o.name)}. Double-click to rename.">${esc(o.name)}${o.qty !== "1" ? `<small>×${esc(o.qty)}</small>` : ""}</span>`;
+    const tail = P.del === o.id
+      ? `<span class="pk-ask">Delete? <button class="pk-btn pk-sm pk-danger" data-pkact="del-yes">Yes</button><button class="pk-btn pk-sm" data-pkact="del-no">No</button></span>`
+      : `<button class="pk-pill w-${o.when}" data-pkpill="${esc(o.id)}" aria-haspopup="true" aria-expanded="${P.menu === o.id}" title="Click to change when you pack this">${esc(o.pill)}</button>
+         <button class="pk-rm" data-pkout="${esc(o.id)}" title="${all ? "Delete for good" : "Leave out of " + esc(name)}" aria-label="${all ? "Delete" : "Leave out"}: ${esc(o.name)}">×</button>`;
+    const menu = P.menu === o.id ? `<div class="pk-menu" role="menu"><p>Pack it</p>` + b.chips.slice(1).map((c) =>
+      `<button role="menuitem" data-pkwhen="${c.id}"><span class="pk-pill w-${c.id}">${esc(c.label)}</span>${o.when === c.id ? "<b>✓</b>" : ""}</button>`).join("") + `</div>` : "";
+    return `<div class="pk-it${b.ticks ? "" : " pk-nock"}${o.done ? " pk-done" : ""}${P.menu === o.id ? " pk-open" : ""}" draggable="${P.edit === o.id ? "false" : "true"}" data-pkid="${esc(o.id)}">
+      ${b.ticks ? `<input type="checkbox" class="pk-ck" data-pktick="${esc(o.id)}" ${o.done ? "checked" : ""} aria-label="Packed: ${esc(o.name)}">` : ""}
+      <span class="pk-ic${o.icon ? "" : " pk-none"}" aria-hidden="true">${o.icon ? esc(o.icon) : "•"}</span>${nm}${tail}${menu}</div>`;
+  };
+  const chips = b.chips.map((c) => `<button class="pk-chip${c.id === "any" ? "" : " w-" + c.id}" data-pkfilter="${c.id}" aria-pressed="${P.when === c.id}">${c.id === "any" ? "" : "<i></i>"}${esc(c.label)} <small>${c.n}</small></button>`).join("");
+  const total = b.chips[0].n;
+  const fresh = mine ? "" : P.fresh
+    ? `<span class="pk-askline">Untick all ${total} on ${esc(name)}? <button class="pk-btn pk-sm pk-danger" data-pkact="fresh-yes">Untick</button><button class="pk-btn pk-sm" data-pkact="fresh-no">Keep</button></span>`
+    : `<button class="pk-quiet" data-pkact="fresh">Start fresh</button>`;
+  const hide = mine ? "" : `<label class="pk-sw"><input type="checkbox" id="pkHide" ${P.hide ? "checked" : ""}> Hide packed</label>`;
+  const shelfBtn = all ? "" : `<button class="pk-btn pk-sm" data-pkact="shelf" aria-pressed="${P.shelf}">${P.shelf ? "Hide" : "Show"} left out <small>${b.out.length}</small></button>`;
+  const tray = `<section class="pk-well pk-tray" data-pkdrop="top">
+    <div class="pk-wh"><span class="pk-em" aria-hidden="true">📥</span><span class="pk-nm">To place<small>New items land here. Drag each one to a bag.</small></span><span class="pk-ct">${b.top.total}</span></div>
+    <form class="pk-add" id="pkAddF"><span class="pk-plus" aria-hidden="true">+</span><input id="pkAdd" placeholder="Add an item, then press Enter" autocomplete="off" aria-label="Add an item"><kbd aria-hidden="true">Enter ↵</kbd></form>
+    ${b.top.rows.length ? `<div class="pk-rows">${b.top.rows.map(row).join("")}</div>` : `<div class="pk-hint">${esc(b.top.hint)}</div>`}</section>`;
+  const bags = b.bags.map((g) => `<section class="pk-well" data-pkdrop="${g.id}">
+    <div class="pk-wh"><span class="pk-em" aria-hidden="true">${g.icon}</span><span class="pk-nm">${esc(g.name)}</span><span class="pk-ct">${esc(g.count)}</span></div>
+    <div class="pk-thin"><i style="width:${b.ticks && g.total ? Math.round(100 * g.done / g.total) : 0}%"></i></div>
+    ${g.rows.length ? `<div class="pk-rows">${g.rows.map(row).join("")}</div>` : `<div class="pk-hint">${esc(g.hint)}</div>`}</section>`).join("");
+  const where = mine ? "list" : "trip";
+  const shelf = !side ? "" : `<aside class="pk-shelf" data-pkdrop="out">
+    <h3>Not on this ${where} <small>${b.out.length}</small></h3>
+    <p class="pk-sub">Click one to bring it. Or drag it to a bag.</p>
+    <label class="pk-find"><span aria-hidden="true">🔍</span><input id="pkFind" placeholder="Find an item" autocomplete="off" aria-label="Find an item left out" value="${esc(P.find)}"></label>
+    <div class="pk-list" id="pkList">${b.out.length ? b.out.map((o) => `<button class="pk-sh" draggable="true" data-pkid="${esc(o.id)}" data-pkin="${esc(o.id)}" title="Bring ${esc(o.name)} on ${esc(name)}">
+      <span class="pk-ic${o.icon ? "" : " pk-none"}" aria-hidden="true">${o.icon ? esc(o.icon) : "•"}</span><span class="pk-n">${esc(o.name)}</span><b>+ Bring</b></button>`).join("") + `<div class="pk-nomatch" id="pkNoMatch" hidden>Nothing left out matches that.</div>`
+      : `<div class="pk-nomatch">Everything you own is on this ${where}.</div>`}</div></aside>`;
+  pg.innerHTML = head + `<div class="pk-tools"><div class="pk-seg" role="group" aria-label="When to pack">${chips}</div><span class="pk-grow"></span>${hide}${fresh}${shelfBtn}</div>
+    <div class="pk-body${side ? " pk-side" : ""}"><div class="pk-board">${tray}<div class="pk-cols">${bags}</div></div>${shelf}</div>`;
+  const r = $("#pkRen"); if (r) { r.focus(); r.select(); }
+  packFind();
+}
+/** Find narrows the side panel in place, with no redraw, so the box keeps his typing. */
+function packFind() {
+  const list = $("#pkList"); if (!list || !PK) return;
+  const hits = new Set(PK.found(P.list, P.find));
+  let n = 0; list.querySelectorAll(".pk-sh").forEach((el) => { const hit = hits.has(el.dataset.pkid); el.hidden = !hit; if (hit) n++; });
+  const nm = $("#pkNoMatch"); if (nm) nm.hidden = n > 0;
+}
+function packRename() {
+  const r = $("#pkRen"); if (!r || !P.edit) return;
+  const id = P.edit; P.edit = null; PK.rename(id, r.value); packDraw();
+}
+function wirePacking() {
+  const pg = $("#page"), on = () => pkOpen() && PK && PK.ready();
+  pg.addEventListener("click", (e) => {
+    if (!on()) return;
+    /* a click anywhere but the open menu or its pill closes the menu */
+    const shut = !!P.menu && !e.target.closest(".pk-menu") && !e.target.closest("[data-pkpill]");
+    if (shut) P.menu = null;
+    const b = e.target.closest("button"); if (!b) { if (shut) packDraw(); return; }
+    const d = b.dataset;
+    if (d.pklist) { P.list = d.pklist; P.menu = P.del = P.edit = null; P.fresh = P.choose = false; P.find = ""; }
+    else if (d.pktab) P.tab = d.pktab;
+    else if (d.pkstart) { PK.start(P.list, d.pkstart); P.choose = false; }
+    else if (d.pkact === "restart") { P.choose = true; P.menu = P.del = P.edit = null; }
+    else if (d.pkact === "keep") P.choose = false;
+    else if (d.pkact === "allpast") P.allPast = true;
+    else if (d.pkfilter) { P.when = d.pkfilter; P.menu = null; }
+    else if (d.pkpill) P.menu = P.menu === d.pkpill ? null : d.pkpill;
+    else if (d.pkwhen) { const id = b.closest("[data-pkid]")?.dataset.pkid; if (id) PK.setWhen(id, d.pkwhen); P.menu = null; }
+    else if (d.pkout) { if (P.list === "all") { P.del = d.pkout; P.menu = null; } else PK.move(P.list, d.pkout, "out"); }
+    else if (d.pkin) PK.bring(P.list, d.pkin);
+    else if (d.pkact === "del-no") P.del = null;
+    else if (d.pkact === "del-yes") { PK.remove(P.del); P.del = null; }
+    else if (d.pkact === "fresh") P.fresh = true;
+    else if (d.pkact === "fresh-no") P.fresh = false;
+    else if (d.pkact === "fresh-yes") { PK.untickAll(P.list); P.fresh = false; }
+    else if (d.pkact === "shelf") P.shelf = !P.shelf;
+    else { if (shut) packDraw(); return; }   // "‹ Calendar" and the rail are the calendar's own (clickRouter)
+    packDraw();
+  });
+  pg.addEventListener("change", (e) => {
+    if (!on()) return;
+    const t = e.target;
+    if (t.dataset.pktick) { PK.tick(P.list, t.dataset.pktick, t.checked); packDraw(); }
+    else if (t.id === "pkHide") { P.hide = t.checked; packDraw(); }
+  });
+  pg.addEventListener("input", (e) => { if (on() && e.target.id === "pkFind") { P.find = e.target.value; packFind(); } });
+  pg.addEventListener("submit", (e) => {
+    if (!on() || e.target.id !== "pkAddF") return;
+    e.preventDefault();
+    if (PK.add(P.list, $("#pkAdd").value)) { packDraw(); $("#pkAdd").focus(); }
+  });
+  pg.addEventListener("dblclick", (e) => { const n = on() && e.target.closest("[data-pkname]"); if (n) { P.edit = n.dataset.pkname; P.menu = null; packDraw(); } });
+  /* Escape closes an open menu, rename or delete ask first; with none open it leaves the page as on every page */
+  pg.addEventListener("keydown", (e) => {
+    if (!on()) return;
+    if (e.target.id === "pkRen" && e.key === "Enter") { e.preventDefault(); packRename(); return; }
+    if (e.key === "Escape" && (P.menu || P.edit || P.del || P.fresh)) { e.stopPropagation(); P.menu = P.edit = P.del = null; P.fresh = false; packDraw(); }
+  });
+  pg.addEventListener("focusout", (e) => { if (on() && e.target.id === "pkRen" && P.edit) packRename(); });
+  /* drag an item between To place, the three bags and the side panel */
+  const clear = () => { P.drag = null; pg.classList.remove("pk-dragging"); pg.querySelectorAll(".pk-over,.pk-drag").forEach((x) => x.classList.remove("pk-over", "pk-drag")); };
+  pg.addEventListener("dragstart", (e) => {
+    const el = on() && e.target.closest && e.target.closest("[data-pkid]"); if (!el) return;
+    P.drag = el.dataset.pkid; el.classList.add("pk-drag"); pg.classList.add("pk-dragging");
+    if (e.dataTransfer) { e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", P.drag); }
+  });
+  pg.addEventListener("dragover", (e) => {
+    const z = P.drag && e.target.closest && e.target.closest("[data-pkdrop]"); if (!z) return;
+    e.preventDefault();
+    pg.querySelectorAll(".pk-over").forEach((x) => { if (x !== z) x.classList.remove("pk-over"); });
+    z.classList.add("pk-over");
+  });
+  pg.addEventListener("drop", (e) => {
+    const z = P.drag && e.target.closest && e.target.closest("[data-pkdrop]"); if (!z) return;
+    e.preventDefault(); const id = P.drag; clear(); PK.move(P.list, id, z.dataset.pkdrop); packDraw();
+  });
+  pg.addEventListener("dragend", clear);
+  /* the window narrows under 768 px: the Packing page closes, as it cannot open there (d14) */
+  WIDE.addEventListener("change", () => { if (!WIDE.matches && S.page === "packing") showPage("cal"); });
 }
 
 /* ---------- pairing ---------- */
@@ -1438,7 +1804,7 @@ function setup() {
     else return;
     e.preventDefault();
   });
-  wireSwipe($("#view")); wirePinch($("#view"));
+  wireSwipe($("#view")); wirePinch($("#view")); wirePacking();
   addEventListener("resize", function onResize() { size(); });
   addEventListener("focus", () => { if (S.tab !== "event" && questKey()) { refresh(); loadSide(); } });
   setInterval(() => { showLook(); tickNow(); if (S.tab === "now" && S.page === "cal" && !dragging) paintPanel(); renderRail(); }, 30000);
