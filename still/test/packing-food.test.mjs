@@ -38,10 +38,11 @@ test("the Road Trip list has the food template: six groups in the mock's order, 
   const f = open().food("road");
   assert.equal(f.started, true);
   assert.equal(f.ticks, false, "My lists have no ticks");
-  assert.deepEqual(f.groups.map((g) => [g.id, g.title, g.sub, g.pill]), [
-    ["steps", "Before you go", "", true], ["every", "Every road trip", "Bryan Johnson food", true],
-    ["trip", "This trip", "Picked for this one", true], ["gear", "Kitchen gear", "Always goes", true],
-    ["buy", "Buy on arrival", "", false], ["cooler", "Cooler", "Frozen only", true]]);
+  assert.deepEqual(f.groups.map((g) => [g.id, g.title, g.icon, g.pill]), [
+    ["steps", "Before you go", "📝", true], ["every", "Every road trip", "🥣", true],
+    ["trip", "This trip", "🍚", true], ["gear", "Kitchen gear", "🍳", true],
+    ["buy", "Buy on arrival", "🛒", false], ["cooler", "Cooler", "🧊", true]]);
+  assert.ok(f.groups.every((g) => !("sub" in g)), "mock v5 (d29): no group subtitles");
   assert.deepEqual(names(grp(f, "steps")), ["Mix the nutty pudding", "Close out the fridge"]);
   assert.deepEqual(names(grp(f, "every")), ["Nutty pudding mix", "Super veggie", "Lentils"]);
   assert.deepEqual(names(grp(f, "trip")), ["Rice", "Cumin seeds", "Sea salt", "Olive oil", "Lunch for the drive"]);
@@ -245,10 +246,23 @@ test("the page loads the food template from food-seed.json before his trips, so 
 });
 
 test("the page has the Bags | Food switch, the button, the six groups, + Add, ticks, pills and ×, all wired to the rules", () => {
-  for (const s of ["🧳 Bags", "🥣 Food", "data-pkview", "data-pkact=\"food-start\"", "data-pkfadd", "+ Add, then Enter", "data-pkftick", "data-pkfpill", "data-pkfwhen", "data-pkfrm"])
+  for (const s of ["🧳 Bags", "🥣 Food", "data-pkview", "data-pkact=\"food-start\"", "data-pkfadd", "Add, then Enter", "data-pkftick", "data-pkfpill", "data-pkfwhen", "data-pkfrm"])
     assert.ok(html.includes(s), s);
   for (const s of ["PK.food(", "PK.startFood(", "PK.foodAdd(", "PK.foodTick(", "PK.foodWhen(", "PK.foodRemove(", "PK.foodWhens("])
     assert.ok(html.includes(s), s);
+});
+
+test("mock v5 (d29): Food is laid out like the Bags, with the Bags' own wells, rows and hover ×", () => {
+  const fn = html.slice(html.indexOf("function packFood("), html.indexOf("function packFind("));
+  for (const s of ["pk-well", "pk-wh", "pk-em", "pk-ct", "pk-cols", "pk-rows", "pk-it", "pk-rm", "pk-add", "pk-plus"])
+    assert.ok(fn.includes(s), s);
+  assert.ok(fn.includes("Add a to-do, then press Enter"), "Before you go adds like To place");
+  assert.ok(fn.includes("Add, then Enter"), "every column adds at the bottom");
+  assert.ok(!/\.sub\b/.test(fn), "no subtitles");
+  assert.ok(!fn.includes("pk-fsteps") && !fn.includes("pk-fside") && !fn.includes("pk-frm"), "the v3 layout is gone");
+  const nm = (html.match(/\.pk-fnm\{[^}]*\}/) || [""])[0];
+  assert.match(nm, /overflow-wrap:anywhere/, "names wrap");
+  assert.doesNotMatch(nm, /ellipsis|nowrap/, "names are never cut off");
 });
 
 test("food stays computer only (d14): its styles sit inside the Packing page's pk- block, nothing for the phone", () => {
@@ -258,8 +272,8 @@ test("food stays computer only (d14): its styles sit inside the Packing page's p
 });
 
 test("the BUILD label names this copy, with a new stamp for the changed core", () => {
-  assert.match(html, /const BUILD = "2026-11-17b road trip food";/);
-  assert.match(html, /calendar-core\.js\?v=21"/);
+  assert.match(html, /const BUILD = "2026-11-17c road trip food v5";/);
+  assert.match(html, /calendar-core\.js\?v=22"/);
 });
 
 test("the page's own script still parses", () => {

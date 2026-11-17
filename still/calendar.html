@@ -13,7 +13,7 @@
 <meta name="apple-mobile-web-app-title" content="Calendar">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>Calendar</title>
-<script src="calendar-core.js?v=21"></script>
+<script src="calendar-core.js?v=22"></script>
 <script src="quest-trips.js?v=20261113c" data-helpers></script>
 <script>
 /* The look saved on this device (the Look row in Settings; Studio when none) goes on here, before anything is drawn,
@@ -547,42 +547,29 @@ body.onpage .left,body.onpage .main,body.onpage .panel{display:none}
   .pk-list{grid-template-columns:repeat(auto-fill,minmax(200px,1fr));overflow:visible}
 }
 @media (max-width:900px){ .pk-cols,.pk-tray .pk-rows{grid-template-columns:minmax(0,1fr)} }
-/* Road trip food (slice 03, Junyan 2026-11-17, "26 yes, 27 yes" to mock v3): its own list beside the bags, behind the
-   Bags | Food switch. Same cream look; every class starts pk-f. Computer only like the rest of the page (d14). */
+/* Road trip food (slice 03, Junyan 2026-11-17, "26 yes, 27 yes"; restyled to mock v5 on "29 yes", d29: "three column
+   design in the same way as the bags"). It reuses the Bags' wells, rows, items, pills and hover ×; only what differs
+   starts pk-f. Names wrap, never cut off. Computer only like the rest of the page (d14). */
 .pk-fseg{display:inline-flex;background:var(--raise);border-radius:12px;padding:3px;box-shadow:inset 0 0 0 1px var(--hair)}
 .pk-fseg button{border:0;background:none;padding:7px 16px;border-radius:9px;font-weight:600;color:var(--soft);white-space:nowrap}
 .pk-fseg button:hover{color:var(--ink)}
 .pk-fseg button[aria-pressed=true]{background:var(--bar);color:var(--ink);box-shadow:var(--card)}
 .pk-fseg small{color:var(--faint);font-weight:600;margin-left:6px;font-variant-numeric:tabular-nums}
 .pk-food{display:grid;gap:14px}
-.pk-fsteps{display:flex;flex-wrap:wrap;align-items:center;gap:10px}
-.pk-flbl{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);font-weight:700;margin-right:4px}
-.pk-fboard{display:grid;grid-template-columns:repeat(3,minmax(0,1fr)) 260px;gap:14px;align-items:start}
-.pk-fside{display:grid;gap:14px;min-width:0}
-.pk-fwell{background:var(--raise);border-radius:16px;padding:12px;min-width:0}
-.pk-fwh{display:flex;align-items:baseline;gap:8px;padding:2px 4px 6px}
-.pk-fwh b{font-size:15px}
-.pk-fwh span{color:var(--faint);font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.pk-fwh .pk-fn{margin-left:auto;font-variant-numeric:tabular-nums;color:var(--soft);font-weight:600;overflow:visible}
-.pk-fit{position:relative;display:flex;align-items:center;gap:10px;background:var(--bar);border-radius:11px;padding:8px 8px 8px 10px;margin-top:6px;box-shadow:var(--card);min-width:0}
-.pk-fsteps .pk-fit{margin-top:0;border:1px solid var(--line);border-radius:12px;box-shadow:none}
-.pk-fit.pk-open{z-index:30}
-.pk-fit .pk-fnm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.pk-fsteps .pk-fit .pk-fnm{flex:none}
+.pk-ftop .pk-rows{grid-template-columns:repeat(3,minmax(0,1fr));gap:6px 14px}
+.pk-it.pk-fit{grid-template-columns:20px minmax(0,1fr) auto;cursor:default}
+.pk-it.pk-fit.pk-nock{grid-template-columns:minmax(0,1fr) auto}
+.pk-fit .pk-fnm{min-width:0;font-weight:500;line-height:1.3;overflow-wrap:anywhere;padding:3px 0}
 .pk-fit.pk-done .pk-fnm{color:var(--faint);text-decoration:line-through;text-decoration-color:var(--line)}
-.pk-fit.pk-done>.pk-pill{opacity:.45}
-.pk-frm{border:0;background:none;color:var(--faint);padding:0 4px;font-size:16px;line-height:1;border-radius:6px}
-.pk-frm:hover{color:var(--bad)}
 .pk-fbuy .pk-ck:checked{background:var(--pk-buy-ink);border-color:var(--pk-buy-ink)}
 .pk-fbuy .pk-ck{border-color:color-mix(in srgb,var(--pk-buy-ink) 62%,transparent)}
-.pk-fempty{color:var(--faint);font-size:13px;padding:8px 6px 4px}
-.pk-fadd{width:100%;margin-top:8px;border:1px dashed var(--line);background:none;border-radius:11px;padding:8px 10px;color:var(--ink)}
-.pk-fadd::placeholder{color:var(--faint)}
-.pk-fadd:focus{outline:2px solid var(--accent);outline-offset:1px;background:var(--bar)}
-.pk-fsteps .pk-fadd{width:auto;flex:1 1 220px;margin-top:0;padding:9px 12px;border-radius:12px}
+.pk-fempty{color:var(--faint);font-size:13px;padding:4px 8px 2px}
+.pk-add.pk-fadd{margin:8px 0 0;background:none;border-style:dashed;box-shadow:none}
+.pk-add.pk-fadd:focus-within{background:var(--bar);border-style:solid}
+.pk-add.pk-fadd input{padding:9px 0;font-size:14px}
 .pk-fstart{background:var(--raise);border-radius:18px;padding:22px 20px 20px}
 .pk-fstart p{margin:0 0 14px;color:var(--soft)}
-@media (max-width:1100px){ .pk-fboard{grid-template-columns:repeat(2,minmax(0,1fr))} }
+@media (max-width:900px){ .pk-ftop .pk-rows{grid-template-columns:minmax(0,1fr)} }
 /* the New task bar would sit over the board; the mock has none */
 body.onpk .drop{display:none}
 /* computer only (d14): no Packing button, and no Packing page, under 768 px */
@@ -722,7 +709,7 @@ if (TOUCH) for (const g of ["gesturestart", "gesturechange"]) document.addEventL
    which shows this build, the phone's answers and a log of every day change with its cause. Until then CalHook.on is
    null and diag() does nothing. BUILD names this copy of the page, so a screenshot proves which copy ran: change it on
    every change to this page or calendar-readout.js (the date plus a letter). */
-const BUILD = "2026-11-17b road trip food";
+const BUILD = "2026-11-17c road trip food v5";
 const CalHook = window.CalHook = { BUILD, on: null };
 const diag = (kind, msg) => { if (CalHook.on) CalHook.on(kind, msg); };
 /* The iPhone home screen app's fit (2026-11-12): html.hs in a home screen app on touch, html.hsfill and --hsgap when
@@ -1732,9 +1719,11 @@ function packDraw() {
   const r = $("#pkRen"); if (r) { r.focus(); r.select(); }
   packFind();
 }
-/** The Food view (slice 03, mock v3): Before you go across the top, then Every road trip, This trip and Kitchen gear,
-    with Buy on arrival and Cooler beside them. Every group has "+ Add, then Enter"; every item a tick (on a trip), a
-    pill (not on Buy on arrival) and ×. The rules are CalCore.packing's food (tests: still/test/packing-food.test.mjs). */
+/** The Food view (slice 03, mock v5, d29): laid out like the Bags. Before you go is a wide well across the top like
+    To place, its add box first and its to-dos three across. Then Every road trip, This trip and Kitchen gear in three
+    columns, and Buy on arrival and Cooler below. Each has its icon tile, count and "+ Add, then Enter"; every item a
+    tick (on a trip), a pill (not on Buy on arrival) and × on hover. The rules are CalCore.packing's food (tests:
+    still/test/packing-food.test.mjs). */
 function packFood(f) {
   if (!f.started) return `<section class="pk-fstart"><p>This trip had its bags before food was added. Your bags and ticks stay as they are.</p>
     <button class="pk-btn" data-pkact="food-start">${esc(f.button)}</button></section>`;
@@ -1742,19 +1731,21 @@ function packFood(f) {
   const item = (g, o) => {
     const menu = P.menu === o.id ? `<div class="pk-menu" role="menu"><p>When</p>` + whens.map((w) =>
       `<button role="menuitem" data-pkfwhen="${esc(w.id)}"><span class="pk-pill w-${esc(w.id)}">${esc(w.label)}</span>${o.when === w.id ? "<b>✓</b>" : ""}</button>`).join("") + `</div>` : "";
-    return `<div class="pk-fit${o.done ? " pk-done" : ""}${P.menu === o.id ? " pk-open" : ""}" data-pkfid="${esc(o.id)}">
+    return `<div class="pk-it pk-fit${f.ticks ? "" : " pk-nock"}${o.done ? " pk-done" : ""}${P.menu === o.id ? " pk-open" : ""}" data-pkfid="${esc(o.id)}">
       ${f.ticks ? `<input type="checkbox" class="pk-ck" data-pkftick="${esc(o.id)}" ${o.done ? "checked" : ""} aria-label="${g.id === "buy" ? "Bought" : "Done"}: ${esc(o.name)}">` : ""}
-      <span class="pk-fnm" title="${esc(o.name)}">${esc(o.name)}</span>
+      <span class="pk-fnm">${esc(o.name)}</span>
       ${g.pill ? `<button class="pk-pill w-${esc(o.when)}" data-pkfpill="${esc(o.id)}" aria-haspopup="true" aria-expanded="${P.menu === o.id}" title="Click to change when">${esc(o.pill)}</button>` : ""}
-      <button class="pk-frm" data-pkfrm="${esc(o.id)}" title="Remove from this ${f.ticks ? "trip" : "list"}" aria-label="Remove: ${esc(o.name)}">×</button>${menu}</div>`;
+      <button class="pk-rm" data-pkfrm="${esc(o.id)}" title="Remove from this ${f.ticks ? "trip" : "list"}" aria-label="Remove: ${esc(o.name)}">×</button>${menu}</div>`;
   };
-  const add = (g) => `<input class="pk-fadd" data-pkfadd="${esc(g.id)}" placeholder="+ Add, then Enter" autocomplete="off" aria-label="Add to ${esc(g.title)}">`;
-  const well = (g) => `<section class="pk-fwell${g.id === "buy" ? " pk-fbuy" : ""}"><div class="pk-fwh"><b>${esc(g.title)}</b>${g.sub ? `<span>${esc(g.sub)}</span>` : ""}<span class="pk-fn">${esc(g.count)}</span></div>
-    ${g.rows.length ? g.rows.map((o) => item(g, o)).join("") : `<div class="pk-fempty">${esc(g.empty)}</div>`}${add(g)}</section>`;
+  const add = (g, hint, top) => `<label class="pk-add${top ? "" : " pk-fadd"}"><span class="pk-plus" aria-hidden="true">+</span><input data-pkfadd="${esc(g.id)}" placeholder="${hint}" autocomplete="off" aria-label="Add to ${esc(g.title)}"></label>`;
+  const head = (g) => `<div class="pk-wh"><span class="pk-em" aria-hidden="true">${esc(g.icon)}</span><span class="pk-nm">${esc(g.title)}</span><span class="pk-ct">${esc(g.count)}</span></div>`;
+  const rows = (g) => g.rows.length ? `<div class="pk-rows">${g.rows.map((o) => item(g, o)).join("")}</div>` : "";
+  const well = (g) => `<section class="pk-well${g.id === "buy" ? " pk-fbuy" : ""}">${head(g)}${rows(g) || `<div class="pk-fempty">${esc(g.empty)}</div>`}${add(g, "Add, then Enter")}</section>`;
   const s = G.steps;
   return `<div class="pk-food">
-    <div class="pk-fsteps"><span class="pk-flbl">${esc(s.title)}</span>${s.rows.map((o) => item(s, o)).join("")}${add(s)}</div>
-    <div class="pk-fboard">${well(G.every)}${well(G.trip)}${well(G.gear)}<div class="pk-fside">${well(G.buy)}${well(G.cooler)}</div></div></div>`;
+    <section class="pk-well pk-ftop">${head(s)}${add(s, "Add a to-do, then press Enter", true)}${rows(s)}</section>
+    <div class="pk-cols">${well(G.every)}${well(G.trip)}${well(G.gear)}</div>
+    <div class="pk-cols">${well(G.buy)}${well(G.cooler)}</div></div>`;
 }
 /** Find narrows the side panel in place, with no redraw, so the box keeps his typing. */
 function packFind() {

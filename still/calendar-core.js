@@ -696,12 +696,14 @@
       const list = tripId(t);
       return { list, tab: split(today).up.some((x) => tripId(x) === list) ? "up" : "past" };
     }
-    /* ---------- Road trip food (slice 03, Junyan 2026-11-17, "26 yes, 27 yes" to mock v3; tests:
+    /* ---------- Road trip food (slice 03, Junyan 2026-11-17, "26 yes, 27 yes", restyled to mock v5 on "29 yes"; tests:
        still/test/packing-food.test.mjs). Food is its own list (his words: "Just make it it's own list"), never in the
        bags. The Road Trip list holds the template (D.food); a trip started from it gets its own copy (rec.food), with
        its own ticks and pills. No amounts anywhere ("I'll decide the quantities"): a name is kept as typed. */
-    const FOODS = [["steps", "Before you go", ""], ["every", "Every road trip", "Bryan Johnson food"], ["trip", "This trip", "Picked for this one"],
-      ["gear", "Kitchen gear", "Always goes"], ["buy", "Buy on arrival", ""], ["cooler", "Cooler", "Frozen only"]];
+    /* Each group's id, title and icon tile. Mock v5 (d29, "three column design in the same way as the bags"): no
+       subtitles ("random words ... that are no necessary"). */
+    const FOODS = [["steps", "Before you go", "📝"], ["every", "Every road trip", "🥣"], ["trip", "This trip", "🍚"],
+      ["gear", "Kitchen gear", "🍳"], ["buy", "Buy on arrival", "🛒"], ["cooler", "Cooler", "🧊"]];
     const FOODIDS = FOODS.map((g) => g[0]);
     /* The Food count on the switch: what gets packed. Before you go are steps and Buy on arrival is bought there. */
     const COUNTED = ["every", "trip", "gear", "cooler"];
@@ -725,14 +727,14 @@
     const roadTrip = (list) => { const rec = tripOf(list); return rec && rec.from === "road" ? rec : null; };
     const foodOf = (list) => (!foodReady() ? null : list === "road" ? D.food : (roadTrip(list) || {}).food || null);
 
-    /** The Food view: six groups as the mock draws them, each with "N of M" on a trip and its size on the template. */
+    /** The Food view: six groups as mock v5 draws them, each with "N of M" on a trip and its size on the template. */
     function food(list) {
       if (!foodReady() || !(list === "road" || roadTrip(list))) return null;
       const F = foodOf(list), ticks = list !== "road";
       if (!F) return { started: false, ticks, count: 0, groups: [], button: "Start food from your Road Trip list" };
-      const groups = FOODS.map(([id, title, sub]) => {
+      const groups = FOODS.map(([id, title, icon]) => {
         const arr = F[id] || [], done = ticks ? arr.filter((x) => x.d).length : 0;
-        return { id, title, sub, pill: id !== "buy", total: arr.length, done, count: ticks ? `${done} of ${arr.length}` : String(arr.length),
+        return { id, title, icon, pill: id !== "buy", total: arr.length, done, count: ticks ? `${done} of ${arr.length}` : String(arr.length),
           empty: id === "cooler" ? "Empty. No ice packs." : "Nothing yet.",
           rows: arr.map((x) => ({ id: x.id, name: x.n, when: id === "buy" ? "" : x.w, pill: id === "buy" ? "" : PILL[x.w] || PILL.none, done: ticks && !!x.d })) };
       });
