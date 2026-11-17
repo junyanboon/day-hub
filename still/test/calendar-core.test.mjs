@@ -49,7 +49,7 @@ test("kind is guessed from the title (d96), a hand-set kind wins", () => {
   assert.equal(C.kindOf({ title: "Visit Mom" }), "social");
   assert.equal(C.kindOf({ title: "Caney's Birthday" }), "social");
   assert.equal(C.kindOf({ title: "Dentist" }), "errand");
-  assert.equal(C.kindOf({ title: "Packing & Errands" }), "errand");
+  assert.equal(C.kindOf({ title: "Packing & Errands" }), "pack");   // "pack" wins since slice 02 (d23)
   assert.equal(C.kindOf({ title: "Montreal: train" }), "travel");
   assert.equal(C.kindOf({ title: "Flight to São Paulo" }), "travel");
   assert.equal(C.kindOf({ title: "Drive" }), "travel");
@@ -65,7 +65,7 @@ test("kind is guessed from the title (d96), a hand-set kind wins", () => {
   assert.equal(C.kindOf({ title: "Call the bank", kind: "ex" }), "gym");
   assert.equal(C.kindOf({ title: "Zouk night", kind: "ex" }), "dance");
   assert.equal(C.kindOf({ title: "Zouk night", kind: "other" }), "other");
-  assert.deepEqual(C.KINDS.map((x) => x[0]), ["deep", "studio", "yoga", "gym", "dance", "cook", "travel", "social", "errand", "wind", "rest", "other"]);
+  assert.deepEqual(C.KINDS.map((x) => x[0]), ["deep", "studio", "yoga", "gym", "dance", "cook", "travel", "pack", "social", "errand", "wind", "rest", "other"]);
 });
 
 test("overlapping events share the width, others take all of it", () => {
