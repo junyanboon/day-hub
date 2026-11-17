@@ -117,3 +117,9 @@ test("the BUILD label names this copy", () => {
   assert.match(html, /const BUILD = "2026-11-16b packing block";/);
   assert.match(html, /calendar-core\.js\?v=19"/, "a new stamp for the changed core");
 });
+
+test("the page's own script still parses (a stray backtick once broke the whole page and no regex test saw it)", () => {
+  const scripts = [...html.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/g)].map((m) => m[1]).filter((s) => s.trim());
+  assert.ok(scripts.length > 0);
+  for (const s of scripts) assert.doesNotThrow(() => new vm.Script(s), SyntaxError);
+});

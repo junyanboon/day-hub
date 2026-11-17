@@ -1321,7 +1321,7 @@ function pEvent(ev) {
     ${canEdit ? "" : `<div class="meta">${esc(cal.name)} is read-only here.</div>`}
     <div class="r">${ev.ghost ? `<button class="btn" id="pSkip">Skip</button><span class="spacer"></span><button class="btn pri" id="pAcc">Accept</button>`
       : `${isNew || !canEdit ? "" : '<button class="btn del" id="pDel">Delete</button>'}${ev.htmlLink ? `<a class="meta" href="${esc(ev.htmlLink)}" target="_blank" rel="noopener">Open in Google</a>` : ""}<span class="spacer"></span>${canEdit ? '<button class="btn pri" id="pSave">Save</button>' : ""}`}</div>
-    ${!isNew && !ev.ghost && TYPES.includes(ev.k) ? `<button class="btn k-${ev.k}" data-page="${ev.k}" style="border-color:color-mix(in srgb,var(--c) 50%,transparent)">${esc(WIDE.matches && C.pageLink(ev.k) ? C.pageLink(ev.k).label : `Open the ${KNAME[ev.k]} page`)} &#8250;</button>` : ""}`
+    ${!isNew && !ev.ghost && TYPES.includes(ev.k) ? `<button class="btn k-${ev.k}" data-page="${ev.k}" style="border-color:color-mix(in srgb,var(--c) 50%,transparent)">${esc(WIDE.matches && C.pageLink(ev.k) ? C.pageLink(ev.k).label : `Open the ${KNAME[ev.k]} page`)} &#8250;</button>` : ""}
     ${!isNew && !ev.ghost && ev.k === "pack" && WIDE.matches ? `<button class="btn k-pack" data-pkday="${esc(packDayOf(ev))}" style="border-color:color-mix(in srgb,var(--c) 50%,transparent)">Open packing list &#8250;</button>` : ""}`;
 }
 /* ---------- the phone's event sheet (slice 02, Junyan 2026-11-12, d2): one-line rows, 760px wide or less ----------
