@@ -65,7 +65,7 @@ test("kind is guessed from the title (d96), a hand-set kind wins", () => {
   assert.equal(C.kindOf({ title: "Call the bank", kind: "ex" }), "gym");
   assert.equal(C.kindOf({ title: "Zouk night", kind: "ex" }), "dance");
   assert.equal(C.kindOf({ title: "Zouk night", kind: "other" }), "other");
-  assert.deepEqual(C.KINDS.map((x) => x[0]), ["deep", "studio", "yoga", "gym", "dance", "cook", "travel", "social", "errand", "wind", "rest", "other"]);
+  assert.deepEqual(C.KINDS.map((x) => x[0]), ["deep", "studio", "yoga", "gym", "dance", "cook", "travel", "pack", "social", "errand", "wind", "rest", "other"]);
 });
 
 test("overlapping events share the width, others take all of it", () => {
