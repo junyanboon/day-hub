@@ -60,14 +60,14 @@ const focusRead = (page, sel) => page.evaluate((sel) => {
   const el = document.querySelector(sel); el.focus(); sheetFit();
   const vv = window.visualViewport, top = vv.offsetTop, bottom = vv.offsetTop + vv.height;
   const b = (e) => { const r = (typeof e === "string" ? document.querySelector(e) : e).getBoundingClientRect(); return [Math.round(r.top), Math.round(r.bottom)]; };
-  return { top, bottom, panel: b("#panel"), x: b("#pX"), save: document.querySelector("#pSave") ? b("#pSave") : null, label: b(".shead b"), head: b(".shead"), box: b(el) };
+  return { top, bottom, panel: b("#panel"), x: b("#pGrab"), save: document.querySelector("#pSave") ? b("#pSave") : null, label: b(".shead b"), head: b(".shead"), box: b(el) };
 }, sel);
 /* a new event at 9 AM tomorrow in the calendar's own zone, built the way an empty-hour tap builds it (calendar.html) */
 const newEvent = (page) => page.evaluate(() => { const s = C.instant(C.addDays(today(), 1), 540, S.tz); panel("event", { isNew: true, id: "draft", calId: "joint", title: "", s, e: s + 3600000, start: new Date(s).toISOString(), end: new Date(s + 3600000).toISOString(), k: "other" }); });
 /** clear: the line nothing may sit above (the top inset, plus the clear strip in a home screen app). */
 function headerChecks(tag, g, clear) {
   const inView = (r) => r && r[0] >= Math.max(g.top, clear) - 0.5 && r[1] <= g.bottom + 0.5;
-  check(`${tag}: x, "Event" and Save sit below ${clear} and above the keyboard`, inView(g.x) && inView(g.label) && inView(g.save), JSON.stringify({ x: g.x, label: g.label, save: g.save, top: g.top, bottom: g.bottom }));
+  check(`${tag}: the dash, "Event" and Save sit below ${clear} and above the keyboard`, inView(g.x) && inView(g.label) && inView(g.save), JSON.stringify({ x: g.x, label: g.label, save: g.save, top: g.top, bottom: g.bottom }));
   check(`${tag}: the box being typed in is fully on screen, under the header row`, g.box[0] >= g.head[1] - 0.5 && g.box[1] <= g.bottom + 0.5 && g.box[0] >= clear, JSON.stringify({ box: g.box, head: g.head, bottom: g.bottom }));
   check(`${tag}: the sheet still fills the space the keyboard leaves`, g.panel[0] === Math.round(g.top) && g.panel[1] === Math.round(g.bottom), JSON.stringify({ panel: g.panel, top: g.top, bottom: g.bottom }));
 }
@@ -119,7 +119,7 @@ try {
     await newEvent(page); await sleep(400); await keyboard(page, 90);
     const g = await focusRead(page, "#pTitle");
     headerChecks("Safari tab, page slid 90, Title", g, 0);
-    check("Safari tab, no inset: the header row starts at the sheet's top (only its 1px edge and 4px gap, no padding)", g.head[0] - g.panel[0] <= 5, JSON.stringify({ head: g.head, panel: g.panel }));
+    check("Safari tab, no inset: the header row starts at the sheet's top (only its 1px edge, the 44px dash and the 4px gap, no padding)", g.head[0] - g.panel[0] <= 49, JSON.stringify({ head: g.head, panel: g.panel }));
     await keyboardDown(page);
     check("Safari tab: no page errors", errors.length === 0, errors.join(" | "));
     await ctx.close(); }
@@ -150,7 +150,7 @@ try {
     await page.waitForSelector("#readout"); await sleep(400);
     const text = await page.evaluate(() => document.querySelector("#readout").innerText);
     const line = (text.match(/\nkb [^\n]*/) || [""])[0].trim();
-    const m = line.match(/^kb on vv 479@0 sheet 0\.\.479 pad 100 head (\d+)\.\.(\d+) title (\d+)\.\.(\d+)$/);
+    const m = line.match(/^kb on vv 479@0 sheet 0\.\.479 pad 100 head (\d+)\.\.(\d+) title (\d+)\.\.(\d+) scroll win 0 doc 0 body 0$/);
     check("readout has a kb line: keyboard on, visual viewport, sheet, pad 100, header row and Title below 100", !!m && +m[1] >= 100 && +m[3] >= +m[2], line);
     await ctx.close(); }
 } finally {

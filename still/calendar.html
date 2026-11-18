@@ -86,7 +86,7 @@
 /* an event that is over (earlier today, or a past day): its card fill, and its title (a share of the type colour
    mixed into --dim-ink); no see-through, so the title still reads at 4.5:1 or better */
 --dim-fill:12%;--dim-title:20%;--dim-ink:var(--soft);--dim-time:var(--soft);
-/* the strip behind the iPhone clock in home-screen mode (only a light look needs one) */
+/* the strip behind the iPhone clock in home-screen mode: the header bar colour in every look (see-through shows the body, which is --bar) */
 --status:transparent;
 /* block types: colour means type (Packing, slice 02 d23: a teal of its own, kept clear of Social and Yoga in every look) */
 --k-deep:var(--amber);--k-studio:var(--orange);--k-yoga:var(--cyan);--k-gym:var(--purple);--k-dance:var(--pink);--k-cook:var(--lime);
@@ -105,8 +105,8 @@
    sunset to sunrise. Both use one coral for "now", today, the Today button and the chosen view, so they feel like one look.
    Day: Studio Morning as first shipped (PR 125). A sunlit studio, a maple floor, a paper planner. Warm cream, warm ink,
    ballet coral. Coral sits near Studio On-Site, so Studio On-Site is a deep burnt orange and Deep Work an ochre. The
-   iPhone draws its clock in white over the top of the page (black-translucent), so a dark strip fills that space;
-   big shadows are a soft warm brown, not black. */
+   iPhone strip behind the clock is the header bar's cream (2026-11-18: a dark strip there looked grey to black
+   against the cream header); big shadows are a soft warm brown, not black. */
 :root[data-look="studio-day"]{
 --amber:#9a7d00;--orange:#a35a0a;--lime:#4f9418;--emerald:#14946a;--cyan:#0e8fa3;--blue:#2563c8;--teal:#147169;
 --indigo:#6358d0;--purple:#9a46c8;--pink:#c7317f;--slate:#5f6f86;--sand:#a1865a;--stone:#857d77;--red:#c42b3c;
@@ -116,7 +116,7 @@
 --ev-fill:14%;--pill-fill:16%;--ev-title:50%;--ev-ink:#1f1b16;--ev-time-p:40%;--ev-time:#4a4239;--ev-halo:0%;
 --glow:rgba(210,74,34,.12);--today-col:rgba(210,74,34,.035);--past:rgba(96,72,40,.05);--drop:rgba(96,72,40,.16);--track:rgba(31,27,22,.10);
 --lift:#3c2a14;--lift-k:.4;--dim-fill:7%;--dim-title:30%;
---status:#1f1b16;color-scheme:light}
+--status:#fffdf9;color-scheme:light}
 /* Night: a flat neutral charcoal with off-white text and no tint, the header and bottom bar a touch lifted from the
    page. The same coral, brightened for the dark; Studio On-Site a yellower tangerine to stay clear of it. */
 :root[data-look="studio-night"]{
@@ -342,7 +342,7 @@ div.month{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));grid-templa
 .lk-chip::after{content:"";position:absolute;left:6px;right:6px;top:calc(30% + 6px);height:2px;border-radius:1px;background:var(--lk-acc)}
 .lk-nm{display:block;min-height:2.4em}
 .look[aria-pressed=true]{color:var(--ink);font-weight:600}.look[aria-pressed=true] .lk-chip{box-shadow:0 0 0 2px var(--bar),0 0 0 4px var(--accent)}
-.grab{display:none}
+.grab,.scrim{display:none}
 .modal{position:fixed;inset:0;background:color-mix(in srgb,var(--lift) calc(50% * var(--lift-k)),transparent);z-index:80;display:grid;place-items:center;padding:16px}
 .modal .card{background:var(--raise);max-width:340px;display:flex;flex-direction:column;gap:10px;box-shadow:0 16px 50px color-mix(in srgb,var(--lift) calc(55% * var(--lift-k)),transparent)}
 .toast{position:fixed;bottom:calc(18px + env(safe-area-inset-bottom,0px));left:50%;transform:translate(-50%,20px);background:var(--raise2);border:1px solid var(--line);padding:8px 16px;border-radius:999px;font-size:12.5px;z-index:70;opacity:0;transition:.25s;pointer-events:none;white-space:nowrap;max-width:92vw;overflow:hidden;text-overflow:ellipsis;box-shadow:0 8px 24px color-mix(in srgb,var(--lift) calc(40% * var(--lift-k)),transparent)}
@@ -680,7 +680,14 @@ body.onpk .drop{display:none}
   #panelBtn{width:36px;height:36px;padding:0;font-size:18px}
   .sc{padding-bottom:env(safe-area-inset-bottom,0px)}
   .panel{top:auto;left:0;width:auto;max-height:78%;border-radius:22px 22px 0 0;border:1px solid var(--line);transform:translateY(105%);padding-top:0;bottom:0}
-  .grab{display:block;width:40px;height:4px;border-radius:2px;background:var(--raise2);margin:8px auto 0;flex:none}
+  /* the two ways out of a phone sheet, no x (Junyan, 2026-11-12: "just me pressing the long dash at the top is good
+     neough or clicking off the menu should close it"): the dash is drawn 40 x 4 but takes a tap 120 x 44, and a clear
+     cover behind the open sheet takes a tap anywhere outside it, so that tap closes the sheet and does nothing else.
+     Both close the way x did (closeSheet): unsaved typing is dropped. The desktop side panel keeps its x. */
+  .grab{display:block;position:relative;width:120px;height:44px;margin:0 auto;padding:0;border:0;border-radius:0;background:none;flex:none;cursor:pointer;-webkit-tap-highlight-color:transparent}
+  .grab::before{content:"";position:absolute;left:40px;top:12px;width:40px;height:4px;border-radius:2px;background:var(--raise2)}
+  body.popen .scrim{display:block;position:fixed;inset:0;z-index:29;cursor:pointer;-webkit-tap-highlight-color:transparent}
+  #pClose{display:none}
   .pbody{min-width:0;padding-bottom:calc(84px + env(safe-area-inset-bottom,0px))}
   /* the event sheet: one-line rows (slice 02). Every box in it is 16px or more so iOS never zooms (PR 133). The time
      and day boxes lie unseen over their row text, so a tap opens the phone's own wheels and the row reads "1:45 PM". */
@@ -689,12 +696,19 @@ body.onpk .drop{display:none}
   .sheet{display:flex;flex-direction:column;gap:12px}
   .shead{display:grid;grid-template-columns:72px 1fr 72px;align-items:center;min-height:44px;position:sticky;top:0;z-index:2;background:var(--bar)}
   /* keyboard up (sheetFit pins the sheet to the visual viewport, which starts at the screen's very top): the sheet pads
-     its top by the status strip, so x, Event, Save and the Title never sit under the clock (Junyan, 2026-11-12: "Event
+     its top by the status strip, so the dash, Event, Save and the Title never sit under the clock (Junyan, 2026-11-12: "Event
      title also gets pushed into the blur"); a home screen app adds its clear strip below (html.hs .panel.kb). A box
      scrolled into view stops below the sticky header row (scroll-padding-top). */
-  .panel.kb{border-radius:0;padding-top:env(safe-area-inset-top,0px)}.panel.kb .grab{display:none}.panel.kb .pbody{padding-bottom:16px;scroll-padding-top:56px}
+  .panel.kb{border-radius:0;padding-top:env(safe-area-inset-top,0px)}.panel.kb .pbody{padding-bottom:16px;scroll-padding-top:56px}
+  /* layout D (Junyan, 2026-11-18, d43: "43 D is good"): with the keyboard up the dash leaves its own 44px row (that row pushed
+     the Title 44px lower than the 2026-11-12l build, into the blur on his phone) and sits in the header row's left spot, where the x
+     was: "---  Event  Save". It is laid over the header cell (72px wide, 44 high, same top as .shead: the status strip,
+     then pbody's 4px, measured from inside the 1px edge), so the header row and the Title sit where the 2026-11-12l build put them.
+     A 4px band of the sheet colour above the sticky header hides content that scrolls under it. */
+  .panel.kb .grab{position:absolute;z-index:3;left:16px;top:calc(env(safe-area-inset-top,0px) + 4px);width:72px;height:44px;margin:0}
+  .panel.kb .grab::before{left:16px}
+  .panel.kb .shead{box-shadow:0 -4px 0 var(--bar)}
   .shead b{text-align:center;font-size:16px}
-  .shead .icon{justify-self:start;width:44px;height:44px;font-size:19px;margin-left:-10px}
   .shead .btn.pri{justify-self:end;padding:8px 16px;font-size:15px}
   .sheet .tinput{width:100%;background:none;border:0;border-radius:0;padding:4px 0 8px;border-bottom:1px solid var(--line)}
   .rows{display:flex;flex-direction:column;background:var(--raise);border:1px solid var(--line);border-radius:14px;overflow:hidden;flex:none}
@@ -705,7 +719,8 @@ body.onpk .drop{display:none}
   .srow i{font-style:normal;color:var(--faint);font-size:18px}
   .srow .ov{position:absolute;inset:0;width:100%;height:100%;opacity:0;font-size:16px;border:0;margin:0;padding:0;-webkit-appearance:none;appearance:none}
   .srow .tx{flex:1;min-width:0;background:none;border:0;padding:13px 0;font-size:16px;line-height:1.3;color:var(--ink);outline:0}
-  .srow textarea.tx{resize:none;font-family:inherit;min-height:46px;max-height:40vh;overflow-y:auto}
+  /* Notes shows two full rows even when empty (Junyan, 2026-11-12: "need to be 2 rows"): 2 lines of 1.3em + 13px padding top and bottom */
+  .srow textarea.tx{resize:none;font-family:inherit;min-height:calc(2.6em + 26px);max-height:40vh;overflow-y:auto}
   .srow .tx::placeholder{color:var(--faint)}.srow .tx:disabled::placeholder{color:transparent}
   .srow.sub{min-height:0;padding:0 14px 10px 102px;border-top:0;margin-top:-6px;font-size:12px;color:var(--faint)}
   .snotes{flex:1;min-width:0;padding:13px 0;white-space:pre-wrap;overflow-wrap:anywhere;color:var(--soft);max-height:40vh;overflow-y:auto}
@@ -731,12 +746,14 @@ html.hs.hsclear{--hstop:38px}
 html.hs body::before{height:calc(env(safe-area-inset-top,0px) + var(--hstop))}
 html.hs .app{padding-top:calc(env(safe-area-inset-top,0px) + var(--hstop))}
 html.hs .panel.kb{padding-top:calc(env(safe-area-inset-top,0px) + var(--hstop))}
+html.hs .panel.kb .grab{top:calc(env(safe-area-inset-top,0px) + var(--hstop) + 4px)}
 html.hs body.month .left{top:calc(48px + env(safe-area-inset-top,0px) + var(--hstop))}
 html.hsfill{height:calc(100% + var(--hsgap,0px))}
 html.hsfill .drop{bottom:calc(-1 * var(--hsshift,0px))}
 html.hsfill .toast{bottom:calc(18px + env(safe-area-inset-bottom,0px) - var(--hsshift,0px))}
 html.hsfill .panel{bottom:calc(-1 * var(--hsshift,0px))}
 html.hsfill .modal{bottom:calc(-1 * var(--hsshift,0px))}
+html.hsfill body.popen .scrim{bottom:calc(-1 * var(--hsshift,0px))}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style></head>
 <body>
@@ -762,8 +779,9 @@ html.hsfill .modal{bottom:calc(-1 * var(--hsshift,0px))}
     </div>
     <div class="sc" id="view"></div>
   </div>
+  <div class="scrim" id="scrim" aria-hidden="true"></div>
   <aside class="panel" id="panel">
-    <span class="grab"></span>
+    <button class="grab" id="pGrab" aria-label="Close"></button>
     <div class="ptabs" role="group" aria-label="Panel">
       <button data-p="now">Now</button><button data-p="set">Settings</button><button data-p="keys">Shortcuts</button>
       <span class="spacer"></span><button id="pClose" aria-label="Close panel">&#10005;</button>
@@ -790,7 +808,7 @@ if (TOUCH) for (const g of ["gesturestart", "gesturechange"]) document.addEventL
    which shows this build, the phone's answers and a log of every day change with its cause. Until then CalHook.on is
    null and diag() does nothing. BUILD names this copy of the page, so a screenshot proves which copy ran: change it on
    every change to this page or calendar-readout.js (the date plus a letter). */
-const BUILD = "2026-11-18b trip read";
+const BUILD = "2026-11-18d top colour";
 const CalHook = window.CalHook = { BUILD, on: null };
 const diag = (kind, msg) => { if (CalHook.on) CalHook.on(kind, msg); };
 /* The iPhone home screen app's fit (2026-11-12): html.hs in a home screen app on touch, html.hsfill and --hsgap when
@@ -1208,15 +1226,25 @@ function wireStrip(v) {
       if (e.target !== col && e.target.id !== "shade") return;
       const min = Math.floor(yToMin(col, e.clientY) / 30) * 30, s = C.instant(col.dataset.day, min, S.tz), cal = homeCal();
       if (!cal) { toast("No calendar you can write to", { bad: true }); return; }
-      clearDraft();
+      clearDraft(); const wasOpen = document.body.classList.contains("popen");
       const el = document.createElement("div"); el.className = "ev draft k-other"; el.style.cssText = `top:${atMin(min)};height:calc(var(--H) - 2px);left:2px;right:3px`;
       el.innerHTML = `<b><span class="t">New event</span></b><small>${C.hm(min)}</small>`; col.appendChild(el);
       panel("event", { isNew: true, id: "draft", calId: cal.id, title: "", s, e: s + 3600000, start: new Date(s).toISOString(), end: new Date(s + 3600000).toISOString(), k: "other" });
-      $("#pTitle")?.focus();
+      focusTitleWhenIn(wasOpen);
     };
   });
 }
 const clearDraft = () => $$(".ev.draft").forEach((d) => d.remove());
+/** A new event's Title takes focus only after the sheet has finished sliding in (2026-11-18): focused while it was still
+    moving, the box sat behind the keyboard line for the first moments and iOS panned the page to reveal it. A sheet that
+    was already open has nothing to wait for; a missed transitionend (reduced motion, a hidden page) is covered by a timer. */
+function focusTitleWhenIn(wasOpen) {
+  const p = $("#panel"); let done = false;
+  const go = () => { if (done) return; done = true; p.removeEventListener("transitionend", on); clearTimeout(t); if (document.body.classList.contains("popen")) $("#pTitle")?.focus(); };
+  const on = (e) => { if (e.target === p && e.propertyName === "transform") go(); };
+  const t = setTimeout(go, 450);
+  if (wasOpen || !sheetOn()) go(); else p.addEventListener("transitionend", on);
+}
 /* A finger swipe between days (Junyan, 2026-11-11: "it changes days when I'm in the day view very easily").
    The strip was one native scroller in both directions with x snapping (.sc.snap), so on the iPhone, which does
    not lock a scroll to one direction, an up/down scroll that drifted sideways snapped to the next day.
@@ -1394,6 +1422,9 @@ function monthView(v) {
 }
 
 /* ---------- the right panel: Now, event details, Settings, Shortcuts ---------- */
+/** Close the phone sheet (event or menu): the dash or a tap outside. Unsaved typing is dropped and a
+    half-made new event is removed, as the old x did (Junyan, 2026-11-12, the dash and a tap outside replace the x). */
+function closeSheet() { panel("now"); document.body.classList.remove("popen"); }
 function panel(tab, ev) {
   if (tab !== "event") clearDraft();
   S.tab = tab; S.ev = ev || null; S.form = null;
@@ -1463,7 +1494,7 @@ function pSheet(ev) {
   const tx = sheetTexts(f, ev), out = (k) => `<output data-v="${k}">${esc(tx[k])}</output>`;
   const pick = (type, key, lbl) => `${out(key)}<input class="ov" type="${type}" data-f="${key}" value="${esc(f[key])}" aria-label="${lbl}" ${dis}>`;
   return `<div class="sheet">
-    <div class="shead"><button class="icon" id="pX" aria-label="Close">&#10005;</button><b>Event</b>${canEdit && !ev.ghost ? '<button class="btn pri" id="pSave">Save</button>' : "<span></span>"}</div>
+    <div class="shead"><span></span><b>Event</b>${canEdit && !ev.ghost ? '<button class="btn pri" id="pSave">Save</button>' : "<span></span>"}</div>
     ${ev.ghost ? `<div class="meta">Suggested by ${esc(ev.by)}${ev.why ? ": " + esc(ev.why) : ""}</div>` : ""}
     <input class="tinput" id="pTitle" value="${esc(f.title)}" placeholder="Title" aria-label="Title" autocomplete="off" ${canEdit ? "" : "disabled"}>
     <div class="rows">
@@ -2207,7 +2238,7 @@ function wirePair() {
 /* ---------- controls ---------- */
 function setup() {
   document.addEventListener("click", function clickRouter(e) {
-    const t = e.target.closest("[data-railtog],[data-pkday],[data-page],[data-n],[data-p],[data-key],[data-staff],[data-allday],[data-open],[data-acc],[data-skip],[data-go],[data-dur],[data-kind],[data-sheet],[data-triptab],button[data-look],#pSave,#pDel,#pAcc,#pSkip,#pX,#pairBtn");
+    const t = e.target.closest("[data-railtog],[data-pkday],[data-page],[data-n],[data-p],[data-key],[data-staff],[data-allday],[data-open],[data-acc],[data-skip],[data-go],[data-dur],[data-kind],[data-sheet],[data-triptab],button[data-look],#pSave,#pDel,#pAcc,#pSkip,#pGrab,#pairBtn");
     if (!t || t.closest(".ev")) return;
     const d = t.dataset;
     if (t.matches("button[data-look]")) setLook(d.look);
@@ -2229,7 +2260,7 @@ function setup() {
     else if (d.dur) { S.form.dur = +d.dur; $$("[data-dur]").forEach((c) => c.setAttribute("aria-pressed", String(c === t))); }
     else if ("kind" in d) { S.form.kind = d.kind; $$("[data-kind]").forEach((c) => c.setAttribute("aria-pressed", String(c === t))); if (S.form.sheet) { $('[data-v="types"]').hidden = true; sheetPaint(); } }
     else if (d.sheet === "type") { const c = $('[data-v="types"]'); c.hidden = !c.hidden; }
-    else if (t.id === "pX") { panel("now"); document.body.classList.remove("popen"); }
+    else if (t.id === "pGrab") closeSheet();
     else if (t.id === "pSave") saveEvent();
     else if (t.id === "pDel") { const ev = S.ev, sh = !!(S.form && S.form.sheet); panel("now"); if (sh) document.body.classList.remove("popen"); deleteEvent(ev); }
     else if (t.id === "pAcc") acceptSugg(S.ev, { calId: $("#pCal").value, title: $("#pTitle").value.trim() || S.ev.title });
@@ -2261,6 +2292,7 @@ function setup() {
     tapT = setTimeout(() => { if (n === 1 && innerWidth <= 760) document.body.classList.toggle("month"); }, 350);
   };
   $("#panelBtn").onclick = () => { if (innerWidth <= 1100) { if (!document.body.classList.contains("popen")) panel("now"); document.body.classList.toggle("popen"); } else { document.body.classList.toggle("nopanel"); setTimeout(size, 300); } };
+  $("#scrim").onclick = closeSheet;
   $("#pClose").onclick = () => { panel("now"); document.body.classList.remove("popen"); if (innerWidth > 1100) { document.body.classList.add("nopanel"); setTimeout(size, 300); } };
   /* the phone sheet: a box being typed in updates its row at once; a time or day box opens its picker on a click with a
      mouse (a phone opens its own wheels); the box in focus stays above the keyboard */
@@ -2302,7 +2334,7 @@ function setup() {
 function readout() {
   if (window.CalReadout) { CalReadout.toggle(); return; }
   CalHook.state = () => ({ cur: S.cur, win0: S.win0, n: S.n, dw, slideX, shown: TOUCH && $("#strip") ? shownX() : null, touch: TOUCH, api: API, h: S.h });
-  const s = document.createElement("script"); s.src = "calendar-readout.js?v=6"; document.head.appendChild(s);
+  const s = document.createElement("script"); s.src = "calendar-readout.js?v=7"; document.head.appendChild(s);
 }
 function boot() { render(); loadSide(); refresh(); }
 setup(); boot();
