@@ -13,7 +13,7 @@
 <meta name="apple-mobile-web-app-title" content="Calendar">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>Calendar</title>
-<script src="calendar-core.js?v=24"></script>
+<script src="calendar-core.js?v=25"></script>
 <script src="quest-trips.js?v=20261113c" data-helpers></script>
 <script>
 /* The look saved on this device (the Look row in Settings; Studio when none) goes on here, before anything is drawn,
@@ -376,6 +376,65 @@ body.onpage .left,body.onpage .main,body.onpage .panel{display:none}
 .tchips .paid{border-color:color-mix(in srgb,var(--emerald) 60%,transparent);color:var(--emerald)}
 .tsub{margin:20px 0 10px}
 #tripNew{color:var(--ink);text-decoration:none}
+.tcard[data-trip]{cursor:pointer}.tcard[data-trip]:hover{border-color:color-mix(in srgb,var(--c) 50%,var(--line))}
+/* One trip: the plans left, the map, a place's card and Saved places right (slice 04, mock
+   https://claude.ai/artifact/BQLvpC1YQjAUDhuBJefsRi, d35). A phone shows one at a time behind the Itinerary / Map tabs (d11). */
+.trip{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);gap:0;max-width:1240px;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:var(--bg)}
+.tleft{padding:20px 22px 36px;min-width:0;border-right:1px solid var(--line)}
+.tside{min-width:0;padding:18px;display:flex;flex-direction:column;gap:14px;background:var(--bar)}
+.trip .phead{margin-bottom:10px;gap:12px}.trip .phead h2{font-size:24px;line-height:1.1;text-wrap:balance}
+.trip .pi{width:46px;height:46px;border-radius:14px;font-size:24px;flex:none}
+.ttop,.ttabs2{display:none}
+.ttabs2 button{flex:1}
+.tday{font-weight:700;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);margin:16px 0 6px}
+.trow{display:flex;gap:10px;align-items:flex-start;width:100%;text-align:left;border:0;background:none;padding:8px 10px;border-radius:10px;color:var(--ink)}
+.trow[data-tpin]{cursor:pointer}.trow[data-tpin]:hover{background:var(--raise)}
+.trow.on{background:color-mix(in srgb,var(--c) 12%,var(--bg))}
+.trow .t{width:66px;flex:none;color:var(--soft);font-variant-numeric:tabular-nums;font-size:13px;padding-top:1px}
+.trow .nm{flex:1;min-width:0}.trow small{display:block;color:var(--faint);font-size:12.5px;margin-top:1px}
+.tmapbox{position:relative;border:1px solid var(--line);border-radius:14px;overflow:hidden;background:var(--raise)}
+.tmap{height:420px;z-index:0}
+.tlegend{position:absolute;left:10px;bottom:10px;z-index:500;background:color-mix(in srgb,var(--bar) 92%,transparent);border:1px solid var(--line);border-radius:10px;padding:6px 9px;font-size:12px;color:var(--soft);display:flex;gap:12px;pointer-events:none}
+.tlegend i{font-style:normal}.tlegend .b{color:var(--c)}
+.tpin{position:relative;display:grid;place-items:center;width:28px;height:28px;border-radius:9px;background:var(--bar);border:1.5px solid var(--line);font-size:14px;box-shadow:0 1px 3px var(--drop);cursor:pointer}
+.tpin.on{width:34px;height:34px;margin:-3px 0 0 -3px;font-size:17px;border:3px solid var(--accent)}
+.tpin .n{position:absolute;top:-8px;right:-8px;min-width:18px;height:18px;border-radius:9px;background:var(--c);color:var(--on-accent);font-size:11px;font-weight:700;display:grid;place-items:center;padding:0 4px}
+.tpin.dot{width:16px;height:16px;border-radius:50%;background:var(--c);border:3px solid var(--bar);margin:6px 0 0 6px}
+.tpin.dot.on{width:22px;height:22px;margin:3px 0 0 3px;border:3px solid var(--bar)}
+.tpin b{position:absolute;top:calc(100% + 3px);left:50%;transform:translateX(-50%);white-space:nowrap;font-size:13px;color:var(--ink);text-shadow:0 0 3px var(--bar),0 0 3px var(--bar),0 0 3px var(--bar)}
+.leaflet-div-icon{background:none;border:0}
+.tcardx{border:1px solid var(--line);border-radius:14px;background:var(--bg);padding:12px 14px}
+.tcardx .h{display:flex;align-items:center;gap:10px}.tcardx .h b{font-size:16px;flex:1;min-width:0}
+.tcardx .addr{color:var(--soft);font-size:13px;margin:2px 0 8px}
+.tcardx .pl{font-size:13px;margin:4px 0;display:flex;gap:8px}
+.tcardx .pl span:first-child{color:var(--soft);width:96px;flex:none;font-variant-numeric:tabular-nums}
+.tcardx .acts{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.tcardx .acts .btn{white-space:nowrap;text-decoration:none;color:var(--ink);font-size:13px}
+.tcardx .acts .go{background:var(--c);color:var(--on-accent);border-color:transparent;font-weight:600}
+.tcardx .x{border:0;background:none;color:var(--faint);font-size:18px;line-height:1;padding:2px 6px}
+.tsh{display:flex;align-items:center;gap:8px;font-weight:700}.tsh .n{color:var(--faint);font-weight:600;font-size:13px}
+.tpl-row{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:10px;border:0;background:none;width:100%;text-align:left;color:var(--ink)}
+.tpl-row:hover{background:var(--raise)}.tpl-row.on{background:color-mix(in srgb,var(--accent) 10%,var(--bg))}
+.tpl-row .e{width:30px;height:30px;border-radius:9px;background:var(--raise);display:grid;place-items:center;flex:none}
+.tpl-row .nm{flex:1;min-width:0;line-height:1.25}.tpl-row small{display:block;color:var(--faint);font-size:12.5px}
+.tpl-row .nopin{font-size:12px;color:var(--accent-ink);font-weight:600;white-space:nowrap}
+.tadd{display:flex;align-items:center;gap:10px;border:1px solid var(--line);background:var(--bg);border-radius:12px;padding:9px 12px;margin-top:6px}
+.tadd i{font-style:normal;color:var(--accent-ink);font-weight:700}
+.tadd input{border:0;background:none;outline:none;flex:1;min-width:0;font-size:16px;color:var(--ink)}
+.tadd input::placeholder{color:var(--faint)}
+@media (min-width:768px) and (max-width:900px){.trip{grid-template-columns:1fr}.tleft{border-right:0;border-bottom:1px solid var(--line)}}
+@media not all and (min-width:768px){
+  .trip{display:block;border:0;border-radius:0;background:none}
+  .tside{padding:0;background:none}
+  .tleft{padding:0;border:0}.tleft .phead{display:none}
+  .ttop{display:flex;align-items:center;gap:10px}.ttop h2{font-family:var(--display);font-size:20px;margin:0;letter-spacing:-.01em;line-height:1.15}
+  .ttop .pi{width:46px;height:46px;border-radius:14px;font-size:24px}
+  .ttabs2{display:flex;margin:12px 0 14px}
+  .trip[data-ttab=Map] .tleft,.trip[data-ttab=Itinerary] .tside{display:none}
+  .tmap{height:340px}
+  .tlegend{position:static;border:0;border-top:1px solid var(--line);border-radius:0;font-size:11.5px;flex-wrap:wrap}
+  .tcardx{background:var(--bar)}
+}
 .wkd{display:flex;gap:5px}
 .wkd i{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;font-style:normal;font-size:10.5px;color:var(--faint);border:1px solid var(--line)}
 .wkd .did{background:var(--c);color:var(--bg);border-color:transparent;font-weight:700}
@@ -704,7 +763,7 @@ if (TOUCH) for (const g of ["gesturestart", "gesturechange"]) document.addEventL
    which shows this build, the phone's answers and a log of every day change with its cause. Until then CalHook.on is
    null and diag() does nothing. BUILD names this copy of the page, so a screenshot proves which copy ran: change it on
    every change to this page or calendar-readout.js (the date plus a letter). */
-const BUILD = "2026-11-17e one click pills";
+const BUILD = "2026-11-18a trip map legend";
 const CalHook = window.CalHook = { BUILD, on: null };
 const diag = (kind, msg) => { if (CalHook.on) CalHook.on(kind, msg); };
 /* The iPhone home screen app's fit (2026-11-12): html.hs in a home screen app on touch, html.hsfill and --hsgap when
@@ -1525,7 +1584,7 @@ async function skipSugg(g) {
 
 /* ---------- a block type's own page (its real content comes in later tickets) ---------- */
 function renderPage() {
-  if (S.page === "travel") { const pg = $("#page"); pg.className = "page k-travel"; pg.innerHTML = tripsPage(); return; }
+  if (S.page === "travel") { if (S.trip) return tripPage(); dropMap(); const pg = $("#page"); pg.className = "page k-travel"; pg.innerHTML = tripsPage(); return; }
   const k = S.page, t = today(), now = Date.now(), ws = C.weekStart(t);
   const all = eventsFor(ws, C.addDays(t, 21)).filter((e) => e.k === k && !isStaff(e));
   const on = (d) => all.some((e) => (e.allDay ? C.coversDay(e, d) : C.wall(e.s, S.tz).day === d));
@@ -1545,7 +1604,7 @@ function tripsPage() {
   const T = window.QuestTrips, k = "travel";
   const c = C.tripCards(T && T.splitTrips(S.trips || [], today()), T && T.whenLabel);
   const links = C.tripLinks(location.search), tab = S.tripTab === "past" ? "past" : "upcoming";
-  const card = (r) => `<div class="card tcard" data-trip="${esc(r.name)}"><div class="t">${esc(r.title)}</div><div class="s">${esc(r.dates)}</div>${r.chips.length ? `<div class="tchips">${r.chips.map((x) => `<span${x.cls ? ` class="${x.cls}"` : ""}>${esc(x.text)}</span>`).join("")}</div>` : ""}</div>`;
+  const card = (r) => `<div class="card tcard" data-trip="${esc(r.name)}" role="button" tabindex="0"><div class="t">${esc(r.title)}</div><div class="s">${esc(r.dates)}</div>${r.chips.length ? `<div class="tchips">${r.chips.map((x) => `<span${x.cls ? ` class="${x.cls}"` : ""}>${esc(x.text)}</span>`).join("")}</div>` : ""}</div>`;
   const grid = (list) => `<div class="tcards">${list.map(card).join("")}</div>`;
   const wait = S.tripsLoading ? "Loading trips…" : "";
   const body = tab === "past"
@@ -1569,10 +1628,208 @@ async function loadTrips() {
   S.tripsLoading = false;
   if (S.page === "travel") render();
 }
+
+/* ---------- one trip: its plans, its map and its saved places (slice 04, Junyan 2026-11-17: "35 yes, 36 yes") ----------
+   Mock https://claude.ai/artifact/BQLvpC1YQjAUDhuBJefsRi as drawn. A trip card opens it. The rules are CalCore.tripMap
+   and friends (tests: still/test/trip-map.test.mjs; browser: still/test/e2e/calendar-trip-map.e2e.mjs). The plans are
+   still-api /quest/trips/one (Notion, read only, d10) plus Day Quest's own Montreal copy, as Day Quest's trip shows
+   them. Saved places are still-api /quest/places (put and del; the server finds the pin). A plan's address that is not
+   a saved place is looked up on OpenStreetMap once and remembered in this browser (SPOTS), as Day Quest does for Local.
+   The map is Leaflet with OpenStreetMap tiles, as Day Quest's. The page is drawn once per trip and then painted in
+   parts, so the map is never rebuilt under him. */
+const TM = { name: "", trip: null, items: [], places: [], sel: null, tab: "Map", loading: false, map: null, layer: null, fitted: false, fitN: 0, moved: false, looking: false, run: 0 };
+const SPOTS = "trip-map-spots-v1";
+const spotsGet = () => { try { const v = JSON.parse(store.get(SPOTS) || "{}"); return v && typeof v === "object" ? v : {}; } catch (e) { return {}; } };
+const dropMap = () => { if (TM.map) { TM.map.remove(); TM.map = null; } };
+/** One OpenStreetMap lookup: {lat, lng}, null when nothing is found, undefined when it could not ask. */
+async function geocode(q) {
+  try { const r = await fetch("https://nominatim.openstreetmap.org/search?format=json&limit=1&q=" + encodeURIComponent(q));
+    if (!r.ok) return undefined; const d = await r.json(); return d[0] ? { lat: +d[0].lat, lng: +d[0].lon } : null; } catch (e) { return undefined; }
+}
+const tripModel = () => C.tripMap({ items: TM.items, places: TM.places, spots: spotsGet(), T: window.QuestTrips });
+async function openTrip(name) {
+  const T = window.QuestTrips; if (!T) return;
+  const meta = (S.trips || []).find((t) => t.name === name || (t.aliases || []).includes(name)) || { name };
+  dropMap();
+  const run = ++TM.run, gone = () => TM.run !== run || S.trip !== meta.name;   // a newer open, or back, wins
+  Object.assign(TM, { name: meta.name, trip: meta, items: [], places: [], sel: null, tab: "Map", loading: true, fitted: false });
+  S.trip = meta.name; render(); $("#page").scrollTop = 0;
+  let ok = true;
+  for (const nm of meta.aliases || [meta.name]) {   // a trip spelled two ways in Notion reads both, as Day Quest does
+    try {
+      const d = await api("/quest/trips/one?name=" + encodeURIComponent(nm));
+      if (gone()) return;
+      for (const it of d.items || []) if (!TM.items.some((x) => x.id === it.id)) TM.items.push(it);
+      for (const p of d.places || []) if (!TM.places.some((x) => x.id === p.id)) TM.places.push(p);
+    } catch (e) { ok = false; toast("Trip not read: " + e.message, { bad: true }); }
+  }
+  if (gone()) return;
+  if (T.tripKey(meta.name) === T.tripKey(T.MTL)) {   // Day Quest's Montreal copy for anything Notion does not have yet
+    const have = new Set(TM.items.map((i) => String(i.name).toLowerCase()));
+    TM.items = T.hideCopies([...TM.items, ...T.SEED.items.filter((i) => !have.has(i.name.toLowerCase())).map((i) => ({ ...i }))]);
+  }
+  /* d36: Montreal Birthday starts with the four Montreal places; only when the read worked, so a dropped connection
+     never seeds a trip that has places */
+  const flag = "trip-map-seeded:" + T.tripKey(meta.name);
+  if (ok) for (const p of C.tripSeed(meta.name, TM.places, !!store.get(flag), T)) {
+    try { const d = await send("/quest/places", "POST", { op: "put", place: p }); if (gone()) return; TM.places.push(d.place); store.set(flag, "1"); }
+    catch (e) { toast("Place not saved: " + e.message, { bad: true }); break; }
+  }
+  if (gone()) return;
+  TM.loading = false; tripPaint(); lookUp();
+}
+/** The plan addresses not found yet, one a second (OpenStreetMap's rule), each remembered here found or not. */
+async function lookUp() {
+  if (TM.looking) return; TM.looking = true;
+  try {
+    for (let q; (q = tripModel().lookups[0]);) {
+      const g = await geocode(q); if (g === undefined) break;
+      const all = spotsGet(); all[q.toLowerCase()] = g; store.set(SPOTS, JSON.stringify(all));
+      if (S.page === "travel" && S.trip) tripPaint();
+      await new Promise((r) => setTimeout(r, 1100));
+    }
+  } finally { TM.looking = false; }
+}
+function tripPage() {
+  const pg = $("#page"), host = pg.querySelector(".trip");
+  if (host && host.dataset.tripname === TM.name) { tripPaint(); return; }
+  dropMap();
+  const h = C.tripHead(TM.trip || { name: TM.name }, window.QuestTrips);
+  pg.className = "page k-travel";
+  pg.innerHTML = `<div class="ttop"><button class="btn" data-tback>&#8249; Trips</button><span class="pi">${esc(h.icon)}</span><div style="min-width:0"><h2>${esc(h.short)}</h2><div class="meta">${esc(h.dates)}</div></div></div>
+    <div class="seg ttabs2" role="group" aria-label="Trip sections">${C.TRIP_TABS.map((t) => `<button data-ttab="${t}" aria-pressed="${t === TM.tab}">${t}</button>`).join("")}</div>
+    <div class="trip" data-ttab="${TM.tab}" data-tripname="${esc(TM.name)}">
+      <div class="tleft"><div class="phead"><button class="btn" data-tback>&#8249; Trips</button><span class="pi">${esc(h.icon)}</span><div style="min-width:0"><h2>${esc(h.title)}</h2><div class="meta">${esc([h.dates, h.who].filter(Boolean).join(" · "))}</div></div></div><div id="tDays"></div></div>
+      <div class="tside"><div class="tmapbox"><div class="tmap" id="tMap" role="region" aria-label="Map of the trip's pins"></div><div class="tlegend"><span><i>💃</i> saved place</span><span><i class="b">●</i> plan address</span><span><i class="b">❷</i> plans there</span></div></div>
+        <div id="tCard"></div>
+        <div><div class="tsh">Saved places <span class="n" id="tN"></span></div><label class="tadd"><i>+</i><input id="tAddIn" placeholder="Add place: a name or an address, then Enter" aria-label="Add place" autocomplete="off" enterkeyhint="done"></label><div id="tPlaces"></div></div></div>
+    </div>`;
+  tripPaint();
+}
+function tripPaint() {
+  if (!$("#page .trip")) return;
+  const m = tripModel(), sel = TM.sel;
+  $("#tDays").innerHTML = TM.loading && !m.days.length ? `<div class="meta">Loading trip…</div>` : m.days.map((d) => `<div class="tday">${esc(d.label)}</div>` + d.plans.map((p) => {
+    const inner = `<span class="t">${esc(p.time)}</span><span class="nm">${esc(p.name)}<small>${esc(p.where)}</small></span>`;
+    return p.at ? `<button class="trow${p.at === sel ? " on" : ""}" data-tpin="${esc(p.at)}">${inner}</button>` : `<div class="trow">${inner}</div>`;
+  }).join("")).join("");
+  const c = sel && m.card(sel);
+  $("#tCard").innerHTML = !c ? "" : `<div class="tcardx"><div class="h"><span>${esc(c.icon)}</span><b>${esc(c.name)}</b><button class="x" data-tclose aria-label="Close">×</button></div><div class="addr">${esc(c.addr)}</div>` +
+    (c.plans.length ? c.plans.map(([w, n]) => `<div class="pl"><span>${esc(w)}</span><span>${esc(n)}</span></div>`).join("") : `<div class="pl"><span></span><span style="color:var(--faint)">No plans here yet.</span></div>`) +
+    `<div class="acts"><a class="btn go" href="${esc(c.dir)}" target="_blank" rel="noopener">Directions ↗</a>${c.remove ? `<button class="btn" data-trm="${esc(c.id)}">Remove place</button>` : ""}</div></div>`;
+  $("#tN").textContent = m.places.length;
+  $("#tPlaces").innerHTML = m.places.map((p) => `<button class="tpl-row${p.id === sel ? " on" : ""}" data-tpin="${esc(p.id)}"><span class="e">${esc(p.emoji)}</span><span class="nm">${esc(p.name)}<small>${esc(p.sub)}</small></span>${p.nopin ? '<span class="nopin">No pin</span>' : ""}</button>`).join("");
+  tripPins(m);
+}
+function mapLib() {   // not "leaflet": Leaflet sets window.leaflet itself
+  if (window.L) return Promise.resolve(window.L);
+  return mapLib.p || (mapLib.p = new Promise((ok, no) => {
+    const l = document.createElement("link"); l.rel = "stylesheet"; l.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"; document.head.appendChild(l);
+    const s = document.createElement("script"); s.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
+    s.onload = () => ok(window.L); s.onerror = () => { mapLib.p = null; no(new Error("no map library")); }; document.head.appendChild(s);
+  }));
+}
+async function tripPins(m) {
+  const box = $("#tMap"); if (!box) return;
+  let L; try { L = await mapLib(); } catch (e) { box.innerHTML = `<div class="meta" style="padding:20px">The map could not load (no connection to the map library).</div>`; return; }
+  if (!$("#tMap") || $("#tMap") !== box) return;
+  m = tripModel();   // the map library may have taken seconds to arrive: draw what is true now
+  if (!TM.map || TM.map.getContainer() !== box) {
+    TM.map = L.map(box, { zoomControl: true, attributionControl: true });
+    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "© OpenStreetMap contributors" }).addTo(TM.map);
+    TM.map.setView([20, 0], 2);
+    TM.layer = L.layerGroup().addTo(TM.map); TM.fitted = false; TM.fitN = 0; TM.moved = false;
+    TM.map.on("dragstart", () => { TM.moved = true; });
+  }
+  TM.layer.clearLayers();
+  for (const p of m.pins) {
+    const on = p.id === TM.sel, label = on ? `<b>${esc(p.name)}</b>` : "";
+    const html = p.plan ? `<div class="tpin dot${on ? " on" : ""}">${label}</div>`
+      : `<div class="tpin${on ? " on" : ""}">${esc(p.emoji)}${p.count ? `<span class="n">${p.count}</span>` : ""}${label}</div>`;
+    const icon = L.divIcon({ className: "", html, iconSize: [28, 28], iconAnchor: [14, 14] });
+    L.marker([p.lat, p.lng], { icon, title: p.name, alt: p.name, keyboard: true, zIndexOffset: on ? 1000 : 0 }).addTo(TM.layer).on("click", () => tripPick(p.id));
+  }
+  TM.map.invalidateSize();   // the box may have just been drawn or shown (the phone's Map tab): measure before fitting
+  /* fit once the plans are read; fit again when a plan's dot is found later, until he moves the map or picks a pin */
+  const more = TM.fitted && m.pins.length > TM.fitN && !TM.moved && !TM.sel;
+  if ((!TM.fitted || more) && !TM.loading && box.offsetWidth) {
+    TM.fitted = true; TM.fitN = m.pins.length;
+    const st = C.mapStart(m.pins, "", null);
+    /* the legend sits over the map's bottom edge on a computer: fit above it, so it never hides a pin (2026-11-18) */
+    const lg = $("#page .tlegend"), over = lg && getComputedStyle(lg).position === "absolute" ? lg.offsetHeight + 10 : 0;
+    if (st.pins) TM.map.fitBounds(st.pins, { paddingTopLeft: [40, 40], paddingBottomRight: [40, 40 + over], maxZoom: 15 });
+    else tripCentre();
+  }
+  setTimeout(() => TM.map && TM.map.invalidateSize(), 60);
+}
+/** No pins yet: the trip's destination (its name without year and flag), else the world (Day Quest's mapStart). */
+async function tripCentre() {
+  const T = window.QuestTrips, dest = T.destOf(TM.name, TM.trip && TM.trip.place), key = "dest:" + dest.toLowerCase(), name = TM.name;
+  let all = spotsGet();
+  if (dest && !(key in all)) {
+    const g = await geocode(dest);
+    all = spotsGet(); if (g !== undefined) { all[key] = g; store.set(SPOTS, JSON.stringify(all)); }
+  }
+  if (TM.name !== name || !TM.map) return;
+  const st = C.mapStart([], dest, all[key]);
+  if (st.center) TM.map.setView(st.center, st.zoom); else TM.map.setView([20, 0], 2);
+}
+/** A pin, a plan row with a place, or a saved place row: the pin grows and its card shows (on a phone, on the Map tab). */
+function tripPick(id) {
+  TM.sel = id;
+  if (!WIDE.matches && TM.tab !== "Map") tripTab("Map");
+  tripPaint();
+  const p = tripModel().pins.find((x) => x.id === id);
+  if (p && TM.map) TM.map.panTo([p.lat, p.lng]);
+}
+function tripTab(t) {
+  TM.tab = t; const tr = $("#page .trip"); if (tr) tr.dataset.ttab = t;
+  $$("#page [data-ttab]").forEach((b) => b.matches("button") && b.setAttribute("aria-pressed", String(b.dataset.ttab === t)));
+  if (t === "Map") setTimeout(() => { if (TM.map) { TM.map.invalidateSize(); if (!TM.fitted) tripPins(tripModel()); } }, 30);
+}
+async function tripAdd(input) {
+  const place = C.placeAdd(input.value, TM.name, window.QuestTrips); if (!place) return;
+  const typed = input.value; input.value = "";
+  try {
+    const d = await send("/quest/places", "POST", { op: "put", place });
+    if (TM.name !== place.trip) return;
+    TM.places.push(d.place); TM.sel = d.place.lat != null ? d.place.id : null;
+    toast(C.placeToast(d.place)); tripPaint();
+    if (d.place.lat != null && TM.map) TM.map.panTo([d.place.lat, d.place.lng]);
+  } catch (e) { input.value = input.value || typed; toast("Not saved: " + e.message, { bad: true }); }
+  input.focus();
+}
+async function tripRemove(id) {
+  const p = TM.places.find((x) => x.id === id); if (!p) return;
+  try {
+    await send("/quest/places", "POST", C.placeRemove(p));
+    TM.places = TM.places.filter((x) => x.id !== id); if (TM.sel === id) TM.sel = null;
+    toast(C.placeToast(p, "removed")); tripPaint();
+  } catch (e) { toast("Not removed: " + e.message, { bad: true }); }
+}
+function tripWire() {
+  document.addEventListener("click", (e) => {
+    if (S.page !== "travel") return;
+    const t = e.target.closest("[data-trip],[data-tpin],[data-tclose],[data-trm],[data-ttab],[data-tback]"); if (!t || !$("#page").contains(t)) return;
+    const d = t.dataset;
+    if (d.trip) openTrip(d.trip);
+    else if ("tback" in d) { S.trip = null; TM.run++; dropMap(); render(); $("#page").scrollTop = 0; }
+    else if (d.ttab) tripTab(d.ttab);
+    else if ("tclose" in d) { TM.sel = null; tripPaint(); }
+    else if (d.trm) tripRemove(d.trm);
+    else if (d.tpin) tripPick(d.tpin);
+  });
+  document.addEventListener("keydown", (e) => {
+    if (S.page !== "travel") return;
+    if (e.target.id === "tAddIn" && e.key === "Enter" && !e.isComposing) { e.preventDefault(); e.stopPropagation(); tripAdd(e.target); return; }
+    const c = e.target.closest && e.target.closest(".tcard[data-trip]");
+    if (c && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); openTrip(c.dataset.trip); }
+  }, true);
+}
 function showPage(k) {
   /* Every type stays in the calendar (Junyan, 2026-11-13: "I want it to stay on the calendar app"; t9's jump to
      Day Quest Trips is gone). The plane's page lists his trips (tripsPage). */
-  if (k === "travel") loadTrips();
+  if (k === "travel") { S.trip = null; TM.run++; dropMap(); loadTrips(); }   // the plane always opens the trip list
   if (k === "packing" && !WIDE.matches) return;   // computer only (d14)
   if (S.page === "packing") packLeave();
   if (S.page === "cal" && $("#strip")) S.top = $("#view").scrollTop;
@@ -1939,7 +2196,7 @@ function setup() {
     else return;
     e.preventDefault();
   });
-  wireSwipe($("#view")); wirePinch($("#view")); wirePacking();
+  wireSwipe($("#view")); wirePinch($("#view")); wirePacking(); tripWire();
   addEventListener("resize", function onResize() { size(); });
   addEventListener("focus", () => { if (S.tab !== "event" && questKey()) { refresh(); loadSide(); } });
   setInterval(() => { showLook(); tickNow(); if (S.tab === "now" && S.page === "cal" && !dragging) paintPanel(); renderRail(); }, 30000);

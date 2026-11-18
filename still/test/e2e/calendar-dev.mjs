@@ -40,6 +40,8 @@ let events = [
 for (let d = -30; d <= 45; d++) events.push(E(d, 18, 0, 19, 0, "Dinner", "joint", { recurringEventId: "dinner" }), E(d, 6, 45, 8, 0, "Morning Yoga"), E(d, 21, 45, 22, 30, "Wind down"));
 let sugg = [{ id: "sg_1", status: "open", title: "Pack for FICTION stay", start: at(2, 19), end: at(2, 20), calId: "joint", by: "Desk Hand session", why: "You drive out at 10:30 Friday" }];
 const tasks = [];
+let places = [];
+const FOUND = { "schwartz's deli": { lat: 45.5163, lng: -73.5776 }, "jean-talon market": { lat: 45.5364, lng: -73.6148 } };
 
 const send = (res, code, body) => { res.writeHead(code, { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "*", "Access-Control-Allow-Methods": "*" }); res.end(JSON.stringify(body)); };
 const readBody = (req) => new Promise((ok) => { let s = ""; req.on("data", (c) => s += c); req.on("end", () => { try { ok(JSON.parse(s || "{}")); } catch { ok({}); } }); });
@@ -54,6 +56,27 @@ http.createServer(async (req, res) => {
       { name: "2027 🇧🇷 Brazil Carnaval", start: "2027-01-02", end: "2027-02-07", booked: 13, bookings: 14 },
       { name: "2025 Egypt", start: "2025-03-01", end: "2025-03-09", bookings: 6 },
     ] });
+  }
+  /* one trip and its saved places (slice 04, the trip map): still-api's /quest/trips/one and /quest/places, in memory.
+     Montreal Birthday has one Notion card of its own, the stay, at an address that is not a saved place (a plain dot).
+     A new place is "found" only for the names in FOUND, as the server's lookup would; anything else has no pin. */
+  if (u.pathname === "/quest/trips/one" || u.pathname === "/quest/places") {
+    if (req.headers["x-quest-key"] !== "test") return send(res, 401, { error: "wrong pairing code (the dev server's code is: test)" });
+    const name = u.searchParams.get("name") || u.searchParams.get("trip") || "";
+    if (u.pathname === "/quest/trips/one") {
+      const mtl = /montreal birthday/i.test(name) && !/🇨🇦/u.test(name);
+      return send(res, 200, { name, extras: {}, places: places.filter((p) => p.trip === name), items: mtl ? [
+        { id: "notion-stay", db: "planner", icon: "🏨", name: "Montreal stay", start: "2026-11-13T17:00:00-05:00", end: "2026-11-17T10:30:00-05:00", status: "Prepaid", tags: "Hotel",
+          fields: { Address: { type: "rich_text", value: "1255 Rue Jeanne-Mance, Montréal" } }, trips: [name] }] : [] });
+    }
+    if (req.method === "GET") return send(res, 200, { places: name ? places.filter((p) => p.trip === name) : places });
+    const b = await readBody(req);
+    if (b.op === "del") { const k = places.length; places = places.filter((p) => p.id !== b.id); return send(res, 200, { ok: true, removed: k - places.length }); }
+    if (!b.place || !String(b.place.name || "").trim()) return send(res, 400, { error: "a place needs a name" });
+    const f = FOUND[String(b.place.name).toLowerCase().replace(/’/g, "'")];
+    const pl = { category: "place", notes: "", savedBy: "Junyan", lat: null, lng: null, ...b.place, id: b.place.id || "pl" + (++n), ...(b.place.lat == null && f ? f : {}) };
+    const i = places.findIndex((p) => p.id === pl.id); if (i >= 0) places[i] = pl; else places.push(pl);
+    return send(res, 200, { ok: true, place: pl });
   }
   if (u.pathname.startsWith("/planner/")) {
     if (req.headers["x-quest-key"] !== "test") return send(res, 401, { error: "wrong pairing code (the dev server's code is: test)" });

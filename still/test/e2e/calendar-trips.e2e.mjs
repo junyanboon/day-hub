@@ -1,7 +1,7 @@
 // The plane in the calendar's left rail opens the calendar's own Trips page (Junyan, 2026-11-13: "I want it to stay on
 // the calendar app"), drawn as look A (d3: "3A"): tabs Upcoming / Past / Local, one card per trip with Day Quest's
 // chips, side by side on a computer and stacked on a phone. Upcoming and Past switch in place; Local and + New trip are
-// links to Day Quest (d4: "4 no"); a card opens nothing yet. "‹ Calendar" goes back. The browser clock is pinned to
+// links to Day Quest (d4: "4 no"); a card opens that trip (slice 04; calendar-trip-map.e2e.mjs tests the trip itself). "‹ Calendar" goes back. The browser clock is pinned to
 // 2026-11-13 so "Now" and "50 days away" never depend on today.
 // On a phone (under 768 px, the same rule quest-trips.js uses to switch Day Quest's Trips view off) Local and + New trip
 // are hidden until the Trips page is ported into the calendar (Junyan, 2026-11-13, d6: "6 yes, hide"): the tabs are
@@ -83,9 +83,11 @@ try {
     check(`${label}: nothing runs off the side`, await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1));
     const ns = await page.evaluate(() => document.querySelectorAll("#page .ttabs button").length);
     if (process.env.SHOTS) await page.screenshot({ path: path.join(process.env.SHOTS, `trips-${label}.png`) });
-    // a card is not a link or a button yet, and a click on it changes nothing
-    await page.click("#page .tcard"); await sleep(200);
-    check(`${label}: a trip card opens nothing yet, but carries its trip name`, up[0].tag === "DIV" && up[0].trip === "2026 🇨🇦 Montreal Birthday" &&
+    // a card opens its trip on this page (slice 04), and "‹ Trips" comes back to the same two cards
+    await page.click("#page .tcard"); await page.waitForSelector("#page .trip", { timeout: 5000 }).catch(() => {});
+    const opened = await page.evaluate(() => !!document.querySelector("#page .trip"));
+    await page.click("#page [data-tback]:not(.ttop [data-tback])").catch(() => page.click("#page .ttop [data-tback]")); await sleep(200);
+    check(`${label}: a trip card opens its trip, carries its trip name, and Trips comes back`, opened && up[0].trip === "2026 🇨🇦 Montreal Birthday" &&
       new URL(page.url()).pathname.endsWith("/calendar.html") && (await cards(page)).length === 2 && ns === 2);
     await page.click('#page [data-triptab="past"]'); await sleep(200);
     const past = await cards(page);

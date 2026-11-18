@@ -293,8 +293,8 @@ test("food stays computer only (d14): its styles sit inside the Packing page's p
 });
 
 test("the BUILD label names this copy, with a new stamp for the changed core", () => {
-  assert.match(html, /const BUILD = "2026-11-17e one click pills";/);
-  assert.match(html, /calendar-core\.js\?v=24"/);
+  assert.match(html, /const BUILD = "2026-11-18a trip map legend";/);
+  assert.match(html, /calendar-core\.js\?v=25"/);
 });
 
 test("the page's own script still parses", () => {
