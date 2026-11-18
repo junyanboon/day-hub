@@ -131,7 +131,7 @@ try {
     const g = await grab(page), head = await box(page, ".shead");
     check("keyboard up: the dash shows", !!g, JSON.stringify(g));
     check("keyboard up: the drawn dash sits below the clear strip (100)", g && g.barTop >= 100, JSON.stringify(g));
-    check("keyboard up: the dash takes a tap 44 px high, above the Event row", g && g.h >= 44 && g.top + g.h <= head.top + 0.5, JSON.stringify({ g, head }));
+    check("keyboard up: the dash takes a tap 44 px high, inside the header row (layout D, d43)", g && g.h >= 44 && g.top >= head.top - 0.5 && g.top + g.h <= head.top + head.h + 0.5, JSON.stringify({ g, head }));
     await page.fill("#pTitle", "Typed with the keyboard up");
     await tap(page, "#panel .grab");
     check("keyboard up: a tap on the dash closes it and saves nothing", !(await isOpen(page)) && !sent.length);

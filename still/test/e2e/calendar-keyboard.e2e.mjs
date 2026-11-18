@@ -150,7 +150,7 @@ try {
     await page.waitForSelector("#readout"); await sleep(400);
     const text = await page.evaluate(() => document.querySelector("#readout").innerText);
     const line = (text.match(/\nkb [^\n]*/) || [""])[0].trim();
-    const m = line.match(/^kb on vv 479@0 sheet 0\.\.479 pad 100 head (\d+)\.\.(\d+) title (\d+)\.\.(\d+)$/);
+    const m = line.match(/^kb on vv 479@0 sheet 0\.\.479 pad 100 head (\d+)\.\.(\d+) title (\d+)\.\.(\d+) scroll win 0 doc 0 body 0$/);
     check("readout has a kb line: keyboard on, visual viewport, sheet, pad 100, header row and Title below 100", !!m && +m[1] >= 100 && +m[3] >= +m[2], line);
     await ctx.close(); }
 } finally {

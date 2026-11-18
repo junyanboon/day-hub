@@ -103,7 +103,7 @@ padding:env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) env(safe-are
     const p = document.getElementById("panel"), vv = window.visualViewport;
     const on = !!(p && p.classList.contains("kb"));
     const span = (el) => { if (!el) return "-"; const b = el.getBoundingClientRect(); return `${r(b.top)}..${r(b.bottom)}`; };
-    return `kb ${on ? "on" : "off"} vv ${vv ? r(vv.height) + "@" + r(vv.offsetTop) : "-"} sheet ${span(p)} pad ${p ? r(parseFloat(getComputedStyle(p).paddingTop)) : "-"} head ${span(document.querySelector(".shead"))} title ${span(document.getElementById("pTitle"))}`;
+    return `kb ${on ? "on" : "off"} vv ${vv ? r(vv.height) + "@" + r(vv.offsetTop) : "-"} sheet ${span(p)} pad ${p ? r(parseFloat(getComputedStyle(p).paddingTop)) : "-"} head ${span(document.querySelector(".shead"))} title ${span(document.getElementById("pTitle"))} scroll win ${r(window.scrollY)} doc ${r(document.scrollingElement ? document.scrollingElement.scrollTop : 0)} body ${r(document.getElementById("pbody") ? document.getElementById("pbody").scrollTop : 0)}`;
   }
   /** The home screen fit (calendar.html homeFit): his two switches, the gap it stretched by, and which rule is on. */
   function fitLine() {

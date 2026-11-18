@@ -700,6 +700,14 @@ body.onpk .drop{display:none}
      title also gets pushed into the blur"); a home screen app adds its clear strip below (html.hs .panel.kb). A box
      scrolled into view stops below the sticky header row (scroll-padding-top). */
   .panel.kb{border-radius:0;padding-top:env(safe-area-inset-top,0px)}.panel.kb .pbody{padding-bottom:16px;scroll-padding-top:56px}
+  /* layout D (Junyan, 2026-11-18, d43: "43 D is good"): with the keyboard up the dash leaves its own 44px row (that row pushed
+     the Title 44px lower than build l, into the blur on his phone) and sits in the header row's left spot, where the x
+     was: "---  Event  Save". It is laid over the header cell (72px wide, 44 high, same top as .shead: the status strip,
+     then pbody's 4px, measured from inside the 1px edge), so the header row and the Title sit where build l put them.
+     A 4px band of the sheet colour above the sticky header hides content that scrolls under it. */
+  .panel.kb .grab{position:absolute;z-index:3;left:16px;top:calc(env(safe-area-inset-top,0px) + 4px);width:72px;height:44px;margin:0}
+  .panel.kb .grab::before{left:16px}
+  .panel.kb .shead{box-shadow:0 -4px 0 var(--bar)}
   .shead b{text-align:center;font-size:16px}
   .shead .btn.pri{justify-self:end;padding:8px 16px;font-size:15px}
   .sheet .tinput{width:100%;background:none;border:0;border-radius:0;padding:4px 0 8px;border-bottom:1px solid var(--line)}
@@ -738,6 +746,7 @@ html.hs.hsclear{--hstop:38px}
 html.hs body::before{height:calc(env(safe-area-inset-top,0px) + var(--hstop))}
 html.hs .app{padding-top:calc(env(safe-area-inset-top,0px) + var(--hstop))}
 html.hs .panel.kb{padding-top:calc(env(safe-area-inset-top,0px) + var(--hstop))}
+html.hs .panel.kb .grab{top:calc(env(safe-area-inset-top,0px) + var(--hstop) + 4px)}
 html.hs body.month .left{top:calc(48px + env(safe-area-inset-top,0px) + var(--hstop))}
 html.hsfill{height:calc(100% + var(--hsgap,0px))}
 html.hsfill .drop{bottom:calc(-1 * var(--hsshift,0px))}
@@ -799,7 +808,7 @@ if (TOUCH) for (const g of ["gesturestart", "gesturechange"]) document.addEventL
    which shows this build, the phone's answers and a log of every day change with its cause. Until then CalHook.on is
    null and diag() does nothing. BUILD names this copy of the page, so a screenshot proves which copy ran: change it on
    every change to this page or calendar-readout.js (the date plus a letter). */
-const BUILD = "2026-11-18b trip read";
+const BUILD = "2026-11-18c dash in header";
 const CalHook = window.CalHook = { BUILD, on: null };
 const diag = (kind, msg) => { if (CalHook.on) CalHook.on(kind, msg); };
 /* The iPhone home screen app's fit (2026-11-12): html.hs in a home screen app on touch, html.hsfill and --hsgap when
@@ -1217,15 +1226,25 @@ function wireStrip(v) {
       if (e.target !== col && e.target.id !== "shade") return;
       const min = Math.floor(yToMin(col, e.clientY) / 30) * 30, s = C.instant(col.dataset.day, min, S.tz), cal = homeCal();
       if (!cal) { toast("No calendar you can write to", { bad: true }); return; }
-      clearDraft();
+      clearDraft(); const wasOpen = document.body.classList.contains("popen");
       const el = document.createElement("div"); el.className = "ev draft k-other"; el.style.cssText = `top:${atMin(min)};height:calc(var(--H) - 2px);left:2px;right:3px`;
       el.innerHTML = `<b><span class="t">New event</span></b><small>${C.hm(min)}</small>`; col.appendChild(el);
       panel("event", { isNew: true, id: "draft", calId: cal.id, title: "", s, e: s + 3600000, start: new Date(s).toISOString(), end: new Date(s + 3600000).toISOString(), k: "other" });
-      $("#pTitle")?.focus();
+      focusTitleWhenIn(wasOpen);
     };
   });
 }
 const clearDraft = () => $$(".ev.draft").forEach((d) => d.remove());
+/** A new event's Title takes focus only after the sheet has finished sliding in (2026-11-18): focused while it was still
+    moving, the box sat behind the keyboard line for the first moments and iOS panned the page to reveal it. A sheet that
+    was already open has nothing to wait for; a missed transitionend (reduced motion, a hidden page) is covered by a timer. */
+function focusTitleWhenIn(wasOpen) {
+  const p = $("#panel"); let done = false;
+  const go = () => { if (done) return; done = true; p.removeEventListener("transitionend", on); clearTimeout(t); if (document.body.classList.contains("popen")) $("#pTitle")?.focus(); };
+  const on = (e) => { if (e.target === p && e.propertyName === "transform") go(); };
+  const t = setTimeout(go, 450);
+  if (wasOpen) go(); else p.addEventListener("transitionend", on);
+}
 /* A finger swipe between days (Junyan, 2026-11-11: "it changes days when I'm in the day view very easily").
    The strip was one native scroller in both directions with x snapping (.sc.snap), so on the iPhone, which does
    not lock a scroll to one direction, an up/down scroll that drifted sideways snapped to the next day.
@@ -2219,7 +2238,8 @@ function wirePair() {
 /* ---------- controls ---------- */
 function setup() {
   document.addEventListener("click", function clickRouter(e) {
-    const t = e.target.closest("[data-railtog],[data-pkday],[data-page],[data-n],[data-p],[data-key],[data-staff],[data-allday],[data-open],[data-acc],[data-skip],[data-go],[data-dur],[data-kind],[data-sheet],[data-triptab],button[data-look],#pSave,#pDel,#pAcc,#pSkip,#pGrab,#pairBtn");    if (!t || t.closest(".ev")) return;
+    const t = e.target.closest("[data-railtog],[data-pkday],[data-page],[data-n],[data-p],[data-key],[data-staff],[data-allday],[data-open],[data-acc],[data-skip],[data-go],[data-dur],[data-kind],[data-sheet],[data-triptab],button[data-look],#pSave,#pDel,#pAcc,#pSkip,#pGrab,#pairBtn");
+    if (!t || t.closest(".ev")) return;
     const d = t.dataset;
     if (t.matches("button[data-look]")) setLook(d.look);
     else if ("railtog" in d) { document.body.classList.toggle("railopen"); renderRail(); setTimeout(size, 260); }
@@ -2314,7 +2334,7 @@ function setup() {
 function readout() {
   if (window.CalReadout) { CalReadout.toggle(); return; }
   CalHook.state = () => ({ cur: S.cur, win0: S.win0, n: S.n, dw, slideX, shown: TOUCH && $("#strip") ? shownX() : null, touch: TOUCH, api: API, h: S.h });
-  const s = document.createElement("script"); s.src = "calendar-readout.js?v=6"; document.head.appendChild(s);
+  const s = document.createElement("script"); s.src = "calendar-readout.js?v=7"; document.head.appendChild(s);
 }
 function boot() { render(); loadSide(); refresh(); }
 setup(); boot();
