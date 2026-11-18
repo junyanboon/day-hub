@@ -114,8 +114,8 @@ test("the panel: the Open packing list button is drawn only on a computer, and P
 });
 
 test("the BUILD label names this copy", () => {
-  assert.match(html, /const BUILD = "2026-11-18a trip map legend";/, "slice 04 (trip map) renamed it");
-  assert.match(html, /calendar-core\.js\?v=25"/, "a new stamp for the changed core (slice 04)");
+  assert.match(html, /const BUILD = "2026-11-18b trip read";/, "slice 05 (read a trip) renamed it");
+  assert.match(html, /calendar-core\.js\?v=26"/, "a new stamp for the changed core (slice 05)");
 });
 
 test("the page's own script still parses (a stray backtick once broke the whole page and no regex test saw it)", () => {

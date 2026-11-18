@@ -8,7 +8,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-const ROOT = fileURLToPath(new URL("../../..", import.meta.url));
+/* DEV_ROOT serves another copy of the pages (the trip read check serves main's copy beside this one, 2026-11-18) */
+const ROOT = process.env.DEV_ROOT || fileURLToPath(new URL("../../..", import.meta.url));
 const PORT = +(process.argv[2] || process.env.PORT || 8791);
 const TYPES = { ".html": "text/html", ".js": "text/javascript", ".mjs": "text/javascript", ".css": "text/css", ".svg": "image/svg+xml", ".png": "image/png", ".json": "application/json", ".webmanifest": "application/manifest+json" };
 const CALS = [
@@ -59,15 +60,20 @@ http.createServer(async (req, res) => {
   }
   /* one trip and its saved places (slice 04, the trip map): still-api's /quest/trips/one and /quest/places, in memory.
      Montreal Birthday has one Notion card of its own, the stay, at an address that is not a saved place (a plain dot).
+     Slice 05 (read a trip) gave the stay Day Quest's ticks and a note, a Notion page and Booked through, and added one
+     plan with no date (a Maybe) and one after the trip (Outside the trip dates).
      A new place is "found" only for the names in FOUND, as the server's lookup would; anything else has no pin. */
   if (u.pathname === "/quest/trips/one" || u.pathname === "/quest/places") {
     if (req.headers["x-quest-key"] !== "test") return send(res, 401, { error: "wrong pairing code (the dev server's code is: test)" });
     const name = u.searchParams.get("name") || u.searchParams.get("trip") || "";
     if (u.pathname === "/quest/trips/one") {
       const mtl = /montreal birthday/i.test(name) && !/🇨🇦/u.test(name);
-      return send(res, 200, { name, extras: {}, places: places.filter((p) => p.trip === name), items: mtl ? [
+      return send(res, 200, { name, places: places.filter((p) => p.trip === name),
+        extras: mtl ? { "notion-stay": { check: { 0: true, 3: true }, notes: "Late check-in is fine, call the desk" } } : {}, items: mtl ? [
         { id: "notion-stay", db: "planner", icon: "🏨", name: "Montreal stay", start: "2026-11-13T17:00:00-05:00", end: "2026-11-17T10:30:00-05:00", status: "Prepaid", tags: "Hotel",
-          fields: { Address: { type: "rich_text", value: "1255 Rue Jeanne-Mance, Montréal" } }, trips: [name] }] : [] });
+          url: "https://www.notion.so/montreal-stay", fields: { Address: { type: "rich_text", value: "1255 Rue Jeanne-Mance, Montréal" }, "Booked Through": { type: "select", value: "Airbnb" } }, trips: [name] },
+        { id: "notion-poutine", db: "planner", icon: "🍟", name: "Poutine crawl", start: "", status: "Idea", fields: {}, trips: [name] },
+        { id: "notion-brunch", db: "planner", icon: "🥞", name: "Goodbye brunch", start: "2026-11-18T11:00:00-05:00", end: "2026-11-18T12:30:00-05:00", status: "Planned", fields: {}, trips: [name] }] : [] });
     }
     if (req.method === "GET") return send(res, 200, { places: name ? places.filter((p) => p.trip === name) : places });
     const b = await readBody(req);
