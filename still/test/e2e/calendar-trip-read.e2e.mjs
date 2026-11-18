@@ -70,7 +70,7 @@ try {
   check("computer: slice 04's plain rows are not shown on a computer", !(await shown(page, "#page #tDays")) && await shown(page, "#page #tRead"));
 
   const all = flat(await L()).toLowerCase(), has = (s) => all.includes(s.toLowerCase());
-  check("computer: Maybe above the days, for a plan with no date", /^.*all thu 12 .* tue 17 maybe 🍟 poutine crawl/.test(all) && all.indexOf("maybe 🍟 poutine crawl") < all.indexOf("thu nov 12"), all.slice(0, 200));
+  check("computer: no Maybe, and a plan with no date is left out (2026-11-18)", await page.evaluate(() => ![...document.querySelectorAll("#page #tRead .tday")].some((d) => /maybe/i.test(d.textContent))) && !all.includes("poutine crawl") && /^.*all thu 12 .* tue 17 thu nov 12/.test(all), all.slice(0, 200));
   check("computer: a stay reads Check-in and check-out with their days", has("5:00 pm 🏨 Montreal stay Check-in 5:00 pm (Fri), check-out 10:30 am (Tue)"));
   check("computer: an end time sits under the start", has("10:00 pm to 2:00 am 🎶 Social 📍 Alliance Dance Company"));
   check("computer: Need to book on a plan still to book", /♨ spa & recovery day ?need to book/.test(all) && await page.evaluate(() => [...document.querySelectorAll("#page #tRead .ttag.need")].some((t) => t.textContent === "Need to book")), all.match(/.{0,40}spa & recovery day.{0,80}/)?.[0]);
@@ -84,28 +84,33 @@ try {
   // a day button shows that day alone
   await page.click('#page .tdays [data-tday="2"]'); await sleep(150);
   const sat = flat(await L()).toLowerCase();
-  check("computer: Sat 14 shows Maybe and that day only", /maybe 🍟 poutine crawl/.test(sat) && sat.includes("sat nov 14") && !sat.includes("fri nov 13") && !sat.includes("outside the trip dates"), sat.slice(0, 160));
+  check("computer: Sat 14 shows that day only", sat.includes("sat nov 14") && !sat.includes("fri nov 13") && !sat.includes("outside the trip dates"), sat.slice(0, 160));
   await page.click('#page .tdays [data-tday="-1"]'); await sleep(150);
 
-  // a stay's details (d71): read only, only the fields with a value, the hotel checklist as saved, Open in Notion
+  // a stay's details (d71): only the fields with a value, the hotel checklist as saved, and the reservation drop (no Book, no Notion link)
   await page.click('#page #tRead [data-tplan="notion-stay"]'); await sleep(300);
   const stay = flat(await text(page, "#page #tCard"));
-  check("computer: the stay's details", stay === "🏨 Montreal stay × Check-in 5:00 pm (Fri) Check-out 10:30 am (Tue) Status Prepaid Address 1255 Rue Jeanne-Mance, Montréal Google Maps ↗ · Directions ↗ Booked through Airbnb Cancel by Missing Confirmation # Missing Notes Late check-in is fine, call the desk HOTEL CHECKLIST ✓ Research and pick the place Upload confirmation # Cancellation policy ✓ Address (opens in Google Maps) Pay outstanding balance Pictures of the room & amenities Open in Notion ↗", stay);
+  check("computer: the stay's details", stay === "🏨 Montreal stay × Check-in 5:00 pm (Fri) Check-out 10:30 am (Tue) Status Prepaid Address 1255 Rue Jeanne-Mance, Montréal Google Maps ↗ · Directions ↗ Booked through Airbnb Cancel by Missing Confirmation # Missing Files Missing Notes Late check-in is fine, call the desk HOTEL CHECKLIST ✓ Research and pick the place Upload confirmation # Cancellation policy ✓ Address (opens in Google Maps) Pay outstanding balance Pictures of the room & amenities Drop the reservation here, or click to pick it", stay);
   const links = await page.evaluate(() => [...document.querySelectorAll("#page #tCard a")].map((a) => [a.textContent, a.href, a.target]));
-  check("computer: Google Maps, Directions and Notion open in a new tab", JSON.stringify(links) === JSON.stringify([
+  check("computer: only Google Maps and Directions links, in a new tab", JSON.stringify(links) === JSON.stringify([
     ["Google Maps ↗", "https://www.google.com/maps/search/?api=1&query=1255%20Rue%20Jeanne-Mance%2C%20Montr%C3%A9al", "_blank"],
-    ["Directions ↗", "https://www.google.com/maps/dir/?api=1&destination=1255%20Rue%20Jeanne-Mance%2C%20Montr%C3%A9al", "_blank"],
-    ["Open in Notion ↗", "https://www.notion.so/montreal-stay", "_blank"]]), JSON.stringify(links));
+    ["Directions ↗", "https://www.google.com/maps/dir/?api=1&destination=1255%20Rue%20Jeanne-Mance%2C%20Montr%C3%A9al", "_blank"]]), JSON.stringify(links));
   const amber = await page.evaluate(() => [...document.querySelectorAll("#page #tCard .tkv .need")].map((x) => x.textContent));
-  check("computer: what the plan is missing is amber", JSON.stringify(amber) === '["Cancel by","Missing","Confirmation #","Missing"]', JSON.stringify(amber));
+  check("computer: what the plan is missing is amber", JSON.stringify(amber) === '["Cancel by","Missing","Confirmation #","Missing","Files","Missing"]', JSON.stringify(amber));
   check("computer: the stay's row is lit and its dot grows", await page.evaluate(() => !!document.querySelector('#page #tRead [data-tplan="notion-stay"].on') && !!document.querySelector("#page .tpin.dot.on")));
-  check("computer: nothing to edit in the details", await page.evaluate(() => !document.querySelector("#page #tCard input, #page #tCard textarea, #page #tCard select, #page #tCard [contenteditable]")));
+  check("computer: nothing to edit in the details but the file pick", await page.evaluate(() => [...document.querySelectorAll("#page #tCard input, #page #tCard textarea, #page #tCard select, #page #tCard [contenteditable]")].every((x) => x.matches("[data-tdrop] input[type=file]"))));
 
-  // a plan to book: Book ↗, and its pin grows when it sits on a saved place
+  // the reservation file: picked (or dropped) on the card, sent to /quest/trips/file, then listed under Files
+  await page.setInputFiles("#page #tCard [data-tdrop] input", { name: "airbnb.pdf", mimeType: "application/pdf", buffer: Buffer.from("%PDF-1.4 test") }); await sleep(500);
+  const filed = flat(await text(page, "#page #tCard"));
+  check("computer: a dropped reservation is saved and listed under Files", filed.includes("Files Ref._Montreal stay_confirmation.pdf ↗") && (await text(page, "#toast").catch(() => "")).includes("Saved as Ref._Montreal stay_confirmation.pdf"), filed);
+  await page.setInputFiles("#page #tCard [data-tdrop] input", { name: "notes.txt", mimeType: "text/plain", buffer: Buffer.from("hi") }); await sleep(300);
+  check("computer: a file that is not a PDF or image is refused, not sent", (await text(page, "#toast").catch(() => "")).includes("Only a PDF or an image"));
+
+  // a plan to book: no Book button (2026-11-18), a calendar copy takes no file, and its pin grows when it sits on a saved place
   await page.click('#page #tRead [data-tplan="seed-spa"]').catch(() => {}); await sleep(250);
   const spa = flat(await text(page, "#page #tCard"));
-  const book = await page.getAttribute("#page #tCard a.go", "href").catch(() => null);
-  check("computer: Need to book shows Book ↗", /^♨ Spa & Recovery Day Need to book × When Mon Nov 16, 11:00 am to 5:30 pm Status Need to Book Address Missing Book ↗$/.test(spa) && book === "https://www.google.com/search?q=Spa%20%26%20Recovery%20Day%20Montreal%20book", spa + " | " + book);
+  check("computer: Need to book has no Book button and no drop on a calendar copy", spa === "♨ Spa & Recovery Day Need to book × When Mon Nov 16, 11:00 am to 5:30 pm Status Need to Book Address Missing", spa);
   const lw = await page.evaluate(() => [...document.querySelectorAll("#page #tRead .trow")].find((r) => /Lambada workshop/.test(r.textContent))?.dataset.tplan);
   await page.click(`#page #tRead [data-tplan="${lw}"]`); await sleep(250);
   check("computer: a plan on a saved place grows that place's pin", (await page.evaluate(() => document.querySelector("#page .tpin.on")?.innerText || "")).includes("Alliance Dance Company"));
@@ -130,8 +135,8 @@ try {
     await page.screenshot({ path: path.join(process.env.SHOTS, "trip-read-computer-1280.png"), fullPage: true });
   }
 
-  /* the only writes are slice 04's: the four Montreal places saved once when the trip first opens */
-  check("computer: read only: nothing but the four starting places is written", writes.length === 4 && writes.every((w) => w === "POST /quest/places"), JSON.stringify(writes));
+  /* the only writes: slice 04's four Montreal places saved once when the trip first opens, and the one reservation file */
+  check("computer: nothing written but the four starting places and the one reservation", writes.length === 5 && writes.filter((w) => w === "POST /quest/places").length === 4 && writes.includes("POST /quest/trips/file"), JSON.stringify(writes));
   check("computer: no page errors", errors.length === 0, errors.join(" | "));
   await ctx.close();
 

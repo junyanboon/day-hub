@@ -962,7 +962,7 @@
   const gsearch = (q) => "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(q);
   const val = (v) => (v == null ? "" : Array.isArray(v) ? v.join(", ") : String(v)).trim();
 
-  /** One trip, read: {head, days, maybe, outside, shown(day), detail(id)}.
+  /** One trip, read: {head, days, outside, shown(day), detail(id)}.
       trip {name, start, end, place}; items its plans; extras Day Quest's own, by plan id; places and spots as tripMap takes them; today "YYYY-MM-DD". */
   function tripRead({ trip, items, extras, places, spots, today, T }) {
     const ex = (id) => (extras || {})[id] || {};
@@ -998,8 +998,9 @@
       if (L.stillOn.length) lines.push(["Still on", L.stillOn.map((x) => x.name).join(", ")]);
       return { i, chip: `${DOW[dowOf(date)]} ${+date.slice(8, 10)}`, label: dayLabel(date), rows: d.on.map(row), lines };
     });
-    const maybe = plan.undated.filter((i) => !i.start).map(row), outside = plan.undated.filter((i) => i.start).map(row);
-    const shown = (day) => ({ maybe, days: day >= 0 ? days.filter((d) => d.i === day) : days, outside: day >= 0 ? [] : outside });
+    // plans with no date are left out on the computer (Junyan, 2026-11-18: "drop this maybe")
+    const outside = plan.undated.filter((i) => i.start).map(row);
+    const shown = (day) => ({ days: day >= 0 ? days.filter((d) => d.i === day) : days, outside: day >= 0 ? [] : outside });
 
     const h = tripHead({ ...trip, start, end }, T), chips = [];
     const away = start && today ? dnum(start) - dnum(today) : 0;
@@ -1008,12 +1009,6 @@
     const dates = !start ? "" : end && end !== start ? `${dayLabel(start)} to ${dayLabel(end)}` : dayLabel(start);
     const head = { icon: h.icon, title: h.title, meta: [dates, h.who].filter(Boolean).join(" · "), chips };
 
-    function bookUrl(it) {
-      const link = Object.values(it.fields || {}).find((f) => f && f.type === "url" && f.value);
-      if (link) return link.value;
-      const f = (ex(it.id).files || [])[0];
-      return f || "https://www.google.com/search?q=" + encodeURIComponent(`${it.name} ${T.destOf(trip.name, trip.place)} book`);
-    }
     function detail(id) {
       const it = list.find((x) => x.id === id); if (!it) return null;
       const e = ex(id), need = new Set(T.missingInfo(it, e).map((m) => T.MISSING_FIELD[m])), rows = [];
@@ -1046,9 +1041,10 @@
       put("Notes", "Notes", e.notes);
       return { id, icon: it.icon || "", name: it.name, tag: tagOf(it), rows, at: map.rowOf(id).at,
         check: kind === "stay" ? CHECK.map((text, i) => ({ text, done: !!(e.check || {})[i] })) : null,
-        book: look(it).book ? bookUrl(it) : "", notion: it.url || "" };
+        // a reservation file can be dropped on a Notion card with a files column, as in Day Quest (no Book, no Notion link: 2026-11-18)
+        drop: Array.isArray(it.files) && !it.seed && !String(id).startsWith("seed-") };
     }
-    return { head, days, maybe, outside, shown, detail };
+    return { head, days, outside, shown, detail };
   }
 
   Object.assign(root.CalCore, { pinMatch, mapStart, gdir, tripMap, placeAdd, placeToast, placeRemove, tripSeed, tripHead, TRIP_TABS, tripRead });

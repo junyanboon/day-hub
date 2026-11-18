@@ -111,7 +111,7 @@ try {
         flat(await text(page, "#page .tleft")).slice(0, 700));
       await page.click('#page .trow[data-tpin^="plan:"]'); await sleep(300);
     } else {
-      check(`${label}: the itinerary rows in slice 05's words`, flat(await text(page, "#page .tleft")).toLowerCase().includes("Fri Nov 13 5:00 pm 🏨 Montreal stay Check-in 5:00 pm (Fri), check-out 10:30 am (Tue) Missing: confirmation #, cancellation policy 9:00 pm 💃 Lambada workshop 📍 Alliance Dance Company".toLowerCase()),
+      check(`${label}: the itinerary rows in slice 05's words`, flat(await text(page, "#page .tleft")).toLowerCase().includes("Fri Nov 13 5:00 pm 🏨 Montreal stay Check-in 5:00 pm (Fri), check-out 10:30 am (Tue) Missing: confirmation #, cancellation policy, confirmation file 9:00 pm 💃 Lambada workshop 📍 Alliance Dance Company".toLowerCase()),
         flat(await text(page, "#page .tleft")).slice(0, 700));
       await page.click("#page .leaflet-marker-icon:has(.tpin.dot)"); await sleep(300);
     }

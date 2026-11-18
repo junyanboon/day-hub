@@ -72,21 +72,21 @@ test("Staying on the days between, Check-out on the last day, Still on for other
   same(plain(d[4].lines), [["Staying", "Montreal stay"]]);
   same(plain(d[5].lines), [["Check-out", "Montreal stay", "by 10:30 am"]]);
 });
-test("plans with no date sit in Maybe above the days; plans outside the trip dates at the bottom; both only when there are any", () => {
+test("plans with no date are left out (Junyan 2026-11-18: drop Maybe); plans outside the trip dates at the bottom, only when there are any", () => {
   const items = [...seed(), { id: "u1", name: "Poutine crawl", start: "", status: "Idea", fields: {} },
     { id: "o1", name: "Brunch", start: "2026-11-18T11:00:00-05:00", status: "Maybe", fields: {} }];
   const m = read({ items });
-  same(m.maybe.map((r) => [r.time, r.name]), [["", "Poutine crawl"]]);
+  assert.equal("maybe" in m, false);
+  assert.equal(JSON.stringify(m.shown(-1)).includes("Poutine crawl"), false);
   same(m.outside.map((r) => [r.time, r.name]), [["11:00 am", "Brunch"]]);
-  same(plain([read().maybe, read().outside]), [[], []]);
+  same(plain(read().outside), []);
 });
-test("a day button shows that day only; Maybe stays, the outside group goes", () => {
+test("a day button shows that day only; the outside group goes", () => {
   const items = [...seed(), { id: "u1", name: "Poutine crawl", start: "", status: "Idea", fields: {} },
     { id: "o1", name: "Brunch", start: "2026-11-18T11:00:00-05:00", status: "Maybe", fields: {} }];
   const m = read({ items });
   const one = m.shown(2), all = m.shown(-1);
   same(one.days.map((d) => d.label), ["Sat Nov 14"]);
-  assert.equal(one.maybe.length, 1);
   assert.equal(one.outside.length, 0);
   assert.equal(all.days.length, 6);
   assert.equal(all.outside.length, 1);
@@ -118,7 +118,7 @@ test("a booked plan, or a status saved in Day Quest's extras on a calendar copy,
 
 /* ---- d71: the details panel, read only */
 const kv = (d) => d.rows.map((r) => [r.k, r.v, !!r.need, (r.links || []).map((l) => l.text)]);
-test("a stay: Check-in and Check-out with their days, Status, Address missing in amber, the six-line checklist and Book", () => {
+test("a stay: Check-in and Check-out with their days, Status, Address missing in amber, the six-line checklist; a calendar copy takes no file", () => {
   const d = plain(read().detail("seed-stay"));
   same([d.icon, d.name, d.tag && d.tag.text], ["🏨", "Montreal stay", "Need to book"]);
   same(kv(d), [
@@ -131,10 +131,9 @@ test("a stay: Check-in and Check-out with their days, Status, Address missing in
     ["Research and pick the place", false], ["Upload confirmation #", false], ["Cancellation policy", false],
     ["Address (opens in Google Maps)", false], ["Pay outstanding balance", false], ["Pictures of the room & amenities", false],
   ]);
-  assert.equal(d.book, "https://www.google.com/search?q=Montreal%20stay%20Montreal%20book");
-  assert.equal(d.notion, "");
+  same([d.drop, "book" in d, "notion" in d], [false, false, false]);
 });
-test("an activity: When, Status, Address with Google Maps and Directions; no checklist, no Book", () => {
+test("an activity: When, Status, Address with Google Maps and Directions; no checklist", () => {
   const d = plain(read().detail("seed-fri-social"));
   same(kv(d), [
     ["When", "Fri Nov 13, 10:00 pm to 2:00 am", false, []],
@@ -147,10 +146,9 @@ test("an activity: When, Status, Address with Google Maps and Directions; no che
     "https://www.google.com/maps/dir/?api=1&destination=Alliance%20Dance%20Company%2C%202529%20Rue%20Ontario%20E%2C%20Montr%C3%A9al",
   ]);
   assert.equal(d.check, null);
-  assert.equal(d.book, "");
   assert.equal(d.at, "mtl-alliance");
 });
-test("only the fields with a value show; a missing one shows in amber as Missing; Notes, Files and Open in Notion when there", () => {
+test("only the fields with a value show; a missing one shows in amber as Missing; Notes and Files when there; a Notion card takes a dropped file", () => {
   const stay = { id: "n1", db: "planner", icon: "🏨", name: "Montreal stay", start: "2026-11-13T17:00:00-05:00", end: "2026-11-17T10:30:00-05:00",
     status: "Prepaid", tags: "Hotel", url: "https://www.notion.so/n1",
     files: [{ name: "booking.pdf", url: "https://files.example/booking.pdf" }],
@@ -172,9 +170,8 @@ test("only the fields with a value show; a missing one shows in amber as Missing
     ["Notes", "Ask for a quiet room", false, []],
   ]);
   same(d.check.map((c) => c.done), [true, false, false, true, false, false], "ticks as saved");
-  assert.equal(d.notion, "https://www.notion.so/n1");
   assert.equal(d.tag, null);
-  assert.equal(d.book, "");
+  same([d.drop, "book" in d, "notion" in d], [true, false, false]);
 });
 test("a booked plan with no file in Notion: Files shows Missing", () => {
   const it = { id: "n2", name: "Lambada workshop", start: "2026-11-13T21:00:00-05:00", status: "Prepaid", files: [], address: "Alliance Dance Company", fields: {} };
@@ -186,8 +183,8 @@ test("transport: Departs and Arrives", () => {
   same(rows.slice(0, 3), [["When", "Thu Nov 12, 8:00 am to 1:05 pm", false, []], ["Departs", "Thu Nov 12, 8:00 am", false, []], ["Arrives", "Thu Nov 12, 1:05 pm", false, []]]);
   same(rows.find((r) => r[0] === "Confirmation #"), ["Confirmation #", "Missing", true, []]);
 });
-test("Book goes to the plan's own link when it has one; an unknown plan has no details", () => {
-  const it = { id: "s1", name: "Spa", start: "2026-11-16T11:00:00-05:00", status: "Need to Book", fields: { Website: { type: "url", value: "https://bota.example" } } };
-  assert.equal(read({ items: [it] }).detail("s1").book, "https://bota.example");
+test("a card with no files column takes no file; an unknown plan has no details", () => {
+  const it = { id: "s1", name: "Spa", start: "2026-11-16T11:00:00-05:00", status: "Need to Book", fields: {} };
+  assert.equal(read({ items: [it] }).detail("s1").drop, false);
   assert.equal(read().detail("nope"), null);
 });
