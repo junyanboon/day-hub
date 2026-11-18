@@ -51,9 +51,27 @@ test("no next-morning block, no Sleep; no Wind down, the evening's last block st
   noWd.push(blk(at(22, 20), at(22, 21, 30), "Call Mum"));
   const sp = A.sleepSpans(noWd, NIGHTS);
   assert.equal(iso(sp[0].s), iso(at(22, 21, 30)));
-  // a later block after Wind down does not start it: Wind down does
-  const late = plan(); late.push(blk(at(22, 22, 30), at(22, 23), "Read"));
-  assert.equal(iso(A.sleepSpans(late, NIGHTS)[0].s), iso(at(22, 22, 30)));
+});
+
+test("a block after Wind down pushes Sleep to its end, never side by side with it (d95)", () => {
+  // Junyan's screenshot, 2026-10-22: Wind down 10:00 to 10:45 PM, Work 10:45 to 11:45 PM; Sleep showed from 10:45 PM beside Work
+  const p = plan();
+  p[1].s = at(22, 22); p[1].e = at(22, 22, 45);
+  p.push(blk(at(22, 22, 45), at(22, 23, 45), "Work"));
+  let sp = A.sleepSpans(p, NIGHTS);
+  assert.equal(sp.length, 1);
+  assert.equal(iso(sp[0].s), iso(at(22, 23, 45)), "Sleep starts when Work ends");
+  assert.equal(iso(sp[0].e), iso(at(23, 6, 45)));
+  assert.equal(A.sleepText(sp[0].min), "7h");
+  // the latest of several wins, and one that started before Wind down but runs past it counts too
+  p.push(blk(at(22, 23), at(23, 0, 30), "Call"));
+  assert.equal(iso(A.sleepSpans(p, NIGHTS)[0].s), iso(at(23, 0, 30)));
+  // a block that ends before Wind down does not move it: Wind down's end still starts Sleep
+  const early = plan(); early.push(blk(at(22, 20), at(22, 21), "Read"));
+  assert.equal(iso(A.sleepSpans(early, NIGHTS)[0].s), iso(at(22, 22, 30)));
+  // Work moved back before Wind down: Sleep follows Wind down again
+  const back = plan(); back.push(blk(at(22, 20, 30), at(22, 21, 30), "Work"));
+  assert.equal(iso(A.sleepSpans(back, NIGHTS)[0].s), iso(at(22, 22, 30)));
 });
 
 test("free time, bookings and a Sleep block already on the calendar are handled", () => {
