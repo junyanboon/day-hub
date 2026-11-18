@@ -886,7 +886,12 @@
         addr: sp.plan ? sp.address + " · from the plan, not a saved place" : sp.lat == null ? "Not found on the map" : sp.address,
         plans: there.map((p) => [`${DOW[dowOf(p.day)]} ${p.time}`.trim(), p.name]), dir: gdir(sp), remove: !sp.plan };
     }
-    return { pins, days, places: list, lookups, card };
+    /** Where one plan sits, dated or not: its pin id ("" for none) and the place line ("📍 name" or "No place yet"). */
+    function rowOf(id) {
+      const p = plans.find((x) => x.id === id), sp = p && p.at && spotOf(p.at);
+      return { at: p ? p.at : "", where: sp ? "📍 " + sp.name : "No place yet" };
+    }
+    return { pins, days, places: list, lookups, card, rowOf };
   }
 
   /** + Add place (d32): one box, a name or an address. The words are the name; the server looks the address up, so a
@@ -921,5 +926,126 @@
   /** The phone's tabs on a trip (d11). Bookings and Ideas join when those pieces are built. */
   const TRIP_TABS = ["Itinerary", "Map"];
 
-  Object.assign(root.CalCore, { pinMatch, mapStart, gdir, tripMap, placeAdd, placeToast, placeRemove, tripSeed, tripHead, TRIP_TABS });
+  /* ---------- read a trip (slice 05, Junyan 2026-11-18: "70 yes, 71 yes, 72 yes, 73 yes it's probably not needed at
+     all", then "74 yes": mock https://claude.ai/artifact/DoUcZHR3SbkquBrUoyKnCA as drawn). Computer only (d14), read
+     only: nothing here writes. Day Quest's trip page (quest-trips.js: openTrip, drawLeft, openItem) is what this matches;
+     its pure helpers come in as T (dayPlan, localDay, stayTime, stayLines, isStay, kindOf, missingInfo, statusLook,
+     pillOf, fieldOf, cardLabel, destOf, MISSING_FIELD). Tests: still/test/trip-read.test.mjs. ---------- */
+  /** Day Quest's hotel checklist (quest-trips.js CHECK, inside its page code, so copied here). */
+  const CHECK = ["Research and pick the place", "Upload confirmation #", "Cancellation policy", "Address (opens in Google Maps)", "Pay outstanding balance", "Pictures of the room & amenities"];
+  const dnum = (s) => Date.UTC(+s.slice(0, 4), +s.slice(5, 7) - 1, +s.slice(8, 10)) / 86400000;
+  const isDay = (s) => /^\d{4}-\d\d-\d\d/.test(String(s || ""));
+  /** "…T22:00…" → "10:00 pm", the plan's own wall clock (Day Quest's timeOf). */
+  function clock(iso) {
+    const m = /T(\d\d):(\d\d)/.exec(String(iso || "")); if (!m) return "";
+    const h = +m[1]; return `${h % 12 || 12}:${m[2]} ${h >= 12 ? "pm" : "am"}`;
+  }
+  /** A time stored in UTC (or another offset) on a plan with a time zone, as that zone's wall clock "YYYY-MM-DDTHH:MM"
+      (Day Quest's localDay does the same for the day: 03:30Z with America/Toronto is 10:30 pm the day before). */
+  function wall(iso, tz) {
+    const s = String(iso || "");
+    if (!tz || !/T\d\d:\d\d.*(Z|[+-]\d\d:?\d\d)$/.test(s)) return iso;
+    try {
+      const p = Object.fromEntries(new Intl.DateTimeFormat("en-CA", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" })
+        .formatToParts(new Date(s)).map((x) => [x.type, x.value]));
+      return `${p.year}-${p.month}-${p.day}T${p.hour}:${p.minute}`;
+    } catch { return iso; }
+  }
+  /** A stay's check-in or check-out time: the time in its dates, else the Notion text column (Day Quest's stayTime). */
+  function stayTime(it, which) {
+    const t = clock(which === "in" ? it.start : it.end); if (t) return t;
+    const f = (it.fields || {})[which === "in" ? "Departure / Check-in" : "Arrival / Check-out"];
+    return f && f.value ? String(f.value).trim().slice(0, 30) : "";
+  }
+  /** "2026-11-13T21:00…" → "Fri Nov 13, 9:00 pm"; a day alone → "Fri Nov 13". */
+  const at = (iso) => isDay(iso) ? dayLabel(String(iso).slice(0, 10)) + (clock(iso) ? ", " + clock(iso) : "") : String(iso || "");
+  const gsearch = (q) => "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(q);
+  const val = (v) => (v == null ? "" : Array.isArray(v) ? v.join(", ") : String(v)).trim();
+
+  /** One trip, read: {head, days, outside, shown(day), detail(id)}.
+      trip {name, start, end, place}; items its plans; extras Day Quest's own, by plan id; places and spots as tripMap takes them; today "YYYY-MM-DD". */
+  function tripRead({ trip, items, extras, places, spots, today, T }) {
+    const ex = (id) => (extras || {})[id] || {};
+    /* a calendar copy's status picked in Day Quest is kept in its extras (Day Quest's openTrip does the same) */
+    const list = (items || []).filter((it) => it && it.name)
+      .map((it) => ((it.seed || String(it.id).startsWith("seed-")) && ex(it.id).status ? { ...it, status: ex(it.id).status } : it))
+      .map((it) => (it.tz ? { ...it, start: wall(it.start, it.tz), end: wall(it.end, it.tz) } : it))
+      .sort((a, b) => (a.start || "9").localeCompare(b.start || "9"));
+    const map = tripMap({ items: list, places, spots, T });
+    let start = String(trip.start || "").slice(0, 10), end = String(trip.end || "").slice(0, 10);
+    if (!start) { const ds = list.map((i) => String(i.start || "").slice(0, 10)).filter(isDay).sort(); start = ds[0] || ""; end = end || ds[ds.length - 1] || ""; }
+    const n = start ? Math.min(31, Math.max(0, dnum(end || start) - dnum(start)) + 1) : 0;
+    const plan = T.dayPlan(list, start, n);
+    const look = (it) => T.statusLook(it.status, !!ex(it.id).plan);
+    const tagOf = (it) => { const l = look(it); return l.cls === "need" ? { text: "Need to book", cls: "need" } : l.cls === "idea" ? { text: l.label, cls: "maybe" } : null; };
+    const dow = (iso) => isDay(iso) ? ` (${DOW[dowOf(String(iso).slice(0, 10))]})` : "";
+    function stayLine(it) {
+      const ci = stayTime(it, "in"), co = stayTime(it, "out");
+      const s = [ci && "Check-in " + ci + (clock(it.start) ? dow(it.start) : ""), co && "check-out " + co + (clock(it.end) ? dow(it.end) : "")].filter(Boolean).join(", ");
+      return s.charAt(0).toUpperCase() + s.slice(1);
+    }
+    function row(it) {
+      const stay = T.isStay(it), ms = T.missingInfo(it, ex(it.id)), r = map.rowOf(it.id);
+      return { id: it.id, time: clock(it.start), end: !stay && clock(it.end) ? "to " + clock(it.end) : "",
+        name: (it.icon ? it.icon + " " : "") + it.name, tag: tagOf(it), sub: (stay && stayLine(it)) || r.where,
+        miss: ms.length ? "Missing: " + ms.join(", ") : "", at: r.at };
+    }
+    const days = plan.days.map((d, i) => {
+      const date = new Date(Date.UTC(+start.slice(0, 4), +start.slice(5, 7) - 1, +start.slice(8, 10) + i)).toISOString().slice(0, 10);
+      const L = T.stayLines(d.staying), lines = [];
+      for (const o of d.out || []) lines.push(["Check-out", o.name, stayTime(o, "out") ? "by " + stayTime(o, "out") : ""].filter((x, k) => k < 2 || x));
+      if (L.staying.length) lines.push(["Staying", L.staying.map((x) => x.name).join(", ")]);
+      if (L.stillOn.length) lines.push(["Still on", L.stillOn.map((x) => x.name).join(", ")]);
+      return { i, chip: `${DOW[dowOf(date)]} ${+date.slice(8, 10)}`, label: dayLabel(date), rows: d.on.map(row), lines };
+    });
+    // plans with no date are left out on the computer (Junyan, 2026-11-18: "drop this maybe")
+    const outside = plan.undated.filter((i) => i.start).map(row);
+    const shown = (day) => ({ days: day >= 0 ? days.filter((d) => d.i === day) : days, outside: day >= 0 ? [] : outside });
+
+    const h = tripHead({ ...trip, start, end }, T), chips = [];
+    const away = start && today ? dnum(start) - dnum(today) : 0;
+    if (away > 0) chips.push({ text: away === 1 ? "1 day away" : `${away} days away`, cls: "" });
+    for (const it of list) if (T.pillOf(it.status) === "need") chips.push({ text: (T.isStay(it) ? "Hotel" : it.name.replace(/ Day$/, "")) + " not booked", cls: "need" });
+    const dates = !start ? "" : end && end !== start ? `${dayLabel(start)} to ${dayLabel(end)}` : dayLabel(start);
+    const head = { icon: h.icon, title: h.title, meta: [dates, h.who].filter(Boolean).join(" · "), chips };
+
+    function detail(id) {
+      const it = list.find((x) => x.id === id); if (!it) return null;
+      const e = ex(id), need = new Set(T.missingInfo(it, e).map((m) => T.MISSING_FIELD[m])), rows = [];
+      const put = (key, k, v, links) => {
+        v = val(v); const nd = need.has(key);
+        if (!v && !nd && !(links && links.length)) return;
+        rows.push({ k, v: v || (nd && !(links && links.length) ? "Missing" : ""), need: nd, ...(links && links.length ? { links } : {}) });
+      };
+      const fld = (k) => { const v = val(T.fieldOf(it, k, e)); return /^\d{4}-\d\d-\d\dT/.test(v) ? at(v) : v; };
+      const kind = T.kindOf(it);
+      if (kind !== "stay") {
+        const day = T.localDay(it), t = clock(it.start), t2 = clock(it.end);
+        put("When", "When", isDay(day) ? dayLabel(day.slice(0, 10)) + (t ? ", " + t + (t2 ? " to " + t2 : "") : "") : "");
+      }
+      if (kind === "stay") {
+        const ci = stayTime(it, "in"), co = stayTime(it, "out");
+        put("Check-in", "Check-in", ci && ci + (clock(it.start) ? dow(it.start) : ""));
+        put("Check-out", "Check-out", co && co + (clock(it.end) ? dow(it.end) : ""));
+      } else if (kind === "transport") {
+        put("Check-in", "Departs", fld("Check-in") || (clock(it.start) ? at(it.start) : ""));
+        put("Check-out", "Arrives", fld("Check-out") || (clock(it.end) ? at(it.end) : ""));
+      }
+      put("Status", "Status", T.cardLabel(it, e));
+      const addr = val(T.fieldOf(it, "Address", e));
+      put("Address", "Address", addr, addr ? [{ text: "Google Maps ↗", href: gsearch(addr) }, { text: "Directions ↗", href: gdir({ address: addr }) }] : null);
+      for (const [k, label] of [["Booked Through", "Booked through"], ["Points / Cash", "Points / Cash"], ["Card", "Card"], ["Cancel by", "Cancel by"], ["Confirmation #", "Confirmation #"]]) put(k, label, fld(k));
+      const files = [...(it.files || []).map((f) => ({ text: f.name + (f.url ? " ↗" : ""), href: f.url || "" })),
+        ...(e.files || []).map((u) => ({ text: String(u).replace(/^https?:\/\//, "").slice(0, 40) + " ↗", href: u }))];
+      put("Files", "Files", "", files);
+      put("Notes", "Notes", e.notes);
+      return { id, icon: it.icon || "", name: it.name, tag: tagOf(it), rows, at: map.rowOf(id).at,
+        check: kind === "stay" ? CHECK.map((text, i) => ({ text, done: !!(e.check || {})[i] })) : null,
+        // a reservation file can be dropped on a Notion card with a files column, as in Day Quest (no Book, no Notion link: 2026-11-18)
+        drop: Array.isArray(it.files) && !it.seed && !String(id).startsWith("seed-") };
+    }
+    return { head, days, outside, shown, detail };
+  }
+
+  Object.assign(root.CalCore, { pinMatch, mapStart, gdir, tripMap, placeAdd, placeToast, placeRemove, tripSeed, tripHead, TRIP_TABS, tripRead });
 })(typeof window !== "undefined" ? window : globalThis);

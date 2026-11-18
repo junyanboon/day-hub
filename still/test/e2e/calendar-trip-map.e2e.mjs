@@ -58,7 +58,7 @@ try {
     await sleep(300);
     const head = phone ? flat(await text(page, "#page .ttop")) : flat(await text(page, "#page .tleft .phead"));
     check(`${label}: the trip opens with its head`, phone ? /Montreal Birthday Nov 12 to Nov 17/.test(head) && !/2026/.test(head)
-      : /2026 🇨🇦 Montreal Birthday Nov 12 to Nov 17 · You \+ Caney/.test(head), head);
+      : /2026 🇨🇦 Montreal Birthday Thu Nov 12 to Tue Nov 17 · You \+ Caney/.test(head), head);   // slice 05 gave the computer's dates their weekdays
     check(`${label}: the address stays on calendar.html`, new URL(page.url()).pathname.endsWith("/still/calendar.html"));
 
     if (phone) {
@@ -103,10 +103,18 @@ try {
     check(`${label}: the picked pin grows and is named`, (await page.evaluate(() => document.querySelector("#page .tpin.on")?.innerText || "")).includes("Alliance Dance Company"));
 
     // a plan row with a place opens that place; a plain dot has no Remove
-    if (phone) { await page.click('#page .ttabs2 [data-ttab="Itinerary"]'); await sleep(200); }
-    check(`${label}: the itinerary rows in the mock's words`, flat(await text(page, "#page .tleft")).toLowerCase().includes("Fri Nov 13 5:00 PM Check in: Montreal stay 📍 Montreal stay 9:00 PM Lambada workshop 📍 Alliance Dance Company".toLowerCase()),
-      flat(await text(page, "#page .tleft")).slice(0, 300));
-    await page.click('#page .trow[data-tpin^="plan:"]'); await sleep(300);
+    /* slice 05 (read a trip) redrew the computer's plans and gave a plan row its own details, so on a computer the
+       stay's plain dot is picked on the map itself; the phone's rows are slice 04's as they were (d14) */
+    if (phone) {
+      await page.click('#page .ttabs2 [data-ttab="Itinerary"]'); await sleep(200);
+      check(`${label}: the itinerary rows in the mock's words`, flat(await text(page, "#page .tleft")).toLowerCase().includes("Fri Nov 13 5:00 PM Check in: Montreal stay 📍 Montreal stay 9:00 PM Lambada workshop 📍 Alliance Dance Company".toLowerCase()),
+        flat(await text(page, "#page .tleft")).slice(0, 700));
+      await page.click('#page .trow[data-tpin^="plan:"]'); await sleep(300);
+    } else {
+      check(`${label}: the itinerary rows in slice 05's words`, flat(await text(page, "#page .tleft")).toLowerCase().includes("Fri Nov 13 5:00 pm 🏨 Montreal stay Check-in 5:00 pm (Fri), check-out 10:30 am (Tue) Missing: confirmation #, cancellation policy, confirmation file 9:00 pm 💃 Lambada workshop 📍 Alliance Dance Company".toLowerCase()),
+        flat(await text(page, "#page .tleft")).slice(0, 700));
+      await page.click("#page .leaflet-marker-icon:has(.tpin.dot)"); await sleep(300);
+    }
     if (phone) check(`${label}: a plan row jumps to the Map tab`, await shown(page, "#page .tmapbox") && !(await shown(page, "#page .tleft")));
     const dot = flat(await text(page, "#page .tcardx"));
     check(`${label}: the stay's dot: from the plan, not a saved place, and no Remove`, /^🔵 Montreal stay × 1255 Rue Jeanne-Mance, Montréal · from the plan, not a saved place Fri 5:00 PM Check in: Montreal stay Directions ↗$/.test(dot), dot);
