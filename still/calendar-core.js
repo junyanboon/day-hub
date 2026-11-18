@@ -847,7 +847,7 @@
       const addr = String(T.fieldOf(it, "Address") || "").trim(), w = when(it.start);
       const name = T.isStay(it) ? "Check in: " + it.name : it.name;
       let at = "";
-      const sp = addr && saved.find((p) => pinMatch(addr, p));
+      const sp = addr && saved.find((p) => p.lat != null && p.lng != null && pinMatch(addr, p));   // Day Quest skips a place with no pin
       if (sp) at = sp.id;
       else if (addr) {
         const key = low(addr); at = "plan:" + key;

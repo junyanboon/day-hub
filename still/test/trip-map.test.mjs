@@ -187,3 +187,13 @@ test("the trip's head: its flag, its full and short name, its dates and who", ()
 test("on a phone the trip has tabs, and Map is one of them", () => {
   assert.deepEqual(plain(C.TRIP_TABS), ["Itinerary", "Map"]);
 });
+
+/* ---- review fix: Day Quest's drawMap skips a saved place with no pin, so a plan there is a plain dot of its own */
+test("a plan never sits on a saved place that has no pin; it gets a plain dot instead", () => {
+  const LOST = { id: "pl-lost", name: "Le Mystère", address: "Le Mystère, Montréal", lat: null, lng: null, category: "place", trip: MTL };
+  const items = [plan("p9", "Late show", "2026-11-14T22:00:00-05:00", "", { fields: { Address: { type: "rich_text", value: "Le Mystère, Montréal" } } })];
+  const m = C.tripMap({ items, places: [LOST], spots: { "le mystère, montréal": { lat: 45.5, lng: -73.6 } }, T });
+  assert.equal(m.days[0].plans[0].at, "plan:le mystère, montréal");
+  assert.equal(m.places[0].sub, "Not found on the map", "the place row counts no plans");
+  assert.deepEqual(m.pins.map((p) => [p.id, p.plan]), [["plan:le mystère, montréal", true]]);
+});

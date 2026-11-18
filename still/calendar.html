@@ -1584,7 +1584,7 @@ async function skipSugg(g) {
 
 /* ---------- a block type's own page (its real content comes in later tickets) ---------- */
 function renderPage() {
-  if (S.page === "travel") { if (S.trip) return tripPage(); if (TM.map) { TM.map.remove(); TM.map = null; } const pg = $("#page"); pg.className = "page k-travel"; pg.innerHTML = tripsPage(); return; }
+  if (S.page === "travel") { if (S.trip) return tripPage(); dropMap(); const pg = $("#page"); pg.className = "page k-travel"; pg.innerHTML = tripsPage(); return; }
   const k = S.page, t = today(), now = Date.now(), ws = C.weekStart(t);
   const all = eventsFor(ws, C.addDays(t, 21)).filter((e) => e.k === k && !isStaff(e));
   const on = (d) => all.some((e) => (e.allDay ? C.coversDay(e, d) : C.wall(e.s, S.tz).day === d));
@@ -1637,25 +1637,33 @@ async function loadTrips() {
    a saved place is looked up on OpenStreetMap once and remembered in this browser (SPOTS), as Day Quest does for Local.
    The map is Leaflet with OpenStreetMap tiles, as Day Quest's. The page is drawn once per trip and then painted in
    parts, so the map is never rebuilt under him. */
-const TM = { name: "", trip: null, items: [], places: [], sel: null, tab: "Map", loading: false, map: null, layer: null, L: null, fitted: false, looking: false };
+const TM = { name: "", trip: null, items: [], places: [], sel: null, tab: "Map", loading: false, map: null, layer: null, fitted: false, fitN: 0, moved: false, looking: false, run: 0 };
 const SPOTS = "trip-map-spots-v1";
 const spotsGet = () => { try { const v = JSON.parse(store.get(SPOTS) || "{}"); return v && typeof v === "object" ? v : {}; } catch (e) { return {}; } };
+const dropMap = () => { if (TM.map) { TM.map.remove(); TM.map = null; } };
+/** One OpenStreetMap lookup: {lat, lng}, null when nothing is found, undefined when it could not ask. */
+async function geocode(q) {
+  try { const r = await fetch("https://nominatim.openstreetmap.org/search?format=json&limit=1&q=" + encodeURIComponent(q));
+    if (!r.ok) return undefined; const d = await r.json(); return d[0] ? { lat: +d[0].lat, lng: +d[0].lon } : null; } catch (e) { return undefined; }
+}
 const tripModel = () => C.tripMap({ items: TM.items, places: TM.places, spots: spotsGet(), T: window.QuestTrips });
 async function openTrip(name) {
   const T = window.QuestTrips; if (!T) return;
   const meta = (S.trips || []).find((t) => t.name === name || (t.aliases || []).includes(name)) || { name };
-  if (TM.map) { TM.map.remove(); TM.map = null; }
+  dropMap();
+  const run = ++TM.run, gone = () => TM.run !== run || S.trip !== meta.name;   // a newer open, or back, wins
   Object.assign(TM, { name: meta.name, trip: meta, items: [], places: [], sel: null, tab: "Map", loading: true, fitted: false });
   S.trip = meta.name; render(); $("#page").scrollTop = 0;
   let ok = true;
   for (const nm of meta.aliases || [meta.name]) {   // a trip spelled two ways in Notion reads both, as Day Quest does
     try {
       const d = await api("/quest/trips/one?name=" + encodeURIComponent(nm));
+      if (gone()) return;
       for (const it of d.items || []) if (!TM.items.some((x) => x.id === it.id)) TM.items.push(it);
       for (const p of d.places || []) if (!TM.places.some((x) => x.id === p.id)) TM.places.push(p);
     } catch (e) { ok = false; toast("Trip not read: " + e.message, { bad: true }); }
   }
-  if (S.trip !== meta.name) return;
+  if (gone()) return;
   if (T.tripKey(meta.name) === T.tripKey(T.MTL)) {   // Day Quest's Montreal copy for anything Notion does not have yet
     const have = new Set(TM.items.map((i) => String(i.name).toLowerCase()));
     TM.items = T.hideCopies([...TM.items, ...T.SEED.items.filter((i) => !have.has(i.name.toLowerCase())).map((i) => ({ ...i }))]);
@@ -1664,10 +1672,10 @@ async function openTrip(name) {
      never seeds a trip that has places */
   const flag = "trip-map-seeded:" + T.tripKey(meta.name);
   if (ok) for (const p of C.tripSeed(meta.name, TM.places, !!store.get(flag), T)) {
-    try { const d = await send("/quest/places", "POST", { op: "put", place: p }); TM.places.push(d.place); store.set(flag, "1"); }
+    try { const d = await send("/quest/places", "POST", { op: "put", place: p }); if (gone()) return; TM.places.push(d.place); store.set(flag, "1"); }
     catch (e) { toast("Place not saved: " + e.message, { bad: true }); break; }
   }
-  if (S.trip !== meta.name) return;
+  if (gone()) return;
   TM.loading = false; tripPaint(); lookUp();
 }
 /** The plan addresses not found yet, one a second (OpenStreetMap's rule), each remembered here found or not. */
@@ -1675,9 +1683,7 @@ async function lookUp() {
   if (TM.looking) return; TM.looking = true;
   try {
     for (let q; (q = tripModel().lookups[0]);) {
-      let g = null;
-      try { const r = await fetch("https://nominatim.openstreetmap.org/search?format=json&limit=1&q=" + encodeURIComponent(q));
-        const d = r.ok ? await r.json() : null; if (!d) break; if (d[0]) g = { lat: +d[0].lat, lng: +d[0].lon }; } catch (e) { break; }
+      const g = await geocode(q); if (g === undefined) break;
       const all = spotsGet(); all[q.toLowerCase()] = g; store.set(SPOTS, JSON.stringify(all));
       if (S.page === "travel" && S.trip) tripPaint();
       await new Promise((r) => setTimeout(r, 1100));
@@ -1687,7 +1693,7 @@ async function lookUp() {
 function tripPage() {
   const pg = $("#page"), host = pg.querySelector(".trip");
   if (host && host.dataset.tripname === TM.name) { tripPaint(); return; }
-  if (TM.map) { TM.map.remove(); TM.map = null; }
+  dropMap();
   const h = C.tripHead(TM.trip || { name: TM.name }, window.QuestTrips);
   pg.className = "page k-travel";
   pg.innerHTML = `<div class="ttop"><button class="btn" data-tback>&#8249; Trips</button><span class="pi">${esc(h.icon)}</span><div style="min-width:0"><h2>${esc(h.short)}</h2><div class="meta">${esc(h.dates)}</div></div></div>
@@ -1727,11 +1733,13 @@ async function tripPins(m) {
   const box = $("#tMap"); if (!box) return;
   let L; try { L = await mapLib(); } catch (e) { box.innerHTML = `<div class="meta" style="padding:20px">The map could not load (no connection to the map library).</div>`; return; }
   if (!$("#tMap") || $("#tMap") !== box) return;
+  m = tripModel();   // the map library may have taken seconds to arrive: draw what is true now
   if (!TM.map || TM.map.getContainer() !== box) {
     TM.map = L.map(box, { zoomControl: true, attributionControl: true });
     L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "© OpenStreetMap contributors" }).addTo(TM.map);
     TM.map.setView([20, 0], 2);
-    TM.layer = L.layerGroup().addTo(TM.map); TM.fitted = false;
+    TM.layer = L.layerGroup().addTo(TM.map); TM.fitted = false; TM.fitN = 0; TM.moved = false;
+    TM.map.on("dragstart", () => { TM.moved = true; });
   }
   TM.layer.clearLayers();
   for (const p of m.pins) {
@@ -1742,8 +1750,10 @@ async function tripPins(m) {
     L.marker([p.lat, p.lng], { icon, title: p.name, alt: p.name, keyboard: true, zIndexOffset: on ? 1000 : 0 }).addTo(TM.layer).on("click", () => tripPick(p.id));
   }
   TM.map.invalidateSize();   // the box may have just been drawn or shown (the phone's Map tab): measure before fitting
-  if (!TM.fitted && !TM.loading && box.offsetWidth) {
-    TM.fitted = true;
+  /* fit once the plans are read; fit again when a plan's dot is found later, until he moves the map or picks a pin */
+  const more = TM.fitted && m.pins.length > TM.fitN && !TM.moved && !TM.sel;
+  if ((!TM.fitted || more) && !TM.loading && box.offsetWidth) {
+    TM.fitted = true; TM.fitN = m.pins.length;
     const st = C.mapStart(m.pins, "", null);
     if (st.pins) TM.map.fitBounds(st.pins, { padding: [40, 40], maxZoom: 15 });
     else tripCentre();
@@ -1755,9 +1765,8 @@ async function tripCentre() {
   const T = window.QuestTrips, dest = T.destOf(TM.name, TM.trip && TM.trip.place), key = "dest:" + dest.toLowerCase(), name = TM.name;
   let all = spotsGet();
   if (dest && !(key in all)) {
-    let g = null;
-    try { const r = await fetch("https://nominatim.openstreetmap.org/search?format=json&limit=1&q=" + encodeURIComponent(dest)); const d = r.ok ? await r.json() : []; if (d[0]) g = { lat: +d[0].lat, lng: +d[0].lon }; } catch (e) {}
-    all = spotsGet(); all[key] = g; store.set(SPOTS, JSON.stringify(all));
+    const g = await geocode(dest);
+    all = spotsGet(); if (g !== undefined) { all[key] = g; store.set(SPOTS, JSON.stringify(all)); }
   }
   if (TM.name !== name || !TM.map) return;
   const st = C.mapStart([], dest, all[key]);
@@ -1802,7 +1811,7 @@ function tripWire() {
     const t = e.target.closest("[data-trip],[data-tpin],[data-tclose],[data-trm],[data-ttab],[data-tback]"); if (!t || !$("#page").contains(t)) return;
     const d = t.dataset;
     if (d.trip) openTrip(d.trip);
-    else if ("tback" in d) { S.trip = null; if (TM.map) { TM.map.remove(); TM.map = null; } render(); $("#page").scrollTop = 0; }
+    else if ("tback" in d) { S.trip = null; TM.run++; dropMap(); render(); $("#page").scrollTop = 0; }
     else if (d.ttab) tripTab(d.ttab);
     else if ("tclose" in d) { TM.sel = null; tripPaint(); }
     else if (d.trm) tripRemove(d.trm);
@@ -1818,7 +1827,7 @@ function tripWire() {
 function showPage(k) {
   /* Every type stays in the calendar (Junyan, 2026-11-13: "I want it to stay on the calendar app"; t9's jump to
      Day Quest Trips is gone). The plane's page lists his trips (tripsPage). */
-  if (k === "travel") loadTrips();
+  if (k === "travel") { S.trip = null; TM.run++; dropMap(); loadTrips(); }   // the plane always opens the trip list
   if (k === "packing" && !WIDE.matches) return;   // computer only (d14)
   if (S.page === "packing") packLeave();
   if (S.page === "cal" && $("#strip")) S.top = $("#view").scrollTop;
