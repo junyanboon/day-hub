@@ -4,8 +4,21 @@
     {
       "name": "day-hub",
       "runtimeExecutable": "python3",
-      "runtimeArgs": ["-m", "http.server", "8765"],
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8765"
+      ],
       "port": 8765
+    },
+    {
+      "name": "calendar-dev-trip-map",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "still/test/e2e/calendar-dev.mjs",
+        "8816"
+      ],
+      "port": 8816
     }
   ]
 }

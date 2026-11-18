@@ -186,18 +186,27 @@
   .sq.done { border-color:rgba(143,227,176,.65); background:linear-gradient(135deg, rgba(143,227,176,.18), rgba(127,208,255,.10)); }
   .sq-i { font-size:22px; } .sq-t { flex:1; font-weight:600; font-size:14px; }
   .sq-t small { display:block; font-weight:400; font-size:12px; color:var(--ink-soft); margin-top:2px; }
-  .sq-bar { display:block; height:6px; border-radius:4px; background:rgba(0,0,0,.25); margin-top:7px; overflow:hidden; }
-  .sq-bar b { display:block; height:100%; width:0; background:linear-gradient(90deg, #7fd0ff, #8fe3b0); border-radius:4px; transition:width .8s cubic-bezier(.2,.8,.2,1); }
   /* the water card (2026-10-19, d23): like the steps side quest, with a "by 4 PM" marker on the bar */
   .wq.done { border-color:rgba(127,208,255,.65); background:linear-gradient(135deg, rgba(127,208,255,.18), rgba(143,227,176,.08)); }
   /* the small line keeps to one line on a phone (Junyan, 2026-10-20, d76): only the block name gives way, with an ellipsis */
   .wq .sq-t { min-width:0; }   /* or a long line widens the card instead of truncating */
   .sq-t small.wq-sub { display:flex; white-space:nowrap; overflow:hidden; }
   .wq-sub span { flex:none; } .wq-sub .wq-blk { flex:0 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; }
-  .wq-bar { position:relative; height:10px; overflow:visible; margin-top:9px; }
-  .wq-bar b { background:linear-gradient(90deg, #7fd0ff, #b8e6ff); }
-  .wq-bar i { position:absolute; top:-3px; bottom:-3px; width:2px; background:#ffd479; border-radius:1px; }
-  .wq-bar em { position:absolute; top:12px; transform:translateX(-50%); font-style:normal; font-size:10px; color:#ffd479; white-space:nowrap; }
+  /* Pips (Junyan, 2026-10-24, d77, design C): 8 boxes on both cards. Water one a glass (gold outline on box 6, the
+     4 PM target); steps one per 1,000 (the prize mark on box 8). A box fills with a pop when it is earned. */
+  .pips { display:flex; gap:4px; margin-top:8px; }
+  .pips i { flex:1; height:14px; border-radius:4px; background:rgba(0,0,0,.25); position:relative; font-style:normal; }
+  .pips i.on { background:linear-gradient(135deg, #7fd0ff, #b8e6ff); }
+  .sq-st .pips i.on { background:linear-gradient(135deg, #8fe3b0, #7fd0ff); }
+  .pips i.mk { box-shadow:inset 0 0 0 2px #ffd479; }
+  .pips i.pz::after { content:"✦"; position:absolute; inset:0; display:grid; place-items:center; font-size:10px; line-height:1; color:#ffd479; }
+  .pips i.pz.on::after { color:#2a1f00; }
+  .pips i.pop { animation:pip-pop .5s cubic-bezier(.2,.8,.2,1) both; }
+  @keyframes pip-pop { 0% { transform:scale(.4); opacity:.3; } 60% { transform:scale(1.25); opacity:1; } 100% { transform:scale(1); } }
+  .sq-shoe { border-color:rgba(143,227,176,.6); background:radial-gradient(circle at 35% 30%, rgba(196,244,214,.35), rgba(143,227,176,.14) 70%); }
+  .sq-shoe:focus-visible { outline-color:#8fe3b0; }
+  .sq-shoe.hit { animation:shoe-hop .7s cubic-bezier(.2,.8,.2,1); } .sq-shoe.hit::after { border-color:#8fe3b0; }
+  @keyframes shoe-hop { 0% { transform:translateY(0); } 25% { transform:translateY(-9px) rotate(-12deg); } 50% { transform:translateY(0) rotate(4deg); } 70% { transform:translateY(-4px) rotate(-4deg); } 100% { transform:translateY(0); } }
   /* the drop is the button (Junyan, 2026-10-20: "make the water symbol into the thing I press"): one compact row */
   .wq-drop { flex:none; width:48px; height:48px; border-radius:50%; display:grid; place-items:center; padding:0; position:relative;
     border:1px solid rgba(127,208,255,.6); background:radial-gradient(circle at 35% 30%, rgba(184,230,255,.35), rgba(127,208,255,.14) 70%);
@@ -213,7 +222,7 @@
   .wq-plus { position:absolute; left:100%; top:-2px; margin-left:6px; font-style:normal; font-weight:700; font-size:13px; color:#7fd0ff; white-space:nowrap;
     pointer-events:none; animation:wq-plus 1.1s ease-out forwards; }
   @keyframes wq-plus { 0% { transform:translateY(4px) scale(.7); opacity:0; } 25% { transform:translateY(-6px) scale(1.15); opacity:1; } 100% { transform:translateY(-26px) scale(1); opacity:0; } }
-  @media (prefers-reduced-motion: reduce) { .wq-drop.hit { animation:none; } .wq-drop.hit::after, .wq-plus { display:none; } }
+  @media (prefers-reduced-motion: reduce) { .wq-drop.hit { animation:none; } .wq-drop.hit::after, .wq-plus { display:none; } .pips i.pop { animation:none; } }
   /* through the day (2026-10-20, d16): three tap buttons under the water bar */
   .wq { flex-direction:column; align-items:stretch; gap:10px; }
   .wq-top { display:flex; gap:12px; align-items:center; min-width:0; }
@@ -227,6 +236,9 @@
   .wq-it.met { border-color:rgba(143,227,176,.75); } .wq-it.met small { color:#8fe3b0; font-weight:600; }
   /* the gut log (2026-10-22, d2): count, Bristol type, sticky, blood, urgency (quest-gut.js) */
   .gq { flex-direction:column; align-items:stretch; gap:8px; }
+  .gq .gq-head { all:unset; display:flex; align-items:center; gap:12px; width:100%; cursor:pointer; -webkit-tap-highlight-color:transparent; }
+  .gq .gq-head .sq-t { flex:1; min-width:0; } .gq-chev { flex:none; font-size:22px; color:var(--ink-soft); transition:transform .2s; } .gq-head[aria-expanded="true"] .gq-chev { transform:rotate(90deg); }
+  .gq .gq-head:focus-visible { outline:2px solid #8fe3b0; outline-offset:2px; border-radius:10px; }
   .gq-row { display:flex; align-items:center; gap:4px; font-size:12px; color:var(--ink-soft); }
   .gq-row > span:first-child { width:54px; flex:none; }
   .gq-row > button { flex:1 1 0; max-width:44px; } .gq-row > button[data-gut="sticky"], .gq-row > button[data-gut="blood"] { max-width:none; }
@@ -355,6 +367,96 @@
   .btn.small { flex:none; padding:8px 12px; font-size:13px; }
   .glabel { display:block; font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--ink-soft); margin:14px 0 6px; }
   #gProg { width:100%; padding:12px; border-radius:12px; background:rgba(0,0,0,.25); color:var(--ink); border:1px solid var(--glass-border); font:inherit; font-size:15px; }
+  /* Gym coach, compact (2026-11-09, after Mobbin: Nike Training Club hero, WHOOP list) */
+  .gx { --gx-line:rgba(255,255,255,.08); --gx-card:rgba(255,255,255,.05); --gx-dim:rgba(255,255,255,.55); --gx-acc:#8fe3b0; }
+  .gx-page { display:grid; grid-template-columns:250px minmax(0, 640px); gap:28px; align-items:start; }
+  .gx-nav { position:sticky; top:0; display:flex; flex-direction:column; gap:4px; }
+  .gx-nav h1 { font-size:22px; font-weight:700; margin:0 0 10px; letter-spacing:-.01em; }
+  #gymHome button.gx-mv, .gx-mv { display:flex; align-items:center; gap:10px; width:100%; padding:6px; border-radius:12px; text-align:left; background:transparent; border:0; color:inherit; cursor:pointer; }
+  .gx-mv:hover { background:rgba(255,255,255,.05); } .gx-mv.on { background:rgba(255,255,255,.09); }
+  .gx-mv img { width:56px; height:36px; object-fit:cover; border-radius:8px; flex:none; opacity:.85; }
+  .gx-mv b { display:block; font-size:14px; font-weight:600; } .gx-mv small { font-size:12px; color:rgba(255,255,255,.5); }
+  .gx-tick { font-style:normal; color:#8fe3b0; font-size:13px; }
+  .gx-grow { flex:1; min-width:0; }
+  .gx-top { display:flex; justify-content:space-between; align-items:flex-end; gap:12px; }
+  .gx-eye { font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--gx-dim); }
+  .gx h2 { margin:2px 0 0; font-size:24px; font-weight:700; letter-spacing:-.01em; text-transform:none; }
+  .gx button.gx-ghost { width:auto; padding:6px 12px; border-radius:999px; border:1px solid var(--gx-line); background:transparent; color:var(--gx-dim); font-size:13px; cursor:pointer; }
+  .gx-tabs { display:flex; gap:18px; border-bottom:1px solid var(--gx-line); margin:14px 0 16px; }
+  .gx-tabs button { width:auto; padding:8px 0; margin-bottom:-1px; background:none; border:0; border-bottom:2px solid transparent; border-radius:0; color:var(--gx-dim); font-size:14px; cursor:pointer; box-shadow:none; }
+  .gx-tabs button.on { color:#fff; border-color:var(--gx-acc); font-weight:600; }
+  body.has-side .gym-top { display:none; }
+  .gx-pick { display:flex; gap:8px; overflow-x:auto; margin:0 -16px 12px; padding:0 16px 4px; scroll-snap-type:x mandatory; scrollbar-width:none; }
+  .gx-pick::-webkit-scrollbar { display:none; }
+  .sheet .gx-pick .gx-mv, .gx-pick .gx-mv { border-radius:14px; width:auto; margin:0; min-height:0; box-shadow:none; color:#fff; font:inherit; text-align:left; flex:0 0 132px; flex-direction:column; align-items:flex-start; gap:6px; padding:6px; scroll-snap-align:start; background:rgba(255,255,255,.05); position:relative; }
+  .gx-pick .gx-mv.on { background:rgba(255,255,255,.14); box-shadow:inset 0 0 0 1.5px #8fe3b0; }
+  .gx-pick .gx-mv img { width:100%; height:64px; }
+  .gx-pick .gx-mv b { font-size:13px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:118px; }
+  .gx-pick .gx-tick { position:absolute; top:10px; right:12px; background:#8fe3b0; color:#12321f; border-radius:50%; width:18px; height:18px; display:grid; place-items:center; font-size:11px; }
+  .gx-pick button { width:auto; flex:none; padding:5px 11px; border-radius:999px; font-size:12px; background:rgba(255,255,255,.07); border:0; color:#fff; }
+  .gx-pick button.on { background:#fff; color:#2a2453; }
+  .gx-hero { position:relative; display:block; aspect-ratio:16/7; border-radius:16px; background-size:cover; background-position:center; overflow:hidden; }
+  .gx-hero::after { content:""; position:absolute; inset:0; background:linear-gradient(180deg, transparent 40%, rgba(0,0,0,.55)); }
+  .gx-pbtn { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width:52px; height:52px; border-radius:50%; background:rgba(255,255,255,.92); color:#2a2453; display:grid; place-items:center; font-size:18px; z-index:1; }
+  .gx-len { position:absolute; right:10px; bottom:8px; font-size:12px; color:#fff; z-index:1; }
+  .gx-facts { display:flex; flex-wrap:wrap; gap:6px 16px; margin:12px 0; font-size:13px; color:var(--gx-dim); }
+  .gx button.gx-cta { display:block; width:100%; padding:13px; border-radius:999px; border:0; background:#fff; color:#2a2453; font-weight:700; font-size:15px; cursor:pointer; }
+  .gx-label { margin:18px 0 6px; font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--gx-dim); }
+  .gx-list { border-radius:14px; background:var(--gx-card); overflow:hidden; }
+  .gx-step, .gx-row { display:flex; align-items:center; gap:12px; padding:9px 12px; font-size:14px; border-top:1px solid var(--gx-line); }
+  .gx-step:first-child, .gx-row:first-child { border-top:0; }
+  .gx-t { width:38px; flex:none; font-variant-numeric:tabular-nums; color:var(--gx-dim); font-size:12px; }
+  .gx-play { color:var(--gx-dim); text-decoration:none; font-size:11px; } .gx-play:hover { color:#fff; }
+  .gx-row.off { color:var(--gx-dim); } .gx-row > span:first-child { width:56px; flex:none; white-space:nowrap; font-size:12px; color:var(--gx-dim); }
+  .gx-dim { color:var(--gx-dim); font-size:12px; }
+  .gx-chips { display:flex; flex-wrap:wrap; gap:6px; }
+  .gx-chips a, .gx-chips span { padding:5px 10px; border-radius:999px; background:var(--gx-card); color:#fff; text-decoration:none; font-size:12px; }
+  .gx-chips b { color:var(--gx-dim); font-weight:500; margin-right:3px; }
+  .gx-rule { border-top:1px solid var(--gx-line); } .gx-rule:first-child { border-top:0; }
+  .gx-rule summary { list-style:none; cursor:pointer; padding:10px 12px; font-size:14px; display:flex; justify-content:space-between; }
+  .gx-rule summary::-webkit-details-marker { display:none; }
+  .gx-rule summary::after { content:"+"; color:var(--gx-dim); } .gx-rule[open] summary::after { content:"−"; }
+  .gx-rule p { margin:0; padding:0 12px 12px; font-size:13px; line-height:1.5; color:rgba(255,255,255,.75); }
+  .gx-steps { display:flex; flex-direction:column; gap:0; padding-left:6px; }
+  .gx-ms { display:flex; align-items:center; gap:10px; font-size:13px; color:var(--gx-dim); padding:5px 0; position:relative; }
+  .gx-ms i { width:10px; height:10px; border-radius:50%; border:1.5px solid rgba(255,255,255,.3); flex:none; }
+  .gx-ms.done i { background:var(--gx-acc); border-color:var(--gx-acc); } .gx-ms.done { color:rgba(255,255,255,.75); }
+  .gx-ms.now i { background:#ffd479; border-color:#ffd479; box-shadow:0 0 0 4px rgba(255,212,121,.2); } .gx-ms.now { color:#fff; font-weight:600; }
+  .gx-card { padding:14px; border-radius:14px; background:var(--gx-card); }
+  .gx-week { display:flex; gap:6px; } .gx-day { flex:1; text-align:center; padding:7px 0; border-radius:9px; font-size:12px; background:rgba(255,255,255,.05); color:var(--gx-dim); }
+  .gx-day.on { background:var(--gx-acc); color:#12321f; font-weight:700; }
+  .gx-stat { margin-top:10px; font-size:14px; }
+  .gx-foot { font-size:12px; color:var(--gx-dim); margin-top:10px; }
+  .gx .gc-step { background:var(--gx-card); }
+  .gym-page { max-width:760px; } .gym-page h1 { font-size:26px; margin:0 0 10px; }
+  .gym-page .gc-t { font-size:4em; } .gym-page .gc-step { font-size:1.1em; }
+  .gc-moves { margin-bottom:6px; }
+  .gc-open { display:block; width:100%; margin-top:10px; text-align:left; }
+  .gc-open small { display:block; opacity:.7; font-weight:400; }
+  .gc-top { display:flex; justify-content:space-between; align-items:center; gap:8px; }
+  .gc-tabs { margin:10px 0; }
+  .gc-wk { display:flex; gap:6px; margin:8px 0; }
+  .gc-d { flex:1; text-align:center; padding:6px 0; border-radius:10px; background:rgba(255,255,255,.08); }
+  .gc-d.on { background:rgba(143,227,176,.45); font-weight:700; }
+  .gc-big { font-size:1.05em; line-height:1.4; }
+  .gc-tab { width:100%; border-collapse:collapse; font-size:.9em; }
+  .gc-tab th, .gc-tab td { text-align:left; padding:5px 4px; border-bottom:1px solid rgba(255,255,255,.1); }
+  .gc-vid { display:block; text-align:center; text-decoration:none; margin:6px 0 10px; }
+  .gc-ch a { display:block; padding:8px 10px; margin-top:4px; border-radius:10px; background:rgba(255,255,255,.08); color:inherit; text-decoration:none; }
+  .gc-rules li, .gc-plan li { margin:6px 0; line-height:1.4; }
+  .gc-clock { text-align:center; margin:6px 0 10px; }
+  .gc-t { font-size:2.6em; font-weight:700; font-variant-numeric:tabular-nums; }
+  .gc-t small { font-size:.4em; opacity:.6; }
+  .gc-dots { display:flex; justify-content:center; gap:6px; margin-top:4px; }
+  .gc-dot { width:10px; height:10px; border-radius:50%; background:rgba(255,255,255,.2); }
+  .gc-dot.past { background:rgba(143,227,176,.6); } .gc-dot.now { background:#ffd479; transform:scale(1.3); }
+  .gc-step { padding:12px; border-radius:14px; background:rgba(255,255,255,.1); }
+  .gc-step h4 { margin:6px 0; font-size:1.25em; } .gc-step li { margin:6px 0; line-height:1.4; }
+  .gc-h { display:flex; justify-content:space-between; opacity:.75; font-size:.9em; font-variant-numeric:tabular-nums; }
+  .gc-cue { display:inline-block; margin-top:6px; color:#9fd0ff; }
+  .gc-stop { margin-top:10px; padding:10px; border-radius:10px; background:rgba(255,120,120,.16); }
+  .gc-test { margin-top:10px; }
+  .gc-ctl { margin-top:10px; }
   .gmove { margin-top:12px; padding:12px; border-radius:14px; background:rgba(255,255,255,.08); }
   /* compact rows (later 2026-10-16): one shut row per move, one open at a time */
   .gmoves .gmove { margin-top:6px; padding:0; overflow:hidden; }
@@ -703,6 +805,13 @@
   .kt-seg button[aria-pressed="true"], .kt-seg button[aria-selected="true"] { background:rgba(255,255,255,.2); color:#fff; }
   .kt-first { margin-top:10px; padding:9px 12px; border-radius:14px; background:rgba(0,0,0,.22); border:1px solid rgba(255,194,122,.7); font-size:13.5px; }
   .kt-first b { color:var(--warn); }
+  /* Use it up and the age colours (d70) */
+  .kt-up { display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
+  .kt-upi { font:inherit; font-size:13px; color:inherit; padding:4px 10px; border-radius:999px; background:rgba(255,212,121,.12); border:1px solid rgba(255,212,121,.6); cursor:pointer; }
+  .kt-upi.old { background:rgba(255,120,120,.14); border-color:rgba(255,130,130,.75); }
+  .kt-upi small { opacity:.75; }
+  .ki.age-soon { border-color:rgba(255,212,121,.75); } .ki.age-soon .st { color:var(--gold); }
+  .ki.age-old { border-color:rgba(255,130,130,.8); } .ki.age-old .st { color:#ff9c9c; }
   .kt-tools { display:flex; gap:6px; flex-wrap:wrap; align-items:center; margin-top:10px; }
   /* the recipe book (2026-10-22, d9): all of Paprika, loaded when it opens (quest-library.js) */
   .rb-list { display:flex; flex-direction:column; gap:4px; margin-top:8px; }
@@ -1017,6 +1126,19 @@
   .soon-det .mo-det { padding:0; }
   .mo-row { display:flex; align-items:center; gap:10px; width:100%; padding:10px 12px; border-radius:16px; background:rgba(255,255,255,.14); color:#fff; text-align:left; }
   .mo-row-t { width:66px; flex:none; font-size:13px; opacity:.85; } .mo-row-n { flex:1; min-width:0; font-size:15px; } .mo-row-go { flex:none; opacity:.7; font-size:18px; }
+  /* ?embed=calendar (2026-10-30, d5): the Mac Day Quest orb's one-click popout shows only this calendar */
+  body.embed-cal #app > :not(.cal-head):not(#mtn) { display:none !important; }
+  body.embed-cal #app { padding-top:6px; }
+  body.embed-cal .cal-head { margin:0; padding:2px 2px 10px; position:relative; z-index:8; }
+  body.embed-cal #mtn { max-height:calc(100vh - 54px); }
+  /* see-through widget (2026-10-30, Junyan: "a small seethrough calendar"): the Mac app paints its own
+     blur behind the page, so the page drops the sky and its opaque fills; cards keep their glass */
+  html:has(body.embed-cal), html[class]:has(body.embed-cal) { background:transparent !important; background-image:none !important; }
+  body.embed-cal #sky { display:none !important; }
+  body.embed-cal .cal-head { display:none; }
+  body.embed-cal #app { padding:4px 8px 8px; }
+  body.embed-cal #mtn { max-height:calc(100vh - 12px); background:transparent; }
+  body.embed-cal .cal-sticky { background:rgba(40,36,88,.55) !important; -webkit-backdrop-filter:blur(8px); backdrop-filter:blur(8px); }
 </style>
 <link rel="stylesheet" href="bag.css?v=20261011a">
 <style>
@@ -1025,7 +1147,8 @@
     src:url(fonts/figtree-latin.woff2) format("woff2"); }
 </style>
 <script src="keeps.js?v=20261009k"></script>
-<script src="bag.js?v=20261019a"></script>
+<script src="bag.js?v=20261023a"></script>
+<script src="quest-timing.js?v=20261103a"></script>
 <script src="quest-merge.js?v=20261022g1"></script>
 <script src="quest-oura.js?v=20261019a"></script>
 <script src="quest-levels.js?v=20261016b"></script>
@@ -1041,17 +1164,20 @@
 <script src="quest-fx.js?v=20261019x"></script>
 <script src="quest-night.js?v=20261020end2"></script>
 <script src="quest-basics.js?v=20261022y2"></script>
-<script src="quest-suggest.js?v=20261019a"></script>
-<script src="quest-water.js?v=20261022c1"></script>
-<script src="quest-gut.js?v=20261022g2"></script>
+<script src="quest-suggest.js?v=20261024a"></script>
+<script src="quest-water.js?v=20261024p1"></script>
+<script src="quest-gut.js?v=20261024g3"></script>
 <script src="quest-library.js?v=20261022b1"></script>
 <script src="quest-gym.js?v=20261019x"></script>
-<script src="quest-morning.js?v=20261019a"></script>
-<script src="quest-agenda.js?v=20261023d94b"></script>
+<script src="quest-gymcoach.js?v=20261109f"></script>
+<script src="quest-morning.js?v=20261030c"></script>
+<script src="quest-buckets.js?v=20261030c"></script>
+<script src="quest-agenda.js?v=20261118d94"></script>
 <script src="quest-offline.js?v=20261017a"></script>
 <script src="quest-nearby.js?v=20261016k"></script>
 </head>
 <body>
+<script>if (new URLSearchParams(location.search).get("embed") === "calendar") document.body.classList.add("embed-cal");</script>
 <div id="sky" aria-hidden="true"><div class="sky-stars"></div><div class="sky-orb"></div>
   <svg class="sky-dunes" viewBox="0 0 1200 220" preserveAspectRatio="none"><path class="d1" d="M0 120 Q160 60 330 105 T700 90 T1200 70 V220 H0 Z"/>
   <path class="d2" d="M0 170 Q220 110 470 150 T900 135 T1200 125 V220 H0 Z"/><path class="d3" d="M0 205 Q300 165 620 195 T1200 180 V220 H0 Z"/></svg></div>
@@ -1060,6 +1186,7 @@
     <div class="avatar" id="avatar"><img src="sprites/head.webp" alt=""></div>
     <div class="status"><span id="statusL">Loading your day…</span><span id="statusR"></span></div>
     <div class="combo" id="combo" title="Days in a row ending at 70% prana or more"><span class="n" id="comboN">·</span><span class="l" id="comboL">days 70+</span></div>
+    <button class="gear gym-top" id="gymBtn" aria-label="Gym coach">🏋️</button>
     <button class="gear" id="bagBtn" aria-label="Bag">🎒</button>
     <button class="gear" id="gear" aria-label="Settings">⚙️</button>
   </div>
@@ -1072,7 +1199,7 @@
   <div id="nextLine"></div>
   <div id="habits"></div>
 
-  <h2><span>Calendar</span><button class="add-btn" id="zap" hidden>↩︎ Back to the quest</button></h2>
+  <h2 class="cal-head"><span>Calendar</span><button class="add-btn" id="zap" hidden>↩︎ Back to the quest</button><a class="add-btn" id="calAppBtn" href="calendar.html" target="_blank" rel="noopener" style="text-decoration:none">Open calendar app</a></h2>
   <div id="mtn"><div class="cal-sticky" id="calDay"></div><div id="calBody"></div></div>
 
   <h2><span>Skills</span><button class="add-btn" id="skillsBtn">Open</button></h2>
@@ -1089,6 +1216,26 @@
 
 <script>
 (() => {
+  /* ---------- ?timing=1: when each load step happened (quest-timing.js, d102) ---------- */
+  const QT = window.QuestTiming ? QuestTiming.create({ search:location.search, now:() => performance.now(), log:s => console.log(s) })
+    : { on:false, mark(){}, wrapFetch:f => f, lines:() => [], onLine(){} };
+  if (QT.on) {
+    window.fetch = QT.wrapFetch(window.fetch.bind(window));
+    const box = document.createElement("div");
+    box.id = "qtiming";
+    box.style.cssText = "position:fixed;left:8px;bottom:8px;z-index:3000;max-width:min(94vw,460px);max-height:45vh;overflow:auto;padding:8px 10px;"
+      + "border-radius:10px;background:rgba(10,12,30,.92);color:#cfe;font:11px/1.45 ui-monospace,Menlo,monospace;white-space:pre-wrap;box-shadow:0 6px 20px rgba(0,0,0,.5)";
+    box.innerHTML = `<div style="display:flex;justify-content:space-between;gap:8px;margin-bottom:4px"><b>Timing (ms since the page started)</b>`
+      + `<button type="button" style="font:inherit;border:0;border-radius:6px;padding:1px 8px;background:#c9b6ff;color:#2a2453;cursor:pointer">Copy</button></div><div></div>`;
+    const list = box.lastChild;
+    box.querySelector("button").onclick = () => { try { navigator.clipboard.writeText(QT.lines().join("\n")); } catch {} };
+    QT.onLine(line => { list.textContent += (list.textContent ? "\n" : "") + line; });
+    document.body.appendChild(box);
+    addEventListener("error", e => QT.mark("page error", e.message));
+    addEventListener("unhandledrejection", e => QT.mark("page error (promise)", String(e.reason && e.reason.message || e.reason)));
+    let paired = "unknown"; try { paired = localStorage.getItem("quest-key") ? "yes" : "no"; } catch {}
+    QT.mark("page start", `paired ${paired}, service worker ${navigator.serviceWorker && navigator.serviceWorker.controller ? "on" : "off"}`);
+  }
   /* ---------- config + clock ---------- */
   const API = new URLSearchParams(location.search).get("api") || "https://still.srv1948070.hstgr.cloud";
 
@@ -1234,20 +1381,21 @@
     return list.filter(t => waiting[t.id] !== true);
   }
   // the saved day for the day it is now, if there is one: true when it was put on screen
+  let savedWhy = "";   // why the saved day was not used (?timing=1)
   function useSaved(){
     const s = readSnap();
-    if (!s || !s.plan) return false;
+    if (!s || !s.plan) { savedWhy = !SNAP_OK ? "test clock (?at=)" : store.get(SNAP) ? "saved day unreadable" : "no saved day on this device"; return false; }
     const tzWas = PLAN_TZ;
     PLAN_TZ = s.plan.tz || null;   // the saved zone decides which day it is there
     const day = QuestOffline.savedDay(s, tzYmd(new Date(now() - 4 * 3600000)));
-    if (!day) { PLAN_TZ = tzWas; return false; }
+    if (!day) { PLAN_TZ = tzWas; savedWhy = `saved day is ${s.ymd}, and its agenda has no ${tzYmd(new Date(now() - 4 * 3600000))}`; return false; }
     PLAN = day.plan; GAME_YMD = day.ymd; TASKS = dropWaiting(day.tasks); AG = day.ag; PLAN_AT = day.at;
     OPS = day.ops || { edits:{}, drops:[], adds:[], ts:0 };
     const out = QuestOffline.pendingOps(readJSON(OPS_OUT, {}), dayKey());
     if (out && out.ts > (OPS.ts || 0)) OPS = out;
     return true;
   }
-  if (SNAP_OK) useSaved();   // shown as "updating…" until the first pull says whether it is offline
+  const SAVED_FIRST = SNAP_OK ? useSaved() : (savedWhy = "test clock (?at=)", false);   // shown as "updating…" until the first pull says whether it is offline
 
   // the service worker marks an answer from its saved copy (x-dq-saved: when it was fetched, 0 if unknown)
   // a slow but working line is not offline: it goes on as before (2026-10-11 Egypt), with the saved answer
@@ -1310,7 +1458,8 @@
     AG = next;
   }
   // at: when this calendar came from still-api, so an offline open can say how old it is
-  const saveSnap = () => { if (SNAP_OK && PLAN) try { localStorage.setItem(SNAP, JSON.stringify({ at:PLAN_AT || Date.now(), ymd:GAME_YMD, plan:PLAN, ops:OPS, tasks:TASKS, ag:AG })); } catch {} };
+  const saveSnap = () => { if (SNAP_OK && PLAN) try { localStorage.setItem(SNAP, JSON.stringify({ at:PLAN_AT || Date.now(), ymd:GAME_YMD, plan:PLAN, ops:OPS, tasks:TASKS, ag:AG })); }
+    catch (e) { QT.mark("saved day NOT saved", e.message); } };
   // a save that cannot hang the page on a network that never answers
   function postJSON(path, body, ms = 8000){
     const ac = new AbortController(), t = setTimeout(() => ac.abort(), ms);
@@ -1387,7 +1536,7 @@
   async function pullAll(){
     try {
       flushTasks();
-      try { await pullPlan(); }   // first: it sets the zone, which decides today's date key
+      try { await pullPlan(); QT.mark("fresh plan in", SAVED_AT == null ? "" : "from the saved copy (offline or slow)"); }   // first: it sets the zone, which decides today's date key
       catch (e) {
         // offline with nothing saved for this date by the service worker: the last day this phone saw (2026-10-17)
         if (!useSaved()) { SAVED_AT = PLAN ? PLAN_AT || 0 : null; throw e; }
@@ -1420,8 +1569,9 @@
       }   // offline: both wait for a fresh calendar, so nothing is placed twice or against an old day
       saveSnap();
       setTimeout(openPending, 0);
-    } catch (e) { pullErr = plainWhy(e); }   // plain words on the status line (d94)
+    } catch (e) { pullErr = plainWhy(e); QT.mark("pull failed", pullErr); }   // plain words on the status line (d94)
     render();
+    QT.mark("fresh calendar drawn", `${document.querySelectorAll("#calBody .cal-ev").length} items${pullErr ? ", " + pullErr : ""}`);
   }
   /* Same protocol as Stillness: the whole day's edit layer, last-write-wins on
      ts. Pull first so a phone edit made a minute ago is not overwritten. */
@@ -1580,7 +1730,8 @@
   const isSleep = b => b.kind === "rest" && /sleep(?!er)|\bbed\b/i.test(b.t);   // not "Sleeper Train"
   // an event over 12 hours (a car rental, a stay) is a booking, not a block of his time (d70, 2026-10-20): it stays on
   // the calendar view but never holds back Day's end, takes Right now or Next, or fills the day for the sadhana slot
-  const isBooking = b => +b.e - +b.s > 12 * 3600000;
+  // the rule lives in quest-agenda.js so every check (and the morning planner's step 2) uses the same one (2026-10-20)
+  const isBooking = b => globalThis.QuestAgenda && globalThis.QuestAgenda.isBooking ? globalThis.QuestAgenda.isBooking(b) : (!!b.allDay || +b.e - +b.s > 12 * 3600000);
   const isMeal = b => b.kind === "fuel";
   // what a block is worth in prana: [on time, late, "not today", missed]
   /* Prana is an energy reading (d102, NVC: no rewards, no punishment). Sadhana,
@@ -1739,7 +1890,7 @@
      "done" flag travels with the game. Reads still-api /steps (public like
      /sleep; the VPS passes it to the Cloudflare Worker that holds the Oura token). */
   const STEP_GOAL = 8000;
-  let STEPS = null;
+  let STEPS = null, stepsFrom = null;   // stepsFrom: boxes before a new Oura read, so only new boxes pop
   const stepGain = () => Math.round(5 * gainMult());
   async function pullSteps(){
     if (!G.day) return;
@@ -1747,7 +1898,8 @@
       const r = await fetch(API + "/steps", { cache:"no-store" }); if (!r.ok) return;
       const j = await r.json();
       const d = (j.days || []).find(x => x.day === gameYmd());
-      STEPS = d ? d.steps : 0;
+      const was = STEPS; STEPS = d ? d.steps : 0;
+      if (was != null && QW() && QW().stepBoxes(STEPS) > QW().stepBoxes(was)) stepsFrom = QW().stepBoxes(was);
       if (STEPS >= STEP_GOAL && !G.day.stepsDone && !DRY) {
         G.day.stepsDone = true;
         addBody(stepGain(), "8,000 steps (Oura)", "8,000 steps");
@@ -1757,12 +1909,19 @@
       }
     } catch {}
   }
+  // the 8 boxes (d77): mk is the gold 4 PM outline (water), pz the prize mark (steps)
+  const pipsHTML = (ps, cls) => `<span class="pips" aria-hidden="true">${ps.map(p => `<i class="${[p.on && "on", p.pop && "pop", p.mark && cls].filter(Boolean).join(" ")}"></i>`).join("")}</span>`;
   function stepsHTML(){
-    if (STEPS == null) return "";
-    const done = G.day.stepsDone || STEPS >= STEP_GOAL, pct = Math.min(100, Math.round(STEPS / STEP_GOAL * 100));
-    return `<div class="sq${done ? " done" : ""}"><span class="sq-i">👟</span><span class="sq-t">Side quest · ${STEPS.toLocaleString()} / 8,000 steps` +
-      `<small>${done ? "Done. Walking gave you a boost." : `${(STEP_GOAL - STEPS).toLocaleString()} to go, then +${stepGain()} prana`}</small>` +
-      `<i class="sq-bar"><b style="width:${pct}%"></b></i></span></div>`;
+    if (STEPS == null || !QW() || !QW().pips) return "";
+    const done = G.day.stepsDone || STEPS >= STEP_GOAL, W = QW(), from = stepsFrom; stepsFrom = null;
+    return `<div class="sq sq-st${done ? " done" : ""}"><button type="button" class="wq-drop sq-shoe" data-shoe aria-label="How far to the next box" title="+${stepGain()} prana at 8,000">👟</button>` +
+      `<span class="sq-t">Steps · ${STEPS.toLocaleString("en-US")} / 8,000${pipsHTML(W.pips(W.stepBoxes(STEPS), from, 8), "pz")}</span></div>`;
+  }
+  // the shoe (d77): a small pop with how far the next box is; it logs nothing
+  function tapShoe(el){
+    if (STEPS == null || !QW()) return;
+    if (el) { el.classList.remove("hit"); void el.offsetWidth; el.classList.add("hit"); setTimeout(() => el.classList.remove("hit"), 800); }
+    calToast(QW().stepsNext(STEPS), 3500);
   }
 
   /* ---------- Water (Junyan, 2026-10-19, d23 and d24; quest-water.js) ----------
@@ -1773,20 +1932,20 @@
   const hourNow = () => +tzParts(now(), { hour:"numeric", hourCycle:"h23" }).hour;
   function waterBlock(){ const b = currentOf(blocks(), now()); return b && b.kind !== "open" && b.kind !== "break" && !isSleep(b) ? b : null; }
   function waterPay(){ const h = HABITS.find(x => x[0] === "water"); return QW().pay(G.day.glasses, Math.max(1, Math.round(h[2] * gainMult())), h[3]); }
-  let waterBarFrom = null;   // the bar width before a tap, so the redrawn bar can fill from it
+  let waterFrom = null;   // the glass count before a tap, so only the new box pops
   function waterHTML(){
     if (!QW() || !G.day) return "";
-    const W = QW(), s = W.summary(G.day.glasses), b = waterBlock(), pct = Math.min(100, Math.round(s.total / W.AIM * 100));
+    const W = QW(), s = W.summary(G.day.glasses), b = waterBlock();
     const left = W.AIM - s.total, after = W.late(hourNow()), nm = b ? shortName(b) : "";
     const sub = s.total >= W.AIM ? `${s.total} glasses, ${(s.ml / 1000).toLocaleString()} L. The aim is met.`
       : `${s.ml.toLocaleString()} ml so far${!after && s.total < W.BY4 ? `, ${W.BY4 - s.total} more by 4 PM` : `, ${left} to the aim`}`;
-    const from = waterBarFrom != null ? waterBarFrom : pct; waterBarFrom = null;   // the bar fills from the last count after a tap
+    const from = waterFrom; waterFrom = null;
     return `<div class="sq wq${s.total >= W.AIM ? " done" : ""}"><div class="wq-top">` +
       `<button type="button" class="wq-drop" data-glass aria-label="Add one glass" title="${esc(W.button(nm, hourNow()))}">💧</button>` +
-      `<span class="sq-t">Water · <span class="wq-n">${s.total} / ${W.AIM}</span> glasses` +
+      `<span class="sq-t">Water · <span class="wq-n">${s.total} / ${W.AIM}</span>` +
       `<small class="wq-sub"><span>${esc(sub)}</span>${W.tail(nm, hourNow(), s.total).map(x =>
         `<span${x.blk ? ' class="wq-blk"' : ""}>&nbsp;· ${esc(x.t)}</span>`).join("")}</small>` +
-      `<i class="sq-bar wq-bar"><b style="width:${from}%" data-to="${pct}"></b><i style="left:${W.markerPct()}%"></i><em style="left:${W.markerPct()}%">by 4 PM</em></i></span></div>${dayItemsHTML()}</div>`;
+      (W.pips ? pipsHTML(W.pips(s.total, from, W.BY4), "mk") : "") + `</span></div>${dayItemsHTML()}</div>`;
   }
   /* Through the day (Junyan, 2026-10-20, d16): supplements, fermented food and xylitol, moved here from the meal sheet.
      The count is how many times the habit counts today (habitN), so a tile tapped in a meal earlier today still shows. */
@@ -1831,7 +1990,11 @@
     if (!QGut() || !G.day) return "";
     const g = G.day.gut || {}, Q = QGut(), on = (c) => c ? " on" : "";
     const bt = (f, v, label, extra) => `<button type="button" class="${extra || ""}${on(f === "sticky" || f === "blood" ? g[f] : g[f] === v)}" data-gut="${f}" data-v="${v}">${label}</button>`;
-    return `<div class="sq gq"><span class="sq-t">🚽 Gut today<small>${esc(Q.line(g))}</small></span>` +
+    const open = gutOpen();
+    const head = `<button type="button" class="gq-head" data-guttog aria-expanded="${open}"><span class="sq-i">🚽</span><span class="sq-t">Gut<small>${esc(Q.line(g))}</small></span>` +
+      `<span class="gq-chev" aria-hidden="true">›</span></button>`;
+    if (!open) return `<div class="sq gq gq-closed">${head}</div>`;
+    return `<div class="sq gq">${head}` +
       `<div class="gq-row"><span>Times</span><button type="button" data-gut="n" data-v="${(g.n || 0) - 1}" aria-label="One less">−</button>` +
       `<span class="gq-n">${g.n != null ? g.n : "–"}</span><button type="button" data-gut="n" data-v="${(g.n || 0) + 1}" aria-label="One more">+</button></div>` +
       `<div class="gq-row"><span>Type</span>${Q.BRISTOL.map(([v, nm]) => bt("b", v, v, "").replace("<button ", `<button title="${esc(nm)}" `)).join("")}</div>` +
@@ -1841,28 +2004,34 @@
       `<div class="gq-row"><span></span>${bt("sticky", 1, "Sticky")}${bt("blood", 1, "Blood", "bad")}</div>` +
       (Q.warn(g) ? `<div class="gq-warn">${esc(Q.warn(g))}</div>` : "") + `</div>`;
   }
+  // open or closed per device, closed again each new day (Junyan, 2026-10-24); localStorage can throw, so try/catch
+  function gutOpen(){ try { return QGut().isOpen(localStorage.getItem(QGut().OPEN_KEY), G.day.date); } catch (e) { return false; } }
+  function tapGutHead(){
+    if (!QGut() || !G.day) return;
+    try { localStorage.setItem(QGut().OPEN_KEY, QGut().toggle(localStorage.getItem(QGut().OPEN_KEY), G.day.date)); } catch (e) {}
+    render();
+  }
   function tapGut(bn){
     if (!QGut() || !G.day) return;
     G.day.gut = QGut().set(G.day.gut, bn.dataset.gut, +bn.dataset.v, now().toISOString());
     render();
   }
   function gutStamp(){ return QGut() && G.day ? QGut().stamp(G.day.gut) : {}; }
-  // after a tap redraws the card: the drop bounces with a splash ring, "+1" floats off the count, the bar fills
+  // after a tap redraws the card: the drop bounces with a splash ring, "+1" floats off the count, the new box pops
   function waterCheer(focused){
     const card = document.querySelector(".wq"); if (!card) return;
-    const drop = card.querySelector(".wq-drop"), n = card.querySelector(".wq-n"), bar = card.querySelector(".wq-bar b");
+    const drop = card.querySelector(".wq-drop"), n = card.querySelector(".wq-n");
     if (drop) { drop.classList.remove("hit"); void drop.offsetWidth; drop.classList.add("hit"); setTimeout(() => drop.classList.remove("hit"), 800); }
-    waterBarFrom = null;
+    waterFrom = null;
     if (drop && focused) drop.focus();
     if (n) { const p = document.createElement("span"); p.className = "wq-plus"; p.setAttribute("aria-hidden", "true"); p.textContent = "+1"; n.appendChild(p); setTimeout(() => p.remove(), 1200); }
-    if (bar) requestAnimationFrame(() => requestAnimationFrame(() => { bar.style.width = bar.dataset.to + "%"; }));
   }
   function waterStamp(){ const s = QW() ? QW().summary(G.day.glasses) : null; return s && s.total ? { wt:s.total, w4:s.before4 } : {}; }
   function addGlass(el){
     if (!QW() || !G.day) return;
     const b = waterBlock(), id = "g" + (+now()) + Math.random().toString(36).slice(2, 6), d = waterPay();
     const fx = window.QuestFx, rect = el ? el.getBoundingClientRect() : null;
-    waterBarFrom = Math.min(100, Math.round(QW().summary(G.day.glasses).total / QW().AIM * 100));
+    waterFrom = QW().summary(G.day.glasses).total;
     G.day.glasses = QW().add(G.day.glasses, { id, at:now().toISOString(), blk:b ? gk(b) : "none", name:b ? shortName(b) : "", hour:hourNow(), d });
     const where = b ? ` (${shortName(b)})` : "";
     addHabit("water", d, `Water, one 250 ml glass${where}`, "1 glass", !!fx);
@@ -2067,7 +2236,7 @@
     try { const day = nextYmd(), plan = await getPlan(day); SUG_NEXT = { day, at:Date.now(), plan }; render(); }
     catch {} finally { SUG_PULL = false; }
   }
-  const sugBlocks = list => list.map(b => ({ t:b.t, s:+b.s, e:+b.e, free:b.kind === "open" || b.kind === "break", meal:isMeal(b), basic:basicId(b) }));
+  const sugBlocks = list => list.map(b => ({ t:b.t, s:+b.s, e:+b.e, free:b.kind === "open" || b.kind === "break", meal:isMeal(b), basic:basicId(b), booking:isBooking(b) }));
   function sugList(){
     if (!QS() || !PLAN || !QB()) return [];
     const skip = G.sugSkip || {}, today = gameYmd(), out = [];
@@ -2385,9 +2554,6 @@
     G.day.checks[gk(b)] = late ? "late" : "in";
     G.day.started = G.day.started || {}; G.day.started[gk(b)] = now().toISOString();
     log(`Started ${shortName(b)}`); saveG();
-    // the bag hands out tools at real moments
-    if (isSadhana(b)) giveItem("breath", "After Shambhavi.");
-    if (isSleep(b) && !late) giveItem("lantern", "On-time bedtime.");
     G.day.onRun = late ? 0 : (G.day.onRun || 0) + 1;
     if (G.day.onRun >= 3) G.day.onRun = 0;   // the Buffer Stone it gave pushed the day (retired 2026-10-19, d50)
     render();
@@ -2513,7 +2679,6 @@
   function closeOut(b, how){
     G.day.closes[gk(b)] = how;
     if (G.day.checks[gk(b)] === "in" || G.day.checks[gk(b)] === "late") spend(b);
-    if (how === "done" && groupOf(b) === "work") giveItem("bell", `Closed ${shortName(b)}.`);
     if (how === "done") { log(`Closed ${shortName(b)}`); saveG(); }
     else if (how === "carried") { log(`Carried ${shortName(b)} forward`); saveG(); }
     render();
@@ -2691,6 +2856,7 @@
     if (isGym(b)) return "gym";
     if (isGroceries(b)) return "kitchen";   // a Groceries block opens the kitchen on its shopping list (2026-10-20, d28)
     if (isMeal(b)) return "meal";
+    if (globalThis.QuestBuckets && globalThis.QuestBuckets.matchTitle(b.t)) return "bucket";   // a task bucket's block opens its tasks (2026-10-30)
     if (basicId(b)) return "basic";   // Morning Yoga, Domestics or Grooming, Wind-down from the calendar (2026-10-19)
     if (INSIGHTS[gk(b)]) return "work";   // the prep list the insight agent wrote (a hike's also carries its barefoot tile)
     if (QB() && QB().outdoorBlock(b.t)) return "outdoor";   // the barefoot walk (d27), on the walk or hike's own list
@@ -2710,8 +2876,26 @@
     if (l === "meal") return openMeal(b);
     if (l === "outdoor") return openOutdoor(b);
     if (l === "work") return openWork(b);
+    if (l === "bucket") return openBucket(b);
     return openNoTiles(b);
   }
+  // a task bucket's block (quest-buckets.js, 2026-10-30): its open tasks, Did it / Not this time
+  const BK_API = { get: p => qfetch(p),
+    post: (p, body) => DRY ? Promise.reject(new Error("dry run: nothing saved")) : qfetch(p, { method:"POST", body:JSON.stringify(body) }) };
+  function openBucket(b){
+    const QBk = window.QuestBuckets, bk = QBk.matchTitle(b.t);
+    if (!bk) return openNoTiles(b);
+    QBk.ensureCss();
+    const draw = () => {
+      const cur = QBk.matchTitle(b.t) || bk;
+      openSheet(`${winHead(b)}<div class="bk-sheet" style="background:linear-gradient(160deg,#6a8fd0,#26305e);color:#fff;border-radius:14px;padding:12px;margin-top:10px">
+        ${QBk.S.loaded ? QBk.listHTML(cur) : "<p>Loading…</p>"}${QBk.S.msg ? `<p class="bk-msg">${esc(QBk.S.msg)}</p>` : ""}</div>
+        <div class="actions"><button class="btn ghost" id="bkX">Close</button></div>`, true);
+      QBk.bind($("sheet"), BK_API, draw); $("bkX").onclick = closeSheet;
+    };
+    QBk.S.msg = ""; draw(); QBk.load(BK_API, true).then(draw);
+  }
+  setTimeout(() => { if (window.QuestBuckets && questKey()) QuestBuckets.load(BK_API); }, 1500);   // after the page has set up
   // no tiles yet (d33 d36: "let's just do them one at a time as they come up")
   function openNoTiles(b){
     openSheet(`${winHead(b)}<p class="hint" style="margin:10px 2px">Tiles for this block aren't set up yet.</p>
@@ -3607,7 +3791,10 @@
     let body;
     if (S.view === "have") {
       const first = QK().useFirst(K, k, t);
+      // Use it up (d70, 2026-10-25): the five oldest long-life items, by how much of their shelf life is gone
+      const up = QK().useUp(K, k, t, 5);
       body = (first.length ? `<div class="kt-first"><b>Use first:</b> ${first.map(x => `${esc(x.it.name)} (${x.at <= +t ? "check it" : QK().dayWord(x.at, t, TZ())})`).join(", ")}</div>` : "") +
+        (up.length ? `<div class="kt-first kt-up"><b>Use it up:</b> ${up.map(x => `<button type="button" class="kt-upi ${x.a.word}" data-kit="${esc(x.it.id)}">${esc(x.it.em)} ${esc(x.it.name)} <small>${kitAgeWord(x.a)}</small></button>`).join("")}</div>` : "") +
         `<div class="kt-tools"><input class="kt-q" id="kQ" type="search" placeholder="Find an item" autocomplete="off" value="${esc(S.q)}">` +
         `<button type="button" class="kt-chip" id="kEdit" aria-pressed="${S.edit}">Edit</button>` +
         (k === "travel" ? `<button type="button" class="kt-chip" id="kBring">Add from Home</button>` : "") + `</div>` +
@@ -3706,6 +3893,8 @@
            food, the amount box for grams or ml. Nothing steps a level any more. */
         return openKitchenItem(bn.dataset.kit);
       });
+      // the Use it up strip (d70): a tap opens that item's page, like its tile
+      sh.querySelectorAll(".kt-upi[data-kit]").forEach(bn => bn.onclick = () => openKitchenItem(bn.dataset.kit));
     }
   }
   /* ---------- the fill-in picker (Junyan, 2026-10-20, d35: "35 yes also I bought groceries today so what happens in that
@@ -3824,9 +4013,11 @@
   // one tile (d34): icon, name on one line, the status line, and the 3-bar meter. The same size whatever it says.
   /* The status line is what is left ("350 g", "4"), or "how many?" in a soft colour for an item with no number; the meter
      fills only for an item with a number (what is left of what he last bought). Levels retired, 2026-10-21. */
+  // how old, in his words: "3 weeks", "4 months" (d70)
+  const kitAgeWord = a => a.days < 14 ? `${Math.round(a.days)} days` : a.days < 60 ? `${Math.round(a.days / 7)} weeks` : `${Math.round(a.days / 30)} months`;
   function kitTile(x, S, t, shop, tz){
-    const st = QK().tileLine(x, t, shop.at, tz), soon = QK().lowSoon(x, t, shop.at), n = QK().hasQ(x);
-    return `<button type="button" class="ki L${n ? x.lv : "q"}${soon ? " soon" : ""}${!n && QK().needsBuy(x) ? " buy" : ""}" data-kit="${esc(x.id)}" ` +
+    const st = QK().tileLine(x, t, shop.at, tz), soon = QK().lowSoon(x, t, shop.at), n = QK().hasQ(x), a = QK().age(x, t);
+    return `<button type="button" class="ki L${n ? x.lv : "q"}${soon ? " soon" : ""}${!n && QK().needsBuy(x) ? " buy" : ""}${a && a.word !== "ok" ? " age-" + a.word : ""}" data-kit="${esc(x.id)}" ` +
       `aria-label="${esc(x.name)}, ${esc(st)}. ${S.edit ? "Tap to edit." : "Tap to say how many, hold to move."}">` +
       `<span class="e">${esc(x.em)}</span><span class="tx"><span class="nm">${esc(x.name)}</span><span class="st">${esc(st)}</span></span>` +
       `<span class="pips" aria-hidden="true"><i></i><i></i><i></i></span></button>`;
@@ -3945,11 +4136,16 @@
         : typeof it.q === "number" ? `<div class="win-lb">Amount now <small>(meals take it down by themselves; fix it here)</small></div>`
         : `<div class="win-lb">How much <small>(e.g. 400 g; with a number, meals take it down)</small></div>`}
       <div class="ki-step"><button type="button" class="mq-mini" id="kiMinus" aria-label="One less"${piece ? "" : " hidden"}>−</button><input id="kiAmt" value="${esc(it.amt || "")}" maxlength="20" autocomplete="off" placeholder="${piece ? "How many?" : "Amount"}" aria-label="${piece ? "How many" : "How much"} ${esc(it.name)}"><button type="button" class="mq-mini" id="kiPlus" aria-label="One more"${piece ? "" : " hidden"}>+</button></div>
+      <div class="win-lb">Bought <small>(${it.fresh ? `${kitAgeWord(QK().age(it, now()) || { days: 0 })} ago, keeps about ${QK().lifeOf(it) >= 60 ? Math.round(QK().lifeOf(it) / 30) + " months" : QK().lifeOf(it) + " days"}` : "when? Then it says when to use it up"})</small></div>
+      <div class="kt-tools">${[[0, "This month"], [1, "1 month ago"], [2, "2 months"], [3, "3 months"], [6, "6+ months"]].map(([m, w]) => `<button type="button" class="kt-chip" data-kib="${m}" aria-pressed="${QK().boughtAgo(it, now()) === m}">${w}</button>`).join("")}</div>
       <div class="win-lb">Group</div><div class="kt-tools">${QK().GROUP_NAMES.map(g => `<button type="button" class="kt-chip" data-kig="${esc(g)}" aria-pressed="${g === it.group}">${esc(g)}</button>`).join("")}</div>
       <div class="win-lb">Shelf</div><div class="kt-tools">${kn.shelves.map(s => `<button type="button" class="kt-chip" data-kish="${s.id}" aria-pressed="${s.id === it.shelf}">${esc(s.name)}</button>`).join("")}</div>
       <div class="actions"><button class="btn danger" id="kiDel">Delete this item</button></div>
       <div class="actions"><button class="btn ghost" id="kiBack">Back</button><button class="btn primary" id="kiSave">Save</button></div>`, true);
-    let shelf = it.shelf, group = it.group;
+    let shelf = it.shelf, group = it.group, ago = null;
+    // d70: the month he bought it (saved with Save; a pick he does not change leaves the date as it is)
+    $("sheet").querySelectorAll("[data-kib]").forEach(bn => bn.onclick = () => { ago = +bn.dataset.kib;
+      $("sheet").querySelectorAll("[data-kib]").forEach(x => x.setAttribute("aria-pressed", +x.dataset.kib === ago)); });
     $("sheet").querySelectorAll("[data-kish]").forEach(bn => bn.onclick = () => { shelf = bn.dataset.kish;
       $("sheet").querySelectorAll("[data-kish]").forEach(x => x.setAttribute("aria-pressed", x.dataset.kish === shelf)); });
     $("sheet").querySelectorAll("[data-kig]").forEach(bn => bn.onclick = () => { group = bn.dataset.kig;
@@ -3965,6 +4161,7 @@
       const amt = $("kiAmt").value.trim();
       if (nm && (nm !== it.name || QK().amtOf(amt) !== (it.amt || ""))) K = QK().rename(K, id, nm, now(), amt);
       K = QK().place(K, id, shelf, group, now());
+      if (ago != null && ago !== QK().boughtAgo(it, now())) K = QK().bought(K, id, ago, now());
       if (K !== G.kitchen) kitSave(K);
       openKitchen(); render(); };
     // the second tap counts from 0.3 s to 4 s after the first (a double tap is not a yes); the timer resets this button only
@@ -4372,7 +4569,7 @@
     $("sheet").querySelectorAll("[data-tick]").forEach(bn => bn.onclick = () => {
       const i = bn.dataset.tick; W.tick[i] = !W.tick[i]; (W.t = W.t || {})[i] = now().toISOString();   // W.t: merges per step
       const pop = prepFx(bn, W.tick[i], (I.items[i] || {}).t);
-      if (n && I.items.every((_, i) => W.tick[i]) && !W.scout) { W.scout = true; giveItem("scout", `Prepped ${shortName(b)}.`); }
+      if (n && I.items.every((_, i) => W.tick[i]) && !W.scout) W.scout = true;
       saveG();
       const top = $("sheet").scrollTop; openWork(b); $("sheet").scrollTop = top;
       if (pop) pop();
@@ -4576,8 +4773,14 @@
   const gymDue = () => GL.dueKeys(LV, GYM, (gymInfo.last || []).map(w => ({ ...w, day:gymDay(w) })), gameYmd());
 
   let gymShowMove = false, gymTesting = null, gymRow = null;
+  /* Coach (2026-11-09): a move's week, its video and a minute-by-minute clock (quest-gymcoach.js). gymCoach is the open
+     view ("week" | "prep" | "go") or null; the clock lives in the draft (GYM.coach) so a redraw or reload keeps it. */
+  let gymCoach = null, gymCoachTick = null, gymCoachStep = -1, gymCoachCode = "OAC", gymPageEl = null;
+  const GC = window.QuestGymCoach;
+  // phone: the 🏋️ button at the top opens the coach any time, no gym block needed (2026-11-09)
+  if ($("gymBtn")) $("gymBtn").onclick = async () => { await openGym(null); gymCoach = "prep"; drawGym(); };
   async function openGym(block){
-    gymShowMove = false; gymTesting = null; gymRow = null; GYMASK = null;
+    gymShowMove = false; gymTesting = null; gymRow = null; GYMASK = null; gymCoach = null; if (gymPageEl) { clearInterval(gymCoachTick); gymCoachTick = null; }
     // opening the log at the gym means you're there; opening it early (to move it) does not
     if (block && !G.day.checks[gk(block)] && block.s - now() < 30 * 60000) checkIn(block);
     await loadGymInfo();
@@ -4593,6 +4796,8 @@
      level and a ✓ once logged; one row opens at a time (quest-gymlog.js). Body weight is one small line. Every change
      saves the draft on this phone at once, as before. */
   function drawGym(){
+    if (gymCoach && GC) return drawCoach();
+    clearInterval(gymCoachTick); gymCoachTick = null;
     const P = PROGRAMS[GYM.program];
     const blk = GYM.blockKey && blocks().find(x => x.key === GYM.blockKey);
     const early = blk && blk.s - now() >= 30 * 60000;   // not at the gym yet: the move options come first
@@ -4602,6 +4807,7 @@
       ${asking ? `<div class="gmv-ask"><span>Are you sure? ${esc(shortName(blk))} at ${fmtT(blk.s)} comes off your schedule${blk.id && blk.calId ? " and Google Calendar" : ""}.</span>
         <span class="gmv-ask-b"><button class="btn ghost small" id="gSkipNo">Cancel</button><button class="btn primary small" id="gSkipYes">Yes, skip</button></span></div>` : ""}
       ${blk && (early || gymShowMove) ? gymMoveHTML(blk) : ""}
+      ${P.strength && GC ? `<button class="btn gc-open" id="gCoach">🎯 Coach <small>video, how to, minute-by-minute session</small></button>` : ""}
       <div class="gtopline"><select id="gProg" aria-label="Program">${Object.keys(PROGRAMS).map(k => `<option ${k === GYM.program ? "selected" : ""}>${k}</option>`).join("")}</select></div>
       <div class="gbw"><label for="gBw">⚖️ Body weight</label><input class="set" id="gBw" inputmode="decimal" placeholder="lbs" value="${esc(GYM.bw || "")}">
         <small id="gBwT">${tr ? `Last ${esc(String(tr.last.lbs))}` : "optional"}</small></div>`;
@@ -4627,7 +4833,7 @@
     openSheet(h, true);
     const sh = $("sheet");
     if (keepScroll != null) sh.scrollTop = keepScroll;
-    $("gClose").onclick = () => { GYMASK = null; saveDraft(); stopRest(); closeSheet(); };
+    $("gClose").onclick = () => { GYMASK = null; gymCoach = null; saveDraft(); stopRest(); closeSheet(); };
     if ($("gSkip")) $("gSkip").onclick = () => { GYMASK = asking ? null : { key:blk.key, kind:"skip" }; drawGym(); };
     if ($("gSkipNo")) $("gSkipNo").onclick = () => { GYMASK = null; drawGym(); };
     if ($("gSkipYes")) $("gSkipYes").onclick = () => skipGym(blk, $("gSkipYes"));
@@ -4656,6 +4862,59 @@
     sh.querySelectorAll("[data-feel]").forEach(b => b.onclick = () => { GYM.feel = GYM.feel === b.dataset.feel ? null : b.dataset.feel; saveDraft(); drawGym(); });
     $("gRest").onclick = startRest;
     $("gSave").onclick = saveGym;
+    if ($("gCoach")) $("gCoach").onclick = () => { const c = coachClock(gymCoachCode); gymCoach = c && c.started ? "go" : "prep"; if (gymPageEl) { closeSheet(); return drawCoach(); } drawGym(); };
+  }
+  /* The desk Gym page (sidebar, 2026-11-09): the same coach, drawn into the page with a move picker on top. The
+     clock per move lives in GYM.coaches[code]; "Open Gym log" opens the log sheet to save. */
+  async function gymReady(){
+    await loadGymInfo();
+    if (!GYM) { try { GYM = GL.fromDraft(LV, JSON.parse(localStorage.getItem(gymDraftKey())), gymLevels()); } catch { GYM = null; }
+      if (!GYM) GYM = newGym(GL.programFor("", ymdLocal())); saveDraft(); }
+  }
+  window.QuestGymPage = {
+    async open(el){ gymPageEl = el; el.innerHTML = `<div class="gnote">Loading your gym…</div>`; await gymReady(); if (!gymPageEl) return; gymCoach = gymCoach || "prep"; drawCoach(); },
+    close(){ gymPageEl = null; clearInterval(gymCoachTick); gymCoachTick = null; },
+  };
+  const coachClock = code => { GYM.coaches = GYM.coaches || {}; if (code === "OAC" && GYM.coach && !GYM.coaches.OAC) GYM.coaches.OAC = GYM.coach; return GYM.coaches[code]; };
+  function drawCoach(){
+    const code = GC.guide(gymCoachCode) ? gymCoachCode : "OAC", g = GC.guide(code);
+    if (!GYM.e[code]) GYM.e[code] = LV.startMove(code, LV.currentLevel(gymLevels(), code));
+    const x = GYM.e[code], clock = coachClock(code);
+    const week = GC.weekStatus(code, (gymInfo.last || []).map(w => ({ ...w, day:gymDay(w) })), x, gameYmd(), LV.touched);
+    const lastW = (gymInfo.last || []).map(w => ({ ...w, day:gymDay(w) }));
+    const navRows = Object.keys(GC.GUIDES).map(k => ({ code:k, level:(GYM.e[k] || {}).level || LV.currentLevel(gymLevels(), k),
+      done:GC.weekStatus(k, lastW, GYM.e[k], gameYmd(), LV.touched).done }));
+    // phone (2026-11-09): the same move list as small cards that scroll sideways above the coach
+    const pick = gymPageEl ? "" : `<div class="gx-pick">${GC.navHTML(esc, code, navRows)}</div>`;
+    const inner = GC.html(esc, code, gymCoach, { week, clock, x, now:Date.now(), LV, page:!!gymPageEl });
+    let sh;
+    if (gymPageEl) {
+      gymPageEl.innerHTML = `<div class="gx-page"><nav class="gx-nav"><h1>Gym</h1>${GC.navHTML(esc, code, navRows)}</nav><main class="gx-main">${inner}</main></div>`; sh = gymPageEl;
+    } else {
+      const keepScroll = $("sheet").classList.contains("open") ? $("sheet").scrollTop : null;
+      openSheet(pick + inner, true);
+      sh = $("sheet"); if (keepScroll != null) sh.scrollTop = keepScroll;
+    }
+    const redraw = () => (gymPageEl ? drawCoach() : drawGym());
+    sh.querySelectorAll("[data-gcm]").forEach(b => b.onclick = () => { gymCoachCode = b.dataset.gcm; gymCoach = gymCoach === "go" && !coachClock(b.dataset.gcm) ? "prep" : gymCoach; redraw(); });
+    sh.querySelector("[data-gcclose]").onclick = () => { if (gymPageEl) { openGym(null); return; } gymCoach = null; drawGym(); };
+    sh.querySelectorAll("[data-gcv]").forEach(b => b.onclick = () => { gymCoach = b.dataset.gcv; sh.scrollTop = 0; redraw(); });
+    sh.querySelectorAll("[data-gc]").forEach(b => b.onclick = () => { if (b.dataset.gc === "start") gymCoach = "go"; GYM.coaches[code] = GC.act(g, coachClock(code), b.dataset.gc, Date.now()); if (code === "OAC") GYM.coach = GYM.coaches.OAC; saveDraft(); redraw(); });
+    sh.querySelectorAll("[data-gctest]").forEach(b => b.onclick = () => gymTest(code, b.dataset.gctest === "1", b.getBoundingClientRect()));
+    sh.querySelectorAll("[data-gcreps]").forEach(inp => inp.oninput = () => { GYM.e[code] = GC.applyLog(GYM.e[code], inp.dataset.gcreps, inp.value); saveDraft(); });
+    sh.querySelectorAll("[data-gcmile]").forEach(b => b.onclick = () => { GYM.e[code] = GC.applyLog(GYM.e[code], "mile", b.dataset.gcmile); saveDraft(); redraw(); });
+    sh.querySelectorAll("[data-gceff]").forEach(b => b.onclick = () => { GYM.e[code] = GC.applyLog(GYM.e[code], "eff", b.dataset.gceff); saveDraft(); redraw(); });
+    // the clock: the time ticks in place; a new step redraws quietly
+    clearInterval(gymCoachTick); gymCoachTick = null;
+    const c = clock;
+    gymCoachStep = c && c.started ? GC.stepAt(g, GC.elapsed(c, Date.now())).i : -1;
+    if (gymCoach === "go" && c && c.started && !c.paused) gymCoachTick = setInterval(() => {
+      if (!gymCoach || !$("gcT")) { clearInterval(gymCoachTick); gymCoachTick = null; return; }
+      const sec = GC.elapsed(coachClock(code), Date.now()), p = GC.stepAt(g, sec);
+      if (p.i !== gymCoachStep) return redraw();   // no buzz on a new step (2026-11-09); level ups keep theirs
+      $("gcT").firstChild.textContent = GC.mmss(sec);
+      if ($("gcL")) $("gcL").textContent = `${GC.mmss(p.left)} left`;
+    }, 1000);
   }
   // d18: a pass is one level up and a little party; "not yet" only records the try
   function gymTest(c, pass, rect){
@@ -4667,6 +4926,7 @@
       if (window.QuestFx && rect) QuestFx.tap(rect, { icon:"⭐", color:"#ffd479" });
       banner("🪢", "LEVEL UP", `${MOVE[c]} L${t} · ${LV.LEVELS[c][t - 1]}`);
     } else log(`Test: ${MOVE[c]} L${t}, not yet`);
+    if (gymPageEl && gymCoach) return drawCoach();
     drawGym();
   }
   // the rest timer is the one place seconds make sense
@@ -4880,36 +5140,18 @@
   }
   $("gear").onclick = openSettings;
 
-  /* ---------- the bag (d103, ticket 11): tools used in the moment, not rewards ----------
-     bag.js draws it (video-game grid, drag and drop, illustrated items); this
-     wires each item to what it does in the day and hands items out at real moments. */
+  /* ---------- the bag: keepsakes only ----------
+     Items are gone (Junyan, 2026-10-23: "Let's completely remove the items system"; a Recovery Lotus
+     kept coming). bag.js still draws the keepsake shelf; any item left in it is cleared. */
   const hasBag = () => typeof window.Bag !== "undefined";
-  function giveItem(id, why){
-    if (!hasBag()) return;
-    try { Bag.give(id, 1, why); } catch {}
-  }
+  const noItems = () => { const g = G.bag; if (!g) return;
+    for (const k of ["slots", "quick"]) if (Array.isArray(g[k])) g[k] = g[k].map(id => id && String(id).startsWith("k:") ? id : null);
+    g.counts = {}; delete g.timer; };
   const BAG_CTX = {
-    getState: () => G,
+    getState: () => (noItems(), G),
     save: () => saveG(),
     openBag: () => openBag(),
-    actions: {
-      // a water item still in the bag counts one glass on the water card (2026-10-19, d24: water lives only there)
-      water: async () => { addGlass(null); return `1 glass logged. ${QW().summary(G.day.glasses).ml.toLocaleString()} ml today.`; },
-      breath: async (item, o = {}) => { if (o.completed) { addPrana(Math.round(3 * gainMult()), "Breath reset", "breath"); render(); return "Reset done. Carry it into the next thing."; } return "Stopped early. That still counts as a pause."; },
-      // the Buffer Stone and the Trail Map pushed the rest of the day; nothing slides now (Junyan, 2026-10-19, d50), so they
-      // do nothing: one still in the bag says so and is not used up (bag.js keeps an item whose action throws)
-      buffer: async () => { throw new Error("the Buffer Stone is retired: Day Quest no longer moves your plan"); },
-      map: async () => { throw new Error("the Trail Map is retired: Day Quest no longer slides your day"); },
-      scout: async () => { const t = now(), n = blocks().find(b => b.s > t && ["work", "major", "travel"].includes(groupOf(b)) && !INSIGHTS[gk(b)]);
-        if (!n) return "Everything coming up already has a prep list.";
-        (G.research = G.research || []).push({ key:gk(n), title:n.t, s:n.s.toISOString() }); saveG();
-        return `The scout is on ${shortName(n)}. Its list lands on the next run (6 AM or 8 PM).`; },
-      lantern: async () => { G.day.windDown = now().toISOString(); saveG(); const sl = blocks().find(isSleep), wd = blocks().find(x => x.basic === "winddown" && x.e > now());
-        return `Wind-down started. Phone on the charger, lights low${sl ? `. Bed at ${fmtT(sl.s)}` : ""}${wd ? ". Your Wind-down list is on the plan" : ""}.`; },
-      lotus: async (item, o = {}) => { const r = RECOVER.find(x => x[0] === o.choice) || RECOVER[0]; startNow(r[0], r[1]); return `${r[0]} for ${r[1]} min. It's on your plan now.`; },
-      bell: async (item, o = {}) => `Focus until ${fmtT(new Date(o.endsAt || +now() + 50 * 60000))}.`,
-      relive: item => log(`Relived: ${item.name}`),
-    },
+    actions: { relive: item => log(`Relived: ${item.name}`) },
   };
   function openBag(){
     if (!hasBag()) return;
@@ -5692,6 +5934,7 @@
         practiced: all.some(b => isSadhana(b) && ["in", "late"].includes(G.day.checks[gk(b)])) || HABITS.some(h => h[7] === "Practice" && habitN(h[0]) > 0),
         items: all.map(b => ({ key:b.key, name:moName(b), s:b.s, e:b.e, kind:b.kind, open:b.kind === "open", brk:b.kind === "break", meal:isMeal(b), sleep:isSleep(b),
           sadhana:isSadhana(b), strength:STRENGTH(b), flight:/flight|\b[A-Z]{2}\d{2,4}\b/.test(b.t) && b.kind === "travel", extra:!!b.extra, taskId:b.taskId || null, basic:b.basic || null,
+          calId:b.calId || "", cal:b.cal || "", type:b.type || "", cs:b.cs, ce:b.ce, allDay:!!b.allDay,
           cost:energy(b).rate * spendMult() * Math.max(0, (b.e - b.s) / 3600000), badge:badge(b, 30) })),
         tasks: TASKS.map(x => est[x.id] ? { ...x, estimate:`${est[x.id]} min` } : x),
         practices: moPractices(), gymLine: gymLine() };
@@ -5731,6 +5974,7 @@
       log(`Note on ${task.task}: ${note}`); saveG(); return true;
     },
     habit: id => { logHabit(id, true); saveG(); },
+    buckets: BK_API,   // the "Your week" step (quest-buckets.js)
     practiceAction: id => { if (id === "nvc") { closeMorning(); openCheckin(); } },
     detail: key => { const b = blkByKey(key); return b && (!b.extra || b.basic) ? moDetail(b) : ""; },
     // the main page's calendar from this hour to the end of today's plan; keys[i] is the block behind data-stop i (null for open space), spans[i] its [start, end] ms
@@ -6755,14 +6999,20 @@
     }
     // phone and desktop alike: the steps card, three picks for right now, then the full list one tap away (2026-10-09)
     const endAt = lastItemEnd(all), nightNow = PLAN && endAt && +t >= endAt;
-    if (nightNow && !G.day.nightShown && !$("sheet").classList.contains("open") && !$("night")) { G.day.nightShown = true; saveG(); openNight(); }
+    // once per day on this device too: a day copy swapped in by a sync or a zone flip lost nightShown and Day's end
+    // kept popping up (2026-10-23, after the Madrid to Toronto flight)
+    let nightSeen = ""; try { nightSeen = localStorage.getItem("quest-night-shown") || ""; } catch {}
+    // the Mac orb's calendar panel (?embed=calendar) never pops Day's end up by itself (2026-10-30)
+    if (nightNow && !document.body.classList.contains("embed-cal") && !G.day.nightShown && nightSeen !== gameYmd() && !$("sheet").classList.contains("open") && !$("night")) {
+      G.day.nightShown = true; try { localStorage.setItem("quest-night-shown", gameYmd()); } catch {} saveG(); openNight(); }
     put("habits", PLAN ? (nightNow ? `<button class="pa-all nt-open" data-night>🌙 Day's end<span>tomorrow, deathbed, reflection ›</span></button>` : "") + stepsHTML() + waterHTML() + gutHTML() + kitchenHTML() + suggestHTML() + sugHTML() : ""); bindHabits($("habits")); bindSug($("habits"));
     $("habits").querySelectorAll("[data-glass]").forEach(bn => bn.onclick = () => addGlass(bn));
+    $("habits").querySelectorAll("[data-shoe]").forEach(bn => bn.onclick = () => tapShoe(bn));
     $("habits").querySelectorAll("[data-gut]").forEach(bn => bn.onclick = () => tapGut(bn));
+    $("habits").querySelectorAll("[data-guttog]").forEach(bn => bn.onclick = () => tapGutHead());
     $("habits").querySelectorAll("[data-kitchen]").forEach(bn => bn.onclick = () => openKitchen({}));
     $("habits").querySelectorAll("[data-day]").forEach(bn => bn.onclick = () => addDayItem(bn.dataset.day, bn));
     $("habits").querySelectorAll("[data-night]").forEach(bn => bn.onclick = openNight);
-    if (PLAN && !z && body() < 40 && !G.day.lotusGiven) { G.day.lotusGiven = true; giveItem("lotus", "Your energy is low today."); }
     if ($("bMorning")) $("bMorning").onclick = () => openMorning();
     // a ?morning=1 link opens the morning straight away, any time of day
     if ((qs.get("morning") || qs.get("brief")) && PLAN && !openMorning.auto) { openMorning.auto = true; setTimeout(() => openMorning(), 600); }
@@ -6883,25 +7133,37 @@
   setInterval(pullAll, 2 * 60 * 1000);
   /* A Home Screen app wakes with the page it had in memory, sometimes from
      before the last update, so the phone and the Mac ran different versions
-     (2026-10-08). On wake: send any unsaved change, reload if GitHub Pages has
-     a newer page, then pull. */
+     (2026-10-08). On wake: send any unsaved change, check whether GitHub Pages
+     has a newer page, then pull. A newer page never reloads by itself (Junyan,
+     2026-11-02, as the FBS Monitor does): a small "New version. Reload" banner
+     shows, with an x to hide it; the page reloads only on Reload. */
+  function versionBanner(lm){
+    if (document.getElementById("newVer") || sessionStorage.getItem("quest-ver-hidden") === String(lm)) return;
+    const b = document.createElement("div");
+    b.id = "newVer"; b.setAttribute("role", "status");
+    b.style.cssText = "position:fixed;left:50%;transform:translateX(-50%);top:calc(10px + env(safe-area-inset-top));z-index:2000;display:flex;align-items:center;gap:10px;"
+      + "padding:7px 8px 7px 14px;border-radius:999px;background:#2a2f63;color:#fff;border:1px solid rgba(201,182,255,.55);box-shadow:0 6px 20px rgba(0,0,0,.45);font:600 14px/1.2 var(--font,system-ui);white-space:nowrap";
+    b.innerHTML = `<span>New version.</span><button type="button" id="newVerGo" style="font:inherit;border:0;border-radius:999px;padding:6px 12px;background:var(--zap,#c9b6ff);color:#2a2453;cursor:pointer">Reload</button>`
+      + `<button type="button" id="newVerX" aria-label="Hide" style="font:inherit;font-size:18px;line-height:1;border:0;background:none;color:rgba(255,255,255,.7);cursor:pointer;padding:2px 6px">×</button>`;
+    document.body.appendChild(b);
+    b.querySelector("#newVerGo").onclick = async () => { try { if (syncTimer) await pushG(); } catch {} location.reload(); };
+    b.querySelector("#newVerX").onclick = () => { sessionStorage.setItem("quest-ver-hidden", String(lm)); b.remove(); };
+  }
   async function checkFresh(){
-    if ($("sheet").classList.contains("open")) return false;
     try {
       // at most 3 s: on a network that never answers, the pull after it must not wait (2026-10-17)
       const ac = new AbortController(); setTimeout(() => ac.abort(), 3000);
       const r = await fetch(location.pathname, { method:"HEAD", cache:"no-store", signal:ac.signal });
       const lm = Date.parse(r.headers.get("last-modified") || ""), mine = Date.parse(document.lastModified);
-      if (!(lm - mine > 5000) || sessionStorage.getItem("quest-reloaded") === String(lm)) return false;
-      // the service worker opens the saved copy, so fetch the new page into it first (2026-10-11)
+      if (!(lm - mine > 5000)) return false;
+      // the service worker opens the saved copy, so fetch the new page into it first (2026-10-11),
+      // then Reload opens the new one
       const fresh = await fetch(location.pathname, { cache:"no-store", headers:{ "x-dq-fresh":"1" } });
       if (!fresh.ok) return false;
       await fresh.text();
-      sessionStorage.setItem("quest-reloaded", String(lm));
-      if (syncTimer) await pushG();
-      location.reload();
-      return true;
-    } catch { return false; }
+      versionBanner(lm);
+    } catch {}
+    return false;
   }
   let lastWake = 0;
   async function wake(){
@@ -6915,11 +7177,15 @@
   addEventListener("pagehide", () => { if (syncTimer) pushG(true); });
   // the internet is back: pull at once, which also sends what waited (edits, ticks, the game) (2026-10-17)
   addEventListener("online", () => { lastWake = 0; AG_AT = 0; wake(); });
-  render();   // the saved day, if there is one, before the network answers
+  try { render(); }   // the saved day, if there is one, before the network answers
+  catch (e) { QT.mark("first draw failed", e.message); throw e; }
+  if (SAVED_FIRST) QT.mark("saved day drawn", `${PLAN.blocks.length} blocks, ${document.querySelectorAll("#calBody .cal-ev").length} items on the calendar, saved ${Math.round((Date.now() - PLAN_AT) / 60000)} min ago`);
+  else QT.mark("saved day skipped", savedWhy);
   checkFresh();
   pullAll();
 })();
 </script>
 <script src="quest-dash.js?v=20261019z"></script>
+<script src="quest-trips.js?v=20261113c"></script>
 </body>
 </html>

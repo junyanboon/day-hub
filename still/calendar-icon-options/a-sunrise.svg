@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Option A, Sunrise (2026-11-11): a calendar page with a sun coming up over the horizon, on a dawn sky. -->
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3a2a6b"/><stop offset=".6" stop-color="#c2477a"/><stop offset="1" stop-color="#ff7a59"/></linearGradient>
+    <linearGradient id="sun" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffd166"/><stop offset="1" stop-color="#ff7a59"/></linearGradient>
+    <clipPath id="up"><rect x="96" y="200" width="320" height="176"/></clipPath>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#sky)"/>
+  <g id="art">
+    <rect x="96" y="120" width="320" height="312" rx="44" fill="#1f1530" opacity=".25" transform="translate(0 10)"/>
+    <rect x="96" y="112" width="320" height="312" rx="44" fill="#fffdf9"/>
+    <path d="M96 200V156a44 44 0 0 1 44-44h232a44 44 0 0 1 44 44v44Z" fill="#ff4f5e"/>
+    <rect x="166" y="84" width="26" height="60" rx="13" fill="#fffdf9"/><rect x="320" y="84" width="26" height="60" rx="13" fill="#fffdf9"/>
+    <g stroke="#ff9f43" stroke-width="16" stroke-linecap="round">
+      <path d="M256 236v-14"/><path d="M190 262l-12-12"/><path d="M322 262l12-12"/><path d="M166 324h-14"/><path d="M346 324h14"/>
+    </g>
+    <circle cx="256" cy="372" r="92" fill="url(#sun)" clip-path="url(#up)"/>
+    <rect x="132" y="370" width="248" height="14" rx="7" fill="#3a2a6b"/>
+  </g>
+</svg>

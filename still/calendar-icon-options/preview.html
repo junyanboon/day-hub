@@ -1,0 +1,26 @@
+<!doctype html><meta charset="utf-8"><title>Calendar icon options</title>
+<style>
+body{margin:0;font:15px -apple-system,system-ui,sans-serif;background:#f4f1ec;color:#1f1b16;padding:28px}
+h1{font-size:22px;margin:0 0 18px}
+.row{display:flex;gap:28px}
+.opt{background:#fff;border-radius:18px;padding:18px;box-shadow:0 2px 10px rgba(0,0,0,.08);width:300px}
+.opt h2{font-size:17px;margin:0 0 4px}.opt p{margin:0 0 14px;color:#6b6258;font-size:13px}
+.big{width:180px;height:180px;border-radius:40px;display:block;margin:0 auto 16px}
+.walls{display:flex;flex-direction:column;gap:10px}
+.wall{flex:1;border-radius:14px;padding:16px 0 10px;display:flex;justify-content:center;gap:16px}
+.wall.light{background:linear-gradient(160deg,#cfe3f7,#f7e6d4)}.wall.dark{background:linear-gradient(160deg,#1b2340,#3a1d3c)}
+.app{display:flex;flex-direction:column;align-items:center;font-size:11px;gap:5px}
+.wall.light .app{color:#1f1b16}.wall.dark .app{color:#fff}
+.app img{width:60px;height:60px;border-radius:13.5px}
+.app.dim img{opacity:.35}
+</style>
+<h1>Calendar icon options (180 px, and 60 px on a light and a dark Home Screen)</h1>
+<div class="row" id="row"></div>
+<script>
+const opts=[["a-sunrise.svg","A. Sunrise","A sun coming up over the page, on a dawn sky."],
+["b-spark.svg","B. Spark","A grid of days, one lit up as a gold star, on a night sky."],
+["c-day-one.svg","C. Day One","A big 1 for a fresh start and a gold spark, on a sunset."]];
+const ph='data:image/svg+xml,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 60 60"><rect width="60" height="60" fill="#888"/></svg>');
+const wall=c=>`<div class="wall ${c}">${["Notes","Calendar","Mail"].map((n,i)=>`<div class="app${i==1?"":" dim"}"><img src="${i==1?"__":ph}">${n}</div>`).join("")}</div>`;
+row.innerHTML=opts.map(([f,t,d])=>`<div class="opt"><h2>${t}</h2><p>${d}</p><img class="big" src="${f}"><div class="walls">${wall("light").replaceAll("__",f)}${wall("dark").replaceAll("__",f)}</div></div>`).join("");
+</script>

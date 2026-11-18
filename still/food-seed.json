@@ -1,0 +1,8 @@
+{
+  "steps": [{"n": "Mix the nutty pudding", "w": "day"}, {"n": "Close out the fridge", "w": "day"}],
+  "every": [{"n": "Nutty pudding mix", "w": "day"}, {"n": "Super veggie", "w": "none"}, {"n": "Lentils", "w": "day"}],
+  "trip": [{"n": "Rice", "w": "day"}, {"n": "Cumin seeds", "w": "day"}, {"n": "Sea salt", "w": "day"}, {"n": "Olive oil", "w": "day"}, {"n": "Lunch for the drive", "w": "leave"}],
+  "gear": [{"n": "Vitamix, in its tote", "w": "day"}, {"n": "Kitchen scale", "w": "day"}, {"n": "Measuring spoons", "w": "day"}, {"n": "Whisk", "w": "day"}, {"n": "Spatula", "w": "day"}, {"n": "Knife", "w": "day"}, {"n": "Wiping towel", "w": "day"}],
+  "buy": [{"n": "Frozen berries"}, {"n": "Broccoli"}, {"n": "Cauliflower"}],
+  "cooler": []
+}

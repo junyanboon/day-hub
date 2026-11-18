@@ -43,3 +43,16 @@ test("the page shows the card, saves it into the day's history and loads the scr
   assert.match(html, /\.\.\.gutStamp\(\) \}/);
   assert.doesNotMatch(fs.readFileSync(fileURLToPath(new URL("../quest-gut.js", import.meta.url)), "utf8"), /[–—]/);
 });
+
+test("the card is closed by default, opens on tap, closes on a second tap, and starts closed on a new day", () => {
+  assert.equal(G.isOpen(null, "2026-10-24"), false);
+  let s = G.toggle(null, "2026-10-24");
+  assert.equal(G.isOpen(s, "2026-10-24"), true);
+  assert.equal(G.isOpen(s, "2026-10-25"), false);
+  s = G.toggle(s, "2026-10-24");
+  assert.equal(G.isOpen(s, "2026-10-24"), false);
+  const f = html.slice(html.indexOf("function gutHTML("), html.indexOf("function tapGut("));
+  assert.match(f, /data-guttog/); assert.match(f, /gq-closed/); assert.match(f, /gq-chev/);
+  assert.match(f, /try \{ return QGut\(\)\.isOpen\(localStorage/);
+  assert.match(html, /querySelectorAll\("\[data-guttog\]"\)/);
+});

@@ -636,6 +636,31 @@
       .sort((a, b) => a.at - b.at);
   }
 
+  /* Freshness (Junyan, 2026-10-25, d70: "70 yes", d71: "71 yes"): long-life food goes stale in a few months unnoticed,
+     so an item shows its age, not a level (levels stay retired). Bought: it.fresh (the shelf-life clock a restock starts,
+     or the month he picks on the item's page). No date: nothing shown, nothing guessed. The shelf life of food that keeps
+     comes from its group (KEEP; the freezer shelf FREEZER), fresh food keeps FRESH. This replaces d28's "never shown".
+     soon: three quarters of its life gone ("use soon"); old: all of it ("getting old"). */
+  const KEEP = { "Nuts and seeds": 90, "Legumes and grains": 365, "Spices": 365, "Oils, vinegars and sweet": 365,
+    "Drinks and ferments": 30, "Vegetables": 7, "Fruit": 7, "Herbs": 5, "Other": 180 };
+  const FREEZER = 120, MONTH = 30 * DAY;
+  const lifeOf = (it) => (it.shelf === "freezer" ? FREEZER : FRESH[keyOf(it.name)] || KEEP[okGroup(it.group) || "Other"] || 180);
+  function age(it, now) {
+    if (!it || !it.fresh || it.lv === 0 || (hasQ(it) && it.left === 0)) return null;
+    const life = lifeOf(it), days = Math.max(0, (ms(now) - ms(it.fresh)) / DAY), share = days / life;
+    return { days, life, share, word: share >= 1 ? "old" : share >= 0.75 ? "soon" : "ok" };
+  }
+  const AGE_WORD = { soon: "use soon", old: "getting old" };
+  const bought = (K, id, monthsAgo, at) => { const it = item(K, id); return it ? put(K, { ...it, fresh: iso(ms(at) - monthsAgo * MONTH) }, at) : K; };
+  // the months-ago choice that matches a bought date (0, 1, 2, 3, 6), or null with no date
+  const boughtAgo = (it, now) => !it || !it.fresh ? null : [6, 3, 2, 1, 0].find((m) => (ms(now) - ms(it.fresh)) >= (m - 0.5) * MONTH) ?? 0;
+  /* Use it up (d70): long-life items at "use soon" or "getting old", oldest share first, up to n. Fresh food that turns
+     in days is Use first's job, so it is left out here. */
+  function useUp(K, k, now, n) {
+    return items(K, k).filter((it) => lifeOf(it) > 20).map((it) => ({ it, a: age(it, now) }))
+      .filter((x) => x.a && x.a.word !== "ok").sort((a, b) => b.a.share - a.a.share).slice(0, n || 5);
+  }
+
   /* The shop the list plans up to, from the Groceries blocks he has (today and the agenda's days ahead). A Groceries block
      that starts within 12 hours (or is on now) is the shop this list is for (soon), so the list plans to the one after it.
      No later block in sight: a week at home, 2 days on a trip. blocks: [{ t, s }].
@@ -1210,9 +1235,11 @@
 
   // a tile's second line (d39): the status, then words he typed for an amount with no number ("how many? · a jar")
   // (d42) an amount item's status already is its amount
-  const tileLine = (it, now, shopAt, tz) => status(it, now, shopAt, tz) + (it && it.amt && !hasQ(it) ? ` · ${it.amt}` : "");
+  // d70 (2026-10-25): then its age, once it is past three quarters of its shelf life ("4 · use soon")
+  const tileLine = (it, now, shopAt, tz) => { const a = age(it, now);
+    return status(it, now, shopAt, tz) + (it && it.amt && !hasQ(it) ? ` · ${it.amt}` : "") + (a && AGE_WORD[a.word] ? ` · ${AGE_WORD[a.word]}` : ""); };
 
   root.QuestKitchen = { NEED, LEVELS, ASK, needsBuy, KITCHENS, SEED, FRESH, DEFAULT_SHOP, GROUP_NAMES, GROUP_ICONS, keyOf, iconFor, groupIcon, splitName, amtOf, tileLine, guessGroup, guessShelf, firstTake, mealList, extraParse, search, unitOf,
-    items, item, grouped, setLevel, nextLevel, tap, add, rename, move, place, remove, status, shows, pace, lowAt, lowSoon, turnAt, useFirst, nextShop, parseAmt, usesOf, amountFor,
+    items, item, grouped, setLevel, nextLevel, tap, add, rename, move, place, remove, status, shows, pace, lowAt, lowSoon, turnAt, useFirst, age, useUp, bought, boughtAgo, lifeOf, KEEP, nextShop, parseAmt, usesOf, amountFor,
     shopList, missing, MAX_RECIPE_ROWS, stepList, tick, buyTicked, hasQ, isPiece, pieceCount, stepCount, isCountText, numOf, numText, fmtItem, cwOf, unitFor, qtyOf, fmtQ, recipeIn, perMeal, setAmount, restock, rateOf, toBuy, eat, setTake, taken, portion, serving, ownDishes, ownDish, saveDish, delDish, dishAmt, dishIcon, kitchenFoods, TRAVEL_STARTER, pickList, preTick, fill, unfill, shopInfo, shopWhen, shopUpto, match, dinner, active, pick, noteActive, tripEnd, bringHome, dayWord, counts };
 })(typeof window !== "undefined" ? window : globalThis);

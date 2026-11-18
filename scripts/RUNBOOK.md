@@ -6,8 +6,9 @@ Once a day, GitHub Actions runs `scripts/rollover.py` (deterministic, no AI) and
    — the **Calendar API** where configured, secret **iCal URLs** otherwise.
 2. Rewrites the Day Hub's **Today** and **Meals** tabs (only the content between the
    `<!-- ROLLOVER:*:START/END -->` markers in `index.html`) and commits if it changed.
-3. Creates today's **Notion Day Plan** page in the *Travel Activities Planner* data
-   source — **idempotently** (skips if one dated today already exists).
+It no longer creates a Notion Day Plan page (removed 2026-11-01, Junyan: the pages were
+useless). The `NOTION_TOKEN` / `NOTION_DAYPLAN_DS` repo secrets are no longer used by this
+workflow and can be deleted.
 
 Workflow: `.github/workflows/rollover.yml` — fires at **11:10 & 12:10 UTC** (= 07:10
 Toronto in summer/winter; the second fire is a harmless no-op). Also `workflow_dispatch`
@@ -26,8 +27,6 @@ In **github.com/junyanboon/day-hub → Settings → Secrets and variables → Ac
 | `GOOGLE_SA_JSON` | Service-account key JSON (see **Calendar access** below). Raw JSON or base64 of it. |
 | `CAL_ID_JOINT` / `CAL_ID_JUNYAN` / `CAL_ID_CANEY` / `CAL_ID_STAFF` | Each calendar's id (see below). |
 | `ICS_URL_JOINT` / `ICS_URL_JUNYAN` / `ICS_URL_CANEY` / `ICS_URL_STAFF` | *Fallback.* Each calendar's **Secret address in iCal format**. Keep these until the API path is proven; `ICS_URL_STAFF` is the same value as fbs-monitor's. |
-| `NOTION_TOKEN`   | A Notion internal-integration token. **Share the *Travel Activities Planner* database with that integration** (••• → Connections). Reuse the fbs-monitor integration if it's easier — just add this DB to its connections. |
-| `NOTION_DAYPLAN_DB` | *(optional)* the Day-Plan database id. Defaults to `e3212b3245264da48a12dc6d8900490b`; only set if that ever changes. |
 
 ## Calendar access — two backends, chosen per calendar
 
@@ -77,7 +76,7 @@ not change the Worker.
 ## After setup
 
 1. Push a commit (or hit **Run workflow** on the Actions tab) to trigger a run.
-2. First green run: confirm `index.html` was updated and a Notion Day Plan page appeared.
+2. First green run: confirm `index.html` was updated.
 3. Once verified, **disable the local `day-hub-morning-rollover` task** so the two don't
    both run (the cloud job is authoritative). They won't corrupt each other — the run is
    idempotent — but one owner is cleaner.
@@ -99,8 +98,7 @@ not change the Worker.
     Failing fast there turns a settling share into a dead run. A genuinely wrong or
     unshared calendar still fails — it just takes 3 attempts to say so.
   - Either way an exhausted calendar read aborts and writes nothing (no partial page).
-- If the Notion query can't be verified, it does **not** create a page (avoids duplicates).
-- Local dry-run: `pip install -r scripts/requirements.txt`, set `NOTION_TOKEN` plus each
+- Local dry-run: `pip install -r scripts/requirements.txt`, set each
   calendar's `CAL_ID_*` (with `GOOGLE_SA_JSON`) or `ICS_URL_*`, then
   `python scripts/rollover.py`.
 
