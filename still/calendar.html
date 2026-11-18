@@ -86,7 +86,7 @@
 /* an event that is over (earlier today, or a past day): its card fill, and its title (a share of the type colour
    mixed into --dim-ink); no see-through, so the title still reads at 4.5:1 or better */
 --dim-fill:12%;--dim-title:20%;--dim-ink:var(--soft);--dim-time:var(--soft);
-/* the strip behind the iPhone clock in home-screen mode (only a light look needs one) */
+/* the strip behind the iPhone clock in home-screen mode: the header bar colour in every look (see-through shows the body, which is --bar) */
 --status:transparent;
 /* block types: colour means type (Packing, slice 02 d23: a teal of its own, kept clear of Social and Yoga in every look) */
 --k-deep:var(--amber);--k-studio:var(--orange);--k-yoga:var(--cyan);--k-gym:var(--purple);--k-dance:var(--pink);--k-cook:var(--lime);
@@ -105,8 +105,8 @@
    sunset to sunrise. Both use one coral for "now", today, the Today button and the chosen view, so they feel like one look.
    Day: Studio Morning as first shipped (PR 125). A sunlit studio, a maple floor, a paper planner. Warm cream, warm ink,
    ballet coral. Coral sits near Studio On-Site, so Studio On-Site is a deep burnt orange and Deep Work an ochre. The
-   iPhone draws its clock in white over the top of the page (black-translucent), so a dark strip fills that space;
-   big shadows are a soft warm brown, not black. */
+   iPhone strip behind the clock is the header bar's cream (2026-11-18: a dark strip there looked grey to black
+   against the cream header); big shadows are a soft warm brown, not black. */
 :root[data-look="studio-day"]{
 --amber:#9a7d00;--orange:#a35a0a;--lime:#4f9418;--emerald:#14946a;--cyan:#0e8fa3;--blue:#2563c8;--teal:#147169;
 --indigo:#6358d0;--purple:#9a46c8;--pink:#c7317f;--slate:#5f6f86;--sand:#a1865a;--stone:#857d77;--red:#c42b3c;
@@ -116,7 +116,7 @@
 --ev-fill:14%;--pill-fill:16%;--ev-title:50%;--ev-ink:#1f1b16;--ev-time-p:40%;--ev-time:#4a4239;--ev-halo:0%;
 --glow:rgba(210,74,34,.12);--today-col:rgba(210,74,34,.035);--past:rgba(96,72,40,.05);--drop:rgba(96,72,40,.16);--track:rgba(31,27,22,.10);
 --lift:#3c2a14;--lift-k:.4;--dim-fill:7%;--dim-title:30%;
---status:#1f1b16;color-scheme:light}
+--status:#fffdf9;color-scheme:light}
 /* Night: a flat neutral charcoal with off-white text and no tint, the header and bottom bar a touch lifted from the
    page. The same coral, brightened for the dark; Studio On-Site a yellower tangerine to stay clear of it. */
 :root[data-look="studio-night"]{
@@ -808,7 +808,7 @@ if (TOUCH) for (const g of ["gesturestart", "gesturechange"]) document.addEventL
    which shows this build, the phone's answers and a log of every day change with its cause. Until then CalHook.on is
    null and diag() does nothing. BUILD names this copy of the page, so a screenshot proves which copy ran: change it on
    every change to this page or calendar-readout.js (the date plus a letter). */
-const BUILD = "2026-11-18c dash in header";
+const BUILD = "2026-11-18d top colour";
 const CalHook = window.CalHook = { BUILD, on: null };
 const diag = (kind, msg) => { if (CalHook.on) CalHook.on(kind, msg); };
 /* The iPhone home screen app's fit (2026-11-12): html.hs in a home screen app on touch, html.hsfill and --hsgap when

@@ -197,10 +197,16 @@ for (const id of faceIds) {
     assert.equal(L.scheme, scheme, "light or dark, for the form controls and the meta tag");
   });
 
-  test(`${id}: the strip behind the iPhone clock is dark enough for its white text, or not there at all`, () => {
+  test(`${id}: the strip behind the iPhone clock is the header bar's colour, so the top and the header row match`, () => {
+    // Junyan, 2026-11-18, iPhone screenshot of the home screen app: the strip behind the clock was a dark brown fading to
+    // near black while the header row below it was cream. The strip is now the header colour (or see-through, which shows
+    // the body, and the body is --bar).
     const st = R(vars.status);
-    if (st === "transparent") return;
-    assert.ok(contrast([255, 255, 255], colour(vars, "status")) >= 7, "white clock text on the strip");
+    if (st === "transparent") return;   // shows the body, pinned to --bar by the next test
+    assert.equal(st.toLowerCase(), R(vars.bar).toLowerCase(), "strip colour is the header bar colour");
+  });
+  test(`${id}: the page behind a see-through strip is the header bar colour`, () => {
+    assert.match(css, /\nbody\{background:var\(--bar\);/);
   });
 }
 
@@ -258,7 +264,7 @@ test("Studio's day half is Studio Morning exactly as PR 125 shipped it", () => {
   const was = { amber: "#9a7d00", orange: "#a35a0a", lime: "#4f9418", emerald: "#14946a", cyan: "#0e8fa3", blue: "#2563c8", indigo: "#6358d0",
     purple: "#9a46c8", pink: "#c7317f", slate: "#5f6f86", sand: "#a1865a", stone: "#857d77", red: "#c42b3c", bg: "#faf6ef", bar: "#fffdf9",
     raise: "#f4eee4", raise2: "#e8dfd1", ink: "#1f1b16", soft: "#5e554a", faint: "#736a5e", now: "#d24a22", "on-accent": "#ffffff",
-    "accent-ink": "#b23a17", "ev-fill": "14%", "pill-fill": "16%", "ev-title": "50%", "ev-ink": "#1f1b16", "ev-time": "#4a4239", status: "#1f1b16" };
+    "accent-ink": "#b23a17", "ev-fill": "14%", "pill-fill": "16%", "ev-title": "50%", "ev-ink": "#1f1b16", "ev-time": "#4a4239", status: "#fffdf9" };
   const d = varsFor("studio-day");
   for (const [k, v] of Object.entries(was)) assert.equal(resolver(d)(d[k]), v, `--${k}`);
 });
