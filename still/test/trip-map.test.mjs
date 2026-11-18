@@ -155,10 +155,10 @@ test("Remove place sends the delete for that place only", () => {
   assert.deepEqual(plain(C.placeRemove(ALLIANCE)), { op: "del", id: "mtl-alliance" });
   assert.equal(C.placeToast(ALLIANCE, "removed"), "Removed Alliance Dance Company");
 });
-test("after a remove the place leaves the list, its pin goes, and its plans have no place", () => {
+test("after a remove the place leaves the list, its pin goes, and its plans fall back to a plain plan address", () => {
   const m = model([PIERNAS, STUDIO]);
   assert.deepEqual(m.places.map((p) => p.name), ["Las Piernas", "Studio 2790"]);
-  assert.equal(m.days[1].plans.find((p) => p.name === "Social").where, "📍 Social", "its address is a plain plan address now");
+  assert.equal(m.days[1].plans.find((p) => p.name === "Social").where, "📍 Lambada workshop", "a plain dot takes the name of the first plan there");
   assert.ok(m.lookups.includes("Alliance Dance Company, 2529 Rue Ontario E, Montréal"), "and is looked up for a dot");
 });
 
