@@ -701,9 +701,9 @@ body.onpk .drop{display:none}
      scrolled into view stops below the sticky header row (scroll-padding-top). */
   .panel.kb{border-radius:0;padding-top:env(safe-area-inset-top,0px)}.panel.kb .pbody{padding-bottom:16px;scroll-padding-top:56px}
   /* layout D (Junyan, 2026-11-18, d43: "43 D is good"): with the keyboard up the dash leaves its own 44px row (that row pushed
-     the Title 44px lower than build l, into the blur on his phone) and sits in the header row's left spot, where the x
+     the Title 44px lower than the 2026-11-12l build, into the blur on his phone) and sits in the header row's left spot, where the x
      was: "---  Event  Save". It is laid over the header cell (72px wide, 44 high, same top as .shead: the status strip,
-     then pbody's 4px, measured from inside the 1px edge), so the header row and the Title sit where build l put them.
+     then pbody's 4px, measured from inside the 1px edge), so the header row and the Title sit where the 2026-11-12l build put them.
      A 4px band of the sheet colour above the sticky header hides content that scrolls under it. */
   .panel.kb .grab{position:absolute;z-index:3;left:16px;top:calc(env(safe-area-inset-top,0px) + 4px);width:72px;height:44px;margin:0}
   .panel.kb .grab::before{left:16px}
@@ -1243,7 +1243,7 @@ function focusTitleWhenIn(wasOpen) {
   const go = () => { if (done) return; done = true; p.removeEventListener("transitionend", on); clearTimeout(t); if (document.body.classList.contains("popen")) $("#pTitle")?.focus(); };
   const on = (e) => { if (e.target === p && e.propertyName === "transform") go(); };
   const t = setTimeout(go, 450);
-  if (wasOpen) go(); else p.addEventListener("transitionend", on);
+  if (wasOpen || !sheetOn()) go(); else p.addEventListener("transitionend", on);
 }
 /* A finger swipe between days (Junyan, 2026-11-11: "it changes days when I'm in the day view very easily").
    The strip was one native scroller in both directions with x snapping (.sc.snap), so on the iPhone, which does
