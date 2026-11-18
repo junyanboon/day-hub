@@ -430,7 +430,6 @@ body.onpage .left,body.onpage .main,body.onpage .panel{display:none}
 .tchips span{font-size:12.5px;border:1px solid var(--line);border-radius:999px;padding:3px 10px;color:var(--soft)}
 .tchips .need,.ttag.need,.tmiss,.tkv .need{color:var(--amber)}
 .tchips .need{border-color:color-mix(in srgb,var(--amber) 60%,transparent)}
-.trtabs{margin-bottom:10px}.trtabs .seg{display:inline-flex;width:auto}
 .tdays{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0}
 .tdays button{border:1px solid var(--line);background:var(--bar);border-radius:999px;padding:4px 11px;font-size:12.5px;color:var(--soft)}
 .tdays button[aria-pressed=true]{background:var(--ink);color:var(--bg);border-color:transparent}
@@ -448,9 +447,6 @@ body.onpage .left,body.onpage .main,body.onpage .panel{display:none}
 .tchk i{width:14px;height:14px;border:1.5px solid var(--line);border-radius:4px;flex:none;display:grid;place-items:center;font-style:normal;font-size:10px}
 .tchk.done i{background:var(--c);border-color:transparent;color:var(--on-accent)}
 .tsub{font-weight:700;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);margin:14px 0 4px}
-table.tmusts{width:100%;border-collapse:collapse;font-size:14px;margin-top:6px}
-.tmusts th{text-align:left;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);font-weight:700;padding:6px 10px;border-bottom:1px solid var(--line)}
-.tmusts td{padding:10px;border-bottom:1px solid var(--line);vertical-align:top}.tmusts td:last-child{color:var(--soft)}
 @media (min-width:768px) and (max-width:900px){.trip{grid-template-columns:1fr}.tleft{border-right:0;border-bottom:1px solid var(--line)}}
 @media not all and (min-width:768px){
   .trip{display:block;border:0;border-radius:0;background:none}
@@ -1666,7 +1662,7 @@ async function loadTrips() {
    a saved place is looked up on OpenStreetMap once and remembered in this browser (SPOTS), as Day Quest does for Local.
    The map is Leaflet with OpenStreetMap tiles, as Day Quest's. The page is drawn once per trip and then painted in
    parts, so the map is never rebuilt under him. */
-const TM = { name: "", trip: null, items: [], places: [], extras: {}, sel: null, plan: null, rtab: "Itinerary", day: -1, tab: "Map", loading: false, map: null, layer: null, fitted: false, fitN: 0, moved: false, looking: false, run: 0 };
+const TM = { name: "", trip: null, items: [], places: [], extras: {}, sel: null, plan: null, day: -1, tab: "Map", loading: false, map: null, layer: null, fitted: false, fitN: 0, moved: false, looking: false, run: 0 };
 const SPOTS = "trip-map-spots-v1";
 const spotsGet = () => { try { const v = JSON.parse(store.get(SPOTS) || "{}"); return v && typeof v === "object" ? v : {}; } catch (e) { return {}; } };
 const dropMap = () => { if (TM.map) { TM.map.remove(); TM.map = null; } };
@@ -1682,7 +1678,7 @@ async function openTrip(name) {
   const meta = (S.trips || []).find((t) => t.name === name || (t.aliases || []).includes(name)) || { name };
   dropMap();
   const run = ++TM.run, gone = () => TM.run !== run || S.trip !== meta.name;   // a newer open, or back, wins
-  Object.assign(TM, { name: meta.name, trip: meta, items: [], places: [], extras: {}, sel: null, plan: null, rtab: "Itinerary", day: -1, tab: "Map", loading: true, fitted: false });
+  Object.assign(TM, { name: meta.name, trip: meta, items: [], places: [], extras: {}, sel: null, plan: null, day: -1, tab: "Map", loading: true, fitted: false });
   S.trip = meta.name; render(); $("#page").scrollTop = 0;
   let ok = true;
   for (const nm of meta.aliases || [meta.name]) {   // a trip spelled two ways in Notion reads both, as Day Quest does
@@ -1691,7 +1687,7 @@ async function openTrip(name) {
       if (gone()) return;
       for (const it of d.items || []) if (!TM.items.some((x) => x.id === it.id)) TM.items.push(it);
       for (const p of d.places || []) if (!TM.places.some((x) => x.id === p.id)) TM.places.push(p);
-      Object.assign(TM.extras, d.extras || {});   // Day Quest's own notes, ticks and Must-haves (read only here, d70)
+      Object.assign(TM.extras, d.extras || {});   // Day Quest's own notes and ticks (read only here, d70)
     } catch (e) { ok = false; toast("Trip not read: " + e.message, { bad: true }); }
   }
   if (gone()) return;
@@ -1755,18 +1751,15 @@ function tripPaint() {
   $("#tPlaces").innerHTML = m.places.map((p) => `<button class="tpl-row${p.id === sel ? " on" : ""}" data-tpin="${esc(p.id)}"><span class="e">${esc(p.emoji)}</span><span class="nm">${esc(p.name)}<small>${esc(p.sub)}</small></span>${p.nopin ? '<span class="nopin">No pin</span>' : ""}</button>`).join("");
   tripPins(m);
 }
+/** Only web links open from a plan (its links come from Notion and Day Quest's own notes). */
+const web = (u) => /^https?:\/\//i.test(String(u || ""));
 const tTag = (g) => g ? `<span class="ttag ${g.cls}">${esc(g.text)}</span>` : "";
-/** The computer's left column: chips, Itinerary / Must-haves, the day buttons and the plans day by day (d70, d72, d73). */
+/** The computer's left column: chips, the day buttons and the plans day by day (d70). Itinerary only, so no tab bar (d75: Must-haves left out). */
 function readPaint() {
-  const box = $("#tRead"); if (!box) return;
+  const box = $("#tRead"); if (!box || !WIDE.matches) return;   // a phone keeps slice 04's rows (d14): nothing to draw here
   const r = readModel();
   $("#tMeta").textContent = r.head.meta;
-  let h = (r.head.chips.length ? `<div class="tchips">${r.head.chips.map((c) => `<span class="${c.cls}">${esc(c.text)}</span>`).join("")}</div>` : "") +
-    `<div class="trtabs"><span class="seg" role="group" aria-label="Trip sections">${["Itinerary", "Must-haves"].map((t) => `<button data-trtab="${t}" aria-pressed="${t === TM.rtab}">${t}</button>`).join("")}</span></div>`;
-  if (TM.rtab === "Must-haves") {
-    box.innerHTML = h + `<table class="tmusts"><tr><th>Name</th><th>Notes</th></tr>${r.musts.map((m) => `<tr><td>${esc(m.name)}</td><td>${esc(m.notes)}</td></tr>`).join("")}</table>`;
-    return;
-  }
+  let h = r.head.chips.length ? `<div class="tchips">${r.head.chips.map((c) => `<span class="${c.cls}">${esc(c.text)}</span>`).join("")}</div>` : "";
   if (TM.loading && !r.days.length) { box.innerHTML = h + `<div class="meta">Loading trip…</div>`; return; }
   if (TM.day >= r.days.length) TM.day = -1;
   const row = (p) => `<button class="trow${p.id === TM.plan ? " on" : ""}" data-tplan="${esc(p.id)}"><span class="t">${esc(p.time)}${p.end ? `<i>${esc(p.end)}</i>` : ""}</span><span class="nm"><b>${esc(p.name)}</b>${tTag(p.tag)}<small>${esc(p.sub)}</small>${p.miss ? `<div class="tmiss">${esc(p.miss)}</div>` : ""}</span></button>`;
@@ -1782,16 +1775,16 @@ function readPaint() {
 function planCard() {
   const d = readModel().detail(TM.plan); if (!d) return "";
   const kv = d.rows.map((x) => {
-    const n = x.need ? ' class="need"' : "", links = (x.links || []).filter((l) => l.href).map((l) => `<a href="${esc(l.href)}" target="_blank" rel="noopener">${esc(l.text)}</a>`).join(" · ");
+    const n = x.need ? ' class="need"' : "", links = (x.links || []).filter((l) => web(l.href)).map((l) => `<a href="${esc(l.href)}" target="_blank" rel="noopener">${esc(l.text)}</a>`).join(" · ");
     return `<span${n}>${esc(x.k)}</span><div${n}>${esc(x.v)}${x.v && links ? "<br>" : ""}${links}</div>`;
   }).join("");
   const chk = d.check ? `<div class="tsub">Hotel checklist</div>` + d.check.map((c) => `<div class="tchk${c.done ? " done" : ""}"><i>${c.done ? "✓" : ""}</i>${esc(c.text)}</div>`).join("") : "";
-  const acts = (d.book ? `<a class="btn go" href="${esc(d.book)}" target="_blank" rel="noopener">Book ↗</a>` : "") + (d.notion ? `<a class="btn" href="${esc(d.notion)}" target="_blank" rel="noopener">Open in Notion ↗</a>` : "");
+  const acts = (web(d.book) ? `<a class="btn go" href="${esc(d.book)}" target="_blank" rel="noopener">Book ↗</a>` : "") + (web(d.notion) ? `<a class="btn" href="${esc(d.notion)}" target="_blank" rel="noopener">Open in Notion ↗</a>` : "");
   return `<div class="tcardx"><div class="h"><span>${esc(d.icon)}</span><b>${esc(d.name)}</b>${tTag(d.tag)}<button class="x" data-tclose aria-label="Close">×</button></div><div class="tkv">${kv}</div>${chk}${acts ? `<div class="acts">${acts}</div>` : ""}</div>`;
 }
 /** A plan row on a computer: its details show, and its pin grows when it sits on one. */
 function tripPlan(id) {
-  TM.plan = id; TM.sel = readModel().detail(id)?.at || null;
+  TM.plan = id; TM.sel = tripModel().rowOf(id).at || null;
   tripPaint();
   const p = TM.sel && tripModel().pins.find((x) => x.id === TM.sel);
   if (p && TM.map) TM.map.panTo([p.lat, p.lng]);
@@ -1885,15 +1878,14 @@ async function tripRemove(id) {
 function tripWire() {
   document.addEventListener("click", (e) => {
     if (S.page !== "travel") return;
-    const t = e.target.closest("[data-trip],[data-tpin],[data-tplan],[data-tday],[data-trtab],[data-tclose],[data-trm],[data-ttab],[data-tback]"); if (!t || !$("#page").contains(t)) return;
+    const t = e.target.closest("[data-trip],[data-tpin],[data-tplan],[data-tday],[data-tclose],[data-trm],[data-ttab],[data-tback]"); if (!t || !$("#page").contains(t)) return;
     const d = t.dataset;
     if (d.trip) openTrip(d.trip);
     else if ("tback" in d) { S.trip = null; TM.run++; dropMap(); render(); $("#page").scrollTop = 0; }
     else if (d.ttab) tripTab(d.ttab);
     else if ("tclose" in d) { TM.sel = null; TM.plan = null; tripPaint(); }
     else if (d.tplan) tripPlan(d.tplan);
-    else if (d.tday) { TM.day = +d.tday; tripPaint(); }
-    else if (d.trtab) { TM.rtab = d.trtab; tripPaint(); }
+    else if ("tday" in d) { TM.day = +d.tday; tripPaint(); }
     else if (d.trm) tripRemove(d.trm);
     else if (d.tpin) tripPick(d.tpin);
   });
@@ -2163,6 +2155,7 @@ function wirePacking() {
   pg.addEventListener("dragend", clear);
   /* the window narrows under 768 px: the Packing page closes, as it cannot open there (d14) */
   WIDE.addEventListener("change", () => { if (!WIDE.matches && S.page === "packing") showPage("cal"); });
+  WIDE.addEventListener("change", () => { if (S.page === "travel" && S.trip) tripPaint(); });   // a trip's computer column draws when the window widens
 }
 
 /* ---------- pairing ---------- */

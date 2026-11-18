@@ -191,15 +191,3 @@ test("Book goes to the plan's own link when it has one; an unknown plan has no d
   assert.equal(read({ items: [it] }).detail("s1").book, "https://bota.example");
   assert.equal(read().detail("nope"), null);
 });
-
-/* ---- d72: Must-haves, read only */
-test("Must-haves: Day Quest's three starters when none are saved", () => {
-  same(plain(read().musts), [
-    { name: "🪪 IDs", notes: "" }, { name: "👟 Dance shoes + outfits", notes: "" },
-    { name: "🏠 Studio cover", notes: "Who watches the studios while away" },
-  ]);
-});
-test("Must-haves: the trip's saved rows when there are any", () => {
-  const extras = { ["trip:" + MTL]: { musts: [{ name: "Passport", notes: "Caney's too" }, { name: "", notes: "" }] } };
-  same(plain(read({ extras }).musts), [{ name: "Passport", notes: "Caney's too" }]);
-});

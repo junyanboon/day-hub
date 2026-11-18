@@ -1,6 +1,6 @@
 // Slice 05, read a trip (Junyan, 2026-11-18: "70 yes, 71 yes, 72 yes, 73 yes it's probably not needed at all", then
 // "74 yes": mock https://claude.ai/artifact/DoUcZHR3SbkquBrUoyKnCA as drawn). On a computer the trip's left column
-// shows Day Quest's full trip: chips, Itinerary and Must-haves, day buttons, every plan once on its own day, Staying and
+// shows Day Quest's full trip: chips, day buttons, every plan once on its own day, Staying and
 // Check-out lines, Maybe and Outside the trip dates; a plan row opens its details under the map, read only. A phone is
 // unchanged (d14): its trip page is compared, word for word, with main's copy served by the same dev server.
 // The rules themselves are tested in still/test/trip-read.test.mjs.
@@ -64,8 +64,7 @@ try {
   check("computer: the head names the trip with its weekdays and who", head === "‹ Trips 🇨🇦 2026 🇨🇦 Montreal Birthday Thu Nov 12 to Tue Nov 17 · You + Caney", head);
   const chips = await page.evaluate(() => [...document.querySelectorAll("#page .tchips span")].map((c) => [c.textContent, c.className]));
   check("computer: an amber chip per plan still to book; no days away once the trip has started", JSON.stringify(chips) === '[["Spa & Recovery not booked","need"]]', JSON.stringify(chips));
-  const tabs = await page.evaluate(() => [...document.querySelectorAll("#page .trtabs button")].map((b) => [b.textContent, b.getAttribute("aria-pressed")]));
-  check("computer: two tabs only, Itinerary and Must-haves (d73)", JSON.stringify(tabs) === '[["Itinerary","true"],["Must-haves","false"]]', JSON.stringify(tabs));
+  check("computer: the Itinerary only, so no tab bar (d73, d75: no Bookings, Ideas or Must-haves)", await page.evaluate(() => !document.querySelector("#page #tRead .seg, #page #tRead [data-ttab]") && !/Must-haves|Bookings|Ideas/.test(document.querySelector("#page .tleft").innerText)));
   const days = await page.evaluate(() => [...document.querySelectorAll("#page .tdays button")].map((b) => b.textContent));
   check("computer: day buttons All, Thu 12 to Tue 17", JSON.stringify(days) === '["All","Thu 12","Fri 13","Sat 14","Sun 15","Mon 16","Tue 17"]', JSON.stringify(days));
   check("computer: slice 04's plain rows are not shown on a computer", !(await shown(page, "#page #tDays")) && await shown(page, "#page #tRead"));
@@ -131,11 +130,6 @@ try {
     await page.screenshot({ path: path.join(process.env.SHOTS, "trip-read-computer-1280.png"), fullPage: true });
   }
 
-  // Must-haves (d72): Day Quest's three starters, read only
-  await page.click('#page .trtabs [data-trtab="Must-haves"]'); await sleep(200);
-  const musts = await page.evaluate(() => [...document.querySelectorAll("#page .tmusts tr")].map((r) => [...r.children].map((c) => c.textContent)));
-  check("computer: Must-haves is a Name and Notes table", JSON.stringify(musts) === JSON.stringify([["Name", "Notes"], ["🪪 IDs", ""], ["👟 Dance shoes + outfits", ""], ["🏠 Studio cover", "Who watches the studios while away"]]), JSON.stringify(musts));
-  check("computer: nothing to edit in Must-haves", await page.evaluate(() => !document.querySelector("#page #tRead input, #page #tRead textarea, #page #tRead [contenteditable]")));
   /* the only writes are slice 04's: the four Montreal places saved once when the trip first opens */
   check("computer: read only: nothing but the four starting places is written", writes.length === 4 && writes.every((w) => w === "POST /quest/places"), JSON.stringify(writes));
   check("computer: no page errors", errors.length === 0, errors.join(" | "));

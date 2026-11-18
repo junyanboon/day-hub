@@ -933,8 +933,6 @@
      pillOf, fieldOf, cardLabel, destOf, MISSING_FIELD). Tests: still/test/trip-read.test.mjs. ---------- */
   /** Day Quest's hotel checklist (quest-trips.js CHECK, inside its page code, so copied here). */
   const CHECK = ["Research and pick the place", "Upload confirmation #", "Cancellation policy", "Address (opens in Google Maps)", "Pay outstanding balance", "Pictures of the room & amenities"];
-  /** Day Quest's starters when a trip has no Must-haves saved. */
-  const MUSTS = [{ name: "🪪 IDs", notes: "" }, { name: "👟 Dance shoes + outfits", notes: "" }, { name: "🏠 Studio cover", notes: "Who watches the studios while away" }];
   const dnum = (s) => Date.UTC(+s.slice(0, 4), +s.slice(5, 7) - 1, +s.slice(8, 10)) / 86400000;
   const isDay = (s) => /^\d{4}-\d\d-\d\d/.test(String(s || ""));
   /** "…T22:00…" → "10:00 pm", the plan's own wall clock (Day Quest's timeOf). */
@@ -964,9 +962,8 @@
   const gsearch = (q) => "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(q);
   const val = (v) => (v == null ? "" : Array.isArray(v) ? v.join(", ") : String(v)).trim();
 
-  /** One trip, read: {head, days, maybe, outside, shown(day), detail(id), musts}.
-      trip {name, start, end, place}; items its plans; extras Day Quest's own (by plan id, and "trip:<name>" for the
-      Must-haves); places and spots as tripMap takes them; today "YYYY-MM-DD". */
+  /** One trip, read: {head, days, maybe, outside, shown(day), detail(id)}.
+      trip {name, start, end, place}; items its plans; extras Day Quest's own, by plan id; places and spots as tripMap takes them; today "YYYY-MM-DD". */
   function tripRead({ trip, items, extras, places, spots, today, T }) {
     const ex = (id) => (extras || {})[id] || {};
     /* a calendar copy's status picked in Day Quest is kept in its extras (Day Quest's openTrip does the same) */
@@ -1008,8 +1005,7 @@
     const away = start && today ? dnum(start) - dnum(today) : 0;
     if (away > 0) chips.push({ text: away === 1 ? "1 day away" : `${away} days away`, cls: "" });
     for (const it of list) if (T.pillOf(it.status) === "need") chips.push({ text: (T.isStay(it) ? "Hotel" : it.name.replace(/ Day$/, "")) + " not booked", cls: "need" });
-    const long = (d) => `${DOW[dowOf(d)]} ${MON[+d.slice(5, 7) - 1]} ${+d.slice(8, 10)}`;
-    const dates = !start ? "" : end && end !== start ? `${long(start)} to ${long(end)}` : long(start);
+    const dates = !start ? "" : end && end !== start ? `${dayLabel(start)} to ${dayLabel(end)}` : dayLabel(start);
     const head = { icon: h.icon, title: h.title, meta: [dates, h.who].filter(Boolean).join(" · "), chips };
 
     function bookUrl(it) {
@@ -1052,10 +1048,7 @@
         check: kind === "stay" ? CHECK.map((text, i) => ({ text, done: !!(e.check || {})[i] })) : null,
         book: look(it).book ? bookUrl(it) : "", notion: it.url || "" };
     }
-    const names = [trip.name, ...(trip.aliases || [])];
-    const saved = names.map((nm) => (ex("trip:" + nm).musts || []).filter((m) => m && (val(m.name) || val(m.notes)))).find((m) => m.length);
-    const musts = (saved || MUSTS).map((m) => ({ name: val(m.name), notes: val(m.notes) }));
-    return { head, days, maybe, outside, shown, detail, musts };
+    return { head, days, maybe, outside, shown, detail };
   }
 
   Object.assign(root.CalCore, { pinMatch, mapStart, gdir, tripMap, placeAdd, placeToast, placeRemove, tripSeed, tripHead, TRIP_TABS, tripRead });
