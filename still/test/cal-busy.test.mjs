@@ -100,3 +100,7 @@ test("the other days of the agenda are read every 10 minutes, and at once after 
   assert.match(p, /agendaDue\(AG_AT/);
   assert.match(fn("qfetch"), /AG_AT = 0/, "a calendar write makes the next read-back fetch them");
 });
+
+test("the busy toast on a drag says 'the move', not the block's name", () => {
+  assert.ok(fn("commitDrag").includes('Trying again to save the ${renamed ? "change" : "move"}…'));
+});
