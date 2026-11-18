@@ -763,7 +763,7 @@ if (TOUCH) for (const g of ["gesturestart", "gesturechange"]) document.addEventL
    which shows this build, the phone's answers and a log of every day change with its cause. Until then CalHook.on is
    null and diag() does nothing. BUILD names this copy of the page, so a screenshot proves which copy ran: change it on
    every change to this page or calendar-readout.js (the date plus a letter). */
-const BUILD = "2026-11-17f trip map";
+const BUILD = "2026-11-18a trip map legend";
 const CalHook = window.CalHook = { BUILD, on: null };
 const diag = (kind, msg) => { if (CalHook.on) CalHook.on(kind, msg); };
 /* The iPhone home screen app's fit (2026-11-12): html.hs in a home screen app on touch, html.hsfill and --hsgap when
@@ -1755,7 +1755,9 @@ async function tripPins(m) {
   if ((!TM.fitted || more) && !TM.loading && box.offsetWidth) {
     TM.fitted = true; TM.fitN = m.pins.length;
     const st = C.mapStart(m.pins, "", null);
-    if (st.pins) TM.map.fitBounds(st.pins, { padding: [40, 40], maxZoom: 15 });
+    /* the legend sits over the map's bottom edge on a computer: fit above it, so it never hides a pin (2026-11-18) */
+    const lg = $("#page .tlegend"), over = lg && getComputedStyle(lg).position === "absolute" ? lg.offsetHeight + 10 : 0;
+    if (st.pins) TM.map.fitBounds(st.pins, { paddingTopLeft: [40, 40], paddingBottomRight: [40, 40 + over], maxZoom: 15 });
     else tripCentre();
   }
   setTimeout(() => TM.map && TM.map.invalidateSize(), 60);

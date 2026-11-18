@@ -82,6 +82,15 @@ try {
     check(`${label}: four place tiles and one plain plan dot, Alliance counts 4`, p0.length === 5 && p0.includes("💃4") && p0.filter((x) => x === "").length === 1, JSON.stringify(p0));
     const legend = flat(await text(page, "#page .tlegend"));
     check(`${label}: the legend in the mock's words`, legend === "💃 saved place ● plan address ❷ plans there", legend);
+    // the legend never hides a pin (Junyan's check on 8816, 2026-11-18): every pin sits clear of the legend box
+    const under = await page.evaluate(() => {
+      const lg = document.querySelector("#page .tlegend").getBoundingClientRect();
+      return [...document.querySelectorAll("#page .leaflet-marker-icon")].filter((m) => {
+        const r = m.getBoundingClientRect();
+        return r.right > lg.left && r.left < lg.right && r.bottom > lg.top && r.top < lg.bottom;
+      }).map((m) => m.getAttribute("title") || m.innerText);
+    });
+    check(`${label}: the legend covers no pin`, under.length === 0, JSON.stringify(under));
     check(`${label}: the add box in the mock's words`, await page.getAttribute("#page #tAddIn", "placeholder") === "Add place: a name or an address, then Enter");
 
     // a saved place row opens its card

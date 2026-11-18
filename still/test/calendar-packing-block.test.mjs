@@ -114,7 +114,7 @@ test("the panel: the Open packing list button is drawn only on a computer, and P
 });
 
 test("the BUILD label names this copy", () => {
-  assert.match(html, /const BUILD = "2026-11-17f trip map";/, "slice 04 (trip map) renamed it");
+  assert.match(html, /const BUILD = "2026-11-18a trip map legend";/, "slice 04 (trip map) renamed it");
   assert.match(html, /calendar-core\.js\?v=25"/, "a new stamp for the changed core (slice 04)");
 });
 
