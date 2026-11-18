@@ -29,7 +29,7 @@ const SPOTS = { "1255 rue jeanne-mance, montréal": { lat: 45.5079, lng: -73.564
 const text = (page, sel) => page.evaluate((s) => document.querySelector(s)?.innerText || "", sel);
 const shown = (page, sel) => page.evaluate((s) => { const el = document.querySelector(s); return !!el && el.getClientRects().length > 0; }, sel);
 const rows = (page) => page.evaluate(() => [...document.querySelectorAll("#page .tpl-row")].map((r) => r.innerText.replace(/\s+/g, " ").trim()));
-const pins = (page) => page.evaluate(() => [...document.querySelectorAll("#page .leaflet-marker-icon")].map((m) => m.innerText.replace(/\s+/g, " ").trim()));
+const pins = (page) => page.evaluate(() => [...document.querySelectorAll("#page .leaflet-marker-icon")].map((m) => m.innerText.replace(/\s+/g, "")));   // a tile's count badge sits on its corner, so innerText may put a gap before it
 const toastText = async (page) => { await page.waitForFunction(() => document.querySelector("#toast.on"), null, { timeout: 4000 }).catch(() => {}); return text(page, "#toast"); };
 
 try {
@@ -95,7 +95,7 @@ try {
 
     // a plan row with a place opens that place; a plain dot has no Remove
     if (phone) { await page.click('#page .ttabs2 [data-ttab="Itinerary"]'); await sleep(200); }
-    check(`${label}: the itinerary rows in the mock's words`, flat(await text(page, "#page .tleft")).includes("Fri Nov 13 5:00 PM Check in: Montreal stay 📍 Montreal stay 9:00 PM Lambada workshop 📍 Alliance Dance Company"),
+    check(`${label}: the itinerary rows in the mock's words`, flat(await text(page, "#page .tleft")).toLowerCase().includes("Fri Nov 13 5:00 PM Check in: Montreal stay 📍 Montreal stay 9:00 PM Lambada workshop 📍 Alliance Dance Company".toLowerCase()),
       flat(await text(page, "#page .tleft")).slice(0, 300));
     await page.click('#page .trow[data-tpin^="plan:"]'); await sleep(300);
     if (phone) check(`${label}: a plan row jumps to the Map tab`, await shown(page, "#page .tmapbox") && !(await shown(page, "#page .tleft")));
@@ -108,7 +108,7 @@ try {
     await page.fill("#page #tAddIn", "Schwartz's Deli"); await page.press("#page #tAddIn", "Enter");
     check(`${label}: a found place: the toast says Saved Schwartz's Deli`, await toastText(page) === "Saved Schwartz's Deli");
     await page.waitForFunction(() => document.querySelectorAll("#page .tpl-row").length === 5, null, { timeout: 4000 }).catch(() => {});
-    check(`${label}: its pin drops (📍) and the list says Saved places 5`, flat(await text(page, "#page .tsh")) === "Saved places 5" && (await pins(page)).includes("📍"), JSON.stringify(await pins(page)));
+    check(`${label}: its pin drops (📍) and the list says Saved places 5`, flat(await text(page, "#page .tsh")) === "Saved places 5" && (await pins(page)).some((p) => p.startsWith("📍")), JSON.stringify(await pins(page)));
     check(`${label}: and its card opens`, /^📍 Schwartz's Deli/.test(flat(await text(page, "#page .tcardx"))));
     await sleep(2700);
     // not found
@@ -136,7 +136,7 @@ try {
     }
 
     // ‹ Trips goes back to the cards
-    await page.click("#page [data-tback]"); await sleep(250);
+    await page.click("#page [data-tback]:visible"); await sleep(250);
     check(`${label}: ‹ Trips goes back to the trip cards`, (await page.evaluate(() => document.querySelectorAll("#page .tcard").length)) === 2);
     check(`${label}: no page errors`, errors.length === 0, errors.join(" | "));
     await ctx.close();

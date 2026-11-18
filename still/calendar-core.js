@@ -796,3 +796,130 @@
 
   root.CalCore.packing = packing;
 })(typeof window !== "undefined" ? window : globalThis);
+
+/* The trip map and saved places (slice 04, Junyan 2026-11-17: "31 yes, 32 yes, 33 no, 34 later", then "35 yes, 36 yes":
+   mock https://claude.ai/artifact/BQLvpC1YQjAUDhuBJefsRi as drawn). No page in here: still/test/trip-map.test.mjs.
+   mapStart, gdir and the pin match rule are Day Quest's own (quest-trips.js: mapStart, gdir, drawMap), copied here so
+   the calendar keeps them once Day Quest is retired. Day Quest's helpers (fieldOf, isStay, destOf, tripKey, SEED, MTL)
+   are passed in as T, as the Packing page does. Saved places live in still-api /quest/places (the server finds the
+   pin); plan addresses are read from Notion and looked up on the map in the page (spots), never written back (d10). */
+(function (root) {
+  "use strict";
+  const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"], DOW = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const low = (s) => String(s || "").toLowerCase().trim();
+  const street = (addr) => String(addr || "").split(",")[0].trim();
+
+  /** Day Quest's pin match: a plan sits on a saved place when its address names the place or the place's street. */
+  function pinMatch(addr, place) {
+    const a = low(addr), nm = low(place && place.name), st = low(street(place && place.address));
+    return !!a && ((!!nm && a.includes(nm)) || (!!st && a.includes(st)));
+  }
+  /** How the map starts: fitted to the pins; else on the trip's destination; else the whole world. */
+  function mapStart(places, dest, geo) {
+    const pins = (places || []).filter((p) => p && p.lat != null && p.lng != null).map((p) => [p.lat, p.lng]);
+    if (pins.length) return { pins };
+    if (dest && geo && geo.lat != null) return { center: [geo.lat, geo.lng], zoom: 5 };
+    return { world: true };
+  }
+  /** Google Maps directions to the pin, else the address, else the name. */
+  const gdir = (p) => "https://www.google.com/maps/dir/?api=1&destination=" + encodeURIComponent(p.lat != null ? `${p.lat},${p.lng}` : p.address || p.name);
+  /** The tile of a saved place: 💃 dance, 🥾 hike, 🍜 food, 📍 anything else (Day Quest's rule; a new place is 📍). */
+  const emojiOf = (cat) => cat === "hike" ? "🥾" : cat === "dance" ? "💃" : /food|eat|restaurant|cafe/i.test(cat || "") ? "🍜" : "📍";
+
+  /** "2026-11-13T21:00:00-05:00" → {day: "2026-11-13", time: "9:00 PM"}: the plan's own wall clock, as Notion holds it. */
+  function when(iso) {
+    const s = String(iso || ""), day = s.slice(0, 10), m = /T(\d\d):(\d\d)/.exec(s);
+    if (!m) return { day, time: "" };
+    const h = +m[1];
+    return { day, time: `${h % 12 || 12}:${m[2]} ${h < 12 ? "AM" : "PM"}` };
+  }
+  const dowOf = (d) => new Date(Date.UTC(+d.slice(0, 4), +d.slice(5, 7) - 1, +d.slice(8, 10))).getUTCDay();
+  const dayLabel = (d) => `${DOW[dowOf(d)]} ${MON[+d.slice(5, 7) - 1]} ${+d.slice(8, 10)}`;
+
+  /** One trip's map: {pins, days, places, lookups, card(id)}.
+      items are the trip's plans (Day Quest's items), places its saved places, spots the plan addresses already found
+      on the map ({lowercased address: {lat, lng}}). A plan whose address is not a saved place pins on a plain dot once
+      its address is found; lookups are the plan addresses still to look up. */
+  function tripMap({ items, places, spots, T }) {
+    const saved = (places || []).map((p) => ({ ...p, emoji: emojiOf(p.category) }));
+    const dots = new Map(), byAt = new Map(), lookups = [];
+    const plans = (items || []).filter((it) => it && it.name).map((it) => {
+      const addr = String(T.fieldOf(it, "Address") || "").trim(), w = when(it.start);
+      const name = T.isStay(it) ? "Check in: " + it.name : it.name;
+      let at = "";
+      const sp = addr && saved.find((p) => pinMatch(addr, p));
+      if (sp) at = sp.id;
+      else if (addr) {
+        const key = low(addr); at = "plan:" + key;
+        if (!dots.has(at)) {
+          const g = (spots || {})[key];
+          dots.set(at, { id: at, plan: true, name: it.name, address: addr, lat: g ? g.lat : null, lng: g ? g.lng : null });
+          if (!g && !(spots && key in spots)) lookups.push(addr);
+        }
+      }
+      const p = { id: it.id, day: w.day, time: w.time, name, at, start: String(it.start || "") };
+      if (at) byAt.set(at, [...(byAt.get(at) || []), p]);
+      return p;
+    });
+    const count = (id) => (byAt.get(id) || []).length;
+    const pins = [
+      ...saved.filter((p) => p.lat != null && p.lng != null).map((p) => ({ id: p.id, name: p.name, emoji: p.emoji, lat: p.lat, lng: p.lng, count: count(p.id), plan: false })),
+      ...[...dots.values()].filter((d) => d.lat != null).map((d) => ({ id: d.id, name: d.name, lat: d.lat, lng: d.lng, count: count(d.id), plan: true })),
+    ];
+    const spotOf = (id) => saved.find((p) => p.id === id) || dots.get(id) || null;
+    const days = [];
+    for (const p of [...plans].filter((x) => x.day).sort((a, b) => a.start.localeCompare(b.start))) {
+      const sp = p.at && spotOf(p.at);
+      const row = { id: p.id, time: p.time, name: p.name, at: p.at, where: sp ? "📍 " + sp.name : "No place yet" };
+      const last = days[days.length - 1];
+      if (last && last.day === p.day) last.plans.push(row); else days.push({ day: p.day, label: dayLabel(p.day), plans: [row] });
+    }
+    const list = saved.map((p) => {
+      const n = count(p.id), nopin = p.lat == null || p.lng == null;
+      return { id: p.id, name: p.name, emoji: p.emoji, nopin,
+        sub: nopin ? "Not found on the map" : street(p.address) + (n ? ` · ${n} ${n === 1 ? "plan" : "plans"}` : "") };
+    });
+    function card(id) {
+      const sp = id && spotOf(id); if (!sp) return null;
+      const there = (byAt.get(id) || []).filter((p) => p.day).sort((a, b) => a.start.localeCompare(b.start));
+      return { id, icon: sp.plan ? "🔵" : sp.emoji, name: sp.name,
+        addr: sp.plan ? sp.address + " · from the plan, not a saved place" : sp.lat == null ? "Not found on the map" : sp.address,
+        plans: there.map((p) => [`${DOW[dowOf(p.day)]} ${p.time}`.trim(), p.name]), dir: gdir(sp), remove: !sp.plan };
+    }
+    return { pins, days, places: list, lookups, card };
+  }
+
+  /** + Add place (d32): one box, a name or an address. The words are the name; the server looks the address up, so a
+      bare name goes with the trip's destination ("Schwartz's Deli, Montreal"). null when nothing was typed. */
+  function placeAdd(q, trip, T) {
+    const s = String(q || "").trim(); if (!s) return null;
+    const dest = T.destOf(trip);
+    return { name: s, address: s.includes(",") || !dest ? s : `${s}, ${dest}`, category: "place", trip, savedBy: "Junyan" };
+  }
+  /** The toast after a save (found or not) or a remove. */
+  function placeToast(p, did) {
+    if (did === "removed") return "Removed " + p.name;
+    return p.lat != null && p.lng != null ? "Saved " + p.name : "Saved, but no pin: we could not find it. Add the street to place it.";
+  }
+  const placeRemove = (p) => ({ op: "del", id: p.id });
+  /** d36: Montreal Birthday starts with the four Montreal places from Day Quest's seed, saved under the trip's name with
+      Day Quest's own ids (mtl-…), so its own copy and this one are the same rows. Only while the trip has no places and
+      this browser has not seeded it before (so removing all four does not bring them back). */
+  function tripSeed(trip, have, done, T) {
+    if (done || (have || []).length || T.tripKey(trip) !== T.tripKey(T.MTL)) return [];
+    return T.SEED.places.map(({ seed, ...p }) => ({ ...p, id: p.id.replace(/^seed-/, "mtl-"), trip }));
+  }
+  /** The trip's head: flag (else a suitcase), full and short name, "Nov 12 to Nov 17", and who (Montreal only). */
+  function tripHead(t, T) {
+    const name = String(t.name || ""), flag = (name.match(/\p{Regional_Indicator}{2}/u) || [])[0];
+    const short = name.replace(/\p{Extended_Pictographic}|\p{Regional_Indicator}|[️‍]/gu, " ").replace(/\b(19|20)\d\d\b/g, " ").replace(/\s+/g, " ").trim();
+    const d = (s) => `${MON[+s.slice(5, 7) - 1]} ${+s.slice(8, 10)}`;
+    const s = String(t.start || "").slice(0, 10), e = String(t.end || t.start || "").slice(0, 10);
+    return { icon: flag || "🧳", title: name, short: short || name, dates: !s ? "" : e === s ? d(s) : `${d(s)} to ${d(e)}`,
+      who: T.tripKey(name) === T.tripKey(T.MTL) ? T.SEED.who : "" };
+  }
+  /** The phone's tabs on a trip (d11). Bookings and Ideas join when those pieces are built. */
+  const TRIP_TABS = ["Itinerary", "Map"];
+
+  Object.assign(root.CalCore, { pinMatch, mapStart, gdir, tripMap, placeAdd, placeToast, placeRemove, tripSeed, tripHead, TRIP_TABS });
+})(typeof window !== "undefined" ? window : globalThis);
