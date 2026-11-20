@@ -4,7 +4,7 @@
 // Check-out lines, Maybe and Outside the trip dates; a plan row opens its details under the map, read only. A phone is
 // unchanged (d14): its trip page is compared, word for word, with main's copy served by the same dev server.
 // The rules themselves are tested in still/test/trip-read.test.mjs.
-// Not part of `node --test`: it needs playwright-core, Google Chrome and git (for main's copy).
+// Not part of `node --test`: it needs playwright-core, the test browser (`sh scripts/install-test-browser.sh`) and git (for main's copy).
 //   PW_DIR=<folder with node_modules/playwright-core> node still/test/e2e/calendar-trip-read.e2e.mjs
 //   SHOTS=<folder> also saves the computer trip page at 1280 px.
 import { spawn, execSync } from "node:child_process";
@@ -16,6 +16,7 @@ import { fileURLToPath } from "node:url";
 
 const require = createRequire(path.join(process.env.PW_DIR || process.cwd(), "x.js"));
 const { chromium } = require("playwright-core");
+import { launchTestBrowser } from "../helpers/test-browser.mjs";
 const here = path.dirname(fileURLToPath(import.meta.url));
 const PORT = +(process.env.PORT || 8818), OLD_PORT = PORT + 1;
 const urlOf = (port) => `http://localhost:${port}/still/calendar.html?api=${encodeURIComponent("http://localhost:" + port)}`;
@@ -52,7 +53,7 @@ async function openTrip(browser, port, opts) {
   return { ctx, page, errors, writes };
 }
 
-const browser = await chromium.launch({ channel: "chrome", headless: !process.env.HEADED });
+const browser = await launchTestBrowser(chromium);
 const old = fs.mkdtempSync(path.join(os.tmpdir(), "trip-read-main-"));
 const servers = [];
 try {

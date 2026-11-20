@@ -5,7 +5,7 @@
 // the dash, "Event" and Save stay below the clear strip and above the keyboard (calendar-keyboard.e2e.mjs), and the
 // whole two-row box is in the space left under the header row.
 // Chrome cannot show the iOS keyboard; only his phone proves that (rule W84).
-// Not part of `node --test`: it needs playwright-core and Google Chrome.
+// Not part of `node --test`: it needs playwright-core and the test browser (`sh scripts/install-test-browser.sh`).
 //   PW_DIR=<folder with node_modules/playwright-core> node still/test/e2e/calendar-notes.e2e.mjs
 import { spawn } from "node:child_process";
 import path from "node:path";
@@ -14,6 +14,7 @@ import { fileURLToPath } from "node:url";
 
 const require = createRequire(path.join(process.env.PW_DIR || process.cwd(), "x.js"));
 const { chromium } = require("playwright-core");
+import { launchTestBrowser } from "../helpers/test-browser.mjs";
 const here = path.dirname(fileURLToPath(import.meta.url));
 const PORT = +(process.env.PORT || 8817), BASE = `http://localhost:${PORT}`;
 const URL_ = `${BASE}/still/calendar.html?api=${encodeURIComponent(BASE)}`;
@@ -23,7 +24,7 @@ const check = (name, ok, detail = "") => { results.push({ name, ok }); console.l
 
 const server = spawn(process.execPath, [path.join(here, "calendar-dev.mjs"), String(PORT)], { stdio: ["ignore", "pipe", "inherit"] });
 await new Promise((ok) => server.stdout.once("data", ok));
-const browser = await chromium.launch({ channel: "chrome", headless: !process.env.HEADED });
+const browser = await launchTestBrowser(chromium);
 const KB = 395;   // his keyboard with the suggestion bar, in CSS px (calendar-keyboard.e2e.mjs)
 
 async function open({ standalone, safe }) {

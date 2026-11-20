@@ -7,7 +7,7 @@
 // checks that the header row and the box being typed in sit fully inside the part of the screen that is left, below
 // the top inset (62) and, in a home screen app with Top "clear", below the blur too (62 + 38 = 100).
 // Chrome cannot show the iOS keyboard or the system blur; only his phone proves those (rule W84).
-// Not part of `node --test`: it needs playwright-core and Google Chrome.
+// Not part of `node --test`: it needs playwright-core and the test browser (`sh scripts/install-test-browser.sh`).
 //   PW_DIR=<folder with node_modules/playwright-core> node still/test/e2e/calendar-keyboard.e2e.mjs
 import { spawn } from "node:child_process";
 import path from "node:path";
@@ -16,6 +16,7 @@ import { fileURLToPath } from "node:url";
 
 const require = createRequire(path.join(process.env.PW_DIR || process.cwd(), "x.js"));
 const { chromium } = require("playwright-core");
+import { launchTestBrowser } from "../helpers/test-browser.mjs";
 const here = path.dirname(fileURLToPath(import.meta.url));
 const PORT = +(process.env.PORT || 8816), BASE = `http://localhost:${PORT}`;
 const URL_ = `${BASE}/still/calendar.html?api=${encodeURIComponent(BASE)}`;
@@ -25,7 +26,7 @@ const check = (name, ok, detail = "") => { results.push({ name, ok }); console.l
 
 const server = spawn(process.execPath, [path.join(here, "calendar-dev.mjs"), String(PORT)], { stdio: ["ignore", "pipe", "inherit"] });
 await new Promise((ok) => server.stdout.once("data", ok));
-const browser = await chromium.launch({ channel: "chrome", headless: !process.env.HEADED });
+const browser = await launchTestBrowser(chromium);
 const KB = 395;   // his keyboard with the suggestion bar, in CSS px (screenshot 7:53 PM: keyboard top near 479 of 874)
 
 /** standalone: fake a home screen app (navigator.standalone). grown: his iOS 26 window, 812 laid out then 874 once
