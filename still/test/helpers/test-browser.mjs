@@ -11,7 +11,8 @@ export const DEFAULT_CACHE = join(homedir(), ".cache", "deck-test-browser");
 export const INSTALL_COMMAND = "run `sh scripts/install-test-browser.sh` (installs chrome-headless-shell into ~/.cache/deck-test-browser)";
 export const SKIP_MESSAGE = `test browser missing (or CHROME_BIN points at the installed Chrome or a missing file): ${INSTALL_COMMAND}`;
 
-const isInstalledChrome = (p) => /\/Applications\/.*Google Chrome/i.test(p) || /\.app\/Contents\/MacOS\/Google Chrome/i.test(p);
+// Any app bundle is refused (Google Chrome, Chromium, Edge...): the test browser is a bare binary in the cache.
+const isInstalledChrome = (p) => p.startsWith("/Applications/") || /\.app\//i.test(p);
 
 export function findTestBrowser({ env = process.env, cacheDir = DEFAULT_CACHE } = {}) {
   const override = env.CHROME_BIN;
@@ -38,16 +39,17 @@ function hook() {
   const kill = () => { for (const b of open) { try { b.process()?.kill("SIGKILL"); } catch {} } };
   process.on("exit", kill);
   for (const sig of ["SIGINT", "SIGTERM", "SIGHUP"]) {
-    process.on(sig, async () => {
-      await Promise.all([...open].map((b) => b.close().catch(() => {})));
+    process.once(sig, async () => {
+      // close the browsers, then let the signal do what it would have done (stops the test's own servers too)
+      await Promise.race([Promise.all([...open].map((b) => b.close().catch(() => {}))), new Promise((r) => setTimeout(r, 3000))]);
       kill();
-      process.exit(130);
+      process.kill(process.pid, sig);
     });
   }
 }
 
 // Opens the test browser. Missing browser: prints the install command and exits 0 (a skip, not a failure).
-// Closes on finish (browser.close()), on failure (uncaught error) and on Ctrl-C or kill.
+// headless is forced on; options cannot turn it off. Closes on finish (browser.close()), on failure (uncaught error) and on Ctrl-C or kill.
 export async function launchTestBrowser(chromium, options = {}) {
   const executablePath = findTestBrowser();
   if (!executablePath) { console.log("SKIP: " + SKIP_MESSAGE); process.exit(0); }

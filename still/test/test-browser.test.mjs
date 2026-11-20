@@ -46,6 +46,10 @@ test("the helper refuses the installed Chrome, even when CHROME_BIN names it", (
   assert.equal(findTestBrowser({ env: { CHROME_BIN: fake }, cacheDir: "/nonexistent" }), null);
 });
 
+test("the helper refuses any /Applications override, not only Chrome", () => {
+  assert.equal(findTestBrowser({ env: { CHROME_BIN: "/Applications/Chromium.app/Contents/MacOS/Chromium" }, cacheDir: "/nonexistent" }), null);
+});
+
 test("the helper never returns an /Applications path", () => {
   const got = findTestBrowser();
   if (got) assert.ok(!got.startsWith("/Applications/"), got);
