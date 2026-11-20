@@ -249,10 +249,10 @@ const S = {
       await page.reload();
       await waitFor(() => bodyHas(page, `Pages 10-17`), 8000);
       api.posts = [];
-      // a prana tick (game state) and a Your move pick (today's edit layer), the two kinds of save the page queues
-      const prana = () => page.evaluate(() => (JSON.parse(localStorage.getItem("quest-v1") || "{}").day || {}).prana || 0);
+      // a water tick (game state: a glass pays the Body meter) and a Your move pick (today's edit layer), the two kinds of save the page queues
+      const prana = () => page.evaluate(() => { const d = JSON.parse(localStorage.getItem("quest-v1") || "{}").day || {}; return (d.prana || 0) + (d.body == null ? 60 : d.body); });   // both meters: a glass pays Body, other ticks pay prana
       const before = await prana();
-      await page.getByText("250 ml water").first().click();
+      await page.locator("[data-glass]").first().click();   // the water drop: one glass
       await sleep(800);
       // a Notion task ticked done offline (side quest, then Complete)
       const dialogs = []; page.on("dialog", d => { dialogs.push(d.message()); d.dismiss(); });
@@ -273,7 +273,7 @@ const S = {
       check("the prana is still there after a reopen offline", (await prana()) >= after, String(await prana()));
       await goOnline(ctx);
       const gotOps = await waitFor(async () => api.posts.find(p => p.path === "/ops" && (p.body.adds || []).some(a => a.t === "Upa Yoga")), 20000);
-      const gotXp = await waitFor(async () => api.posts.find(p => p.path === "/quest/state" && ((p.body.day || {}).prana || 0) >= after), 20000);
+      const gotXp = await waitFor(async () => api.posts.find(p => p.path === "/quest/state" && (((p.body.day || {}).prana || 0) + ((p.body.day || {}).body == null ? 60 : p.body.day.body)) >= after), 20000);
       check("the block edit reaches the server by itself", !!gotOps);
       check("the prana reaches the server by itself", !!gotXp);
       const gotTask = await waitFor(async () => api.posts.find(p => p.path === "/tasks/done" && p.body.id === "t1" && p.body.done === true), 20000);
