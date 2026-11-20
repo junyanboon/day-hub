@@ -10,7 +10,7 @@
 //     behind the keyboard while the sheet is still moving);
 //   - the readout's kb line also gives the page scroll and the sheet content scroll.
 // Chrome cannot show the iOS keyboard or the system blur; only his phone proves those (rule W84).
-// Not part of `node --test`: it needs playwright-core and Google Chrome.
+// Not part of `node --test`: it needs playwright-core and the test browser (`sh scripts/install-test-browser.sh`).
 //   PW_DIR=<folder with node_modules/playwright-core> node still/test/e2e/calendar-dashheader.e2e.mjs
 import { spawn } from "node:child_process";
 import path from "node:path";
@@ -19,6 +19,7 @@ import { fileURLToPath } from "node:url";
 
 const require = createRequire(path.join(process.env.PW_DIR || process.cwd(), "x.js"));
 const { chromium } = require("playwright-core");
+import { launchTestBrowser } from "../helpers/test-browser.mjs";
 const here = path.dirname(fileURLToPath(import.meta.url));
 const PORT = +(process.env.PORT || 8836), BASE = `http://localhost:${PORT}`;
 const URL_ = `${BASE}/still/calendar.html?api=${encodeURIComponent(BASE)}`;
@@ -28,7 +29,7 @@ const check = (name, ok, detail = "") => { results.push({ name, ok }); console.l
 
 const server = spawn(process.execPath, [path.join(here, "calendar-dev.mjs"), String(PORT)], { stdio: ["ignore", "pipe", "inherit"] });
 await new Promise((ok) => server.stdout.once("data", ok));
-const browser = await chromium.launch({ channel: "chrome", headless: !process.env.HEADED });
+const browser = await launchTestBrowser(chromium);
 const KB = 395;
 
 /** his home screen app: 402 x 874, top inset 62, Top clear (the default, so 62 + 38 = 100) */
@@ -100,8 +101,9 @@ try {
     await ctx.close(); }
 
   /* ---- a new event focuses its Title only after the sheet has slid in ---- */
+  // the spot needs clear column 12 px above and below it: the test browser taps up to 7 px off where Chrome did
   { const { ctx, page } = await open();
-    const spot = await page.evaluate(() => { const v = document.querySelector("#view").getBoundingClientRect(); for (const col of document.querySelectorAll(".col")) { const c = col.getBoundingClientRect(); for (let y = Math.max(v.top + 20, c.top); y < Math.min(v.bottom - 20, c.bottom); y += 6) { const x = c.left + c.width / 2; if (document.elementFromPoint(x, y) === col) return { x, y }; } } return null; });
+    const spot = await page.evaluate(() => { const v = document.querySelector("#view").getBoundingClientRect(); for (const col of document.querySelectorAll(".col")) { const c = col.getBoundingClientRect(); for (let y = Math.max(v.top + 20, c.top); y < Math.min(v.bottom - 20, c.bottom); y += 6) { const x = c.left + c.width / 2; if ([-12, 0, 12].every((d) => document.elementFromPoint(x, y + d) === col)) return { x, y }; } } return null; });
     check("found an empty hour to tap", !!spot);
     await page.evaluate(() => { window.__f = []; document.addEventListener("focusin", (e) => { if (e.target.id === "pTitle") window.__f.push({ t: Math.round(performance.now()), top: document.querySelector("#panel").getBoundingClientRect().top }); }); });
     await page.touchscreen.tap(spot.x, spot.y);

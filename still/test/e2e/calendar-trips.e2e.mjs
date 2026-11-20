@@ -6,7 +6,7 @@
 // On a phone (under 768 px, the same rule quest-trips.js uses to switch Day Quest's Trips view off) Local and + New trip
 // are hidden until the Trips page is ported into the calendar (Junyan, 2026-11-13, d6: "6 yes, hide"): the tabs are
 // Upcoming and Past only, with no gap in the pill. 767 and 768 px are checked so the two rules never disagree.
-// Not part of `node --test`: it needs playwright-core and Google Chrome.
+// Not part of `node --test`: it needs playwright-core and the test browser (`sh scripts/install-test-browser.sh`).
 //   PW_DIR=<folder with node_modules/playwright-core> node still/test/e2e/calendar-trips.e2e.mjs
 //   SHOTS=<folder> also saves a desktop and a phone screenshot of the page.
 import { spawn } from "node:child_process";
@@ -17,6 +17,7 @@ import { readFileSync } from "node:fs";
 
 const require = createRequire(path.join(process.env.PW_DIR || process.cwd(), "x.js"));
 const { chromium } = require("playwright-core");
+import { launchTestBrowser } from "../helpers/test-browser.mjs";
 const here = path.dirname(fileURLToPath(import.meta.url));
 const PORT = +(process.env.PORT || 8806), BASE = `http://localhost:${PORT}`;
 const API = `?api=${encodeURIComponent(BASE)}`;
@@ -29,7 +30,7 @@ const check = (name, ok, detail = "") => { results.push({ name, ok }); console.l
 
 const server = spawn(process.execPath, [path.join(here, "calendar-dev.mjs"), String(PORT)], { stdio: ["ignore", "pipe", "inherit"] });
 await new Promise((ok) => server.stdout.once("data", ok));
-const browser = await chromium.launch({ channel: "chrome", headless: !process.env.HEADED });
+const browser = await launchTestBrowser(chromium);
 const shown = (el) => !!el && el.getClientRects().length > 0 && getComputedStyle(el).visibility !== "hidden";
 const cards = (page) => page.evaluate(() => [...document.querySelectorAll("#page .tcard")].map((c) => {
   const r = c.getBoundingClientRect();

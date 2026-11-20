@@ -15,6 +15,7 @@ import { fileURLToPath } from "node:url";
 
 const require = createRequire(path.join(process.env.PW_DIR || process.cwd(), "x.js"));
 const { chromium } = require("playwright-core");
+import { launchTestBrowser } from "../helpers/test-browser.mjs";
 const here = path.dirname(fileURLToPath(import.meta.url));
 const PORT = +(process.env.PORT || 8806), BASE = `http://localhost:${PORT}`;
 const URL_ = `${BASE}/still/calendar.html?api=${encodeURIComponent(BASE)}`;
@@ -24,7 +25,7 @@ const check = (name, ok, detail = "") => { results.push({ name, ok }); console.l
 
 const server = spawn(process.execPath, [path.join(here, "calendar-dev.mjs"), String(PORT)], { stdio: ["ignore", "pipe", "inherit"] });
 await new Promise((ok) => server.stdout.once("data", ok));
-const browser = await chromium.launch({ channel: "chrome", headless: !process.env.HEADED });
+const browser = await launchTestBrowser(chromium);
 // PIN: the hidden toast's box ends 52 above the screen's bottom (its own 18 + the 34 home bar inset), plus the 20 it
 // is pushed down while hidden: 874 - 52 + 20. Any bottom-pinned box off by the shift would show here.
 const PIN = 874 - 18 - 34 + 20;

@@ -3,7 +3,7 @@
 // 168px an hour; the time under the fingers stays under them; the page never zooms, never changes day, never rebuilds
 // the strip, and a pinch opens nothing. The height is kept on the phone. The desktop is unchanged.
 // Two real touch points go through Chrome's DevTools Input.dispatchTouchEvent, each move awaited (moves sent together
-// merge into one). Not part of `node --test`: it needs playwright-core and Google Chrome.
+// merge into one). Not part of `node --test`: it needs playwright-core and the test browser (`sh scripts/install-test-browser.sh`).
 //   PW_DIR=<folder with node_modules/playwright-core> node still/test/e2e/calendar-pinch.e2e.mjs
 import { spawn } from "node:child_process";
 import path from "node:path";
@@ -12,6 +12,7 @@ import { fileURLToPath } from "node:url";
 
 const require = createRequire(path.join(process.env.PW_DIR || process.cwd(), "x.js"));
 const { chromium } = require("playwright-core");
+import { launchTestBrowser } from "../helpers/test-browser.mjs";
 const here = path.dirname(fileURLToPath(import.meta.url));
 const PORT = +(process.env.PORT || 8811), BASE = `http://localhost:${PORT}`;
 const URL_ = `${BASE}/still/calendar.html?api=${encodeURIComponent(BASE)}`;
@@ -42,7 +43,7 @@ const nowMin = (page) => page.evaluate(() => {
 
 const server = spawn(process.execPath, [path.join(here, "calendar-dev.mjs"), String(PORT)], { stdio: ["ignore", "pipe", "inherit"] });
 await new Promise((ok) => server.stdout.once("data", ok));
-const browser = await chromium.launch({ channel: "chrome", headless: !process.env.HEADED });
+const browser = await launchTestBrowser(chromium);
 try {
   const phone = { viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true, timezoneId: "America/Toronto" };
   const ctx = await browser.newContext(phone);

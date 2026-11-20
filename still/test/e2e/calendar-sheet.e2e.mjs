@@ -4,7 +4,7 @@
 // back on reopen, a read-only event has no Save or Delete, a new event from an empty hour saves, every box is 16px or
 // more, and at 1280px the panel's HTML for an event equals origin/main's (a second dev server serves origin/main's page).
 // Chrome cannot show the iOS date and time wheels or the iOS keyboard; those are proven on the phone.
-// Not part of `node --test`: it needs playwright-core and Google Chrome.
+// Not part of `node --test`: it needs playwright-core and the test browser (`sh scripts/install-test-browser.sh`).
 //   PW_DIR=<folder with node_modules/playwright-core> node still/test/e2e/calendar-sheet.e2e.mjs
 import { spawn, execFileSync } from "node:child_process";
 import fs from "node:fs";
@@ -15,6 +15,7 @@ import { fileURLToPath } from "node:url";
 
 const require = createRequire(path.join(process.env.PW_DIR || process.cwd(), "x.js"));
 const { chromium } = require("playwright-core");
+import { launchTestBrowser } from "../helpers/test-browser.mjs";
 const here = path.dirname(fileURLToPath(import.meta.url)), repo = path.resolve(here, "../../..");
 const PORT = +(process.env.PORT || 8806), BASE = `http://localhost:${PORT}`, MAIN = `http://localhost:${PORT + 1}`;
 const pageUrl = (b) => `${b}/still/calendar.html?api=${encodeURIComponent(b)}`;
@@ -32,7 +33,7 @@ const start = async (file, port) => { const s = spawn(process.execPath, [file, S
 const server = await start(path.join(here, "calendar-dev.mjs"), PORT);
 const mainServer = await start(path.join(tmp, "still/test/e2e/calendar-dev.mjs"), PORT + 1);
 
-const browser = await chromium.launch({ channel: "chrome", headless: !process.env.HEADED });
+const browser = await launchTestBrowser(chromium);
 const phone = { viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true, timezoneId: "America/Toronto" };
 const desk = { viewport: { width: 1280, height: 900 }, timezoneId: "America/Toronto" };
 async function open(ctxOpts = phone, base = BASE) {

@@ -1,5 +1,5 @@
 // Day Quest offline check in a real browser (Junyan, 2026-10-17, Madrid: "when the internet is down it doesn't work").
-// Not part of `node --test still/test/*.test.mjs`: it needs playwright-core and Google Chrome.
+// Not part of `node --test still/test/*.test.mjs`: it needs playwright-core and the test browser (`sh scripts/install-test-browser.sh`).
 //   PW_DIR=<folder with node_modules/playwright-core> node still/test/e2e/offline.e2e.mjs [scenario...]
 // The page and a fake still-api each run on their own localhost port. "Offline" means both servers are shut
 // (connections refused, as with no internet) and the browser is told it is offline. Nothing reaches his server.
@@ -11,6 +11,7 @@ import { fileURLToPath } from "node:url";
 
 const require = createRequire(path.join(process.env.PW_DIR || process.cwd(), "x.js"));
 const { chromium } = require("playwright-core");
+import { launchTestBrowser } from "../helpers/test-browser.mjs";
 const ROOT = fileURLToPath(new URL("../../..", import.meta.url));   // the day-hub folder
 const PAGE_PORT = +(process.env.PAGE_PORT || 8799), API_PORT = +(process.env.API_PORT || 8798);
 const API = `http://localhost:${API_PORT}`, PAGE = `http://localhost:${PAGE_PORT}/still/quest.html?api=${encodeURIComponent(API)}`;
@@ -97,7 +98,7 @@ const statusText = page => page.locator("#statusL").innerText();
 const bodyHas = (page, s) => page.evaluate(x => document.body.innerText.includes(x), s);
 const calHas = (page, s) => page.evaluate(x => (document.querySelector("#calBody") ? document.querySelector("#calBody").innerText : "").includes(x), s);
 async function fresh(clockAt){
-  const browser = await chromium.launch({ channel:"chrome", headless:process.env.HEADED ? false : true });
+  const browser = await launchTestBrowser(chromium);
   const ctx = await browser.newContext({ timezoneId:TZ, viewport:{ width:390, height:844 }, serviceWorkers:"allow" });
   await ctx.addInitScript(() => { try { localStorage.setItem("quest-key", "test-key"); localStorage.setItem("quest-synced", "test-key"); } catch {} });
   const page = await ctx.newPage();

@@ -1,6 +1,6 @@
 // The calendar on a phone, in a real browser with real touch events (Junyan, 2026-11-11: swipes changed days too
 // easily in the day view; the top edge faded; no Home Screen icon).
-// Not part of `node --test still/test/*.test.mjs`: it needs playwright-core and Google Chrome.
+// Not part of `node --test still/test/*.test.mjs`: it needs playwright-core and the test browser (`sh scripts/install-test-browser.sh`).
 //   PW_DIR=<folder with node_modules/playwright-core> node still/test/e2e/calendar-phone.e2e.mjs
 // It starts calendar-dev.mjs (the fake still-api with a made-up week) on its own port; nothing reaches his server.
 // Touches go through Chrome's DevTools Input.dispatchTouchEvent, so the browser scrolls the page itself the way a
@@ -12,6 +12,7 @@ import { fileURLToPath } from "node:url";
 
 const require = createRequire(path.join(process.env.PW_DIR || process.cwd(), "x.js"));
 const { chromium } = require("playwright-core");
+import { launchTestBrowser } from "../helpers/test-browser.mjs";
 const here = path.dirname(fileURLToPath(import.meta.url));
 const PORT = +(process.env.PORT || 8801), BASE = `http://localhost:${PORT}`;
 const URL_ = `${BASE}/still/calendar.html?api=${encodeURIComponent(BASE)}`;
@@ -22,7 +23,7 @@ const check = (name, ok, detail = "") => { results.push({ name, ok }); console.l
 
 const server = spawn(process.execPath, [path.join(here, "calendar-dev.mjs"), String(PORT)], { stdio: ["ignore", "pipe", "inherit"] });
 await new Promise((ok) => server.stdout.once("data", ok));
-const browser = await chromium.launch({ channel: "chrome", headless: !process.env.HEADED });
+const browser = await launchTestBrowser(chromium);
 try {
   const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true, timezoneId: "America/Toronto" });
   const page = await ctx.newPage();

@@ -5,7 +5,7 @@
 // not; remove one; Directions goes to Google Maps. The rules themselves are tested in still/test/trip-map.test.mjs.
 // The plan addresses' map lookups are put in this browser's memory first, so nothing here asks OpenStreetMap for an
 // address; the map tiles and Leaflet itself do load from the internet.
-// Not part of `node --test`: it needs playwright-core and Google Chrome.
+// Not part of `node --test`: it needs playwright-core and the test browser (`sh scripts/install-test-browser.sh`).
 //   PW_DIR=<folder with node_modules/playwright-core> node still/test/e2e/calendar-trip-map.e2e.mjs
 //   SHOTS=<folder> also saves a computer and a phone screenshot of the trip.
 import { spawn } from "node:child_process";
@@ -15,6 +15,7 @@ import { fileURLToPath } from "node:url";
 
 const require = createRequire(path.join(process.env.PW_DIR || process.cwd(), "x.js"));
 const { chromium } = require("playwright-core");
+import { launchTestBrowser } from "../helpers/test-browser.mjs";
 const here = path.dirname(fileURLToPath(import.meta.url));
 const PORT = +(process.env.PORT || 8815), BASE = `http://localhost:${PORT}`;
 const URL_ = `${BASE}/still/calendar.html?api=${encodeURIComponent(BASE)}`;
@@ -24,7 +25,7 @@ const flat = (s) => String(s || "").replace(/\s+/g, " ").trim();
 const results = [];
 const check = (name, ok, detail = "") => { results.push({ name, ok }); console.log(`${ok ? "PASS" : "FAIL"}  ${name}${detail ? "  (" + detail + ")" : ""}`); };
 
-const browser = await chromium.launch({ channel: "chrome", headless: !process.env.HEADED });
+const browser = await launchTestBrowser(chromium);
 const SPOTS = { "1255 rue jeanne-mance, montréal": { lat: 45.5079, lng: -73.5646 }, "mount royal, montréal": null };
 const text = (page, sel) => page.evaluate((s) => document.querySelector(s)?.innerText || "", sel);
 const shown = (page, sel) => page.evaluate((s) => { const el = document.querySelector(s); return !!el && el.getClientRects().length > 0; }, sel);
