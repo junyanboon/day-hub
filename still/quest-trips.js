@@ -425,7 +425,7 @@
   if (!WIDE.matches) { WIDE.addEventListener && WIDE.addEventListener("change", (e) => e.matches && location.reload()); return; }
   WIDE.addEventListener && WIDE.addEventListener("change", (e) => !e.matches && location.reload());
 
-  const API = new URLSearchParams(location.search).get("api") || "https://still.srv1948070.hstgr.cloud";
+  const API = new URLSearchParams(location.search).get("api") || (location.hostname === "junyan.danceannex.ca" ? location.origin : "https://still.srv1948070.hstgr.cloud");
   const key = () => { try { return localStorage.getItem("quest-key") || ""; } catch { return ""; } };
   async function call(path, body) {
     const r = await fetch(API + path, { method: body ? "POST" : "GET", cache: "no-store",
