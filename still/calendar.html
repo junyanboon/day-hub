@@ -1211,7 +1211,7 @@ function renderRail() {
       (k === "travel" ? `<button class="pk-rail" data-page="packing" aria-pressed="${S.page === "packing"}" title="Packing"><span class="ic">🧳</span><span class="nm">Packing</span></button>` : "")).join("");
 }
 function renderSide() {
-  $("#cals").innerHTML = S.cals.map((c) => `<label class="${S.hidden.has(c.id) ? "off" : ""}" style="--c:${esc(c.color)}"><input type="checkbox" data-id="${esc(c.id)}" ${S.hidden.has(c.id) ? "" : "checked"}>${esc(c.name)}${c.writable ? "" : ' <span class="meta">read-only</span>'}${c.ok === false ? ` <span class="err" title="${esc(c.error)}">not readable</span>` : ""}</label>`).join("") || '<span class="meta">Pair to see your calendars.</span>';
+  $("#cals").innerHTML = S.cals.map((c) => `<label class="${S.hidden.has(c.id) ? "off" : ""}" style="--c:${esc(c.color)}"><input type="checkbox" data-id="${esc(c.id)}" ${S.hidden.has(c.id) ? "" : "checked"}>${esc(c.name)}${c.writable ? "" : ' <span class="meta">read-only</span>'}${c.ok === false ? ` <span class="err" title="${esc(c.error)}">not readable</span>` : ""}</label>`).join("") || `<span class="meta">${SIGNIN ? "Sign in" : "Pair"} to see your calendars.</span>`;
   if (window.Cards && window.Cards.hasAny(store)) $("#cals").insertAdjacentHTML("beforeend", `<label class="${S.hidden.has("cards") ? "off" : ""}" style="--c:var(--purple)"><input type="checkbox" data-id="cards" ${S.hidden.has("cards") ? "" : "checked"}>Cards <span class="meta">due, fees, targets</span></label>`);
 }
 function whenText(e) {
