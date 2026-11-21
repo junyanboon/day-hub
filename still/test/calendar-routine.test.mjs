@@ -63,3 +63,21 @@ test("his own wind down that runs late: the suggested sleep starts when it ends"
   assert.equal(b.wind, undefined);
   assert.equal(hm(b.sleep.s), "21 11:59 pm"); assert.equal(hm(b.sleep.e), "22 5:45 am");
 });
+
+test("Domestic is its own type with its own colour in every look, and no page of its own (d62)", async () => {
+  const { readFileSync } = await import("node:fs");
+  const html = readFileSync(new URL("../calendar.html", import.meta.url), "utf8");
+  assert.equal(C.guessKind("Laundry"), "home"); assert.equal(C.guessKind("Domestic"), "home");
+  assert.equal(by(C.routineBlocks(DAY, [], TO)).domestic.kind, "home");
+  assert.ok(html.includes("--k-home:var(--fuchsia)"));
+  assert.equal((html.match(/--fuchsia:#/g) || []).length, 5, "all five looks set fuchsia");
+  assert.match(html, /home: "🧺"/);
+  assert.match(html, /k !== "home"/);
+});
+
+test("Accept on one night block adds all three for that day (d63)", async () => {
+  const { readFileSync } = await import("node:fs");
+  const html = readFileSync(new URL("../calendar.html", import.meta.url), "utf8");
+  assert.match(html, /const NIGHT = \["wind", "sleep", "morning"\]/);
+  assert.match(html, /return acceptNight\(set, g, over\)/);
+});

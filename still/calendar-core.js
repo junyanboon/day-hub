@@ -55,7 +55,7 @@
      helper and page, plus "other". Guessed from the title, first match wins; a hand-set kind wins over the guess. ---- */
   const KINDS = [["deep", "Deep Work"], ["studio", "Studio On-Site"], ["yoga", "Yoga"], ["gym", "Gym"], ["dance", "Dance"],
     ["cook", "Culinary"], ["travel", "Travel"], ["pack", "Packing"], ["social", "Social"], ["errand", "Errands"], ["wind", "Wind Down"],
-    ["rest", "Rest"], ["other", "Other"]];
+    ["rest", "Rest"], ["home", "Domestic"], ["other", "Other"]];
   /* Hand-set kinds saved before the eleven types (ex, food, out, work). "ex" is guessed again: gym or dance. */
   const OLD_KIND = { food: "cook", out: "travel", work: "studio" };
   /* Packing (slice 02, Junyan 2026-11-16, d23: "p1 yes"): "pack" anywhere in the title, any case, so "Pack for FICTION
@@ -64,6 +64,8 @@
     ["pack", /pack/i],
     ["deep", /\b(work block|deep work|focus block|focus time)\b/i],
     ["wind", /\b(wind.?down|bedtime)\b/i],
+    /* Domestic (Junyan, 2026-11-21, d62: "give it a more exciting colour"): its own type and colour, no page of its own */
+    ["home", /\b(domestic|chores?|cleaning|clean up|laundry|tidy(ing)?|housework|vacuum\w*|dishes)\b/i],
     ["rest", /\b(isha kriya|yoga nidra|nidra|nsdr)\b/i],
     ["yoga", /\b(yoga|sadhana|shambhavi|mahamudra|kriya|angamardana|yogasanas?|surya|bhuta shuddhi|nadi shuddhi|hatha)\b/i],
     ["dance", /\b(zouk|lambada|samba|salsa|bachata|kizomba|forr[oó]|practica|dance|dancing|ws|workshop|battle|hip hop)\b/i],
@@ -176,7 +178,7 @@
       const best = fits || gaps.filter(([a, b]) => b - a >= R.domesticMin * M).sort((x, y) => (y[1] - y[0]) - (x[1] - x[0]))[0];
       if (best) {
         const len = fits ? R.domestic * M : Math.floor((best[1] - best[0]) / q) * q;
-        out.push({ key: "domestic", kind: "other", title: "Domestic", s: best[0], e: best[0] + len,
+        out.push({ key: "domestic", kind: "home", title: "Domestic", s: best[0], e: best[0] + len,
           why: fits ? "Your first free hour" : `Only ${h(len)} free today` });
       }
     }

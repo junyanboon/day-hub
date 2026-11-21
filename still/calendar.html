@@ -13,7 +13,7 @@
 <meta name="apple-mobile-web-app-title" content="Calendar">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>Calendar</title>
-<script src="calendar-core.js?v=27"></script>
+<script src="calendar-core.js?v=28"></script>
 <script src="cards-vault.js?v=2"></script><script src="cards.js?v=7"></script>
 <script src="quest-trips.js?v=20261121a" data-helpers></script>
 <script>
@@ -68,7 +68,7 @@
    - solid header and footer bars with a hairline edge; nothing shows through them. */
 :root{
 /* the palette */
---amber:#fbbf24;--orange:#fb923c;--lime:#a3e635;--emerald:#34d399;--cyan:#22d3ee;--blue:#60a5fa;
+--fuchsia:#e040fb;--amber:#fbbf24;--orange:#fb923c;--lime:#a3e635;--emerald:#34d399;--cyan:#22d3ee;--blue:#60a5fa;
 --indigo:#818cf8;--purple:#c084fc;--pink:#f472b6;--slate:#94a3b8;--sand:#d6bc8a;--stone:#a8a29e;--red:#ff4f5e;--teal:#13aea4;
 /* surfaces and text */
 --bg:#0e1015;--bar:#14171e;--raise:#1a1e27;--raise2:#232835;--line:rgba(255,255,255,.09);--hair:rgba(255,255,255,.05);
@@ -91,7 +91,7 @@
 --status:transparent;
 /* block types: colour means type (Packing, slice 02 d23: a teal of its own, kept clear of Social and Yoga in every look) */
 --k-deep:var(--amber);--k-studio:var(--orange);--k-yoga:var(--cyan);--k-gym:var(--purple);--k-dance:var(--pink);--k-cook:var(--lime);
---k-travel:var(--blue);--k-pack:var(--teal);--k-social:var(--emerald);--k-errand:var(--indigo);--k-wind:var(--slate);--k-rest:var(--sand);--k-other:var(--stone);
+--k-travel:var(--blue);--k-pack:var(--teal);--k-social:var(--emerald);--k-errand:var(--indigo);--k-wind:var(--slate);--k-rest:var(--sand);--k-home:var(--fuchsia);--k-other:var(--stone);
 /* old names some rules still use */
 --glass:var(--raise);--glass2:var(--raise2);--panel:var(--bar);--pin:var(--bar);--deep:var(--bar);
 --H:56px;--hh:68px;--gut:56px;--rail:56px;--radius:8px;
@@ -109,7 +109,7 @@
    iPhone strip behind the clock is the header bar's cream (2026-11-18: a dark strip there looked grey to black
    against the cream header); big shadows are a soft warm brown, not black. */
 :root[data-look="studio-day"]{
---amber:#9a7d00;--orange:#a35a0a;--lime:#4f9418;--emerald:#14946a;--cyan:#0e8fa3;--blue:#2563c8;--teal:#147169;
+--fuchsia:#e038f8;--amber:#9a7d00;--orange:#a35a0a;--lime:#4f9418;--emerald:#14946a;--cyan:#0e8fa3;--blue:#2563c8;--teal:#147169;
 --indigo:#6358d0;--purple:#9a46c8;--pink:#c7317f;--slate:#5f6f86;--sand:#a1865a;--stone:#857d77;--red:#c42b3c;
 --bg:#faf6ef;--bar:#fffdf9;--raise:#f4eee4;--raise2:#e8dfd1;--line:rgba(96,72,40,.16);--hair:rgba(96,72,40,.09);
 --ink:#1f1b16;--soft:#5e554a;--faint:#736a5e;
@@ -121,7 +121,7 @@
 /* Night: a flat neutral charcoal with off-white text and no tint, the header and bottom bar a touch lifted from the
    page. The same coral, brightened for the dark; Studio On-Site a yellower tangerine to stay clear of it. */
 :root[data-look="studio-night"]{
---amber:#fbbf24;--orange:#fc980c;--lime:#a3e635;--emerald:#34d399;--cyan:#22d3ee;--blue:#60a5fa;
+--fuchsia:#e040f8;--amber:#fbbf24;--orange:#fc980c;--lime:#a3e635;--emerald:#34d399;--cyan:#22d3ee;--blue:#60a5fa;
 --indigo:#818cf8;--purple:#c084fc;--pink:#f472b6;--slate:#94a3b8;--sand:#d6bc8a;--stone:#a8a29e;--red:#ff5a5f;--teal:#13aea4;
 --bg:#1c1c1c;--bar:#262626;--raise:#2e2e2e;--raise2:#3a3a3a;--line:rgba(255,255,255,.10);--hair:rgba(255,255,255,.055);
 --ink:#e6e6e6;--soft:#ababab;--faint:#8c8c8c;
@@ -131,7 +131,7 @@
 /* Stage Lights: the moment before the curtain. A plum-black stage, spotlight gold for "now", jewel-tone gels that glow.
    Gold sits near Deep Work, so Deep Work turns a deep amber-orange and Studio On-Site a vermilion. */
 :root[data-look="stage"]{
---amber:#e08000;--orange:#ff5c3a;--lime:#a6ec3c;--emerald:#28e0a0;--cyan:#2ee0e8;--blue:#3d8bff;--teal:#08966c;
+--fuchsia:#f010e0;--amber:#e08000;--orange:#ff5c3a;--lime:#a6ec3c;--emerald:#28e0a0;--cyan:#2ee0e8;--blue:#3d8bff;--teal:#08966c;
 --indigo:#8a80ff;--purple:#c46cf5;--pink:#ff4fae;--slate:#9ea6cf;--sand:#c8b49c;--stone:#a39aa3;--red:#ff5c6c;
 --bg:#120d1a;--bar:#1d1529;--raise:#251b34;--raise2:#302343;--line:rgba(236,220,255,.10);--hair:rgba(236,220,255,.055);
 --ink:#f7f1fb;--soft:#bdb1cc;--faint:#8a7d9e;
@@ -141,7 +141,7 @@
 /* Velvet & Brass: a quiet, premium front office. Emerald-black, warm cream text, brushed brass for "now", calmer
    gem tones. Brass sits near Deep Work and Rest, so Deep Work is a bright citrine and Rest a pale linen. */
 :root[data-look="velvet"]{
---amber:#f5cc1f;--orange:#d0603e;--lime:#a3c45c;--emerald:#4cbf86;--cyan:#3cc6c0;--blue:#4f88e0;--teal:#0d94a0;
+--fuchsia:#e038f8;--amber:#f5cc1f;--orange:#d0603e;--lime:#a3c45c;--emerald:#4cbf86;--cyan:#3cc6c0;--blue:#4f88e0;--teal:#0d94a0;
 --indigo:#9097ec;--purple:#b97ad9;--pink:#d9668f;--slate:#8ea2ac;--sand:#e0d6c2;--stone:#a39c92;--red:#e0605a;
 --bg:#0b1a17;--bar:#11251f;--raise:#16302a;--raise2:#1e3c34;--line:rgba(243,234,216,.10);--hair:rgba(243,234,216,.055);
 --ink:#f3ead8;--soft:#b8b4a0;--faint:#82907f;
@@ -156,7 +156,7 @@ button,input,select{font:inherit;color:inherit}button{cursor:pointer}
 button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--now);outline-offset:1px}
 [hidden]{display:none!important}
 .k-deep{--c:var(--k-deep)}.k-studio{--c:var(--k-studio)}.k-yoga{--c:var(--k-yoga)}.k-gym{--c:var(--k-gym)}.k-dance{--c:var(--k-dance)}.k-cook{--c:var(--k-cook)}
-.k-travel{--c:var(--k-travel)}.k-pack{--c:var(--k-pack)}.k-social{--c:var(--k-social)}.k-errand{--c:var(--k-errand)}.k-wind{--c:var(--k-wind)}.k-rest{--c:var(--k-rest)}.k-other{--c:var(--k-other)}
+.k-travel{--c:var(--k-travel)}.k-pack{--c:var(--k-pack)}.k-social{--c:var(--k-social)}.k-errand{--c:var(--k-errand)}.k-wind{--c:var(--k-wind)}.k-rest{--c:var(--k-rest)}.k-home{--c:var(--k-home)}.k-other{--c:var(--k-other)}
 .app{display:grid;grid-template-columns:var(--rail) 236px minmax(0,1fr) 324px;height:100%;padding-top:env(safe-area-inset-top,0px);background:var(--bar)}
 body.nopanel .app{grid-template-columns:var(--rail) 236px minmax(0,1fr) 0}
 body.railopen{--rail:186px}
@@ -971,7 +971,7 @@ if (TOUCH) for (const g of ["gesturestart", "gesturechange"]) document.addEventL
    which shows this build, the phone's answers and a log of every day change with its cause. Until then CalHook.on is
    null and diag() does nothing. BUILD names this copy of the page, so a screenshot proves which copy ran: change it on
    every change to this page or calendar-readout.js (the date plus a letter). */
-const BUILD = "2026-11-21f routine";
+const BUILD = "2026-11-21g domestic";
 const CalHook = window.CalHook = { BUILD, on: null };
 const diag = (kind, msg) => { if (CalHook.on) CalHook.on(kind, msg); };
 /* The iPhone home screen app's fit (2026-11-12): html.hs in a home screen app on touch, html.hsfill and --hsgap when
@@ -1026,8 +1026,8 @@ const store = { get(k) { try { return localStorage.getItem(k); } catch { return 
   set(k, v) { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch {} } };
 const MON = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 const DOW = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"], DOWM = ["Mo","Tu","We","Th","Fr","Sa","Su"];
-const KICON = { deep: "🎯", studio: "🔑", yoga: "🪔", gym: "🏋️", dance: "💃", cook: "🍳", travel: "✈️", pack: "🧳", social: "💛", errand: "🧭", wind: "🌙", rest: "🌀", other: "" };
-const KNAME = Object.fromEntries(C.KINDS), TYPES = C.KINDS.map((x) => x[0]).filter((k) => k !== "other" && k !== "pack");
+const KICON = { deep: "🎯", studio: "🔑", yoga: "🪔", gym: "🏋️", dance: "💃", cook: "🍳", travel: "✈️", pack: "🧳", social: "💛", errand: "🧭", wind: "🌙", rest: "🌀", home: "🧺", other: "" };
+const KNAME = Object.fromEntries(C.KINDS), TYPES = C.KINDS.map((x) => x[0]).filter((k) => k !== "other" && k !== "pack" && k !== "home");   // Domestic has no page of its own (d62)
 /* Packing (slice 02, d23) has no tab of its own: the rail's Packing button after Travel is its page (d17). */
 const KFROM = { deep: "your Tasks Inbox and your Claude sessions", studio: "the maintenance tab in FBS", yoga: "the new Yoga tab", gym: "your Gym tab",
   dance: "your Zouk Training pages in Notion", cook: "the Meal prep tab", travel: "your Travel Planner in Notion", social: "your own notes",
@@ -1852,8 +1852,25 @@ function pKeys() {
 }
 
 /* ---------- suggestions ---------- */
+/* Wind Down, Sleep and Morning Routine go in together (Junyan, 2026-11-21, d63: "63 yes"): Accept on one adds every one
+   of the three still shown for that day. The one pressed keeps any title or calendar picked for it. */
+const NIGHT = ["wind", "sleep", "morning"];
+function nightSet(g) {
+  const m = /^auto:(\w+):(.+)$/.exec(g.id || ""); if (!m || !NIGHT.includes(m[1])) return [g];
+  return NIGHT.map((k) => (S.autoG || []).find((x) => x.id === `auto:${k}:${m[2]}`)).filter(Boolean);
+}
+async function acceptNight(set, g, over) {
+  status("Saving…"); const done = [];
+  for (const x of set) {
+    const o = x.id === g.id ? over : {};
+    try { await send("/planner/event", "POST", { calId: o.calId || x.calId, title: o.title || x.title, start: x.start, end: x.end, kind: x.kind }); done.push(x.title); dropMonthsAround(x.start); }
+    catch (e) { toast(e.message, { bad: true }); }
+  }
+  if (done.length) toast("Added " + done.join(", ").replace(/, ([^,]*)$/, " and $1"));
+  await refresh(true);
+}
 async function acceptSugg(g, over = {}) {
-  if (g.auto) { panel("now"); await createEvent({ calId: over.calId || g.calId, title: over.title || g.title, start: g.start, end: g.end, kind: g.kind }); return; }
+  if (g.auto) { panel("now"); const set = nightSet(g); if (set.length < 2) { await createEvent({ calId: over.calId || g.calId, title: over.title || g.title, start: g.start, end: g.end, kind: g.kind }); return; } return acceptNight(set, g, over); }
   panel("now"); status("Saving…");
   try { const d = await send("/planner/suggestions/accept", "POST", { id: g.id, ...over }); S.sugg = S.sugg.filter((x) => x.id !== g.id); dropMonthsAround(g.start); toast("Accepted, on " + calOf(d.suggestion.eventCalId).name); await refresh(true); }
   catch (e) { status(""); toast(e.message, { bad: true }); }
