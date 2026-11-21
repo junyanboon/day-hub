@@ -3,7 +3,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import "../cards.js";
 import { readFileSync } from "node:fs";
-const { events, msrState, normalize, actions, dueNow, digest, digestEvents, FLOWS, flowState, startFlow, tidyFlow, timeline } = globalThis.Cards;
+const { events, msrState, normalize, actions, dueNow, digest, digestEvents, FLOWS, flowState, startFlow, tidyFlow, timeline, stepDone, msrLedger, newCardComing } = globalThis.Cards;
 const card = (o) => ({ id: "c1", owner: "Junyan", name: "Avion Biz", last4: "6637", status: "MSR", currency: "CAD", dueDay: 31, fee: { amount: 175, date: "12-01" }, ...o });
 
 test("due dates clamp to the month's last day and skip closed cards", () => {
@@ -104,7 +104,7 @@ test("Product switch sets up its own checklist; pressing it twice does not doubl
   assert.equal(flowState(d, d.cards[0]), null);
 });
 test("the checklists stay very short", () => {
-  for (const k of ["close", "switch"]) { assert.ok(FLOWS[k].length <= 4, k); for (const s of FLOWS[k]) assert.ok(s.length <= 36, s); }
+  for (const k of ["close", "switch"]) { assert.ok(FLOWS[k].length <= 5, k); for (const s of FLOWS[k]) assert.ok(s.length <= 36, s); }
 });
 test("a card's timeline: what is coming soonest first, what happened newest first", () => {
   const d = book(), c = d.cards[0];
@@ -123,4 +123,47 @@ test("the page has no lock button, no idle lock and no add-a-to-do box", () => {
   for (const w of ["Lock now", "5 minutes", "setInterval", 'id="xtd"', 'data-x="tadd"', 'data-x="lock"']) assert.equal(src.includes(w), false, w);
   assert.match(src, /data-x="flow" data-kind="close">Close card</);
   assert.match(src, /data-x="flow" data-kind="switch">Product switch</);
+});
+test("closing waits for the final statement: the call makes it Pending Close and dates the last step; ticking that closes it", () => {
+  const d = normalize({ cards: [card({ status: "Open", statementDay: 14 })] });
+  startFlow(d, "c1", "close", "2026-11-21");
+  assert.equal(FLOWS.close.at(-1), "Final statement shows $0");
+  const call = d.todos.find((t) => t.text === "Call to close"), fin = d.todos.find((t) => t.text === "Final statement shows $0");
+  for (const t of d.todos) if (t !== fin) { t.done = true; t.doneAt = "2026-11-21"; }
+  stepDone(d, call, "2026-11-21");
+  assert.equal(d.cards[0].status, "Pending Close");
+  assert.equal(fin.due, "2026-12-14");
+  const a = actions(d, "2026-11-21", "Junyan").find((x) => x.t === "close");
+  assert.deepEqual([a.day, a.flow.next.text], ["2026-12-14", "Final statement shows $0"]);
+  assert.ok(events(d, "2026-12-01", "2026-12-31", "2026-11-21").some((e) => e.cardEvent === "todo" && e.start === "2026-12-14"));
+  fin.done = true; fin.doneAt = "2026-12-14"; assert.equal(stepDone(d, fin, "2026-12-14"), true);
+  assert.deepEqual([d.cards[0].status, d.cards[0].closed], ["Closed", "2026-12-14"]);
+});
+test("a card called in before the final statement step existed gets that step and waits for it", () => {
+  const old = ["Use or move the points", "Move autopays off", "Pay balance to $0", "Call to close"].map((text, i) => ({ id: "t" + i, cardId: "c1", text, done: true, doneAt: "2026-11-21", due: null, flow: "close" }));
+  const d = normalize({ cards: [card({ status: "Need to Close", statementDay: 14 })], todos: old });
+  const fl = flowState(d, d.cards[0]);
+  assert.deepEqual([fl.done, fl.total, fl.next.text, fl.next.due, d.cards[0].status], [4, 5, "Final statement shows $0", "2026-12-14", "Pending Close"]);
+  assert.equal(normalize(d).todos.length, 5, "only added once");
+});
+test("an open spend row lists each spend with a running total, marks where the target was met, and counts planned spend apart", () => {
+  const c = card({ msr: { steps: [{ amount: 1000, deadline: "2026-12-31" }, { amount: 3000, deadline: "2027-03-31" }], base: 400, baseDate: "2026-11-01", baseAt: 1 } });
+  const d = normalize({ cards: [c], transactions: [
+    { id: "a", cardId: "c1", date: "2026-11-10", amount: 700, payee: "Rent", at: 2 },
+    { id: "b", cardId: "c1", date: "2026-12-20", amount: 2000, payee: "Flights", at: 3 },
+    { id: "z", cardId: "c1", date: "2026-11-05", amount: 999, msr: false, at: 4 }] });
+  const st = msrState(d.cards[0], d, "2026-11-21");
+  assert.deepEqual([st.spent, st.planned, st.step.amount], [1100, 2000, 3000], "planned spend is not spent yet");
+  const L = msrLedger(d.cards[0], d, "2026-11-21");
+  assert.deepEqual(L.rows.map((r) => [r.t, r.run, r.plan, r.hit]), [["Spend before tracking here", 400, false, []], ["Rent", 1100, false, [1000]], ["Flights", 3100, true, [3000]]]);
+  assert.equal(L.willMeet, true);
+  assert.equal(msrState(d.cards[0], d, "2026-12-20").spent, 3100, "planned spend counts once its day comes");
+});
+test("New card coming puts a dated activate step in the do-next list and on the calendar", () => {
+  const d = normalize({ cards: [card({ status: "Keeper", msr: null })] });
+  newCardComing(d, "c1", "2026-11-26", "2026-11-21");
+  const a = actions(d, "2026-11-21", "Junyan").find((x) => x.t === "do");
+  assert.deepEqual([a.day, a.todo.text], ["2026-11-26", "Activate the new card"]);
+  assert.ok(events(d, "2026-11-26", "2026-11-26", "2026-11-21").some((e) => e.cardEvent === "todo"));
+  assert.match(timeline(d, d.cards[0], "2026-11-21").past[0].t, /New card in the mail, arrives Nov 26/);
 });

@@ -37,6 +37,7 @@
   function normalize(d) {
     const x = { ...empty(), ...(d && typeof d === "object" ? d : {}) };
     for (const k of LISTS) if (!Array.isArray(x[k])) x[k] = [];
+    for (const c of x.cards) addFinalStep(x, c);
     return x;
   }
 
@@ -44,14 +45,32 @@
       first one not yet reached; deadlines are inclusive. */
   function msrState(card, data, today) {
     const m = card.msr; if (!m || !(m.steps || []).length) return null;
-    const extra = (data.transactions || []).filter((t) => t.cardId === card.id && t.msr !== false && (!m.baseAt || (t.at || 0) > m.baseAt)).reduce((s, t) => s + (+t.amount || 0), 0);
-    const spent = Math.round(((+m.base || 0) + extra) * 100) / 100;
+    const counted = (data.transactions || []).filter((t) => t.cardId === card.id && t.msr !== false && (!m.baseAt || (t.at || 0) > m.baseAt));
+    const isPlan = (t) => !!(today && t.date && t.date > today), sum = (l) => l.reduce((s, t) => s + (+t.amount || 0), 0), r2 = (n) => Math.round(n * 100) / 100;
+    const spent = r2((+m.base || 0) + sum(counted.filter((t) => !isPlan(t)))), planned = r2(sum(counted.filter(isPlan)));
     const steps = m.steps.filter((s) => s.amount);
     if (!steps.length) return null;
     const step = steps.find((s) => spent < s.amount) || steps[steps.length - 1];
     const met = spent >= step.amount;
     const daysLeft = step.deadline && today ? dayDiff(step.deadline, today) : null;
-    return { spent, step, steps, met, allMet: steps.every((s) => spent >= s.amount), left: Math.max(0, step.amount - spent), pct: Math.min(100, Math.round(spent / step.amount * 100)), daysLeft, late: !met && daysLeft != null && daysLeft < 0 };
+    return { spent, planned, step, steps, met, allMet: steps.every((s) => spent >= s.amount), left: Math.max(0, step.amount - spent), pct: Math.min(100, Math.round(spent / step.amount * 100)), daysLeft, late: !met && daysLeft != null && daysLeft < 0 };
+  }
+  /** The spend behind a target, oldest first, for the open spend row (Junyan, 2026-11-21: "expand these out to see which
+      transactions have met the min spend (or will meet the min spend)"). Each row is {id, d, t, amt, run, plan, hit}: run is the
+      total so far, plan marks spend dated after today (it counts once its day comes), hit lists the target amounts this row
+      reached. willMeet is true when the planned spend gets the current step there. */
+  function msrLedger(card, data, today) {
+    const st = msrState(card, data, today); if (!st) return null;
+    const m = card.msr, rows = [];
+    if (+m.base) rows.push({ id: null, d: m.baseDate || "", t: "Spend before tracking here", amt: +m.base, plan: false });
+    const tx = data.transactions.filter((t) => t.cardId === card.id && t.msr !== false && (!m.baseAt || (t.at || 0) > m.baseAt))
+      .map((t) => ({ id: t.id, d: t.date || "", t: t.payee || "Spend", amt: +t.amount || 0, plan: !!(t.date && t.date > today) }))
+      .sort((a, b) => (a.plan - b.plan) || a.d.localeCompare(b.d));
+    rows.push(...tx);
+    let run = 0;
+    for (const r of rows) { const was = run; run = Math.round((run + r.amt) * 100) / 100; r.run = run; r.hit = st.steps.filter((s) => was < s.amount && run >= s.amount).map((s) => s.amount); }
+    const projected = Math.round((st.spent + st.planned) * 100) / 100;
+    return { st, rows, projected, willMeet: !st.met && projected >= st.step.amount, short: Math.max(0, Math.round((st.step.amount - projected) * 100) / 100) };
   }
   const dueOn = (c, y, m) => `${y}-${pad(m)}-${pad(Math.min(c.dueDay, monthLen(y, m)))}`;
   const isPaid = (c, data, day) => data.payments.some((p) => p.cardId === c.id && p.forDue === day);
@@ -120,7 +139,7 @@
       const st = msrState(c, data, today);
       if (st && !st.allMet) out.push({ t: "spend", card: c, day: st.step.deadline || null, st });
       const fl = flowState(data, c);
-      if (fl) { const f = nextFee(c, today), fee = f && dayDiff(f, today) <= 90 ? f : null; out.push({ t: fl.kind, card: c, day: fee, fee, flow: fl }); }
+      if (fl) { const f = nextFee(c, today), fee = f && dayDiff(f, today) <= 90 ? f : null; out.push({ t: fl.kind, card: c, day: (fl.next && fl.next.due) || fee, fee, flow: fl }); }
     }
     for (const td of data.todos) {
       if (td.done || td.flow) continue;   // a checklist step shows inside its card's Close or Switch row
@@ -135,13 +154,42 @@
   /* Closing a card or switching its product: one button makes a short checklist (to-dos marked flow), and the card's
      one row in the do-next list walks through it (Junyan, 2026-11-20: "Pressing a clean button for when I do close
      cards or product switches that then sets up a to do list (make it very concise)"). */
-  const FLOWS = { close: ["Use or move the points", "Move autopays off", "Pay balance to $0", "Call to close"], switch: ["Pick the new card", "Call to switch", "Move autopays if the number changes"] };
+  /* The last close step waits for the final statement, so a card only counts as closed once the bank shows $0 (Junyan,
+     2026-11-21: "one more step where I receive the final statement so I know it's cancelled 100%"). */
+  const CALL = "Call to close", FINAL = "Final statement shows $0";
+  const FLOWS = { close: ["Use or move the points", "Move autopays off", "Pay balance to $0", CALL, FINAL], switch: ["Pick the new card", "Call to switch", "Move autopays if the number changes"] };
   const kindOf = (c) => c.status === "Need to PS" ? "switch" : c.status === "Need to Close" || c.status === "Pending Close" ? "close" : null;
   /** Where a card's close or switch stands: {kind, steps, done, total, next}; null when it is doing neither. */
   function flowState(data, c) {
     const kind = isActive(c) ? kindOf(c) : null; if (!kind) return null;
     const steps = data.todos.filter((t) => t.cardId === c.id && t.flow === kind);
     return { kind, steps, done: steps.filter((t) => t.done).length, total: steps.length, next: steps.find((t) => !t.done) || null };
+  }
+  /** The first statement day after a given day: when the final statement should land. null when the card has no statement day. */
+  function nextStatement(c, from) {
+    if (!c.statementDay || !from) return null;
+    let y = +from.slice(0, 4), m = +from.slice(5, 7);
+    for (let i = 0; i < 3; i++) { const day = `${y}-${pad(m)}-${pad(Math.min(c.statementDay, monthLen(y, m)))}`; if (day > from) return day; if (++m > 12) { m = 1; y++; } }
+    return null;
+  }
+  /** A close checklist made before the final statement step existed gets it now, so a card already called in waits for it. */
+  function addFinalStep(data, c) {
+    if (!isActive(c) || kindOf(c) !== "close") return;
+    const steps = data.todos.filter((t) => t.cardId === c.id && t.flow === "close");
+    if (!steps.length || steps.some((t) => t.text === FINAL)) return;
+    data.todos.push({ id: uid("t") + "f", cardId: c.id, text: FINAL, done: false, due: null, flow: "close" });
+    const call = steps.find((t) => t.text === CALL && t.done); if (call) stepDone(data, call, call.doneAt);
+  }
+  /** What ticking a close step does to the card. Call to close done: the card waits (Pending Close) and the final
+      statement step is dated on the next statement day. Final statement done: the card is closed. Returns true when it closed. */
+  function stepDone(data, t, today) {
+    const c = data.cards.find((x) => x.id === t.cardId); if (!c || t.flow !== "close" || !isActive(c)) return false;
+    const fin = data.todos.find((x) => x.cardId === c.id && x.flow === "close" && x.text === FINAL);
+    if (t.text === CALL) {
+      c.status = t.done ? "Pending Close" : "Need to Close";
+      if (fin && !fin.done) fin.due = t.done ? nextStatement(c, t.doneAt || today) : null;
+    } else if (t.text === FINAL && t.done) { c.status = "Closed"; c.closed = today; tidyFlow(data, c); return true; }
+    return false;
   }
   /** Drops checklist steps that are not done and no longer fit what the card is doing. */
   function tidyFlow(data, c) { const k = isActive(c) ? kindOf(c) : null; data.todos = data.todos.filter((t) => !(t.cardId === c.id && t.flow && !t.done && t.flow !== k)); }
@@ -196,7 +244,7 @@
 
   /* ---------- the open copy, the lock and the saved file ---------- */
   const M = { env: undefined, ses: null, data: null, busy: Promise.resolve(), pending: null, pushT: 0, pulled: 0, syncErr: "", opening: null };
-  const V = { own: "all", sel: null, q: "", closed: false, spend: null, spendIn: "main", edit: false, ps: false, note: false, list: false, lv: null, msg: "", undo: null, conflict: null, lastSel: null, code: "" };
+  const V = { xp: null, nc: false, own: "all", sel: null, q: "", closed: false, spend: null, spendIn: "main", edit: false, ps: false, note: false, list: false, lv: null, msg: "", undo: null, conflict: null, lastSel: null, code: "" };
   const parse = (s) => { try { return JSON.parse(s); } catch (e) { return null; } };
   function envOf(store) { if (M.env === undefined) { const e = parse(store.get(K.env) || "null"); M.env = VLT && VLT.isEnvelope(e) ? e : null; } return M.env; }
   function setEnv(store, env) { M.env = env; store.set(K.env, env ? JSON.stringify(env) : null); }
@@ -318,6 +366,7 @@
       const st = a.st;
       line = `<b>${money(st.left, c.currency)} left</b>` + (inP ? (a.day ? ` by ${fmt(a.day, today)}` : "") : ` ${nm}`);
       bar = `<i class="x-bar" style="width:${st.pct}%"></i>`;
+      line += `<span class="x-chev" aria-hidden="true">${V.xp === c.id + where ? "▾" : "▸"}</span>`;
       bt = V.spend === c.id && V.spendIn === where ? `<input class="xamt" inputmode="decimal" placeholder="$" aria-label="Amount spent"><button class="btn go" data-x="addspend" data-id="${id}">Add</button>` : `<button class="btn" data-x="spend" data-id="${id}">+ Spend</button>`;
     } else if (a.t === "close" || a.t === "switch") {
       const fl = a.flow, nx = fl && fl.next;
@@ -328,7 +377,18 @@
       bt = `<button class="btn go" data-x="tdone" data-id="${esc(a.todo.id)}">Done</button>`;
     }
     const who = !inP && V.own === "all" && c && c.owner === "Caney" ? `<span class="x-who" title="Caney's card">C</span>` : "";
-    return `<div class="x-act t-${TYPE[a.t]} ${n != null && n <= 2 ? "u-now" : ""}">${inP || !a.day ? "" : `<span class="x-date">${fmt(a.day, today)}</span>`}<span class="x-vb">${VERB[a.t]}</span><span class="x-line">${line}${who}</span><span class="x-rel">${n == null ? "" : relS(n)}</span><span class="x-bt">${bt}</span>${bar}</div>`;
+    const xp = a.t === "spend" && V.xp === c.id + where;
+    return `<div class="x-act t-${TYPE[a.t]} ${n != null && n <= 2 ? "u-now" : ""}${a.t === "spend" ? " can-xp" : ""}"${a.t === "spend" ? ` data-x="xp" data-id="${id}" title="Show the spend"` : ""}>${inP || !a.day ? "" : `<span class="x-date">${fmt(a.day, today)}</span>`}<span class="x-vb">${VERB[a.t]}</span><span class="x-line">${line}${who}</span><span class="x-rel">${n == null ? "" : relS(n)}</span><span class="x-bt">${bt}</span>${bar}</div>${xp ? spendHTML(c, today) : ""}`;
+  }
+  /** The open spend row: every spend that counts, a running total, where each target was met, and planned spend. */
+  function spendHTML(c, today) {
+    const L = msrLedger(c, M.data, today); if (!L) return "";
+    const $m = (n) => money(n, c.currency), st = L.st;
+    const rows = L.rows.map((r) => `<div class="x-spr${r.plan ? " plan" : ""}"><time>${r.d ? tfmt(r.d, today) : ""}</time><span>${esc(r.t)}${r.plan ? " <small>planned</small>" : ""}</span><em>${$m(r.amt)}</em><b>${$m(r.run)}</b>${r.id ? `<button class="x" data-x="hdel" data-id="tx:${esc(r.id)}" aria-label="Remove">×</button>` : "<i></i>"}</div>` +
+      r.hit.map((h) => `<div class="x-spr hit"><span>✓ ${$m(h)} target ${r.plan ? "will be met" : "met"} here</span></div>`).join("")).join("");
+    const end = st.allMet ? "All targets met ✓" : st.met ? `${$m(st.step.amount)} met ✓` : L.willMeet ? `Planned spend meets ${$m(st.step.amount)} ✓` : `${$m(L.short)} still to plan${st.step.deadline ? " by " + fmt(st.step.deadline, today) : ""}`;
+    return `<div class="x-sp">${rows || `<div class="x-spr"><span class="x-p">No spend yet.</span></div>`}<div class="x-spe ${st.met || L.willMeet ? "ok" : ""}">${end}</div>
+      <div class="x-add"><input class="xsa" inputmode="decimal" placeholder="$" aria-label="Amount"><input class="xsw" placeholder="What (optional)" aria-label="What it was"><input class="xsd" type="date" value="${today}" aria-label="Date, a later day is planned"><button class="btn" data-x="spadd" data-id="${esc(c.id)}">Add</button></div></div>`;
   }
   function hint(c, acts, data, today) {
     if (!isActive(c)) return ["none", c.status.toLowerCase()];
@@ -430,13 +490,14 @@
        <div class="x-ph"><h2>${esc(c.name)}${c.last4 ? `<small>${l4(c)}</small>` : ""}</h2><span class="x-chip t-${tone}">${esc(c.status)}</span></div>
        ${mine.length ? `<div class="x-box">${mine.map((a) => row(a, today, "panel")).join("")}</div>` : ""}
        ${flow}
+       ${V.nc ? `<form class="x-psf" id="ncForm"><label class="cf"><span>New card arrives</span><input name="date" type="date" value="${today}" required></label><div class="r"><button type="button" class="btn" data-x="nccancel">Cancel</button><button class="btn pri" type="submit">Save</button></div></form>` : ""}
        ${V.ps ? `<form class="x-psf" id="psForm"><label class="cf"><span>New name</span><input name="name" value="${esc(c.name)}" required></label><label class="cf"><span>Switched on</span><input name="date" type="date" value="${today}" required></label><div class="r"><button type="button" class="btn" data-x="pscancel">Cancel</button><button class="btn pri" type="submit">Save switch</button></div></form>` : ""}
        ${facts ? `<div class="x-facts">${facts}</div>` : ""}
        <div><div class="x-th"><p class="lbl">Timeline</p><button class="x-tx" data-x="note">+ Note</button></div>
         ${V.note ? `<div class="x-add"><input id="xnote" placeholder="What happened" aria-label="Note for the timeline"><input id="xnoted" type="date" value="${today}" aria-label="Date"><button class="btn" data-x="noteadd">Add</button></div>` : ""}
         <div class="x-tl">${tl.next.slice().reverse().map((x) => te(x, true)).join("")}<div class="x-te now"><i></i><time>Today</time></div>${tl.past.map((x) => te(x)).join("")}</div></div>
        ${c.notes ? `<p class="x-notes">${esc(c.notes)}</p>` : ""}
-       <div class="r">${on && !(fl && fl.kind === "close") ? `<button class="btn" data-x="flow" data-kind="close">Close card</button>` : ""}${on && !(fl && fl.kind === "switch") && !V.ps ? `<button class="btn" data-x="flow" data-kind="switch">Product switch</button>` : ""}<button class="btn" data-x="edit">Edit</button></div>`;
+       <div class="r">${on && !(fl && fl.kind === "close") ? `<button class="btn" data-x="flow" data-kind="close">Close card</button>` : ""}${on && !(fl && fl.kind === "switch") && !V.ps ? `<button class="btn" data-x="flow" data-kind="switch">Product switch</button>` : ""}${on && !V.nc ? `<button class="btn" data-x="nc">New card coming</button>` : ""}<button class="btn" data-x="edit">Edit</button></div>`;
       el.innerHTML = `<div class="ptabs"><span class="lbl">${esc(c.issuer || "Card")} · ${esc(c.owner)}</span><span class="spacer"></span><button class="icon" data-x="close" title="Close">✕</button></div><div class="pbody">${body}</div>`;
     }
     const pb = el.querySelector(".pbody"); if (pb) { if (anim) pb.classList.add("in"); else pb.scrollTop = top; }
@@ -473,7 +534,7 @@
     /* a passive redraw (the calendar's own ticks) never wipes something he is in the middle of typing */
     if (passive && pg.classList.contains("cards") && (st === "open") === !!pg.querySelector("#xmain")) {
       const f = root.document.activeElement;
-      if (pg.querySelector("#cardForm,#psForm") || [...pg.querySelectorAll("#xrc,#xnote,.xamt")].some((i) => i.value) || (f && pg.contains(f) && /INPUT|TEXTAREA|SELECT/.test(f.tagName))) return;
+      if (pg.querySelector("#cardForm,#psForm,#ncForm") || [...pg.querySelectorAll("#xrc,#xnote,.xamt,.xsa,.xsw")].some((i) => i.value) || (f && pg.contains(f) && /INPUT|TEXTAREA|SELECT/.test(f.tagName))) return;
     }
     if (!VLT || !root.crypto || !root.crypto.subtle) { pg.className = "page cards locked"; pg.innerHTML = `<div class="x-lock"><div class="x-lk"><h2>Cards</h2><p>This browser cannot open your cards (it needs a secure https page).</p></div></div>`; return; }
     if (st !== "open") {
@@ -562,6 +623,20 @@
     change(ctx, (d) => { d.transactions.push({ id: uid("x"), cardId: id, date: ctx.today(), amount: v, payee: "", msr: true, at: Date.now() }); V.spend = null; },
       before && before.spent + v >= before.step.amount ? `🎯 Target hit on ${c.name}` : `Added ${money(v, c.currency)} to ${c.name}`);
   }
+  /** Adds a spend from the open spend row. A later date makes it planned: it counts once that day comes. */
+  function addLedger(ctx, id, box) {
+    const q = (s) => (box && box.querySelector(s)) || {}, v = parseFloat(String(q(".xsa").value || "").replace(/[$,\s]/g, "")); if (!(v > 0)) return box && q(".xsa").focus && q(".xsa").focus();
+    const today = ctx.today(), date = q(".xsd").value || today, c = M.data.cards.find((x) => x.id === id);
+    change(ctx, (d) => d.transactions.push({ id: uid("x"), cardId: id, date, amount: v, payee: String(q(".xsw").value || "").trim(), msr: true, at: Date.now() }),
+      date > today ? `Planned ${money(v, c.currency)} on ${fmt(date, today)}` : `Added ${money(v, c.currency)} to ${c.name}`);
+  }
+  /** "New card coming": a dated to-do to activate it, in the do-next list and on the calendar, and a timeline note. */
+  function newCardComing(data, id, date, today) {
+    const c = data.cards.find((x) => x.id === id); if (!c || !date) return false;
+    data.todos.push({ id: uid("t"), cardId: id, text: "Activate the new card", done: false, due: date, doneAt: null });
+    data.history.push({ id: uid("h"), cardId: id, date: today, text: `New card in the mail, arrives ${fmt(date, today)}` });
+    return true;
+  }
   /** A row's own button: the row slides away, then the change lands. */
   function rowChange(ctx, b, fn, msg) { const r = b.closest(".x-act"); if (r) { r.classList.add("x-gone"); setTimeout(() => change(ctx, fn, msg), 280); } else change(ctx, fn, msg); }
 
@@ -569,10 +644,11 @@
   function onClick(e, ctx) {
     const b = e.target.closest("[data-x]"); if (!b) return false;
     const act = b.dataset.x, id = b.dataset.id, today = ctx.today();
+    if (act === "xp" && e.target.closest("input,.x-bt")) return true;   // typing in a row's own box never folds it
     if (!M.data) { lockAct(ctx, act, b).catch((err) => fail(ctx, err)); return true; }
     const d = M.data, card = (x) => d.cards.find((c) => c.id === x), sel = card(V.sel);
     if (act === "own") V.own = id;
-    else if (act === "open") { V.sel = id; V.edit = false; V.ps = false; V.note = false; V.list = false; }
+    else if (act === "open") { V.sel = id; V.edit = false; V.ps = false; V.nc = false; V.note = false; V.list = false; }
     else if (act === "close") { V.sel = null; V.edit = false; V.ps = false; V.note = false; V.code = ""; }
     else if (act === "settings") { V.sel = V.sel === "@" ? null : "@"; V.edit = false; V.list = false; }
     else if (act === "list") V.list = !V.list;
@@ -586,8 +662,16 @@
     else if (act === "flowstop" && sel) return change(ctx, (x) => { const c = x.cards.find((y) => y.id === sel.id); c.status = "Open"; tidyFlow(x, c); }, "Switch cancelled"), true;
     else if (act === "ps") { V.sel = id; V.ps = true; V.edit = false; V.list = false; }
     else if (act === "pscancel") V.ps = false;
-    else if (act === "tdone") return rowChange(ctx, b, (x) => { const t = x.todos.find((y) => y.id === id); t.done = true; t.doneAt = today; }, "Done ✓"), true;
-    else if (act === "tcheck") return change(ctx, (x) => { const t = x.todos.find((y) => y.id === id); t.done = !t.done; t.doneAt = t.done ? today : null; }), true;
+    else if (act === "nc") { V.nc = true; V.edit = false; V.ps = false; }
+    else if (act === "nccancel") V.nc = false;
+    else if (act === "xp") { const k = id + (b.closest("#xpanel") ? "panel" : "main"); V.xp = V.xp === k ? null : k; }
+    else if (act === "spadd") return addLedger(ctx, id, b.closest(".x-sp")), true;
+    else if (act === "tdone" || act === "tcheck") {
+      const t0 = d.todos.find((y) => y.id === id); if (!t0) return true;
+      const fin = t0.text === FINAL && !t0.done, nm = (card(t0.cardId) || {}).name, msg = fin ? `Closed: ${nm}` : t0.text === CALL && !t0.done ? `Waiting for the final statement: ${nm}` : act === "tdone" ? "Done ✓" : "";
+      const fn = (x) => { const t = x.todos.find((y) => y.id === id); t.done = act === "tdone" ? true : !t.done; t.doneAt = t.done ? today : null; stepDone(x, t, today); };
+      return (act === "tdone" ? rowChange(ctx, b, fn, msg) : change(ctx, fn, msg)), true;
+    }
     else if (act === "note") V.note = !V.note;
     else if (act === "noteadd" && sel) {
       const i = $(ctx, "#xnote"), text = i.value.trim(), date = $(ctx, "#xnoted").value || today; if (!text) return i.focus(), true;
@@ -614,10 +698,11 @@
     ctx.redraw(); return true;
   }
   function onSubmit(e, ctx) {
-    const form = e.target; if (!M.data || !["cardForm", "psForm"].includes(form.id)) return false;
+    const form = e.target; if (!M.data || !["cardForm", "psForm", "ncForm"].includes(form.id)) return false;
     e.preventDefault();
     const c = M.data.cards.find((x) => x.id === V.sel); if (!c) return true;
     const fd = Object.fromEntries(new FormData(form)), num = (v) => (v === "" || v == null ? null : +v), today = ctx.today();
+    if (form.id === "ncForm") { V.nc = false; change(ctx, (d) => newCardComing(d, c.id, fd.date, today), `Activate the new card: ${fmt(fd.date, today)}`); return true; }
     if (form.id === "psForm") {
       V.ps = false; const name = fd.name.trim() || c.name;
       change(ctx, (d) => { c.productSwitches = [...(c.productSwitches || []), fd.date].sort(); if (name !== c.name) { d.history.push({ id: uid("h"), cardId: c.id, date: fd.date, text: `Was ${c.name}` }); c.name = name; } if (c.status === "Need to PS") c.status = "Open"; tidyFlow(d, c); }, `Switched: ${name}`);
@@ -649,12 +734,13 @@
     const t = e.target;
     if (e.key === "Enter" && t.id === "xrc") { const b = ctx.page().querySelector('[data-x="usecode"]'); if (b) b.click(); return true; }
     if (!M.data) return false;
+    if (e.key === "Enter" && t.closest && t.closest(".x-sp") && t.tagName === "INPUT") { const b = t.closest(".x-sp").querySelector('[data-x="spadd"]'); addLedger(ctx, b.dataset.id, t.closest(".x-sp")); return true; }
     if (e.key === "Enter" && t.classList && t.classList.contains("xamt")) { addSpend(ctx, V.spend, t.closest(".x-bt")); return true; }
     if (e.key === "Enter" && (t.id === "xnote" || t.id === "xnoted")) { ctx.page().querySelector('[data-x="noteadd"]').click(); return true; }
-    if (e.key === "Escape") { if (V.spend) V.spend = null; else if (V.note) V.note = false; else if (V.edit || V.ps) { V.edit = false; V.ps = false; } else if (V.list) V.list = false; else if (V.sel) V.sel = null; else return false; if (t.blur) t.blur(); ctx.redraw(); return true; }
+    if (e.key === "Escape") { if (V.spend) V.spend = null; else if (V.xp) V.xp = null; else if (V.nc) V.nc = false; else if (V.note) V.note = false; else if (V.edit || V.ps) { V.edit = false; V.ps = false; } else if (V.list) V.list = false; else if (V.sel) V.sel = null; else return false; if (t.blur) t.blur(); ctx.redraw(); return true; }
     return false;
   }
 
-  root.Cards = { STATUSES, FLOWS, normalize, msrState, events, actions, flowState, startFlow, tidyFlow, timeline, digest, digestEvents, dueNow, nextFee, isActive, hasAny, calEvents, draw, onClick, onSubmit, onInput, onKey, refresh, wake,
+  root.Cards = { STATUSES, FLOWS, normalize, stepDone, nextStatement, msrLedger, newCardComing, msrState, events, actions, flowState, startFlow, tidyFlow, timeline, digest, digestEvents, dueNow, nextFee, isActive, hasAny, calEvents, draw, onClick, onSubmit, onInput, onKey, refresh, wake,
     isOpen: () => !!M.data, view: V, select: (id) => { if (M.data && id) { V.sel = id; V.edit = false; V.ps = false; V.note = false; } } };
 })(typeof window !== "undefined" ? window : globalThis);
