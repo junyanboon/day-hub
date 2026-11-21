@@ -384,8 +384,8 @@
   function spendHTML(c, today) {
     const L = msrLedger(c, M.data, today); if (!L) return "";
     const $m = (n) => money(n, c.currency), st = L.st;
-    const rows = L.rows.map((r) => `<div class="x-spr${r.plan ? " plan" : ""}"><time>${r.d ? tfmt(r.d, today) : ""}</time><span>${esc(r.t)}${r.plan ? " <small>planned</small>" : ""}</span><em>${$m(r.amt)}</em><b>${$m(r.run)}</b>${r.id ? `<button class="x" data-x="hdel" data-id="tx:${esc(r.id)}" aria-label="Remove">×</button>` : "<i></i>"}</div>` +
-      r.hit.map((h) => `<div class="x-spr hit"><span>✓ ${$m(h)} target ${r.plan ? "will be met" : "met"} here</span></div>`).join("")).join("");
+    const rows = L.rows.map((r) => `<div class="x-spr${r.plan ? " plan" : ""}"><time>${r.d ? tfmt(r.d, today) : ""}</time><span>${esc(r.t)}${r.plan ? " <small>planned</small>" : ""}</span><em>${$m(r.amt)}</em><b${r.hit.length ? ' class="hit"' : ""}>${$m(r.run)}${r.hit.length ? " ✓" : ""}</b>${r.id ? `<button class="x" data-x="hdel" data-id="tx:${esc(r.id)}" aria-label="Remove">×</button>` : "<i></i>"}</div>` +
+      "").join("");   // no "target met here" line: the ✓ on the running total and the bar say it (Junyan, 2026-11-21: "redundant")
     const end = st.allMet ? "All targets met ✓" : st.met ? `${$m(st.step.amount)} met ✓` : L.willMeet ? `Planned spend meets ${$m(st.step.amount)} ✓` : `${$m(L.short)} still to plan${st.step.deadline ? " by " + fmt(st.step.deadline, today) : ""}`;
     return `<div class="x-sp">${rows || `<div class="x-spr"><span class="x-p">No spend yet.</span></div>`}<div class="x-spe ${st.met || L.willMeet ? "ok" : ""}">${end}</div>
       <div class="x-add"><input class="xsa" inputmode="decimal" placeholder="$" aria-label="Amount"><input class="xsw" placeholder="What (optional)" aria-label="What it was"><input class="xsd" type="date" value="${today}" aria-label="Date, a later day is planned"><button class="btn" data-x="spadd" data-id="${esc(c.id)}">Add</button></div></div>`;
@@ -478,7 +478,7 @@
       const id = esc(c.id), mine = acts.filter((a) => a.card === c && !a.flow), st = msrState(c, d, today), fl = flowState(d, c), tl = timeline(d, c, today), on = isActive(c);
       const tone = st && !st.allMet ? "spend" : fl ? "close" : c.status === "Keeper" ? "do" : "none", fee = nextFee(c, today);
       const facts = fact("Due", c.dueDay ? ord(c.dueDay) + (c.autopay ? " · autopay" : "") : "") + fact("Statement", c.statementDay ? ord(c.statementDay) : "") +
-        fact("Fee", c.fee && +c.fee.amount ? money(c.fee.amount, c.currency) + (fee ? " · " + fmt(fee, today) : "") : "") + fact("Limit", c.limit ? money(c.limit, c.currency) : "") +
+        fact("Fee", c.fee && +c.fee.amount ? money(c.fee.amount, c.currency) + (fee ? " · " + fmt(fee, today) : "") : "") + fact("Limit", c.limit ? money(c.limit, c.currency) : on ? `<button class="x-tx" data-x="edit">+ Add</button>` : "") +
         fact("Spend", st ? `${money(st.spent, c.currency)} of ${money(st.step.amount, c.currency)}${st.allMet ? " ✓" : ""}` : "", true) +
         fact("Bonus", c.bonus && (c.bonus.expected || c.bonus.received) ? `${esc(c.bonus.expected || "Bonus")}${c.bonus.received ? " ✓" : ""}` : "", true) +
         fact("Points", c.points && c.points.balance != null && c.points.balance !== "" ? `${Number(c.points.balance).toLocaleString("en-CA")} ${esc(c.points.program || "")}` : "", true);
