@@ -14,7 +14,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>Calendar</title>
 <script src="calendar-core.js?v=26"></script>
-<script src="cards-vault.js?v=1"></script><script src="cards.js?v=3"></script>
+<script src="cards-vault.js?v=2"></script><script src="cards.js?v=4"></script>
 <script src="quest-trips.js?v=20261113c" data-helpers></script>
 <script>
 /* The look saved on this device (the Look row in Settings; Studio when none) goes on here, before anything is drawn,
@@ -762,12 +762,13 @@ html.hsfill .page.cards .x-panel{bottom:calc(-1 * var(--hsshift,0px))}
 html.hsfill .x-toast{bottom:calc(22px + env(safe-area-inset-bottom,0px) - var(--hsshift,0px))}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 
-/* Cards page (cards.js): mockup v3 (c4). Look variables only, so it follows every Day Hub look. */
+/* Cards page (cards.js): compact rows and a per-card timeline (Junyan, 2026-11-20: "way more compact and easier to
+   read"). Look variables only, so it follows every Day Hub look. */
 .page.cards:not([hidden]){display:grid;grid-template-columns:304px minmax(0,1fr) 348px;grid-template-rows:minmax(0,1fr);padding:0;overflow:hidden;background:var(--bar)}
 .page.cards.nosel:not([hidden]){grid-template-columns:304px minmax(0,1fr)}
 .page.cards.nosel .x-panel{display:none}
 .page.cards.locked:not([hidden]){display:block;overflow-y:auto;background:var(--bg)}
-.page.cards .t-pay{--t:var(--now)}.page.cards .t-spend{--t:var(--blue)}.page.cards .t-close{--t:var(--amber)}.page.cards .t-do{--t:var(--purple)}.page.cards .t-none{--t:transparent}
+.page.cards .t-pay{--t:var(--now)}.page.cards .t-spend{--t:var(--blue)}.page.cards .t-close{--t:var(--amber)}.page.cards .t-do{--t:var(--purple)}.page.cards .t-note{--t:var(--stone)}.page.cards .t-none{--t:transparent}
 .page.cards .btn.pri{background:var(--accent);color:var(--on-accent);border-color:transparent}
 .x-main{display:flex;flex-direction:column;min-width:0;min-height:0;background:var(--bg)}
 .x-back,.x-menu,.x-lh,.x-phone{display:none}
@@ -787,79 +788,82 @@ html.hsfill .x-toast{bottom:calc(22px + env(safe-area-inset-bottom,0px) - var(--
 .x-c.has .hint{color:color-mix(in srgb,var(--t) 70%,var(--ink));font-weight:600}
 .x-c.closed .nm{color:var(--faint);text-decoration:line-through}
 .x-more{border:0;background:none;color:var(--faint);font-size:12px;padding:8px;text-align:left;border-radius:9px;width:100%}.x-more:hover{background:var(--raise)}
-.x-safe{margin-top:auto;display:flex;align-items:center;gap:8px;font-size:11.5px;color:var(--faint);padding:8px}
-.x-safe button{margin-left:auto;border:0;background:none;color:var(--soft);text-decoration:underline;font-size:11.5px;padding:0}
 /* middle: what to do, soonest first */
 .x-scroll{flex:1;overflow-y:auto;min-height:0}
-.x-w{max-width:760px;margin:0 auto;padding:10px 20px 90px}
-.x-h{display:flex;align-items:baseline;gap:10px;margin:22px 4px 8px}
-.x-h h2{font-family:var(--display);font-size:13px;margin:0;font-weight:700;letter-spacing:.01em}
-.x-h span{color:var(--faint);font-size:12px}
-.x-box{background:var(--raise);border:1px solid var(--line);border-radius:16px;overflow:hidden}
-.x-act{display:grid;grid-template-columns:44px minmax(0,1fr) auto;gap:14px;align-items:center;padding:11px 14px;border-top:1px solid var(--hair);position:relative}
+.x-w{max-width:720px;margin:0 auto;padding:4px 20px 90px}
+.x-h{display:flex;align-items:baseline;gap:8px;margin:16px 4px 5px}
+.x-h h2{font-size:10.5px;margin:0;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--faint)}
+.x-h span{color:var(--faint);font-size:11px}
+.x-box{background:var(--raise);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+/* one thing to do = one line: date, verb, what, how soon, one button */
+.x-act{display:flex;align-items:center;gap:10px;min-height:38px;padding:5px 8px 5px 12px;border-top:1px solid var(--hair);position:relative;font-size:13.5px}
 .x-act:first-child{border-top:0}
-.x-date{text-align:center;line-height:1;border-radius:10px;padding:6px 0 5px;background:var(--raise2);font-variant-numeric:tabular-nums}
-.x-date i{display:block;font-style:normal;font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--faint);font-weight:700}
-.x-date b{display:block;font-family:var(--display);font-size:17px;margin-top:3px}
-.x-date.nd b{font-size:11px;color:var(--faint);text-transform:uppercase;letter-spacing:.06em}
-.x-act.u-now .x-date{background:color-mix(in srgb,var(--now) 20%,var(--raise))}.x-act.u-now .x-date i{color:color-mix(in srgb,var(--now) 75%,var(--ink))}
-.x-line{font-size:14px;line-height:1.3}.x-line b{font-weight:700}
-.x-line .lk{border:0;background:none;padding:0;font-weight:700;text-decoration:underline;text-decoration-color:var(--line);text-underline-offset:3px;text-align:left}
-.x-line .lk:hover{text-decoration-color:var(--ink)}
-.x-line small{color:var(--faint);font-size:12px;font-variant-numeric:tabular-nums}
-.x-vb{display:inline-block;font-size:10px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;border-radius:6px;padding:2px 7px;margin-right:8px;vertical-align:1.5px;background:color-mix(in srgb,var(--t) 20%,transparent);color:color-mix(in srgb,var(--t) 78%,var(--ink))}
+.x-date{flex:none;width:50px;font-size:12px;color:var(--soft);white-space:nowrap;font-variant-numeric:tabular-nums}
+.x-vb{flex:none;width:50px;text-align:center;font-size:9.5px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;border-radius:6px;padding:2px 0;background:color-mix(in srgb,var(--t) 20%,transparent);color:color-mix(in srgb,var(--t) 78%,var(--ink))}
+/* each piece of the line shrinks by itself, so a long name ends in … instead of dropping off the row */
+.x-line{flex:1;min-width:0;display:flex;align-items:baseline;gap:5px;white-space:nowrap;line-height:1.3}
+.x-line>*{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis}.x-line b{font-weight:700}
+.x-line small,.x-line .x-who,.t-spend .x-line b{flex:none}.x-line .x-nx{flex:1 1 0}
+.x-line .lk{border:0;background:none;padding:0;font-weight:600;text-align:left;white-space:nowrap}
+.x-line .lk:hover{text-decoration:underline;text-underline-offset:3px}
+.x-line small,.x-nx{color:var(--faint);font-size:12px;font-variant-numeric:tabular-nums}
+.x-nx{margin-left:3px}
+.x-who{display:inline-grid;place-items:center;align-self:center;width:15px;height:15px;border-radius:50%;margin-left:1px;font-size:9px;font-weight:700;vertical-align:1px;background:var(--raise2);color:var(--soft)}
+.x-rel{flex:none;font-size:11.5px;color:var(--faint);white-space:nowrap;font-variant-numeric:tabular-nums}
+.x-act.u-now .x-date,.x-act.u-now .x-rel{color:color-mix(in srgb,var(--now) 75%,var(--ink));font-weight:700}
+.x-bar{position:absolute;left:0;bottom:0;height:2px;border-radius:0 2px 2px 0;background:var(--blue);transition:width .5s cubic-bezier(.3,.7,.2,1)}
 .x-sub{color:var(--faint);font-size:12px;margin-top:2px}
-.x-sub em{font-style:normal;color:var(--soft);font-weight:600}
-.x-act.u-now .x-sub em{color:color-mix(in srgb,var(--now) 75%,var(--ink))}
-.x-prog{display:flex;align-items:center;gap:8px;margin-top:7px;max-width:330px;font-size:11px;color:var(--faint);font-variant-numeric:tabular-nums}
-.x-prog div{flex:1;height:5px;border-radius:5px;background:var(--raise2);overflow:hidden}
-.x-prog div i{display:block;height:100%;border-radius:5px;background:var(--blue);transition:width .5s cubic-bezier(.3,.7,.2,1)}
-.x-bt{display:flex;gap:6px;align-items:center}.x-bt.c{justify-content:center;margin-top:16px}
-.x-bt .btn{padding:6px 12px;font-size:12.5px;white-space:nowrap;font-weight:600}
+.x-bt{display:flex;gap:6px;align-items:center;flex:none}.x-bt.c{justify-content:center;margin-top:14px}
+.x-bt .btn{padding:4px 10px;font-size:12px;white-space:nowrap;font-weight:600;border-radius:8px}
 .x-bt .go{background:var(--ink);color:var(--bg);border-color:transparent;font-weight:700}
-.x-bt input{width:84px;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:6px 9px;font-variant-numeric:tabular-nums}
-.x-hero{border-color:color-mix(in srgb,var(--t) 45%,var(--line));background:linear-gradient(120deg,color-mix(in srgb,var(--t) 13%,var(--raise)),var(--raise) 60%)}
-.x-hero .x-act{grid-template-columns:56px minmax(0,1fr) auto;padding:18px}
-.x-hero .x-date{padding:9px 0 8px;border-radius:13px}.x-hero .x-date b{font-size:23px}.x-hero .x-date.nd b{font-size:12px}
-.x-hero .x-line{font-family:var(--display);font-size:20px;letter-spacing:-.01em}
-.x-hero .x-vb{vertical-align:3px}
-.x-hero .x-sub{font-size:13px;margin-top:4px}
-.x-hero .x-bt .btn{padding:10px 18px;font-size:14px}
-.x-hero .x-bt .go,.x-clear .go,.x-clash .go{background:var(--accent);color:var(--on-accent)}
+.x-bt input{width:70px;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:4px 8px;font-variant-numeric:tabular-nums}
+.x-clear .go,.x-clash .go{background:var(--accent);color:var(--on-accent)}
 .x-gone{animation:xgone .35s ease forwards}
 @keyframes xgone{to{opacity:0;transform:translateX(24px)}}
-.x-quiet{text-align:center;color:var(--faint);font-size:12.5px;margin-top:22px}
 .x-clear{text-align:center;padding:46px 20px}.x-clear .big{margin-bottom:6px}
 .x-clash{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:12px 14px;margin-top:14px;border-color:color-mix(in srgb,var(--now) 50%,var(--line))}
-/* right: one card, or the lock and copies panel */
+/* right: one card (what it needs, its facts, its timeline), or settings */
 .x-panel{border-left:1px solid var(--line);display:flex;flex-direction:column;background:var(--bar);min-width:0;min-height:0}
-.x-panel .pbody{gap:14px;padding-top:2px}.x-panel .pbody>*{flex:none}
-.x-ph h2{font-family:var(--display);font-size:21px;margin:2px 0 8px;letter-spacing:-.01em}
-.x-ph h2 small{color:var(--faint);font-weight:400;font-size:14px;margin-left:4px}
-.x-chip{display:inline-block;font-size:11px;font-weight:700;border-radius:999px;padding:2px 9px;margin-right:6px;background:color-mix(in srgb,var(--t,var(--stone)) 20%,transparent);color:color-mix(in srgb,var(--t,var(--stone)) 75%,var(--ink))}
+.x-panel .pbody{gap:12px;padding-top:2px}.x-panel .pbody>*{flex:none}
+.x-ph{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
+.x-ph h2{font-family:var(--display);font-size:18px;margin:0;letter-spacing:-.01em;min-width:0}
+.x-ph h2 small{color:var(--faint);font-weight:400;font-size:13px;margin-left:5px}
+.x-chip{flex:none;font-size:10.5px;font-weight:700;border-radius:999px;padding:2px 8px;white-space:nowrap;background:color-mix(in srgb,var(--t,var(--stone)) 20%,transparent);color:color-mix(in srgb,var(--t,var(--stone)) 75%,var(--ink))}
 .x-chip.t-none{--t:var(--stone)}
-.x-panel .x-box{border-radius:14px}
-.x-panel .x-act{grid-template-columns:36px minmax(0,1fr);gap:10px;padding:10px 12px}
-.x-panel .x-date b{font-size:14px}.x-panel .x-date i{font-size:8.5px}.x-panel .x-date.nd b{font-size:9.5px}
-.x-panel .x-line{font-size:13px}.x-panel .x-bt{grid-column:2;margin-top:2px}
+.x-panel .x-act{padding-left:10px}.x-panel .x-rel{display:none}.x-panel .u-now .x-rel{display:block}
 .x-ok{padding:12px;color:var(--soft);font-size:13px}
-.x-facts{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--hair);border:1px solid var(--line);border-radius:14px;overflow:hidden}
-.x-facts div{background:var(--raise);padding:9px 12px;min-width:0}
-.x-facts .lbl{margin:0 0 2px;font-size:9.5px}
-.x-facts b{font-size:13.5px;font-variant-numeric:tabular-nums}
-.x-li{display:flex;gap:10px;align-items:center;padding:7px 2px;border-top:1px solid var(--hair);font-size:13px}
-.x-li:first-of-type{border-top:0}.x-li .meta{margin-left:auto;white-space:nowrap}
-.x-li input[type=checkbox]{accent-color:var(--accent)}
+.x-facts{display:grid;grid-template-columns:1fr 1fr;column-gap:16px;border-top:1px solid var(--hair)}
+.x-facts div{display:flex;justify-content:space-between;align-items:baseline;gap:8px;padding:5px 0;border-bottom:1px solid var(--hair);font-size:12.5px;min-width:0}
+.x-facts .w{grid-column:1/-1}
+.x-facts span{color:var(--faint);flex:none}
+.x-facts b{font-weight:600;text-align:right;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-variant-numeric:tabular-nums}
+/* the close or switch checklist */
+.x-flow{border:1px solid color-mix(in srgb,var(--t) 45%,var(--line));border-radius:12px;padding:8px 12px 10px;background:var(--raise)}
+.x-flow .lbl{margin:0 0 2px;color:color-mix(in srgb,var(--t) 75%,var(--ink))}
+.x-flow .r{margin-top:8px}.x-flow .r .btn,.x-panel .pbody>.r .btn{padding:5px 11px;font-size:12px}
+.x-li{display:flex;gap:9px;align-items:center;padding:5px 0;font-size:13px;cursor:pointer}
+.x-li input[type=checkbox]{accent-color:var(--accent);margin:0}
 .x-li.done span{color:var(--faint);text-decoration:line-through}
-.x-step{width:16px;height:16px;border-radius:50%;border:2px solid var(--blue);flex:none;display:grid;place-items:center;font-size:10px;color:var(--bg)}
-.x-step.on{background:var(--blue)}
+/* the card's timeline: what is coming above Today, what happened below */
+.x-th{display:flex;align-items:center;justify-content:space-between}.x-th .lbl{margin:0}
+.x-tx{border:0;background:none;color:var(--soft);font-size:12px;padding:2px 0 2px 8px;text-decoration:underline;text-underline-offset:3px}
+.x-tl{position:relative;margin-top:4px}
+.x-tl::before{content:"";position:absolute;left:4px;top:9px;bottom:9px;width:1px;background:var(--line)}
+.x-te{display:grid;grid-template-columns:9px 58px minmax(0,1fr) auto auto;gap:8px;align-items:center;min-height:24px;font-size:12.5px;position:relative}
+.x-te i{width:9px;height:9px;border-radius:50%;background:var(--t,var(--stone));box-shadow:0 0 0 2px var(--bar)}
+.x-te.up i{background:var(--bar);border:2px solid var(--t,var(--stone))}
+.x-te time{color:var(--faint);font-size:11.5px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.x-te span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.x-te.up span{color:var(--soft)}
+.x-te em{font-style:normal;color:var(--faint);font-size:11.5px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.x-te .x{font-size:14px;line-height:1;opacity:.55}.x-te .x:hover{opacity:1}
+.x-te.now i{background:var(--ink)}.x-te.now time{color:var(--ink);font-weight:700;font-size:10px;letter-spacing:.08em;text-transform:uppercase}
 .x-add{display:flex;gap:6px;margin-top:6px}.x-add input{flex:1;min-width:0;background:var(--raise);border:1px solid var(--line);border-radius:10px;padding:6px 9px}.x-add input[type=date]{flex:0 0 122px}
 .x-p{margin:0 0 8px;color:var(--soft);font-size:13px;line-height:1.45}.x-notes{margin:0;white-space:pre-wrap;color:var(--soft);font-size:13px;line-height:1.45}
 .x-psf{display:flex;flex-direction:column;gap:8px;border:1px solid var(--line);border-radius:14px;padding:12px;background:var(--raise)}
 .x{border:0;background:none;color:var(--faint);font-size:16px;cursor:pointer;padding:0 4px}.x:hover{color:var(--ink)}
 .cform{display:grid;grid-template-columns:1fr 1fr;gap:8px 10px}.cf{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--soft);min-width:0}.cf.full,.cform .full{grid-column:1/-1}.cf.ck{flex-direction:row;align-items:center;gap:6px}
 .cform input,.cform select,.cform textarea,.x-psf input{font:inherit;font-size:13px;padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);min-width:0;width:100%}.cf.ck input{width:auto}
-/* the lock screen */
+/* first set-up, and opening on a new device */
 .x-lock{min-height:100%;display:grid;place-items:center;padding:20px}
 .x-lk{max-width:360px;width:100%;text-align:center;display:flex;flex-direction:column;gap:10px;align-items:center}
 .x-lk .ico{width:64px;height:64px;border-radius:20px;background:var(--raise);border:1px solid var(--line);display:grid;place-items:center;font-size:28px;margin-bottom:6px}
@@ -871,8 +875,6 @@ html.hsfill .x-toast{bottom:calc(22px + env(safe-area-inset-bottom,0px) - var(--
 .x-lk .txt{border:0;background:none;color:var(--soft);font-size:12.5px;text-decoration:underline;padding:6px}
 .x-lk input{width:100%;text-align:center;font-family:ui-monospace,Menlo,monospace;letter-spacing:.04em;background:var(--raise);border:1px solid var(--line);border-radius:10px;padding:11px;font-size:14px}
 .x-code{width:100%;text-align:center;font-family:ui-monospace,Menlo,monospace;font-size:15px;letter-spacing:.08em;background:var(--raise);border:1.5px dashed var(--line);border-radius:12px;padding:14px;line-height:1.7;user-select:all;-webkit-user-select:all;margin-bottom:8px}
-.x-ways{width:100%;text-align:left;background:var(--raise);border:1px solid var(--line);border-radius:12px;padding:4px 12px;font-size:12.5px}
-.x-ways div{padding:8px 0;border-top:1px solid var(--hair);display:flex;gap:10px}.x-ways div:first-child{border-top:0}
 .x-toast{position:fixed;left:50%;bottom:calc(22px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:60;background:var(--ink);color:var(--bg);border-radius:999px;padding:8px 8px 8px 16px;font-weight:600;display:flex;gap:10px;align-items:center;font-size:13px;white-space:nowrap;max-width:94vw;animation:xup .25s ease}
 .x-toast span{overflow:hidden;text-overflow:ellipsis;padding-right:8px}
 .x-toast button{border:0;border-radius:999px;padding:4px 12px;font-weight:700;background:color-mix(in srgb,var(--bg) 16%,transparent);color:var(--bg)}
@@ -892,9 +894,8 @@ html.hsfill .x-toast{bottom:calc(22px + env(safe-area-inset-bottom,0px) - var(--
   .page.cards.xlist .x-left{display:flex}
   .x-c{padding:9px 8px}.x-c .nm{font-size:14.5px}
   .x-w{padding:6px 12px 110px}
-  .x-act,.x-hero .x-act{grid-template-columns:40px minmax(0,1fr);gap:11px;padding:11px 12px}
-  .x-bt{grid-column:2;flex-wrap:wrap}
-  .x-hero .x-line{font-size:17px}
+  .x-act{gap:8px;min-height:44px;padding-left:10px}.x-date{width:46px}.x-vb{width:46px}.x-rel{display:none}.x-act.u-now .x-rel{display:block}
+  .x-bt .btn{padding:7px 11px}
   .page.cards .x-panel{top:auto;left:0;width:auto;max-height:88%;border-radius:22px 22px 0 0;border:1px solid var(--line);padding-top:0;animation:xsheet .22s ease}
   .page.cards input,.page.cards select,.page.cards textarea{font-size:16px}
   .x-toast{white-space:normal;border-radius:18px}
@@ -953,7 +954,7 @@ if (TOUCH) for (const g of ["gesturestart", "gesturechange"]) document.addEventL
    which shows this build, the phone's answers and a log of every day change with its cause. Until then CalHook.on is
    null and diag() does nothing. BUILD names this copy of the page, so a screenshot proves which copy ran: change it on
    every change to this page or calendar-readout.js (the date plus a letter). */
-const BUILD = "2026-11-20c cards names";
+const BUILD = "2026-11-20d cards compact";
 const CalHook = window.CalHook = { BUILD, on: null };
 const diag = (kind, msg) => { if (CalHook.on) CalHook.on(kind, msg); };
 /* The iPhone home screen app's fit (2026-11-12): html.hs in a home screen app on touch, html.hsfill and --hsgap when
@@ -1213,7 +1214,7 @@ function render() {
   head(); renderSide(); renderRail();
   const v = $("#view");
   if (S.page === "packing") { packShow(); return; }
-  if (S.page === "cards") { cardsDraw(true); return; }   // cards live locked in this browser, so the page opens unpaired too; a passive redraw keeps what he is typing
+  if (S.page === "cards") { cardsDraw(true); return; }   // cards are kept in this browser, so the page opens unpaired too; a passive redraw keeps what he is typing
   if (!questKey()) { v.classList.remove("snap"); v.innerHTML = pairHTML(); wirePair(); return; }
   if (S.page !== "cal") { renderPage(); return; }
   if (S.n === "m") { v.classList.remove("snap"); monthView(v); } else strip(v);
@@ -2107,8 +2108,8 @@ function tripWire() {
   }, true);
 }
 /* ---------- the Cards page (cards.js; Junyan's and Caney's credit cards, 2026-11-20) ---------- */
-/* The cards are locked (cards-vault.js): a redraw also covers a lock that lands while he is on the calendar, so the
-   open page never lingers behind it, and the calendar's pills go back to "Card payment due". */
+/* No lock screen (Junyan, 2026-11-20): this device keeps its own key, so wake opens the cards as the app loads and
+   the calendar's pills name the card. A redraw also repaints the calendar when the cards open or change. */
 const cardsCtx = { store, today, toast, page: () => $("#page"), api: { base: API, key: questKey },
   redraw: () => { if (S.page === "cards" || $("#page").classList.contains("cards")) cardsDraw(); if (S.page !== "cards") render(); } };
 function cardsDraw(passive) { if (window.Cards) window.Cards.draw(cardsCtx, passive); else $("#page").textContent = "Cards did not load."; }
@@ -2119,6 +2120,7 @@ function cardsDraw(passive) { if (window.Cards) window.Cards.draw(cardsCtx, pass
   pg.addEventListener("input", (e) => { if (on()) window.Cards.onInput(e, cardsCtx); });
   pg.addEventListener("keydown", (e) => { if (on() && window.Cards.onKey(e, cardsCtx)) { e.preventDefault(); e.stopPropagation(); } });
   addEventListener("focus", () => { if (window.Cards) window.Cards.refresh(cardsCtx); });
+  if (window.Cards) window.Cards.wake(cardsCtx);
 }
 function showPage(k) {
   /* Every type stays in the calendar (Junyan, 2026-11-13: "I want it to stay on the calendar app"; t9's jump to

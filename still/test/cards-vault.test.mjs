@@ -49,3 +49,13 @@ test("a changed locked file is refused, not half read", async () => {
   const bad = { ...env, ct: env.ct.slice(0, -6) + (env.ct.slice(-6, -5) === "A" ? "B" : "A") + env.ct.slice(-5) };
   await assert.rejects(V.openWithCode(bad, code));
 });
+
+test("a device that has opened the cards keeps a key that opens them again; another key does not", async () => {
+  const { env, ses } = await V.create(DATA), key = V.keyOf(ses);
+  assert.ok(!JSON.stringify(env).includes(key), "the key is never inside the saved file");
+  const again = await V.seal(ses, env, { ...DATA, todos: [{ id: "t" }] });
+  assert.deepEqual((await V.openWithKey(again, key)).data.todos, [{ id: "t" }]);
+  const other = await V.create(DATA);
+  await assert.rejects(V.openWithKey(env, V.keyOf(other.ses)), /wrong key/);
+  await assert.rejects(V.openWithKey(env, "not a key"), /wrong key/);
+});

@@ -3,25 +3,24 @@
    date, a verb (Pay, Spend, Close, Switch, Do) and one button. Every card is one line in the list on the left.
    Records are separate lists that point at a card by cardId, so a later money page (the YNAB replacement) can share them:
      cards         one per card (owner, issuer, last 4, status, limit, statement and due day, autopay, fee, spend target,
-                   bonus, points, product switch dates, notes)
-     todos         {id, cardId, text, done, due}
+                   bonus, points, product switch dates, opened, closed, notes)
+     todos         {id, cardId, text, done, due, doneAt, flow}   flow "close" or "switch": a step of that checklist
      transactions  {id, cardId, date, amount, payee, msr}   spend; counts toward the target when msr is not false
      payments      {id, cardId, date, amount, forDue}       a bill paid; marks that month's due date paid
      history       {id, cardId, date, text}                 a note of something decided ("Kept another year")
-   Locked (c5: "yes"): the lists are scrambled by cards-vault.js before they are saved; this browser's storage and the
-   Day Hub server (c6: "yes", still-api /quest/vault) hold only the locked file. The open copy is in memory, and is
-   dropped after 5 idle minutes. While locked the calendar still shows that something is due on a day, from a small
-   list of dates and kinds only (no card names). Only last 4 digits are ever kept, never a full number.
+   No lock screen (Junyan, 2026-11-20: "Card locking feature is annoying so maybe let's drop that for the time being").
+   The lists are still scrambled by cards-vault.js before they are saved, so the Day Hub server (c6: "yes", still-api
+   /quest/vault) holds only a file it cannot read. Each device keeps its own key (cards-key-v1), so Cards opens by
+   itself there; a new device needs the recovery code once. Only last 4 digits are ever kept, never a full number.
    The repo is public, so no card data lives here: the starting list is a private file he imports once.
-   Rules are plain functions (events, msrState, actions, digest) so still/test/cards.test.mjs can check them in node. */
+   Rules are plain functions (events, msrState, actions, flowState, startFlow, timeline, digest) so still/test/cards.test.mjs can check them in node. */
 (function (root) {
   "use strict";
   const VLT = root.CardsVault;
-  const K = { env: "cards-vault-v1", sync: "cards-sync-v1", digest: "cards-digest-v1", nopk: "cards-nopk-v1", old: "money-v1" };
-  const IDLE = 5 * 60 * 1000;
+  const K = { env: "cards-vault-v1", sync: "cards-sync-v1", digest: "cards-digest-v1", key: "cards-key-v1", nopk: "cards-nopk-v1", old: "money-v1" };
   const STATUSES = ["Applied", "Card in Mail", "MSR", "Open", "Keeper", "No Fee", "Need to PS", "Product Switch", "Need to Close", "Pending Close", "Closed", "Rejected"];
   const DONE = new Set(["Closed", "Rejected"]), LISTS = ["cards", "todos", "transactions", "payments", "history"];
-  const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"], DOW = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
   const empty = () => ({ v: 1, cards: [], todos: [], transactions: [], payments: [], history: [] });
   const pad = (n) => String(n).padStart(2, "0");
   const addDays = (d, n) => { const t = new Date(d + "T12:00:00Z"); t.setUTCDate(t.getUTCDate() + n); return t.toISOString().slice(0, 10); };
@@ -34,7 +33,6 @@
   const ord = (n) => n + (n % 10 === 1 && n !== 11 ? "st" : n % 10 === 2 && n !== 12 ? "nd" : n % 10 === 3 && n !== 13 ? "rd" : "th");
   const rel = (n) => n < 0 ? `${-n} day${n === -1 ? "" : "s"} late` : n === 0 ? "Today" : n === 1 ? "Tomorrow" : `In ${n} days`;
   const fmt = (d, today) => { if (!d) return ""; const [y, m, dd] = d.split("-"); return `${MON[+m - 1]} ${+dd}${today && Math.abs(dayDiff(d, today)) > 300 ? ", " + y : ""}`; };
-  const dow = (d) => DOW[new Date(d + "T12:00:00Z").getUTCDay()];
 
   function normalize(d) {
     const x = { ...empty(), ...(d && typeof d === "object" ? d : {}) };
@@ -121,19 +119,64 @@
       if (c.dueDay && !c.autopay) { const d = dueNow(c, data, today); if (d && dayDiff(d.day, today) <= 10) out.push({ t: "pay", card: c, day: d.day }); }
       const st = msrState(c, data, today);
       if (st && !st.allMet) out.push({ t: "spend", card: c, day: st.step.deadline || null, st });
-      if (c.status === "Need to Close" || c.status === "Pending Close" || c.status === "Need to PS") {
-        const f = nextFee(c, today), fee = f && dayDiff(f, today) <= 90 ? f : null;
-        out.push({ t: c.status === "Need to PS" ? "switch" : "close", card: c, day: fee, fee });
-      }
+      const fl = flowState(data, c);
+      if (fl) { const f = nextFee(c, today), fee = f && dayDiff(f, today) <= 90 ? f : null; out.push({ t: fl.kind, card: c, day: fee, fee, flow: fl }); }
     }
     for (const td of data.todos) {
-      if (td.done) continue;
+      if (td.done || td.flow) continue;   // a checklist step shows inside its card's Close or Switch row
       const c = data.cards.find((x) => x.id === td.cardId);
       if (c ? !isActive(c) || !mine(c) : who && who !== "all") continue;
       out.push({ t: "do", card: c || null, day: td.due || null, todo: td });
     }
     const rank = { pay: 0, close: 1, switch: 2, spend: 3, do: 4 };
     return out.sort((a, b) => (a.day || "9999").localeCompare(b.day || "9999") || rank[a.t] - rank[b.t]);
+  }
+
+  /* Closing a card or switching its product: one button makes a short checklist (to-dos marked flow), and the card's
+     one row in the do-next list walks through it (Junyan, 2026-11-20: "Pressing a clean button for when I do close
+     cards or product switches that then sets up a to do list (make it very concise)"). */
+  const FLOWS = { close: ["Use or move the points", "Move autopays off", "Pay balance to $0", "Call to close"], switch: ["Pick the new card", "Call to switch", "Move autopays if the number changes"] };
+  const kindOf = (c) => c.status === "Need to PS" ? "switch" : c.status === "Need to Close" || c.status === "Pending Close" ? "close" : null;
+  /** Where a card's close or switch stands: {kind, steps, done, total, next}; null when it is doing neither. */
+  function flowState(data, c) {
+    const kind = isActive(c) ? kindOf(c) : null; if (!kind) return null;
+    const steps = data.todos.filter((t) => t.cardId === c.id && t.flow === kind);
+    return { kind, steps, done: steps.filter((t) => t.done).length, total: steps.length, next: steps.find((t) => !t.done) || null };
+  }
+  /** Drops checklist steps that are not done and no longer fit what the card is doing. */
+  function tidyFlow(data, c) { const k = isActive(c) ? kindOf(c) : null; data.todos = data.todos.filter((t) => !(t.cardId === c.id && t.flow && !t.done && t.flow !== k)); }
+  /** Starts a close or a switch: marks the card, writes the checklist and notes the day on the timeline. */
+  function startFlow(data, id, kind, today) {
+    const c = data.cards.find((x) => x.id === id); if (!c || !FLOWS[kind] || !isActive(c)) return false;
+    if (kindOf(c) !== kind) c.status = kind === "close" ? "Need to Close" : "Need to PS";
+    data.todos = data.todos.filter((t) => !(t.cardId === id && t.flow && !t.done));
+    FLOWS[kind].forEach((text, i) => data.todos.push({ id: uid("t") + i, cardId: id, text, done: false, due: null, flow: kind }));
+    data.history.push({ id: uid("h"), cardId: id, date: today, text: kind === "close" ? "Started closing" : "Started product switch" });
+    return true;
+  }
+  /** One card's timeline: next holds what is coming (soonest first), past what happened (newest first). Each entry is
+      {d, k, t, x, del}: day, kind, text, amount, and what the × removes (Junyan, 2026-11-20: "I want a time line of
+      information though.. that is really important to me"). */
+  function timeline(data, c, today) {
+    const next = [], past = [];
+    if (isActive(c)) {
+      const d = c.dueDay ? dueNow(c, data, today) : null;
+      if (d) next.push({ d: d.day, k: "pay", t: c.autopay ? "Bill due · autopay" : "Bill due" });
+      const f = nextFee(c, today); if (f) next.push({ d: f, k: "fee", t: "Annual fee", x: money(c.fee.amount, c.currency) });
+      const st = msrState(c, data, today);
+      if (st) for (const s of st.steps) if (s.deadline && st.spent < s.amount) next.push({ d: s.deadline, k: "spend", t: `Spend ${money(s.amount, c.currency)}`, x: `${money(s.amount - st.spent, c.currency)} left` });
+    }
+    for (const t of data.todos) if (t.cardId === c.id) {
+      if (t.done) { if (t.doneAt) past.push({ d: t.doneAt, k: "do", t: "✓ " + t.text, del: "todo:" + t.id }); }
+      else if (t.due) next.push({ d: t.due, k: "do", t: t.text });
+    }
+    for (const p of data.payments) if (p.cardId === c.id && p.date) past.push({ d: p.date, k: "pay", t: `Paid the ${fmt(p.forDue)} bill`, x: p.amount ? money(p.amount, c.currency) : "", del: "pay:" + p.id });
+    for (const t of data.transactions) if (t.cardId === c.id && t.date) past.push({ d: t.date, k: "spend", t: t.payee || "Spend added", x: money(t.amount, c.currency), del: "tx:" + t.id });
+    for (const h of data.history) if (h.cardId === c.id && h.date) (h.date > today ? next : past).push({ d: h.date, k: "note", t: h.text, del: "hist:" + h.id });
+    for (const x of c.productSwitches || []) if (x) past.push({ d: x, k: "switch", t: "Product switch" });
+    if (c.closed) past.push({ d: c.closed, k: "close", t: "Closed" });
+    if (c.opened) past.push({ d: c.opened, k: "open", t: "Opened" });
+    return { next: next.sort((a, b) => a.d.localeCompare(b.d)), past: past.sort((a, b) => b.d.localeCompare(a.d)) };
   }
 
   /** What the calendar may show while the cards are locked: dates and kinds only, no names, no amounts. */
@@ -152,8 +195,8 @@
   }
 
   /* ---------- the open copy, the lock and the saved file ---------- */
-  const M = { env: undefined, ses: null, data: null, seen: 0, busy: Promise.resolve(), pending: null, timer: 0, pushT: 0, pulled: 0, syncErr: "", wired: false };
-  const V = { own: "all", sel: null, q: "", closed: false, spend: null, spendIn: "main", edit: false, ps: false, list: false, lv: null, msg: "", undo: null, conflict: null, lastSel: null, code: "" };
+  const M = { env: undefined, ses: null, data: null, busy: Promise.resolve(), pending: null, pushT: 0, pulled: 0, syncErr: "", opening: null };
+  const V = { own: "all", sel: null, q: "", closed: false, spend: null, spendIn: "main", edit: false, ps: false, note: false, list: false, lv: null, msg: "", undo: null, conflict: null, lastSel: null, code: "" };
   const parse = (s) => { try { return JSON.parse(s); } catch (e) { return null; } };
   function envOf(store) { if (M.env === undefined) { const e = parse(store.get(K.env) || "null"); M.env = VLT && VLT.isEnvelope(e) ? e : null; } return M.env; }
   function setEnv(store, env) { M.env = env; store.set(K.env, env ? JSON.stringify(env) : null); }
@@ -166,17 +209,26 @@
   const hasAny = (store) => !!(M.data || store.get(K.env) || store.get(K.digest));
   function calEvents(store, from, to, today) { return M.data ? events(M.data, from, to, today) : digestEvents(parse(store.get(K.digest) || "[]"), from, to); }
 
+  /** Drops the open copy (the saved file no longer fits this device's key, or a backup file replaced it). */
   function lock(ctx, why) {
     if (VLT) VLT.forget(M.ses);
-    M.ses = null; M.data = null; M.pending = null; clearInterval(M.timer); M.timer = 0;
-    Object.assign(V, { sel: null, edit: false, ps: false, spend: null, undo: null, lv: null, msg: why || "", list: false, code: "" });
+    M.ses = null; M.data = null; M.pending = null;
+    Object.assign(V, { sel: null, edit: false, ps: false, note: false, spend: null, undo: null, lv: null, msg: why || "", list: false, code: "" });
     if (ctx) ctx.redraw();
   }
+  /** The cards are open. This device keeps the key, so next time they open without asking. */
   function opened(ctx, ses, data) {
-    M.ses = ses; M.data = normalize(data); M.seen = Date.now(); V.lv = null; V.msg = "";
+    M.ses = ses; M.data = normalize(data); V.lv = null; V.msg = "";
+    ctx.store.set(K.key, VLT.keyOf(ses)); ctx.store.set(K.nopk, null);
     putDigest(ctx);
-    clearInterval(M.timer); M.timer = setInterval(() => { if (M.data && Date.now() - M.seen > IDLE) lock(ctx, "Locked after 5 minutes idle."); }, 15000);
-    if (!M.wired && root.document) { M.wired = true; for (const ev of ["pointerdown", "keydown"]) root.document.addEventListener(ev, () => { M.seen = Date.now(); }, true); }
+  }
+  /** Opens the saved file with this device's own key, quietly: on page load, and when Cards is shown. A key that no
+      longer fits is dropped, and the page then asks for the recovery code. */
+  function wake(ctx) {
+    const env = VLT && envOf(ctx.store), key = ctx.store.get(K.key);
+    if (M.data || M.opening || !env || !key) return M.opening || Promise.resolve();
+    M.opening = VLT.openWithKey(env, key).then((o) => { opened(ctx, o.ses, o.data); refresh(ctx); }, () => { ctx.store.set(K.key, null); }).then(() => { M.opening = null; ctx.redraw(); });
+    return M.opening;
   }
   const pushSoon = (ctx) => { clearTimeout(M.pushT); M.pushT = setTimeout(() => push(ctx), 1200); };
   /** Scrambles the open copy and saves the locked file here, then sends it to the server. One save at a time, in order.
@@ -201,7 +253,7 @@
     const before = JSON.stringify(M.data);
     fn(M.data); V.undo = msg ? before : null;
     persist(ctx); ctx.redraw();
-    if (msg) toast(ctx, msg, true);
+    if (msg) toast(ctx, msg, true); else { const t = ctx.page().querySelector("#xtoast"); if (t) t.innerHTML = ""; }   // an old Undo must not outlive the change it was for
   }
 
   /* ---------- the server copy (still-api /quest/vault): the same locked file, so phone and computer match ---------- */
@@ -216,7 +268,7 @@
   /** Takes the server's locked file as this device's. An open session re-reads it; if its key no longer fits, it locks. */
   async function adopt(ctx, env, rev, at) {
     setEnv(ctx.store, env); setSync(ctx.store, { rev, dirty: false, at: at || "" }); V.conflict = null;
-    if (M.ses) { try { M.data = normalize(await VLT.read(M.ses, env)); putDigest(ctx); } catch (e) { lock(null, "Your cards were changed on another device. Unlock again."); } }
+    if (M.ses) { try { M.data = normalize(await VLT.read(M.ses, env)); putDigest(ctx); } catch (e) { lock(null, "Your cards were set up again on another device. Type the recovery code from that set-up."); } }
   }
   /** Asks the server what it holds. Returns "none", "same", "adopted" or "conflict"; throws when it cannot ask. */
   async function pull(ctx) {
@@ -256,34 +308,27 @@
   const TYPE = { pay: "pay", spend: "spend", close: "close", switch: "close", do: "do" }, VERB = { pay: "Pay", spend: "Spend", close: "Close", switch: "Switch", do: "Do" };
   const cname = (c) => `<button class="lk" data-x="open" data-id="${esc(c.id)}">${esc(c.name)}</button>${c.last4 ? ` <small>${l4(c)}</small>` : ""}`;
 
+  const relS = (n) => n < 0 ? `${-n}d late` : n === 0 ? "today" : n === 1 ? "tomorrow" : `${n}d`;
+  /** One thing to do, on one line: date, verb, what, how soon, one button. In a card's own panel the card name is left out. */
   function row(a, today, where) {
-    const c = a.card, n = a.day ? dayDiff(a.day, today) : null, id = c ? esc(c.id) : "";
-    let line = "", sub = "", bt = "", extra = "";
-    const when = n == null ? "" : `<em>${rel(n)}</em> · ${dow(a.day)} ${fmt(a.day, today)}`;
-    if (a.t === "pay") { line = cname(c); sub = `${when} · ${esc(c.owner)}`; bt = `<button class="btn go" data-x="paid" data-id="${id}" data-due="${a.day}">Mark paid</button>`; }
+    const c = a.card, n = a.day ? dayDiff(a.day, today) : null, id = c ? esc(c.id) : "", inP = where === "panel", nm = inP ? "" : cname(c || {});
+    let line = "", bt = "", bar = "";
+    if (a.t === "pay") { line = inP ? `Bill due <b>${fmt(a.day, today)}</b>` : nm; bt = `<button class="btn go" data-x="paid" data-id="${id}" data-due="${a.day}">Paid</button>`; }
     else if (a.t === "spend") {
-      const st = a.st, per = n != null && n > 0 ? Math.ceil(st.left / n) : null;
-      line = `<b>${money(st.left, c.currency)} more</b> on ${cname(c)}`;
-      sub = (n == null ? "<em>no deadline set</em>" : n < 0 ? `<em>${rel(n)}</em> · was due ${fmt(a.day, today)}` : `<em>by ${fmt(a.day, today)}</em> · ${n} day${n === 1 ? "" : "s"} left${per ? ` · about ${money(per, c.currency)} a day` : ""}`) +
-        (st.steps.length > 1 ? ` · step ${st.steps.indexOf(st.step) + 1} of ${st.steps.length}` : "");
-      extra = `<div class="x-prog"><div><i style="width:${st.pct}%"></i></div>${money(st.spent, c.currency)} of ${money(st.step.amount, c.currency)}</div>`;
-      bt = V.spend === c.id && V.spendIn === where ? `<input class="xamt" inputmode="decimal" placeholder="$ spent" aria-label="Amount spent"><button class="btn go" data-x="addspend" data-id="${id}">Add</button>` : `<button class="btn" data-x="spend" data-id="${id}">+ Add spend</button>`;
-    } else if (a.t === "close") {
-      const wait = c.status === "Pending Close";
-      line = a.fee ? `${cname(c)} before the <b>${money(c.fee.amount, c.currency)} fee</b>` : cname(c);
-      sub = (a.fee ? `${when} · ` : "") + (wait ? "close asked for, check it went through" : "marked to close") + ` · ${esc(c.owner)}`;
-      bt = `<button class="btn go" data-x="closed" data-id="${id}">Closed it</button>${wait ? "" : `<button class="btn" data-x="keep" data-id="${id}">Keep it</button>`}`;
-    } else if (a.t === "switch") {
-      line = a.fee ? `${cname(c)} before the <b>${money(c.fee.amount, c.currency)} fee</b>` : cname(c);
-      sub = (a.fee ? `${when} · ` : "") + `ask the bank for a product switch · ${esc(c.owner)}`;
-      bt = `<button class="btn go" data-x="ps" data-id="${id}">Switched it</button>`;
+      const st = a.st;
+      line = `<b>${money(st.left, c.currency)} left</b>` + (inP ? (a.day ? ` by ${fmt(a.day, today)}` : "") : ` ${nm}`);
+      bar = `<i class="x-bar" style="width:${st.pct}%"></i>`;
+      bt = V.spend === c.id && V.spendIn === where ? `<input class="xamt" inputmode="decimal" placeholder="$" aria-label="Amount spent"><button class="btn go" data-x="addspend" data-id="${id}">Add</button>` : `<button class="btn" data-x="spend" data-id="${id}">+ Spend</button>`;
+    } else if (a.t === "close" || a.t === "switch") {
+      const fl = a.flow, nx = fl && fl.next;
+      line = nm + `<span class="x-nx">${nx ? `${esc(nx.text)} · ${fl.done + 1}/${fl.total}` : a.fee ? `before the ${money(c.fee.amount, c.currency)} fee` : ""}</span>`;
+      bt = nx ? `<button class="btn go" data-x="tdone" data-id="${esc(nx.id)}">Done</button>` : a.t === "close" ? `<button class="btn go" data-x="closed" data-id="${id}">Closed</button>` : `<button class="btn go" data-x="ps" data-id="${id}">Switched</button>`;
     } else {
-      line = `<b>${esc(a.todo.text)}</b>`;
-      sub = [n == null ? "" : `<em>by ${fmt(a.day, today)}</em> · ${rel(n).toLowerCase()}`, c ? `${esc(c.name)} ${l4(c)} · ${esc(c.owner)}` : ""].filter(Boolean).join(" · ");
+      line = `<b>${esc(a.todo.text)}</b>` + (c && !inP ? `<span class="x-nx">${esc(c.name)} ${l4(c)}</span>` : "");
       bt = `<button class="btn go" data-x="tdone" data-id="${esc(a.todo.id)}">Done</button>`;
     }
-    const chip = a.day ? `<i>${MON[+a.day.slice(5, 7) - 1]}</i><b>${+a.day.slice(8)}</b>` : `<i>any</i><b>day</b>`;
-    return `<div class="x-act t-${TYPE[a.t]} ${n != null && n <= 2 ? "u-now" : ""}"><div class="x-date ${a.day ? "" : "nd"}">${chip}</div><div><div class="x-line"><span class="x-vb">${VERB[a.t]}</span>${line}</div><div class="x-sub">${sub}</div>${extra}</div><div class="x-bt">${bt}</div></div>`;
+    const who = !inP && V.own === "all" && c && c.owner === "Caney" ? `<span class="x-who" title="Caney's card">C</span>` : "";
+    return `<div class="x-act t-${TYPE[a.t]} ${n != null && n <= 2 ? "u-now" : ""}">${inP || !a.day ? "" : `<span class="x-date">${fmt(a.day, today)}</span>`}<span class="x-vb">${VERB[a.t]}</span><span class="x-line">${line}${who}</span><span class="x-rel">${n == null ? "" : relS(n)}</span><span class="x-bt">${bt}</span>${bar}</div>`;
   }
   function hint(c, acts, data, today) {
     if (!isActive(c)) return ["none", c.status.toLowerCase()];
@@ -309,7 +354,6 @@
     const cl = all.filter((c) => !isActive(c)).sort((a, b) => a.name.localeCompare(b.name));
     if (cl.length) h += `<div><button class="x-more" data-x="showclosed">${V.closed || q ? "▾" : "▸"} Closed cards · ${cl.length}</button>${V.closed || q ? cl.map(line).join("") : ""}</div>`;
     if (!all.length) h += `<div class="x-ok">${q ? "No card matches that." : "No cards yet."}</div>`;
-    h += `<div class="x-safe"><span>🔓 Unlocked on this device</span><button data-x="lock">Lock now</button></div>`;
     $(ctx, "#xleft").innerHTML = h;
   }
   function drawMain(ctx, acts, today) {
@@ -317,21 +361,18 @@
     $(ctx, "#xown").innerHTML = [["all", "Both"], ["Junyan", "Junyan"], ["Caney", "Caney"]].map(([k, n]) => `<button data-x="own" data-id="${k}" aria-pressed="${V.own === k}">${n}</button>`).join("");
     const first = acts[0], n0 = first && first.day ? dayDiff(first.day, today) : null;
     $(ctx, "#xstatus").textContent = !d.cards.length ? "" : acts.length ? `${acts.length} to do${n0 != null ? " · next " + rel(n0).toLowerCase() : ""}` : "all clear";
-    const clash = V.conflict ? `<div class="x-box x-clash"><div><b>Your cards were changed on two devices.</b><div class="x-sub">Pick the copy to keep. The other one stays on the server as a spare for a while.</div></div><div class="x-bt"><button class="btn go" data-x="mine">Keep this device's</button><button class="btn" data-x="theirs">Use the other one</button></div></div>` : "";
+    const clash = V.conflict ? `<div class="x-box x-clash"><div><b>Your cards were changed on two devices.</b><div class="x-sub">Pick the copy to keep.</div></div><div class="x-bt"><button class="btn go" data-x="mine">Keep this device's</button><button class="btn" data-x="theirs">Use the other one</button></div></div>` : "";
     let h;
-    if (!d.cards.length) h = `<div class="x-clear"><div class="big">No cards yet</div><div class="meta">Bring in your starting list (the private file cards-seed.json on your Mac), or add a card by hand.</div><div class="x-bt c"><button class="btn go" data-x="import">Import your card file</button><button class="btn" data-x="new">+ Add a card</button></div></div>`;
-    else if (!acts.length) h = `<div class="x-clear"><div class="big">All clear ✓</div><div class="meta">Nothing to pay, spend or decide right now.</div></div>`;
+    if (!d.cards.length) h = `<div class="x-clear"><div class="big">No cards yet</div><div class="x-bt c"><button class="btn go" data-x="import">Import your card file</button><button class="btn" data-x="new">+ Add a card</button></div></div>`;
+    else if (!acts.length) h = `<div class="x-clear"><div class="big">All clear ✓</div></div>`;
     else {
       const g = [["This week", []], ["Next 30 days", []], ["Later", []], ["Any time", []]];
-      for (const a of acts.slice(1)) { const n = a.day ? dayDiff(a.day, today) : null; g[n == null ? 3 : n <= 7 ? 0 : n <= 30 ? 1 : 2][1].push(a); }
-      const open = d.cards.filter((c) => isActive(c) && (V.own === "all" || c.owner === V.own)), busy = new Set(acts.filter((a) => a.card).map((a) => a.card.id)).size, quiet = open.length - busy;
-      h = `<div class="x-h"><h2>Next up</h2></div><div class="x-box x-hero t-${TYPE[first.t]}">${row(first, today, "main")}</div>` +
-        g.filter((x) => x[1].length).map(([n, l]) => `<div class="x-h"><h2>${n}</h2><span>${l.length}</span></div><div class="x-box">${l.map((a) => row(a, today, "main")).join("")}</div>`).join("") +
-        (quiet > 0 ? `<div class="x-quiet">${quiet} other card${quiet === 1 ? " needs" : "s need"} nothing from you right now.</div>` : "");
+      for (const a of acts) { const n = a.day ? dayDiff(a.day, today) : null; g[n == null ? 3 : n <= 7 ? 0 : n <= 30 ? 1 : 2][1].push(a); }
+      h = g.filter((x) => x[1].length).map(([n, l]) => `<div class="x-h"><h2>${n}</h2><span>${l.length}</span></div><div class="x-box">${l.map((a) => row(a, today, "main")).join("")}</div>`).join("");
     }
     $(ctx, "#xmain").innerHTML = clash + h;
   }
-  const fact = (label, val) => `<div><p class="lbl">${label}</p><b>${val}</b></div>`;
+  const fact = (label, val, wide) => val ? `<div${wide ? ' class="w"' : ""}><span>${label}</span><b>${val}</b></div>` : "";
   const field = (label, name, val, type = "text", extra = "") => `<label class="cf"><span>${label}</span><input name="${name}" type="${type}" value="${esc(val ?? "")}" ${extra}></label>`;
   function editForm(c) {
     const m = c.msr || { steps: [] }, sel = (name, opts, cur) => `<select name="${name}">${opts.map((o) => `<option ${o === cur ? "selected" : ""}>${o}</option>`).join("")}</select>`;
@@ -348,23 +389,25 @@
       ${field("Spend target 2", "s1a", m.steps[1] && m.steps[1].amount, "number")}${field("by", "s1d", m.steps[1] && m.steps[1].deadline, "date")}
       ${field("Welcome bonus", "bonusExpected", c.bonus && c.bonus.expected, "text", 'placeholder="e.g. 20,000 Avion"')}<label class="cf ck"><input type="checkbox" name="bonusReceived" ${c.bonus && c.bonus.received ? "checked" : ""}><span>Bonus received</span></label>
       ${field("Points program", "pointsProgram", c.points && c.points.program)}${field("Points now", "pointsBalance", c.points && c.points.balance, "number")}
-      ${field("Closed on", "closed", c.closed, "date")}<span></span>
+      ${field("Closed on", "closed", c.closed, "date")}${field("Opened on", "opened", c.opened, "date")}
       <label class="cf full"><span>Notes</span><textarea name="notes" rows="4">${esc(c.notes)}</textarea></label>
       <div class="r full"><button type="button" class="btn del" data-x="del">Delete card</button><span class="spacer"></span><button type="button" class="btn" data-x="cancel">Cancel</button><button class="btn pri" type="submit">Save</button></div></form>`;
   }
   function settings(ctx) {
-    const s = syncOf(ctx.store), env = M.env || {}, n = (env.pk || []).length, can = VLT.canPasskey();
-    const sync = M.syncErr ? `<b>Not saved to the server yet</b>: ${esc(M.syncErr)}. Your cards stay safe on this device, and it will try again.` : s.dirty ? "Saving to the Day Hub server…" : s.rev ? `Saved on the Day Hub server${s.at ? " · " + esc(new Date(s.at).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })) : ""}. Your phone and computer show the same cards.` : "Not on the server yet.";
-    return `<div class="ptabs"><span class="lbl">Lock and copies</span><span class="spacer"></span><button class="icon" data-x="close" title="Close">✕</button></div><div class="pbody">
-      <div><p class="lbl">Lock</p><p class="x-p">Your cards lock by themselves after 5 minutes idle, and every time the page is closed.</p><div class="r"><button class="btn" data-x="lock">Lock now</button></div></div>
-      <div><p class="lbl">Ways in</p><p class="x-p">🔑 Passkeys on file: <b>${n}</b>${can ? "" : " · this browser cannot use a passkey"}<br>🗝️ Recovery code: set (it was shown once, when you set up)</p>
-        ${V.code ? `<div class="x-code">${esc(V.code.slice(0, 14))}<br>${esc(V.code.slice(15))}</div><p class="x-p">This is your new recovery code. The old one no longer works. Save it in 1Password now: it is not shown again.</p><div class="r"><button class="btn" data-x="copycode">Copy code</button><button class="btn go" data-x="codeok">I saved it</button></div>`
-          : `<div class="r">${can ? `<button class="btn" data-x="addpk">Add a passkey on this device</button>` : ""}<button class="btn" data-x="newcode">Make a new recovery code</button></div>`}</div>
-      <div><p class="lbl">Copies</p><p class="x-p">${sync}</p><div class="r"><button class="btn" data-x="syncnow">Check the server now</button><button class="btn" data-x="backup">Download a locked backup</button></div>
-        <p class="x-p meta">A backup file is locked the same way: it opens only with your passkey or recovery code.</p></div>
-      <div><p class="lbl">Card list</p><div class="r"><button class="btn" data-x="import">Import a card file</button><button class="btn" data-x="restore">Restore a locked backup</button></div></div>
+    const s = syncOf(ctx.store);
+    const sync = M.syncErr ? `<b>Not on the server yet</b>: ${esc(M.syncErr)}. It will try again.` : s.dirty ? "Saving…" : s.rev ? `Saved${s.at ? " " + esc(new Date(s.at).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })) : ""}. Phone and computer match.` : "Not on the server yet.";
+    return `<div class="ptabs"><span class="lbl">Settings</span><span class="spacer"></span><button class="icon" data-x="close" title="Close">✕</button></div><div class="pbody">
+      <div><p class="lbl">This device</p><p class="x-p">Cards opens by itself here. No lock.</p></div>
+      <div><p class="lbl">Saved copy</p><p class="x-p">${sync}</p><div class="r"><button class="btn" data-x="syncnow">Check now</button><button class="btn" data-x="backup">Download backup</button></div></div>
+      <div><p class="lbl">New phone or computer</p><p class="x-p">It asks for your recovery code once.</p>
+        ${V.code ? `<div class="x-code">${esc(V.code.slice(0, 14))}<br>${esc(V.code.slice(15))}</div><p class="x-p">Your new code. The old one no longer works. Save it in 1Password now: it is not shown again.</p><div class="r"><button class="btn" data-x="copycode">Copy code</button><button class="btn go" data-x="codeok">I saved it</button></div>`
+          : `<div class="r"><button class="btn" data-x="newcode">New recovery code</button></div>`}</div>
+      <div><p class="lbl">Card list</p><div class="r"><button class="btn" data-x="import">Import a card file</button><button class="btn" data-x="restore">Restore a backup</button></div></div>
     </div>`;
   }
+  const TK = { pay: "pay", fee: "close", spend: "spend", do: "do", close: "close", switch: "close" };
+  /** A timeline date: "Feb 2", with the year ('25) when it is not this year. */
+  const tfmt = (d, today) => { const [y, m, dd] = d.split("-"); return `${MON[+m - 1]} ${+dd}${y !== today.slice(0, 4) ? " '" + y.slice(2) : ""}`; };
   function drawPanel(ctx, acts, today) {
     const el = $(ctx, "#xpanel"), d = M.data, c = V.sel && V.sel !== "@" ? d.cards.find((x) => x.id === V.sel) : null;
     const old = el.querySelector(".pbody"), top = old && V.lastSel === V.sel ? old.scrollTop : 0, anim = V.lastSel !== V.sel;
@@ -372,76 +415,71 @@
     if (V.sel === "@") el.innerHTML = settings(ctx);
     else if (!c) { el.innerHTML = ""; return; }
     else {
-      const mine = acts.filter((a) => a.card === c), st = msrState(c, d, today), tds = d.todos.filter((t) => t.cardId === c.id);
-      const tone = st && !st.allMet ? "spend" : /Close|PS/.test(c.status) ? "close" : c.status === "Keeper" ? "do" : "none";
-      const hist = [
-        ...d.payments.filter((p) => p.cardId === c.id).map((p) => ({ d: p.date, t: `Paid the ${fmt(p.forDue)} bill`, x: p.amount ? money(p.amount, c.currency) : "", del: `pay:${p.id}` })),
-        ...d.transactions.filter((t) => t.cardId === c.id).map((t) => ({ d: t.date, t: t.payee || "Spend added", x: money(t.amount, c.currency), del: `tx:${t.id}` })),
-        ...d.history.filter((x) => x.cardId === c.id).map((x) => ({ d: x.date, t: x.text, del: `hist:${x.id}` })),
-        ...(c.productSwitches || []).map((x) => ({ d: x, t: "Product switch" })), ...(c.closed ? [{ d: c.closed, t: "Card closed" }] : []),
-      ].filter((x) => x.d).sort((a, b) => b.d.localeCompare(a.d)).slice(0, 12);
-      const fee = nextFee(c, today), bonus = c.bonus && (c.bonus.expected || c.bonus.received) ? `${esc(c.bonus.expected || "Bonus")}${c.bonus.received ? " ✓ received" : ""}` : "none";
+      const id = esc(c.id), mine = acts.filter((a) => a.card === c && !a.flow), st = msrState(c, d, today), fl = flowState(d, c), tl = timeline(d, c, today), on = isActive(c);
+      const tone = st && !st.allMet ? "spend" : fl ? "close" : c.status === "Keeper" ? "do" : "none", fee = nextFee(c, today);
+      const facts = fact("Due", c.dueDay ? ord(c.dueDay) + (c.autopay ? " · autopay" : "") : "") + fact("Statement", c.statementDay ? ord(c.statementDay) : "") +
+        fact("Fee", c.fee && +c.fee.amount ? money(c.fee.amount, c.currency) + (fee ? " · " + fmt(fee, today) : "") : "") + fact("Limit", c.limit ? money(c.limit, c.currency) : "") +
+        fact("Spend", st ? `${money(st.spent, c.currency)} of ${money(st.step.amount, c.currency)}${st.allMet ? " ✓" : ""}` : "", true) +
+        fact("Bonus", c.bonus && (c.bonus.expected || c.bonus.received) ? `${esc(c.bonus.expected || "Bonus")}${c.bonus.received ? " ✓" : ""}` : "", true) +
+        fact("Points", c.points && c.points.balance != null && c.points.balance !== "" ? `${Number(c.points.balance).toLocaleString("en-CA")} ${esc(c.points.program || "")}` : "", true);
+      const flow = !fl ? "" : `<div class="x-flow t-close"><p class="lbl">${fl.kind === "close" ? "Closing" : "Switching"}${fl.total ? ` · ${fl.done}/${fl.total}` : ""}</p>
+        ${fl.steps.map((t) => `<label class="x-li ${t.done ? "done" : ""}"><input type="checkbox" data-x="tcheck" data-id="${esc(t.id)}" ${t.done ? "checked" : ""}><span>${esc(t.text)}</span></label>`).join("")}
+        <div class="r">${fl.kind === "close" ? `<button class="btn go" data-x="closed" data-id="${id}">Closed it</button><button class="btn" data-x="keep" data-id="${id}">Keep it</button>` : `<button class="btn go" data-x="ps" data-id="${id}">Switched it</button><button class="btn" data-x="flowstop">Cancel</button>`}${fl.total ? "" : `<button class="btn" data-x="flow" data-kind="${fl.kind}">Checklist</button>`}</div></div>`;
+      const te = (x, up) => `<div class="x-te ${up ? "up " : ""}t-${TK[x.k] || "note"}"><i></i><time>${tfmt(x.d, today)}</time><span>${esc(x.t)}</span><em>${esc(x.x || "")}</em>${x.del ? `<button class="x" data-x="hdel" data-id="${esc(x.del)}" aria-label="Remove">×</button>` : ""}</div>`;
       const body = V.edit ? editForm(c) : `
        <div class="x-ph"><h2>${esc(c.name)}${c.last4 ? `<small>${l4(c)}</small>` : ""}</h2><span class="x-chip t-${tone}">${esc(c.status)}</span></div>
-       ${isActive(c) ? `<div><p class="lbl">Needs you</p><div class="x-box">${mine.length ? mine.map((a) => row(a, today, "panel")).join("") : `<div class="x-ok">✓ Nothing to do on this card.</div>`}</div></div>` : ""}
-       <div class="x-facts">
-        ${fact("Payment due", c.dueDay ? `${ord(c.dueDay)} of each month${c.autopay ? " · autopay" : ""}` : "not set")}${fact("Statement closes", c.statementDay ? ord(c.statementDay) : "not set")}
-        ${fact("Annual fee", c.fee && +c.fee.amount ? `${money(c.fee.amount, c.currency)}${fee ? " · " + fmt(fee, today) : ""}` : "No fee")}${fact("Credit limit", c.limit ? money(c.limit, c.currency) : "not set")}
-        ${fact("Welcome bonus", bonus)}${fact("Points now", c.points && c.points.balance != null && c.points.balance !== "" ? `${Number(c.points.balance).toLocaleString("en-CA")} ${esc(c.points.program || "")}` : "not set")}
-       </div>
-       ${st ? `<div><p class="lbl">Spend target · ${money(st.spent, c.currency)} so far</p>${st.steps.map((s) => `<div class="x-li"><span class="x-step ${st.spent >= s.amount ? "on" : ""}">${st.spent >= s.amount ? "✓" : ""}</span><span>Spend ${money(s.amount, c.currency)}</span><span class="meta">${st.spent >= s.amount ? "done" : s.deadline ? "by " + fmt(s.deadline, today) : "no deadline"}</span></div>`).join("")}</div>` : ""}
-       <div><p class="lbl">To-dos</p>${tds.map((t) => `<div class="x-li ${t.done ? "done" : ""}"><input type="checkbox" data-x="tcheck" data-id="${esc(t.id)}" ${t.done ? "checked" : ""} aria-label="Done"><span>${esc(t.text)}</span><span class="meta">${t.due ? fmt(t.due, today) : ""}</span><button class="x" data-x="tdel" data-id="${esc(t.id)}" aria-label="Remove">×</button></div>`).join("")}
-        <div class="x-add"><input id="xtd" placeholder="Add a to-do" aria-label="Add a to-do"><input id="xtdd" type="date" title="Do it by (shows on the calendar)" aria-label="Do it by"><button class="btn" data-x="tadd" data-id="${esc(c.id)}">Add</button></div></div>
-       ${V.ps ? `<form class="x-psf" id="psForm"><p class="lbl">Product switch</p><label class="cf"><span>The card is now called</span><input name="name" value="${esc(c.name)}" required></label><label class="cf"><span>Switched on</span><input name="date" type="date" value="${today}" required></label><div class="r"><button type="button" class="btn" data-x="pscancel">Cancel</button><button class="btn pri" type="submit">Save switch</button></div></form>` : ""}
-       ${hist.length ? `<div><p class="lbl">History</p>${hist.map((x) => `<div class="x-li"><span>${esc(x.t)}</span><span class="meta">${fmt(x.d, today)}${x.x ? " · " + x.x : ""}</span>${x.del ? `<button class="x" data-x="hdel" data-id="${esc(x.del)}" aria-label="Remove">×</button>` : ""}</div>`).join("")}</div>` : ""}
-       ${c.notes ? `<div><p class="lbl">Notes</p><p class="x-notes">${esc(c.notes)}</p></div>` : ""}
-       <div class="r"><button class="btn" data-x="edit">Edit card</button>${isActive(c) && !V.ps ? `<button class="btn" data-x="ps" data-id="${esc(c.id)}">Product switch</button>` : ""}</div>`;
+       ${mine.length ? `<div class="x-box">${mine.map((a) => row(a, today, "panel")).join("")}</div>` : ""}
+       ${flow}
+       ${V.ps ? `<form class="x-psf" id="psForm"><label class="cf"><span>New name</span><input name="name" value="${esc(c.name)}" required></label><label class="cf"><span>Switched on</span><input name="date" type="date" value="${today}" required></label><div class="r"><button type="button" class="btn" data-x="pscancel">Cancel</button><button class="btn pri" type="submit">Save switch</button></div></form>` : ""}
+       ${facts ? `<div class="x-facts">${facts}</div>` : ""}
+       <div><div class="x-th"><p class="lbl">Timeline</p><button class="x-tx" data-x="note">+ Note</button></div>
+        ${V.note ? `<div class="x-add"><input id="xnote" placeholder="What happened" aria-label="Note for the timeline"><input id="xnoted" type="date" value="${today}" aria-label="Date"><button class="btn" data-x="noteadd">Add</button></div>` : ""}
+        <div class="x-tl">${tl.next.slice().reverse().map((x) => te(x, true)).join("")}<div class="x-te now"><i></i><time>Today</time></div>${tl.past.map((x) => te(x)).join("")}</div></div>
+       ${c.notes ? `<p class="x-notes">${esc(c.notes)}</p>` : ""}
+       <div class="r">${on && !(fl && fl.kind === "close") ? `<button class="btn" data-x="flow" data-kind="close">Close card</button>` : ""}${on && !(fl && fl.kind === "switch") && !V.ps ? `<button class="btn" data-x="flow" data-kind="switch">Product switch</button>` : ""}<button class="btn" data-x="edit">Edit</button></div>`;
       el.innerHTML = `<div class="ptabs"><span class="lbl">${esc(c.issuer || "Card")} · ${esc(c.owner)}</span><span class="spacer"></span><button class="icon" data-x="close" title="Close">✕</button></div><div class="pbody">${body}</div>`;
     }
     const pb = el.querySelector(".pbody"); if (pb) { if (anim) pb.classList.add("in"); else pb.scrollTop = top; }
   }
 
-  /* ---------- the lock screen ---------- */
+  /* ---------- first set-up, and opening on a new device ---------- */
   function lockHTML(ctx, st) {
-    const env = envOf(ctx.store), can = VLT.canPasskey(), hasPk = !!(env && (env.pk || []).length), v = V.lv || (st === "none" ? "check" : hasPk && can ? "locked" : "recover");
+    const env = envOf(ctx.store), pk = VLT.canPasskey() && !!(env && (env.pk || []).length), v = st === "opening" ? "opening" : V.lv || (st === "none" ? "check" : "recover");
     const msg = V.msg ? `<p class="x-msg">${esc(V.msg)}</p>` : "", back = `<button class="txt x-back" data-page="cal">‹ Back to the calendar</button>`;
     const file = `<button class="txt" data-x="restore">Restore from a backup file</button>`;
     const box = (h) => `<div class="x-lock"><div class="x-lk">${h}${back}</div></div>`;
-    if (v === "check") return box(`<div class="ico">🔐</div><h2>Cards</h2><p>Checking for your cards…</p>`);
-    if (v === "setup") return box(`<div class="ico">🔐</div><h2>Set up Cards</h2><p>Your card details are scrambled on this device before they are saved anywhere. Only last 4 digits are ever kept.</p>${msg}
-      <div class="x-ways"><div>🔑<span><b>Passkey</b>: Touch ID or Face ID, every day</span></div><div>🗝️<span><b>Recovery code</b>: your spare key if the passkey is lost</span></div><div>💾<span><b>Backup file</b>: a locked copy you can download any time</span></div></div>
+    if (v === "opening") return box(`<div class="ico">💳</div><h2>Cards</h2><p>Opening your cards…</p>`);
+    if (v === "check") return box(`<div class="ico">💳</div><h2>Cards</h2><p>Checking for your cards…</p>`);
+    if (v === "setup") return box(`<div class="ico">💳</div><h2>Set up Cards</h2><p>Cards opens by itself on this device. The copy saved on the Day Hub server is scrambled. Only last 4 digits are ever kept.</p>${msg}
       <button class="btn go" data-x="setup">Set up</button>${M.syncErr ? `<button class="btn" data-x="recheck">Check the server again</button>` : ""}${file}`);
-    if (v === "code") return box(`<div class="ico">🗝️</div><h2>Save your recovery code</h2><p>This is your way back in if you ever lose your passkey. It is shown once. Keep it in 1Password or on paper.</p>
+    if (v === "code") return box(`<div class="ico">🗝️</div><h2>Save your recovery code</h2><p>A new phone or computer needs this code once to open your cards. It is shown once. Keep it in 1Password.</p>
       <div class="x-code">${esc(M.pending.code.slice(0, 14))}<br>${esc(M.pending.code.slice(15))}</div>${msg}
       <button class="btn" data-x="copycode">Copy code</button><button class="btn go" data-x="savedcode">I saved it</button>`);
-    if (v === "passkey") return box(`<div class="ico">🔑</div><h2>Add your passkey</h2><p>From now on you open Cards on this device with Touch ID or Face ID. Your device may ask you twice.</p>${msg}
-      <button class="btn go" data-x="makepk">Add a passkey</button><button class="txt" data-x="skippk">Not now, I will use the recovery code</button>`);
-    if (v === "recover") return box(`<div class="ico">🗝️</div><h2>${hasPk && can ? "Recovery code" : "Cards are locked"}</h2><p>${hasPk && can ? "Type the code you saved when you set up Cards. It opens your cards and lets you make a new passkey." : "Type your recovery code to open your cards" + (can ? ". You can add a passkey for this device right after." : " (this browser cannot use a passkey).")}</p>${msg}
-      <input id="xrc" placeholder="XXXX-XXXX-XXXX-XXXX-XXXX-XXXX" autocomplete="off" autocapitalize="characters" spellcheck="false" aria-label="Recovery code"><button class="btn go" data-x="usecode">Unlock</button>
-      ${hasPk && can ? `<button class="txt" data-x="tolock">Back</button>` : ""}${file}<button class="txt" data-x="toreset">Lost the code too? Start over</button>`);
-    if (v === "reset") return box(`<div class="ico">🧹</div><h2>Start over?</h2><p>Without a passkey or the recovery code nobody can open the locked cards, not even this app. Starting over clears them from this device and replaces the server copy. You then set up again and bring your card list back in from your starting file (cards-seed.json on your Mac). Changes made since that file are lost.</p>
+    if (v === "reset") return box(`<div class="ico">🧹</div><h2>Start over?</h2><p>Without the recovery code nobody can open the saved cards, not even this app. Starting over clears them from this device and replaces the server copy. You then set up again and import your starting file (cards-seed.json on your Mac). Changes made since that file are lost.</p>
       <button class="btn del" data-x="reset">Yes, clear and start over</button><button class="txt" data-x="tolock">Back</button>`);
-    return box(`<div class="ico">🔒</div><h2>Cards are locked</h2><p>Your card details stay scrambled until you unlock them.</p>${msg}
-      <button class="btn go" data-x="unlock">Unlock with passkey</button><div class="meta">Touch ID on your Mac, Face ID on your phone</div>
-      <button class="txt" data-x="torecover">Lost your passkey? Use your recovery code</button>`);
+    return box(`<div class="ico">🗝️</div><h2>Open Cards on this device</h2><p>${pk ? "Use your passkey or your recovery code, once." : "Type your recovery code once."} After that, Cards opens by itself here.</p>${msg}
+      ${pk ? `<button class="btn go" data-x="unlock">Use my passkey</button>` : ""}<input id="xrc" placeholder="XXXX-XXXX-XXXX-XXXX-XXXX-XXXX" autocomplete="off" autocapitalize="characters" spellcheck="false" aria-label="Recovery code"><button class="btn ${pk ? "" : "go"}" data-x="usecode">Open with the code</button>
+      ${file}<button class="txt" data-x="toreset">Lost the code? Start over</button>`);
   }
   const SHELL = `<aside class="x-left" id="xleft"></aside>
     <div class="x-main"><div class="bar"><button class="icon x-back" data-page="cal" title="Calendar">‹</button><button class="icon x-menu" data-x="list" title="All cards">☰</button><h1>Cards</h1><span class="status" id="xstatus"></span><span class="spacer"></span>
-      <div class="seg" id="xown"></div><button class="icon" data-x="settings" title="Lock and copies">⚙</button><button class="icon" data-x="lock" title="Lock now">🔒</button><button class="btn pri" data-x="new">+ Card</button></div>
+      <div class="seg" id="xown"></div><button class="icon" data-x="settings" title="Settings">⚙</button><button class="btn pri" data-x="new">+ Card</button></div>
       <div class="x-scroll"><div class="x-w" id="xmain"></div></div></div>
     <aside class="x-panel" id="xpanel"></aside><div id="xtoast"></div>`;
 
-  /** Draws the whole page into ctx.page(). Locked or not set up: only the lock screen. */
+  /** Draws the whole page into ctx.page(). Not set up, or a device with no key yet: the set-up screen only. */
   function draw(ctx, passive) {
     const pg = ctx.page(), st = state(ctx.store);
     /* a passive redraw (the calendar's own ticks) never wipes something he is in the middle of typing */
-    if (passive && pg.classList.contains("cards") && (st === "open" && V.lv !== "passkey") === !!pg.querySelector("#xmain")) {
+    if (passive && pg.classList.contains("cards") && (st === "open") === !!pg.querySelector("#xmain")) {
       const f = root.document.activeElement;
-      if (pg.querySelector("#cardForm,#psForm") || [...pg.querySelectorAll("#xrc,#xtd,.xamt")].some((i) => i.value) || (f && pg.contains(f) && /INPUT|TEXTAREA|SELECT/.test(f.tagName))) return;
+      if (pg.querySelector("#cardForm,#psForm") || [...pg.querySelectorAll("#xrc,#xnote,.xamt")].some((i) => i.value) || (f && pg.contains(f) && /INPUT|TEXTAREA|SELECT/.test(f.tagName))) return;
     }
-    if (!VLT || !root.crypto || !root.crypto.subtle) { pg.className = "page cards locked"; pg.innerHTML = `<div class="x-lock"><div class="x-lk"><h2>Cards</h2><p>This browser cannot lock your cards (it needs a secure https page), so they stay closed here.</p></div></div>`; return; }
-    if (st !== "open" || V.lv === "passkey") {
-      pg.className = "page cards locked"; pg.innerHTML = lockHTML(ctx, st);
+    if (!VLT || !root.crypto || !root.crypto.subtle) { pg.className = "page cards locked"; pg.innerHTML = `<div class="x-lock"><div class="x-lk"><h2>Cards</h2><p>This browser cannot open your cards (it needs a secure https page).</p></div></div>`; return; }
+    if (st !== "open") {
+      pg.className = "page cards locked";
+      if (st === "locked" && !V.lv && ctx.store.get(K.key)) { pg.innerHTML = lockHTML(ctx, "opening"); wake(ctx); return; }
+      pg.innerHTML = lockHTML(ctx, st);
       if (st === "none" && !V.lv) firstCheck(ctx);
       else if (st === "locked" && !V.lv) refresh(ctx);
       const i = pg.querySelector("#xrc"); if (i && root.matchMedia && root.matchMedia("(min-width:761px)").matches) i.focus();
@@ -452,7 +490,7 @@
     pg.className = "page cards" + (V.sel ? " sel" : " nosel") + (V.list ? " xlist" : "");
     const today = ctx.today(), acts = actions(M.data, today, V.own);
     drawLeft(ctx, acts, today); drawMain(ctx, acts, today); drawPanel(ctx, acts, today);
-    const amt = pg.querySelector(V.spendIn === "panel" ? "#xpanel .xamt" : "#xmain .xamt"); if (amt) amt.focus();
+    const amt = pg.querySelector(V.spendIn === "panel" ? "#xpanel .xamt" : "#xmain .xamt") || pg.querySelector("#xnote"); if (amt) amt.focus();
   }
   /** First visit on a device: see whether the server already holds his locked cards before offering to set up. */
   function firstCheck(ctx) {
@@ -470,35 +508,29 @@
   const toastLater = (ctx, msg) => setTimeout(() => toast(ctx, msg), 30);
   const fail = (ctx, e) => { V.msg = e && e.name === "NotAllowedError" ? "That was cancelled or timed out. Try again." : (e && e.message) || String(e); ctx.redraw(); };
   const copy = async (text) => { try { await root.navigator.clipboard.writeText(text); return "Copied. Paste it into 1Password now."; } catch (e) { return "Could not copy. Select the code and copy it by hand."; } };
-  const UNLOCKED = "Unlocked. Locks again after 5 minutes idle.";
+  const OPENED = "Open. Cards now opens by itself on this device.";
 
-  /* the lock screen's buttons */
+  /* the set-up screen's buttons */
   async function lockAct(ctx, act, b) {
-    const store = ctx.store, offerPk = () => { if (VLT.canPasskey() && !store.get(K.nopk)) V.lv = "passkey"; else toastLater(ctx, UNLOCKED); };
+    const store = ctx.store;
     if (act === "setup") { M.pending = await VLT.create({ since: ctx.today(), ...normalize(parse(store.get(K.old) || "null")) }); V.lv = "code"; V.msg = ""; }
     else if (act === "copycode") V.msg = await copy(M.pending.code);
     else if (act === "savedcode") {
-      const p = M.pending; setEnv(store, p.env); store.set(K.old, null); store.set(K.nopk, null);
-      opened(ctx, p.ses, await VLT.read(p.ses, p.env)); M.pending = null; markDirty(store); push(ctx); offerPk();
-    } else if (act === "makepk") {
-      b.textContent = "Waiting for your device…";
-      try { const pk = await VLT.makePasskey(M.env); await envEdit(ctx, (env) => VLT.addPasskey(env, M.ses, pk.id, pk.out, root.navigator.platform || "")); store.set(K.nopk, null); V.lv = null; V.msg = ""; toastLater(ctx, "Passkey added. Cards lock again after 5 minutes idle."); }
-      catch (e) { if (e.message !== "no-prf") return fail(ctx, e); store.set(K.nopk, "1"); V.lv = null; V.msg = ""; toastLater(ctx, "This device's passkeys cannot lock Cards. The recovery code opens them here."); }
-    } else if (act === "skippk") { store.set(K.nopk, "1"); V.lv = null; V.msg = ""; }
-    else if (act === "unlock") {
+      const p = M.pending; setEnv(store, p.env); store.set(K.old, null);
+      opened(ctx, p.ses, await VLT.read(p.ses, p.env)); M.pending = null; markDirty(store); push(ctx);
+    } else if (act === "unlock") {
       b.textContent = "Checking…";
-      try { const pk = await VLT.askPasskey(M.env), o = await VLT.openWithPrf(M.env, pk.id, pk.out); opened(ctx, o.ses, o.data); refresh(ctx, true); toastLater(ctx, UNLOCKED); }
+      try { const pk = await VLT.askPasskey(M.env), o = await VLT.openWithPrf(M.env, pk.id, pk.out); opened(ctx, o.ses, o.data); refresh(ctx, true); toastLater(ctx, OPENED); }
       catch (e) { return fail(ctx, e.message === "no-prf" ? new Error("This device's passkey cannot open Cards. Use your recovery code.") : e); }
     } else if (act === "usecode") {
       const code = (ctx.page().querySelector("#xrc") || {}).value || "";
       if (!VLT.codeOk(code)) return fail(ctx, new Error("That does not look like a recovery code: it is 24 letters and numbers."));
       b.textContent = "Checking…";
-      try { const o = await VLT.openWithCode(M.env, code); opened(ctx, o.ses, o.data); refresh(ctx, true); offerPk(); }
+      try { const o = await VLT.openWithCode(M.env, code); opened(ctx, o.ses, o.data); refresh(ctx, true); toastLater(ctx, OPENED); }
       catch (e) { return fail(ctx, new Error(e.message === "wrong code" ? "That code does not open these cards. Check it and try again." : e.message)); }
-    } else if (act === "torecover") { V.lv = "recover"; V.msg = ""; }
-    else if (act === "tolock") { V.lv = null; V.msg = ""; }
+    } else if (act === "tolock") { V.lv = null; V.msg = ""; }
     else if (act === "toreset") { V.lv = "reset"; V.msg = ""; }
-    else if (act === "reset") { setEnv(store, null); store.set(K.digest, null); setSync(store, { rev: 0, dirty: false, at: "", fresh: true }); M.pending = null; V.lv = "setup"; V.msg = "Cleared. Set up again, then import your card file."; }
+    else if (act === "reset") { setEnv(store, null); store.set(K.key, null); store.set(K.digest, null); setSync(store, { rev: 0, dirty: false, at: "", fresh: true }); M.pending = null; V.lv = "setup"; V.msg = "Cleared. Set up again, then import your card file."; }
     else if (act === "recheck") { V.lv = null; V.msg = ""; M.syncErr = ""; }
     else if (act === "restore") return pickFile(ctx);
     ctx.redraw();
@@ -510,10 +542,10 @@
       try {
         const j = JSON.parse(await inp.files[0].text());
         if (VLT.isEnvelope(j)) {
-          if (envOf(ctx.store) && !root.confirm("Replace the locked cards on this device with this backup file? You will unlock it with the passkey or recovery code it was made with.")) return;
-          lock(null); setEnv(ctx.store, j); markDirty(ctx.store); V.msg = "Backup loaded. Unlock it to carry on.";
+          if (envOf(ctx.store) && !root.confirm("Replace the cards on this device with this backup file? If it was made with another set-up, it needs that set-up's recovery code.")) return;
+          lock(null); setEnv(ctx.store, j); markDirty(ctx.store); V.msg = "Backup loaded.";
         } else {
-          if (!M.data) throw new Error("that is not a locked backup. Unlock first to import a card list");
+          if (!M.data) throw new Error("that is not a backup file. Open your cards first to import a card list");
           const n = normalize(j); if (!n.cards.length) throw new Error("no cards in that file");
           if (M.data.cards.length && !root.confirm(`Replace the ${M.data.cards.length} cards here with the ${n.cards.length} in this file?`)) return;
           V.sel = null; return change(ctx, (d) => { for (const k of LISTS) d[k] = n[k]; d.since = n.since || ctx.today(); }, `Imported ${n.cards.length} cards`);
@@ -537,41 +569,40 @@
   function onClick(e, ctx) {
     const b = e.target.closest("[data-x]"); if (!b) return false;
     const act = b.dataset.x, id = b.dataset.id, today = ctx.today();
-    if (!M.data || V.lv === "passkey") { lockAct(ctx, act, b).catch((err) => fail(ctx, err)); return true; }
+    if (!M.data) { lockAct(ctx, act, b).catch((err) => fail(ctx, err)); return true; }
     const d = M.data, card = (x) => d.cards.find((c) => c.id === x), sel = card(V.sel);
     if (act === "own") V.own = id;
-    else if (act === "open") { V.sel = id; V.edit = false; V.ps = false; V.list = false; }
-    else if (act === "close") { V.sel = null; V.edit = false; V.ps = false; V.code = ""; }
+    else if (act === "open") { V.sel = id; V.edit = false; V.ps = false; V.note = false; V.list = false; }
+    else if (act === "close") { V.sel = null; V.edit = false; V.ps = false; V.note = false; V.code = ""; }
     else if (act === "settings") { V.sel = V.sel === "@" ? null : "@"; V.edit = false; V.list = false; }
     else if (act === "list") V.list = !V.list;
     else if (act === "showclosed") V.closed = !V.closed;
-    else if (act === "lock") return lock(ctx), true;
     else if (act === "spend") { V.spend = id; V.spendIn = b.closest("#xpanel") ? "panel" : "main"; }
     else if (act === "addspend") return addSpend(ctx, id, b.closest(".x-bt")), true;
     else if (act === "paid") return rowChange(ctx, b, (x) => x.payments.push({ id: uid("p"), cardId: id, date: today, amount: null, forDue: b.dataset.due }), `Paid: ${card(id).name}`), true;
-    else if (act === "closed") return rowChange(ctx, b, (x) => { const c = x.cards.find((y) => y.id === id); c.status = "Closed"; c.closed = today; }, `Closed: ${card(id).name}`), true;
-    else if (act === "keep") return rowChange(ctx, b, (x) => { x.cards.find((y) => y.id === id).status = "Keeper"; x.history.push({ id: uid("h"), cardId: id, date: today, text: "Kept another year" }); }, `Keeping ${card(id).name}. Its fee stays on the calendar.`), true;
+    else if (act === "closed") return rowChange(ctx, b, (x) => { const c = x.cards.find((y) => y.id === id); c.status = "Closed"; c.closed = today; tidyFlow(x, c); }, `Closed: ${card(id).name}`), true;
+    else if (act === "keep") return rowChange(ctx, b, (x) => { const c = x.cards.find((y) => y.id === id); c.status = "Keeper"; tidyFlow(x, c); x.history.push({ id: uid("h"), cardId: id, date: today, text: "Kept another year" }); }, `Keeping ${card(id).name}`), true;
+    else if (act === "flow" && sel) return change(ctx, (x) => startFlow(x, sel.id, b.dataset.kind, today), b.dataset.kind === "close" ? "Closing checklist ready" : "Switch checklist ready"), true;
+    else if (act === "flowstop" && sel) return change(ctx, (x) => { const c = x.cards.find((y) => y.id === sel.id); c.status = "Open"; tidyFlow(x, c); }, "Switch cancelled"), true;
     else if (act === "ps") { V.sel = id; V.ps = true; V.edit = false; V.list = false; }
     else if (act === "pscancel") V.ps = false;
-    else if (act === "tdone") return rowChange(ctx, b, (x) => { x.todos.find((t) => t.id === id).done = true; }, "Done ✓"), true;
-    else if (act === "tcheck") return change(ctx, (x) => { const t = x.todos.find((y) => y.id === id); t.done = !t.done; }), true;
-    else if (act === "tdel") return change(ctx, (x) => { x.todos = x.todos.filter((t) => t.id !== id); }, "To-do removed"), true;
-    else if (act === "tadd") { const i = $(ctx, "#xtd"), v = i.value.trim(), due = $(ctx, "#xtdd").value || null; if (!v) return i.focus(), true; return change(ctx, (x) => x.todos.push({ id: uid("t"), cardId: id, text: v, done: false, due })), true; }
-    else if (act === "hdel") { const [k, hid] = id.split(":"), list = { pay: "payments", tx: "transactions", hist: "history" }[k]; return change(ctx, (x) => { x[list] = x[list].filter((y) => y.id !== hid); }, "Removed"), true; }
+    else if (act === "tdone") return rowChange(ctx, b, (x) => { const t = x.todos.find((y) => y.id === id); t.done = true; t.doneAt = today; }, "Done ✓"), true;
+    else if (act === "tcheck") return change(ctx, (x) => { const t = x.todos.find((y) => y.id === id); t.done = !t.done; t.doneAt = t.done ? today : null; }), true;
+    else if (act === "note") V.note = !V.note;
+    else if (act === "noteadd" && sel) {
+      const i = $(ctx, "#xnote"), text = i.value.trim(), date = $(ctx, "#xnoted").value || today; if (!text) return i.focus(), true;
+      V.note = false; return change(ctx, (x) => x.history.push({ id: uid("h"), cardId: sel.id, date, text })), true;
+    }
+    else if (act === "hdel") { const [k, hid] = id.split(":"), list = { pay: "payments", tx: "transactions", hist: "history", todo: "todos" }[k]; return change(ctx, (x) => { x[list] = x[list].filter((y) => y.id !== hid); }, "Removed"), true; }
     else if (act === "undo") { if (V.undo) { M.data = normalize(JSON.parse(V.undo)); V.undo = null; persist(ctx); $(ctx, "#xtoast").innerHTML = ""; } }
-    else if (act === "edit") { V.edit = true; V.ps = false; }
+    else if (act === "edit") { V.edit = true; V.ps = false; V.note = false; }
     else if (act === "cancel") { V.edit = false; if (sel && sel.name === "New card" && !sel.issuer && !sel.last4) return change(ctx, (x) => { x.cards = x.cards.filter((c) => c.id !== sel.id); V.sel = null; }), true; }
     else if (act === "new") { const n = blank(V.own === "Caney" ? "Caney" : "Junyan"); V.sel = n.id; V.edit = true; V.ps = false; V.list = false; return change(ctx, (x) => x.cards.push(n)), true; }
     else if (act === "del" && sel) { if (!root.confirm(`Delete ${sel.name}? Its to-dos, spend and payments go too.`)) return true; V.edit = false; V.sel = null; return change(ctx, (x) => { for (const k of LISTS) x[k] = x[k].filter((y) => k === "cards" ? y.id !== sel.id : y.cardId !== sel.id); }, `Deleted ${sel.name}`), true; }
     else if (act === "import" || act === "restore") return pickFile(ctx), true;
-    else if (act === "backup") { const u = URL.createObjectURL(new Blob([JSON.stringify(M.env)], { type: "application/json" })), l = root.document.createElement("a"); l.href = u; l.download = `cards-locked-backup-${today}.json`; l.click(); setTimeout(() => URL.revokeObjectURL(u), 1000); toast(ctx, "Locked backup downloaded"); return true; }
+    else if (act === "backup") { const u = URL.createObjectURL(new Blob([JSON.stringify(M.env)], { type: "application/json" })), l = root.document.createElement("a"); l.href = u; l.download = `cards-backup-${today}.json`; l.click(); setTimeout(() => URL.revokeObjectURL(u), 1000); toast(ctx, "Backup downloaded"); return true; }
     else if (act === "syncnow") { b.textContent = "Checking…"; refresh(ctx, true).then(() => { if (!V.conflict && !M.syncErr && syncOf(ctx.store).dirty) return push(ctx); }).then(() => ctx.redraw()); return true; }
-    else if (act === "addpk") {
-      b.textContent = "Waiting for your device…";
-      VLT.makePasskey(M.env).then((pk) => envEdit(ctx, (env) => VLT.addPasskey(env, M.ses, pk.id, pk.out, root.navigator.platform || ""))).then(() => { ctx.store.set(K.nopk, null); ctx.redraw(); toast(ctx, "Passkey added for this device"); })
-        .catch((err) => { ctx.redraw(); toast(ctx, err.message === "no-prf" ? "This device's passkeys cannot lock Cards. Keep using the recovery code here." : err.name === "NotAllowedError" ? "That was cancelled or timed out." : "Could not add a passkey: " + err.message); });
-      return true;
-    } else if (act === "newcode") {
+    else if (act === "newcode") {
       if (!root.confirm("Make a new recovery code? The old one stops working, on every device.")) return true;
       let made = ""; envEdit(ctx, async (env) => { const r = await VLT.newCode(env, M.ses); made = r.code; return r.env; }).then(() => { V.code = made; ctx.redraw(); }).catch((err) => toast(ctx, "Could not make a new code: " + err.message));
       return true;
@@ -589,13 +620,13 @@
     const fd = Object.fromEntries(new FormData(form)), num = (v) => (v === "" || v == null ? null : +v), today = ctx.today();
     if (form.id === "psForm") {
       V.ps = false; const name = fd.name.trim() || c.name;
-      change(ctx, (d) => { c.productSwitches = [...(c.productSwitches || []), fd.date].sort(); if (name !== c.name) { d.history.push({ id: uid("h"), cardId: c.id, date: fd.date, text: `Was ${c.name}` }); c.name = name; } if (c.status === "Need to PS") c.status = "Open"; }, `Switched: ${name}`);
+      change(ctx, (d) => { c.productSwitches = [...(c.productSwitches || []), fd.date].sort(); if (name !== c.name) { d.history.push({ id: uid("h"), cardId: c.id, date: fd.date, text: `Was ${c.name}` }); c.name = name; } if (c.status === "Need to PS") c.status = "Open"; tidyFlow(d, c); }, `Switched: ${name}`);
       return true;
     }
     V.edit = false;
     change(ctx, (d) => {
       Object.assign(c, { name: fd.name.trim() || "Card", last4: fd.last4.replace(/\D/g, "").slice(-4), issuer: fd.issuer.trim(), owner: fd.owner, status: fd.status, currency: fd.currency,
-        limit: num(fd.limit), statementDay: num(fd.statementDay), dueDay: num(fd.dueDay), autopay: !!fd.autopay, closed: fd.closed || (fd.status === "Closed" && !c.closed ? today : null), notes: fd.notes,
+        limit: num(fd.limit), statementDay: num(fd.statementDay), dueDay: num(fd.dueDay), autopay: !!fd.autopay, closed: fd.closed || (fd.status === "Closed" && !c.closed ? today : null), opened: fd.opened || null, notes: fd.notes,
         fee: num(fd.feeAmount) ? { amount: num(fd.feeAmount), date: fd.feeDate || null } : null,
         bonus: { ...(c.bonus || {}), expected: fd.bonusExpected, received: !!fd.bonusReceived },
         points: { program: fd.pointsProgram, balance: num(fd.pointsBalance), asOf: num(fd.pointsBalance) != null ? today : null } });
@@ -605,6 +636,7 @@
         /* a hand-typed "spend so far" restarts the count from now; left alone, the spend added since still counts */
         c.msr = old && Math.abs(old.spent - base) < 0.005 ? { ...c.msr, steps } : { steps, base, baseDate: today, baseAt: Date.now() };
       } else c.msr = null;
+      tidyFlow(d, c);
     }, `Saved ${fd.name.trim() || "card"}`);
     return true;
   }
@@ -618,11 +650,11 @@
     if (e.key === "Enter" && t.id === "xrc") { const b = ctx.page().querySelector('[data-x="usecode"]'); if (b) b.click(); return true; }
     if (!M.data) return false;
     if (e.key === "Enter" && t.classList && t.classList.contains("xamt")) { addSpend(ctx, V.spend, t.closest(".x-bt")); return true; }
-    if (e.key === "Enter" && (t.id === "xtd" || t.id === "xtdd")) { ctx.page().querySelector('[data-x="tadd"]').click(); return true; }
-    if (e.key === "Escape") { if (V.spend) V.spend = null; else if (V.edit || V.ps) { V.edit = false; V.ps = false; } else if (V.list) V.list = false; else if (V.sel) V.sel = null; else return false; if (t.blur) t.blur(); ctx.redraw(); return true; }
+    if (e.key === "Enter" && (t.id === "xnote" || t.id === "xnoted")) { ctx.page().querySelector('[data-x="noteadd"]').click(); return true; }
+    if (e.key === "Escape") { if (V.spend) V.spend = null; else if (V.note) V.note = false; else if (V.edit || V.ps) { V.edit = false; V.ps = false; } else if (V.list) V.list = false; else if (V.sel) V.sel = null; else return false; if (t.blur) t.blur(); ctx.redraw(); return true; }
     return false;
   }
 
-  root.Cards = { STATUSES, normalize, msrState, events, actions, digest, digestEvents, dueNow, nextFee, isActive, hasAny, calEvents, draw, onClick, onSubmit, onInput, onKey, refresh, lock,
-    isOpen: () => !!M.data, view: V, select: (id) => { if (M.data && id) { V.sel = id; V.edit = false; V.ps = false; } } };
+  root.Cards = { STATUSES, FLOWS, normalize, msrState, events, actions, flowState, startFlow, tidyFlow, timeline, digest, digestEvents, dueNow, nextFee, isActive, hasAny, calEvents, draw, onClick, onSubmit, onInput, onKey, refresh, wake,
+    isOpen: () => !!M.data, view: V, select: (id) => { if (M.data && id) { V.sel = id; V.edit = false; V.ps = false; V.note = false; } } };
 })(typeof window !== "undefined" ? window : globalThis);
