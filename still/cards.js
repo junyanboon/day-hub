@@ -300,7 +300,7 @@
     const d = M.data, q = V.q.trim().toLowerCase(), own = (c) => V.own === "all" || c.owner === V.own;
     const all = d.cards.filter((c) => own(c) && (!q || `${c.issuer} ${c.name} ${c.last4}`.toLowerCase().includes(q)));
     const order = (c) => { const i = acts.findIndex((a) => a.card === c); return i < 0 ? 1e6 : i; };
-    const line = (c) => { const [t, h] = hint(c, acts, d, today); return `<button class="x-c t-${t} ${t !== "none" ? "has" : ""} ${V.sel === c.id ? "sel" : ""} ${isActive(c) ? "" : "closed"}" data-x="open" data-id="${esc(c.id)}"><i class="dot"></i><span class="nm">${esc(c.name)}${c.last4 ? `<small>${l4(c)}</small>` : ""}</span><span class="hint">${esc(h)}</span></button>`; };
+    const line = (c) => { const [t, h] = hint(c, acts, d, today); return `<button class="x-c t-${t} ${t !== "none" ? "has" : ""} ${V.sel === c.id ? "sel" : ""} ${isActive(c) ? "" : "closed"}" data-x="open" data-id="${esc(c.id)}"><i class="xdot"></i><span class="nm"><span class="xn">${esc(c.name)}</span>${c.last4 ? `<small>${l4(c)}</small>` : ""}</span><span class="hint">${esc(h)}</span></button>`; };
     let h = `<div class="x-lh"><span>All cards</span><button class="icon" data-x="list" title="Back">✕</button></div><label class="x-find"><span aria-hidden="true">🔍</span><input id="xq" placeholder="Find a card" value="${esc(V.q)}" aria-label="Find a card"></label>`;
     for (const o of ["Junyan", "Caney"]) {
       const list = all.filter((c) => c.owner === o && isActive(c)).sort((a, b) => order(a) - order(b) || a.name.localeCompare(b.name));

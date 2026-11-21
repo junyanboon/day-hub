@@ -2,6 +2,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import "../cards.js";
+import { readFileSync } from "node:fs";
 const { events, msrState, normalize, actions, dueNow, digest, digestEvents } = globalThis.Cards;
 const card = (o) => ({ id: "c1", owner: "Junyan", name: "Avion Biz", last4: "6637", status: "MSR", currency: "CAD", dueDay: 31, fee: { amount: 175, date: "12-01" }, ...o });
 
@@ -71,4 +72,10 @@ test("bills that fell due before he started tracking here never show as late", (
   assert.equal(dueNow(d.cards[0], d, "2026-12-02").day, "2026-11-28");
   d.since = "2026-12-01";
   assert.equal(dueNow(d.cards[0], d, "2026-12-02").day, "2026-12-28");
+});
+test("the card list's marker is not called \"dot\": a browser extension restyles that name and hid every card name", () => {
+  const src = readFileSync(new URL("../cards.js", import.meta.url), "utf8"), html = readFileSync(new URL("../calendar.html", import.meta.url), "utf8");
+  assert.doesNotMatch(src, /class="dot"/);
+  assert.match(src, /<i class="xdot"><\/i>/);
+  assert.match(html, /\.x-c \.xdot\{/);
 });
