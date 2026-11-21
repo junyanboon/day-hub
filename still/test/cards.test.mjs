@@ -3,7 +3,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import "../cards.js";
 import { readFileSync } from "node:fs";
-const { events, msrState, normalize, actions, dueNow, digest, digestEvents } = globalThis.Cards;
+const { events, msrState, normalize, actions, dueNow, digest, digestEvents, FLOWS, flowState, startFlow, tidyFlow, timeline } = globalThis.Cards;
 const card = (o) => ({ id: "c1", owner: "Junyan", name: "Avion Biz", last4: "6637", status: "MSR", currency: "CAD", dueDay: 31, fee: { amount: 175, date: "12-01" }, ...o });
 
 test("due dates clamp to the month's last day and skip closed cards", () => {
@@ -78,4 +78,49 @@ test("the card list's marker is not called \"dot\": a browser extension restyles
   assert.doesNotMatch(src, /class="dot"/);
   assert.match(src, /<i class="xdot"><\/i>/);
   assert.match(html, /\.x-c \.xdot\{/);
+});
+
+/* ---- close and switch checklists, the timeline, no lock (Junyan, 2026-11-20) ---- */
+test("Close card sets up a short checklist, and the card stays one row that walks through it", () => {
+  const d = book();
+  assert.equal(startFlow(d, "c1", "close", "2026-11-20"), true);
+  assert.equal(d.cards[0].status, "Need to Close");
+  const fl = flowState(d, d.cards[0]);
+  assert.deepEqual([fl.kind, fl.done, fl.total, fl.next.text], ["close", 0, FLOWS.close.length, FLOWS.close[0]]);
+  const a = actions(d, "2026-11-20", "Junyan");
+  assert.deepEqual(a.map((x) => [x.t, x.day]), [["pay", "2026-11-28"], ["close", "2026-12-01"], ["spend", "2026-12-09"]], "dated by the fee; the steps are not extra Do rows");
+  fl.next.done = true;
+  assert.equal(actions(d, "2026-11-20", "Junyan").find((x) => x.t === "close").flow.next.text, FLOWS.close[1]);
+  assert.equal(startFlow(d, "c3", "close", "2026-11-20"), false, "a closed card cannot start one");
+});
+test("Product switch sets up its own checklist; pressing it twice does not double it; keeping the card clears it", () => {
+  const d = book();
+  startFlow(d, "c1", "switch", "2026-11-20"); startFlow(d, "c1", "switch", "2026-11-21");
+  assert.equal(d.cards[0].status, "Need to PS");
+  assert.equal(d.todos.filter((t) => t.flow === "switch").length, FLOWS.switch.length);
+  d.todos.find((t) => t.flow === "switch").done = true;
+  d.cards[0].status = "Keeper"; tidyFlow(d, d.cards[0]);
+  assert.deepEqual(d.todos.filter((t) => t.flow).map((t) => t.done), [true], "only the finished step stays, for the timeline");
+  assert.equal(flowState(d, d.cards[0]), null);
+});
+test("the checklists stay very short", () => {
+  for (const k of ["close", "switch"]) { assert.ok(FLOWS[k].length <= 4, k); for (const s of FLOWS[k]) assert.ok(s.length <= 36, s); }
+});
+test("a card's timeline: what is coming soonest first, what happened newest first", () => {
+  const d = book(), c = d.cards[0];
+  Object.assign(c, { opened: "2024-05-01", productSwitches: ["2025-02-02"] });
+  d.payments.push({ id: "p0", cardId: "c1", date: "2026-10-27", forDue: "2026-10-28" });
+  d.history.push({ id: "h1", cardId: "c1", date: "2026-11-01", text: "Kept another year" }, { id: "h2", cardId: "c1", date: "2027-02-01", text: "Ask for retention offer" });
+  d.todos.push({ id: "t9", cardId: "c1", text: "Call the bank", done: true, doneAt: "2026-11-10" }, { id: "t8", cardId: "c1", text: "No date, done", done: true });
+  const tl = timeline(d, c, "2026-11-20");
+  assert.deepEqual(tl.next.map((x) => [x.d, x.k]), [["2026-11-28", "pay"], ["2026-12-01", "fee"], ["2026-12-09", "spend"], ["2027-02-01", "note"]]);
+  assert.deepEqual(tl.past.map((x) => [x.d, x.t]), [["2026-11-10", "✓ Call the bank"], ["2026-11-01", "Kept another year"], ["2026-10-27", "Paid the Oct 28 bill"], ["2025-02-02", "Product switch"], ["2024-05-01", "Opened"]]);
+  const closed = timeline(d, d.cards[2], "2026-11-20");
+  assert.deepEqual(closed.next, [], "a closed card has nothing coming");
+});
+test("the page has no lock button, no idle lock and no add-a-to-do box", () => {
+  const src = readFileSync(new URL("../cards.js", import.meta.url), "utf8");
+  for (const w of ["Lock now", "5 minutes", "setInterval", 'id="xtd"', 'data-x="tadd"', 'data-x="lock"']) assert.equal(src.includes(w), false, w);
+  assert.match(src, /data-x="flow" data-kind="close">Close card</);
+  assert.match(src, /data-x="flow" data-kind="switch">Product switch</);
 });

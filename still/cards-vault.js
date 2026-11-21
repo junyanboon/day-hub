@@ -1,11 +1,13 @@
-/* Cards vault (2026-11-20, Junyan's c5: "yes"): the lock on the Cards page.
+/* Cards vault (2026-11-20, Junyan's c5: "yes"): scrambles the Cards page's lists before they are saved or sent.
+   The page no longer locks (Junyan, 2026-11-20: "Card locking feature is annoying"): a device that has opened the
+   cards once keeps the data key (keyOf, openWithKey) and opens them by itself after that.
    Card details are scrambled in the browser with AES-GCM (256 bit) under one random data key. That data key is itself
    locked twice, so there are two ways in:
      pk   one entry per passkey (Touch ID, Face ID). The passkey hands back a secret only it can make (the WebAuthn
           "prf" extension); that secret opens the data key.
      rc   the recovery code, shown once at setup (120 random bits, PBKDF2 into a key).
-   Only the locked file ("envelope") is ever saved or sent: this browser's storage and the Day Hub server hold the same
-   scrambled text, and neither can read it. The open copy lives in memory only and is dropped on lock.
+   Only the locked file ("envelope") is ever sent: the Day Hub server holds scrambled text it cannot read. A device
+   that has opened the cards keeps the same locked file plus the data key, so that device can open it by itself.
    Everything here is plain functions on plain objects, so still/test/cards-vault.test.mjs runs it in node. */
 (function (root) {
   "use strict";
@@ -56,6 +58,12 @@
     let raw; try { raw = await openRaw(await prfKey(out, env.prf.salt), w); } catch (e) { throw new Error("that passkey did not open the cards"); }
     const ses = await session(raw); return { ses, data: await read(ses, env) };
   }
+  /** The data key as text, for a device that should open the cards by itself next time. */
+  const keyOf = (ses) => b64(ses.raw);
+  /** Opens with a key that keyOf gave. Throws "wrong key" when it does not fit this file. */
+  async function openWithKey(env, key) {
+    try { const ses = await session(unb64(key)); return { ses, data: await read(ses, env) }; } catch (e) { throw new Error("wrong key"); }
+  }
   /** Adds (or replaces) a passkey's lock on the data key. */
   async function addPasskey(env, ses, id, out, label) {
     const w = { id, label: label || "", at: new Date().toISOString(), ...(await sealRaw(await prfKey(out, env.prf.salt), ses.raw)) };
@@ -93,5 +101,5 @@
     return askPasskey(env, [id]);   // some devices only hand the secret back on a second touch
   }
 
-  root.CardsVault = { KIND, makeCode, normCode, codeOk, isEnvelope, create, seal, read, openWithCode, openWithPrf, addPasskey, newCode, forget, canPasskey, askPasskey, makePasskey };
+  root.CardsVault = { KIND, makeCode, normCode, codeOk, isEnvelope, create, seal, read, openWithCode, openWithPrf, keyOf, openWithKey, addPasskey, newCode, forget, canPasskey, askPasskey, makePasskey };
 })(typeof window !== "undefined" ? window : globalThis);
