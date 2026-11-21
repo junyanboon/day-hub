@@ -14,8 +14,8 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>Calendar</title>
 <script src="calendar-core.js?v=26"></script>
-<script src="cards-vault.js?v=2"></script><script src="cards.js?v=6"></script>
-<script src="quest-trips.js?v=20261113c" data-helpers></script>
+<script src="cards-vault.js?v=2"></script><script src="cards.js?v=7"></script>
+<script src="quest-trips.js?v=20261121a" data-helpers></script>
 <script>
 /* The look saved on this device (the Look row in Settings; Studio when none) goes on here, before anything is drawn,
    so the page never opens in the wrong look first. Studio shows its day or night half by the sun in the calendar's
@@ -971,7 +971,7 @@ if (TOUCH) for (const g of ["gesturestart", "gesturechange"]) document.addEventL
    which shows this build, the phone's answers and a log of every day change with its cause. Until then CalHook.on is
    null and diag() does nothing. BUILD names this copy of the page, so a screenshot proves which copy ran: change it on
    every change to this page or calendar-readout.js (the date plus a letter). */
-const BUILD = "2026-11-21c own address";
+const BUILD = "2026-11-21d sign in";
 const CalHook = window.CalHook = { BUILD, on: null };
 const diag = (kind, msg) => { if (CalHook.on) CalHook.on(kind, msg); };
 /* The iPhone home screen app's fit (2026-11-12): html.hs in a home screen app on touch, html.hsfill and --hsgap when
@@ -1066,10 +1066,26 @@ async function api(path, opts = {}) {
     headers: { "Content-Type": "application/json", "X-Quest-Key": questKey(), ...(opts.headers || {}) } });
   let d = {};
   try { d = await r.json(); } catch {}
-  if (!r.ok) throw new Error(d.error || `HTTP ${r.status}`);
+  if (!r.ok) {
+    // signed out on the server (12 hours away, or signed out from another device): show the sign-in
+    if (r.status === 401 && SIGNIN && S.auth.signedIn && !path.startsWith("/auth/")) { S.auth.signedIn = false; S.auth.known = true; render(); }
+    throw new Error(d.error || `HTTP ${r.status}`);
+  }
   return d;
 }
 const send = (path, method, body) => api(path, { method, body: JSON.stringify(body) });
+
+/* ---------- sign-in (d54, 2026-11-21) ----------
+   At junyan.danceannex.ca the server shows this page and signs Junyan in with a password (and a passkey): a cookie the
+   page cannot read, 30 days per device, asked again after 12 hours away. On github.io the pairing code still works. */
+const SIGNIN = location.hostname === "junyan.danceannex.ca" || qs.get("signin") === "1";
+S.auth = { checked: !SIGNIN, signedIn: false, known: false, hasPassword: true, hasPasskey: false };
+const authed = () => (SIGNIN ? S.auth.signedIn : !!questKey());
+async function authMe() {
+  try { const r = await fetch(API + "/auth/me", { cache: "no-store" }); Object.assign(S.auth, await r.json()); S.auth.error = ""; }
+  catch (e) { S.auth.error = "The server could not be reached. Try again in a minute."; }
+  S.auth.checked = true;
+}
 function toast(msg, { bad = false } = {}) {
   const t = $("#toast"); t.textContent = msg; t.classList.toggle("bad", bad); t.classList.add("on");
   clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove("on"), bad ? 6000 : 2200);
@@ -1124,7 +1140,7 @@ function viewRange() {
   return [S.win0, C.addDays(S.win0, WIN - 1)];
 }
 async function refresh(force) {
-  if (!questKey()) return;
+  if (!authed()) return;
   const [a, b] = viewRange();
   const ms = [...new Set([...C.monthsFor(a, b), C.monthKey(today())])];
   if (ms.some((m) => !S.months[m])) status("Loading…");
@@ -1133,7 +1149,7 @@ async function refresh(force) {
   saveCache(); render();
 }
 async function loadSide() {
-  if (!questKey()) return;
+  if (!authed()) return;
   await Promise.all([
     api("/planner/calendars").then((d) => { S.cals = d.calendars || []; }).catch((e) => toast("Calendars: " + e.message, { bad: true })),
     api("/planner/suggestions").then((d) => { S.sugg = d.suggestions || []; }).catch(() => {}),
@@ -1232,7 +1248,12 @@ function render() {
   const v = $("#view");
   if (S.page === "packing") { packShow(); return; }
   if (S.page === "cards") { cardsDraw(true); return; }   // cards are kept in this browser, so the page opens unpaired too; a passive redraw keeps what he is typing
-  if (!questKey()) { v.classList.remove("snap"); v.innerHTML = pairHTML(); wirePair(); return; }
+  if (!authed()) {
+    v.classList.remove("snap");
+    if (!SIGNIN) { v.innerHTML = pairHTML(); wirePair(); return; }
+    const si = signInState(); if (v.querySelector(`.pair[data-si="${si}"]`)) return;   // a passive redraw keeps what he is typing
+    v.innerHTML = signInHTML(); wireSignIn(); return;
+  }
   if (S.page !== "cal") { renderPage(); return; }
   if (S.n === "m") { v.classList.remove("snap"); monthView(v); } else strip(v);
   if (S.tab !== "event") paintPanel();
@@ -1777,7 +1798,7 @@ function pSet() {
     <div class="field"><p class="lbl" style="margin:0">Studio shifts</p><label class="sw" for="railSw">Show in a slim rail, not as full blocks<input type="checkbox" id="railSw" ${S.rail ? "checked" : ""}></label></div>
     <div class="field"><p class="lbl" style="margin:0">Time zones</p><label class="sw" for="tz1">Main<select id="tz1">${opts(S.tz)}</select></label><label class="sw" for="tz2">Second<select id="tz2">${opts(S.tz2, true)}</select></label></div>
     <div class="field"><p class="lbl" style="margin:0">Block types</p>${C.KINDS.map(([k, n]) => `<div class="r k-${k}" style="color:var(--soft)"><i style="width:12px;height:12px;border-radius:4px;background:var(--c)"></i>${KICON[k] ? KICON[k] + " " : ""}${n}</div>`).join("")}<div class="meta">Guessed from the title. Change one on its event and it sticks.</div></div>
-    <div class="field"><p class="lbl" style="margin:0">This device</p><button class="btn" id="pairBtn">Change pairing code</button></div>`;
+    ${SIGNIN ? devicesHTML() : `<div class="field"><p class="lbl" style="margin:0">This device</p><button class="btn" id="pairBtn">Change pairing code</button></div>`}`;
 }
 /** Put the chosen look on the whole page; for Studio, the half the sun says (day or night) in the calendar's zone.
     Runs on a tap, every 30 s and when the page comes back into view, so Studio flips at sunrise and sunset by itself. */
@@ -2127,7 +2148,7 @@ function tripWire() {
 /* ---------- the Cards page (cards.js; Junyan's and Caney's credit cards, 2026-11-20) ---------- */
 /* No lock screen (Junyan, 2026-11-20): this device keeps its own key, so wake opens the cards as the app loads and
    the calendar's pills name the card. A redraw also repaints the calendar when the cards open or change. */
-const cardsCtx = { store, today, toast, page: () => $("#page"), api: { base: API, key: questKey },
+const cardsCtx = { store, today, toast, page: () => $("#page"), api: { base: API, key: questKey, signedIn: () => SIGNIN && S.auth.signedIn },
   redraw: () => { if (S.page === "cards" || $("#page").classList.contains("cards")) cardsDraw(); if (S.page !== "cards") render(); } };
 function cardsDraw(passive) { if (window.Cards) window.Cards.draw(cardsCtx, passive); else $("#page").textContent = "Cards did not load."; }
 {
@@ -2181,7 +2202,7 @@ async function packLoad() {
       PK.seedFood(await r.json());
     } catch (e) { toast("Road trip food did not load: " + e.message + ". Open Packing again.", { bad: true }); }
   }
-  if (questKey()) {
+  if (authed()) {
     try {
       const d = await api("/quest/trips");
       /* the same list Day Quest builds: its own saved Montreal trip, then still-api's trips */
@@ -2402,6 +2423,74 @@ function wirePacking() {
   WIDE.addEventListener("change", () => { if (S.page === "travel" && S.trip) tripPaint(); });   // a trip's computer column draws when the window widens
 }
 
+/* ---------- sign-in screen (SIGNIN only) ---------- */
+const signInState = () => { const a = S.auth; return !a.checked ? "wait" : a.error ? "err" : !a.hasPassword ? "first" : a.known ? "back" : "in"; };
+function signInHTML() {
+  const a = S.auth, st = signInState();
+  if (st === "wait") return `<div class="pair" data-si="wait"><p class="meta">Checking…</p></div>`;
+  if (st === "err") return `<div class="pair" data-si="err"><h2>Sign in</h2><p class="meta">${esc(a.error)}</p><button class="btn pri" id="siRetry">Try again</button></div>`;
+  if (st === "first") return `<form class="pair" data-si="first" id="siForm"><h2>Set your password</h2><p class="meta">One time only: enter the Day Quest pairing code, then choose a password of at least 12 characters.</p>
+    <input id="siKey" type="password" autocomplete="off" aria-label="Pairing code" placeholder="Pairing code" data-1p-ignore data-lpignore="true">
+    <input type="text" name="username" autocomplete="username" value="junyan" style="display:none">
+    <input id="siPw" type="password" autocomplete="new-password" aria-label="New password" placeholder="New password" minlength="12">
+    <input id="siPw2" type="password" autocomplete="new-password" aria-label="New password again" placeholder="New password again">
+    <button class="btn pri" id="siGo" type="submit">Set password and sign in</button></form>`;
+  return `<form class="pair" data-si="${st}" id="siForm"><h2>${st === "back" ? "Welcome back" : "Sign in"}</h2><p class="meta">${st === "back" ? "You have been away 12 hours. Sign in again to see your calendar." : "Your calendar, tasks and cards."}</p>
+    <input type="text" name="username" autocomplete="username" value="junyan" style="display:none">
+    <input id="siPw" type="password" autocomplete="current-password" aria-label="Password" placeholder="Password">
+    <button class="btn pri" id="siGo" type="submit">Sign in</button></form>`;
+}
+function wireSignIn() {
+  if ($("#siRetry")) { $("#siRetry").onclick = () => { S.auth.checked = false; render(); boot(); }; return; }
+  const f = $("#siForm"); if (!f) return;
+  const done = () => { Object.assign(S.auth, { signedIn: true, known: true, hasPassword: true }); toast("Signed in"); boot(); };
+  f.onsubmit = async (e) => {
+    e.preventDefault();
+    const go = $("#siGo"), pw = $("#siPw").value;
+    if (!pw) return;
+    go.disabled = true;
+    try {
+      if (signInState() === "first") {
+        if (pw !== $("#siPw2").value) throw new Error("The two passwords are not the same.");
+        await api("/auth/password", { method: "POST", headers: { "X-Quest-Key": $("#siKey").value.trim() }, body: JSON.stringify({ password: pw }) });
+      } else await send("/auth/login", "POST", { password: pw });
+      done();
+    } catch (err) { go.disabled = false; $("#siPw").select(); toast(err.message, { bad: true }); }
+  };
+  setTimeout(() => { const i = $("#siKey") || $("#siPw"); if (i && !TOUCH) i.focus(); }, 50);
+}
+/* Settings: the devices signed in, sign out, change password (d60: any device can be signed out) */
+function devicesHTML() {
+  setTimeout(loadDevices, 0);
+  return `<div class="field"><p class="lbl" style="margin:0">Signed in devices</p><div id="devList" class="meta">Loading…</div>
+    <div class="r" style="gap:8px;flex-wrap:wrap"><button class="btn" id="soBtn">Sign out</button><button class="btn" id="soAll">Sign out other devices</button><button class="btn" id="pwBtn">Change password</button></div>
+    <div id="pwForm" hidden style="display:flex;flex-direction:column;gap:6px;margin-top:6px">
+      <input type="text" name="username" autocomplete="username" value="junyan" style="display:none">
+      <input id="pwCur" type="password" autocomplete="current-password" placeholder="Current password" aria-label="Current password">
+      <input id="pwNew" type="password" autocomplete="new-password" placeholder="New password (12 or more characters)" aria-label="New password">
+      <button class="btn pri" id="pwGo">Save new password</button><div class="meta">This signs out every other device.</div></div></div>`;
+}
+const ago = (iso) => { const m = Math.round((Date.now() - new Date(iso)) / 60000); return m < 2 ? "now" : m < 60 ? m + " min ago" : m < 1440 ? Math.round(m / 60) + " h ago" : Math.round(m / 1440) + " days ago"; };
+async function loadDevices() {
+  const box = $("#devList"); if (!box) return;
+  try {
+    const d = await api("/auth/sessions");
+    box.innerHTML = d.sessions.map((x) => `<div class="r" style="justify-content:space-between;gap:8px"><span>${esc(x.device)}${x.current ? " (this one)" : ""}<br><span class="meta">${x.how === "passkey" ? "Face ID" : "password"}, used ${ago(x.seen)}</span></span>${x.current ? "" : `<button class="btn" data-end="${esc(x.id)}">Sign out</button>`}</div>`).join("");
+  } catch (e) { box.textContent = "Could not load the devices: " + e.message; }
+}
+async function endDevices(body) {
+  try { const r = await send("/auth/sessions/end", "POST", body); toast(r.ended === 1 ? "Signed out 1 device" : `Signed out ${r.ended} devices`); loadDevices(); }
+  catch (e) { toast(e.message, { bad: true }); }
+}
+async function signOut() {
+  try { await send("/auth/logout", "POST", {}); } catch (e) {}
+  Object.assign(S.auth, { signedIn: false, known: false }); document.body.classList.remove("popen"); render();
+}
+async function changePassword() {
+  try { await send("/auth/password", "POST", { current: $("#pwCur").value, password: $("#pwNew").value }); toast("Password changed. Other devices are signed out."); $("#pwForm").hidden = true; loadDevices(); }
+  catch (e) { toast(e.message, { bad: true }); }
+}
+
 /* ---------- pairing ---------- */
 /* On a phone the box shows the code as plain text, offers no autofill or autocorrect, and a paste drops spaces and line
    breaks and replaces what is there (Junyan, 2026-11-12: a paste "adds extra digits"). Desktop keeps the hidden box. */
@@ -2426,7 +2515,7 @@ function wirePair() {
 /* ---------- controls ---------- */
 function setup() {
   document.addEventListener("click", function clickRouter(e) {
-    const t = e.target.closest("[data-railtog],[data-pkday],[data-page],[data-n],[data-p],[data-key],[data-staff],[data-allday],[data-open],[data-acc],[data-skip],[data-go],[data-dur],[data-kind],[data-sheet],[data-triptab],button[data-look],#pSave,#pDel,#pAcc,#pSkip,#pGrab,#pairBtn");
+    const t = e.target.closest("[data-railtog],[data-pkday],[data-page],[data-n],[data-p],[data-key],[data-staff],[data-allday],[data-open],[data-acc],[data-skip],[data-go],[data-dur],[data-kind],[data-sheet],[data-triptab],button[data-look],#pSave,#pDel,#pAcc,#pSkip,#pGrab,#pairBtn,[data-end],#soBtn,#soAll,#pwBtn,#pwGo");
     if (!t || t.closest(".ev")) return;
     const d = t.dataset;
     if (t.matches("button[data-look]")) setLook(d.look);
@@ -2454,6 +2543,11 @@ function setup() {
     else if (t.id === "pDel") { const ev = S.ev, sh = !!(S.form && S.form.sheet); panel("now"); if (sh) document.body.classList.remove("popen"); deleteEvent(ev); }
     else if (t.id === "pAcc") acceptSugg(S.ev, { calId: $("#pCal").value, title: $("#pTitle").value.trim() || S.ev.title });
     else if (t.id === "pSkip") skipSugg(S.ev);
+    else if (t.id === "soBtn") signOut();
+    else if (t.id === "soAll") endDevices({ all: true });
+    else if (d.end) endDevices({ id: d.end });
+    else if (t.id === "pwBtn") { const f = $("#pwForm"); f.hidden = !f.hidden; if (!f.hidden) $("#pwCur").focus(); }
+    else if (t.id === "pwGo") changePassword();
     else if (t.id === "pairBtn") { document.body.classList.remove("popen"); const v = $("#view"); v.classList.remove("snap"); v.innerHTML = pairHTML(); wirePair(); }
   });
   document.addEventListener("change", (e) => {
@@ -2493,7 +2587,7 @@ function setup() {
     const inp = e.target, v = inp.value.trim();
     if (e.key === "Escape") { inp.blur(); return; }
     if (e.key !== "Enter" || !v) return;
-    if (!questKey()) { toast("Pair this device first", { bad: true }); return; }
+    if (!authed()) { toast("Pair this device first", { bad: true }); return; }
     inp.value = ""; inp.disabled = true;
     try {
       await send("/planner/tasks", "POST", { title: v });
@@ -2515,7 +2609,7 @@ function setup() {
   });
   wireSwipe($("#view")); wirePinch($("#view")); wirePacking(); tripWire();
   addEventListener("resize", function onResize() { size(); });
-  addEventListener("focus", () => { if (S.tab !== "event" && questKey()) { refresh(); loadSide(); } });
+  addEventListener("focus", () => { if (S.tab !== "event" && authed()) { refresh(); loadSide(); } });
   setInterval(() => { showLook(); tickNow(); if (S.tab === "now" && S.page === "cal" && !dragging) paintPanel(); renderRail(); }, 30000);
   document.addEventListener("visibilitychange", () => { if (!document.hidden) showLook(); });
 }
@@ -2525,7 +2619,7 @@ function readout() {
   CalHook.state = () => ({ cur: S.cur, win0: S.win0, n: S.n, dw, slideX, shown: TOUCH && $("#strip") ? shownX() : null, touch: TOUCH, api: API, h: S.h });
   const s = document.createElement("script"); s.src = "calendar-readout.js?v=7"; document.head.appendChild(s);
 }
-function boot() { render(); loadSide(); refresh(); }
+async function boot() { if (SIGNIN && !S.auth.checked) await authMe(); render(); loadSide(); refresh(); }
 setup(); boot();
 </script>
 </body></html>

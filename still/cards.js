@@ -306,8 +306,11 @@
 
   /* ---------- the server copy (still-api /quest/vault): the same locked file, so phone and computer match ---------- */
   async function vaultFetch(ctx, method, body) {
-    const key = ctx.api && ctx.api.key(); if (!key) throw new Error("unpaired");
-    const r = await root.fetch(ctx.api.base + "/quest/vault", { method, cache: "no-store", headers: { "Content-Type": "application/json", "X-Quest-Key": key }, body: body ? JSON.stringify(body) : undefined });
+    // signed in at junyan.danceannex.ca, the cookie goes along by itself; elsewhere the pairing code does (d54)
+    const key = ctx.api && ctx.api.key(), session = !!(ctx.api && ctx.api.signedIn && ctx.api.signedIn());
+    if (!key && !session) throw new Error("unpaired");
+    const headers = { "Content-Type": "application/json" }; if (key) headers["X-Quest-Key"] = key;
+    const r = await root.fetch(ctx.api.base + "/quest/vault", { method, cache: "no-store", headers, body: body ? JSON.stringify(body) : undefined });
     let d = {}; try { d = await r.json(); } catch (e) {}
     if (!r.ok && r.status !== 409) throw new Error(d.error || "HTTP " + r.status);
     return { ...d, status: r.status };
