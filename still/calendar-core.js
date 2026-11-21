@@ -55,7 +55,7 @@
      helper and page, plus "other". Guessed from the title, first match wins; a hand-set kind wins over the guess. ---- */
   const KINDS = [["deep", "Deep Work"], ["studio", "Studio On-Site"], ["yoga", "Yoga"], ["gym", "Gym"], ["dance", "Dance"],
     ["cook", "Culinary"], ["travel", "Travel"], ["pack", "Packing"], ["social", "Social"], ["errand", "Errands"], ["wind", "Wind Down"],
-    ["rest", "Rest"], ["other", "Other"]];
+    ["rest", "Rest"], ["home", "Domestic"], ["other", "Other"]];
   /* Hand-set kinds saved before the eleven types (ex, food, out, work). "ex" is guessed again: gym or dance. */
   const OLD_KIND = { food: "cook", out: "travel", work: "studio" };
   /* Packing (slice 02, Junyan 2026-11-16, d23: "p1 yes"): "pack" anywhere in the title, any case, so "Pack for FICTION
@@ -64,6 +64,8 @@
     ["pack", /pack/i],
     ["deep", /\b(work block|deep work|focus block|focus time)\b/i],
     ["wind", /\b(wind.?down|bedtime)\b/i],
+    /* Domestic (Junyan, 2026-11-21, d62: "give it a more exciting colour"): its own type and colour, no page of its own */
+    ["home", /\b(domestic|chores?|cleaning|clean up|laundry|tidy(ing)?|housework|vacuum\w*|dishes)\b/i],
     ["rest", /\b(isha kriya|yoga nidra|nidra|nsdr)\b/i],
     ["yoga", /\b(yoga|sadhana|shambhavi|mahamudra|kriya|angamardana|yogasanas?|surya|bhuta shuddhi|nadi shuddhi|hatha)\b/i],
     ["dance", /\b(zouk|lambada|samba|salsa|bachata|kizomba|forr[oó]|practica|dance|dancing|ws|workshop|battle|hip hop)\b/i],
@@ -108,10 +110,19 @@
   }
 
   /** A timed event {start, end} (ms) cut into one piece per shown day: {day, top, bottom} in minutes. */
+  /* A day's first and last instant, kept: the strip asks for the same 36 days once per event, and working them out
+     each time made every key press take about 0.4 s with ~600 events (Junyan, 2026-11-21, "shortcuts too slow"). */
+  const bounds = new Map();
+  function dayBounds(day, tz) {
+    const k = day + "|" + tz;
+    let b = bounds.get(k);
+    if (!b) { if (bounds.size > 4000) bounds.clear(); b = [instant(day, 0, tz), instant(addDays(day, 1), 0, tz)]; bounds.set(k, b); }
+    return b;
+  }
   function pieces(ev, days, tz) {
     const out = [];
     for (const day of days) {
-      const d0 = instant(day, 0, tz), d1 = instant(addDays(day, 1), 0, tz);
+      const [d0, d1] = dayBounds(day, tz);
       if (ev.end <= d0 || ev.start >= d1) continue;
       const s = Math.max(ev.start, d0), e = Math.min(ev.end, d1);
       const top = s === d0 ? 0 : wall(s, tz).min;
@@ -122,6 +133,57 @@
   }
   /** An all-day event {start, end: "YYYY-MM-DD", end exclusive} covers day? */
   const coversDay = (ev, day) => ev.start <= day && day < ev.end;
+
+  /* ---- the day's own blocks: Domestic, and Wind Down, Sleep, Morning Routine back to back ----
+     (Junyan, 2026-11-21: "suggestions in the day for a Domestic block (1 hr if possible but less if necessary) a Wind
+     Down + Sleep + Morning Routine (3 connected) blocks.") */
+  const ROUTINE = { domestic: 60, domesticMin: 30, wind: 60, windMin: 30, sleep: 8 * 60, morning: 60,
+    morningBy: 9 * 60, morningLatest: 10 * 60, dayFrom: 9 * 60 };
+  const RX_DOMESTIC = /\b(domestic|chores?|clean(ing)?|laundry|tidy(ing)?|housework)\b/i;
+  const RX_WIND = /\b(wind.?down|bedtime)\b/i, RX_SLEEP = /\bsleep\b/i, RX_MORNING = /\bmorning routine\b/i;
+  /** Suggested blocks for one day. events: his own timed events {title, s, e} in ms (no all-day, no studio shifts, no
+      suggestions), covering the day and the next morning. now (ms) cuts today's Domestic search short.
+      Returns [{key, kind, title, s, e, why}]; a block he already has (by title) is left out, the rest keep their times. */
+  function routineBlocks(day, events, tz, now = 0) {
+    const R = ROUTINE, M = 60000, next = addDays(day, 1), [d0, d1] = dayBounds(day, tz), [, n1] = dayBounds(next, tz);
+    const own = (e) => RX_WIND.test(e.title) || RX_SLEEP.test(e.title) || RX_MORNING.test(e.title) || RX_DOMESTIC.test(e.title);
+    const busy = events.filter((e) => e.e > e.s && !own(e)).sort((a, b) => a.s - b.s);
+    // the morning: an hour, ending at the next day's first plan (after 4 am), else 9 am, and never after 10 am
+    const first = busy.find((e) => e.s >= instant(next, 4 * 60, tz) && e.s < n1);
+    const mEnd = first ? Math.min(first.s, instant(next, R.morningLatest, tz)) : instant(next, R.morningBy, tz);
+    const mStart = mEnd - R.morning * M, sleepEnd = mStart;
+    // the night: 8 hours of sleep and an hour to wind down before it, moved later (and shorter) when the evening runs late
+    let windStart = sleepEnd - (R.sleep + R.wind) * M, sleepStart = sleepEnd - R.sleep * M;
+    const late = busy.filter((e) => e.s < sleepEnd && e.e > windStart && e.s >= instant(day, 12 * 60, tz)).reduce((m, e) => Math.max(m, e.e), 0);
+    if (late > windStart) { windStart = late; sleepStart = Math.max(sleepStart, windStart + R.windMin * M); }
+    // his own wind down that night: sleep starts when it ends
+    const myWind = events.filter((e) => RX_WIND.test(e.title) && e.s >= instant(day, 12 * 60, tz) && e.s < sleepEnd).sort((a, b) => b.e - a.e)[0];
+    if (myWind && myWind.e > sleepStart) sleepStart = Math.min(myWind.e, sleepEnd);
+    const h = (ms) => dur(Math.round(ms / M));
+    const out = [], night = sleepStart < sleepEnd;   // a plan that runs into the morning leaves no night to suggest
+    const has = (rx, a, b) => events.some((e) => rx.test(e.title) && e.s < b && e.e > a);
+    if (night && !has(RX_WIND, d0 + 12 * 60 * M, d1 + 6 * 60 * M)) out.push({ key: "wind", kind: "wind", title: "Wind Down", s: windStart, e: sleepStart,
+      why: late > sleepEnd - (R.sleep + R.wind) * M ? "Starts when your evening ends" : "An hour before sleep" });
+    if (night && !has(RX_SLEEP, sleepStart, sleepEnd)) out.push({ key: "sleep", kind: "wind", title: "Sleep", s: sleepStart, e: sleepEnd,
+      why: sleepEnd - sleepStart < R.sleep * M ? `${h(sleepEnd - sleepStart)}, the evening runs late` : "8 hours" });
+    if (!has(RX_MORNING, d1, n1)) out.push({ key: "morning", kind: "yoga", title: "Morning Routine", s: mStart, e: mEnd,
+      why: first ? `Before ${first.title}` : "Before your day starts" });
+    // Domestic: the first free hour between 9 am (or now) and wind down; else the longest free stretch of 30 min or more
+    if (!has(RX_DOMESTIC, d0, d1)) {
+      const q = 15 * M, from = Math.ceil(Math.max(instant(day, R.dayFrom, tz), now) / q) * q, to = Math.min(windStart, d1);
+      const gaps = []; let at = from;
+      for (const e of busy) { if (e.e <= at || e.s >= to) continue; if (e.s > at) gaps.push([at, e.s]); at = Math.max(at, e.e); }
+      if (to > at) gaps.push([at, to]);
+      const fits = gaps.find(([a, b]) => b - a >= R.domestic * M);
+      const best = fits || gaps.filter(([a, b]) => b - a >= R.domesticMin * M).sort((x, y) => (y[1] - y[0]) - (x[1] - x[0]))[0];
+      if (best) {
+        const len = fits ? R.domestic * M : Math.floor((best[1] - best[0]) / q) * q;
+        out.push({ key: "domestic", kind: "home", title: "Domestic", s: best[0], e: best[0] + len,
+          why: fits ? "Your first free hour" : `Only ${h(len)} free today` });
+      }
+    }
+    return out;
+  }
 
   /* ---- tasks ---- */
   function orderBetween(prev, next) {
@@ -441,7 +503,7 @@
   const clock = (min) => { const h = Math.floor(min / 60) % 24; return `${h % 12 || 12}:${String(min % 60).padStart(2, "0")} ${h < 12 ? "AM" : "PM"}`; };
 
   root.CalCore = { wall, instant, offset, addDays, dowOf, weekStart, isoWeek, addMonths, monthKey, monthsFor,
-    KINDS, guessKind, kindOf, layout, pieces, coversDay, orderBetween, groupOf, dropTask, blockMinutes, hm, dur, SWIPE, swipeLock, swipeCommit, HOUR, pinchHeight, hourMin, pinchMinute, pinchScroll, cardFit, cardTime, startHour, LOOKS, lookId, startLook, LOOK_RESET, placeOf, sunTimes, sunHalf, lookFace, tripCards, tripLinks, homeFit, homeShift,
+    KINDS, guessKind, kindOf, layout, pieces, coversDay, routineBlocks, ROUTINE, orderBetween, groupOf, dropTask, blockMinutes, hm, dur, SWIPE, swipeLock, swipeCommit, HOUR, pinchHeight, hourMin, pinchMinute, pinchScroll, cardFit, cardTime, startHour, LOOKS, lookId, startLook, LOOK_RESET, placeOf, sunTimes, sunHalf, lookFace, tripCards, tripLinks, homeFit, homeShift,
     sheetForm, sheetWhen, sheetPatch, sheetLength, sheetStart, sheetEnd, sheetDay, sheetEndDay, sheetAllDay, notesRich, notesText, dayText, clock, toMin };
 })(typeof window !== "undefined" ? window : globalThis);
 
