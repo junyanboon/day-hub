@@ -971,7 +971,7 @@ if (TOUCH) for (const g of ["gesturestart", "gesturechange"]) document.addEventL
    which shows this build, the phone's answers and a log of every day change with its cause. Until then CalHook.on is
    null and diag() does nothing. BUILD names this copy of the page, so a screenshot proves which copy ran: change it on
    every change to this page or calendar-readout.js (the date plus a letter). */
-const BUILD = "2026-11-21e passkey";
+const BUILD = "2026-11-21f user id";
 const CalHook = window.CalHook = { BUILD, on: null };
 const diag = (kind, msg) => { if (CalHook.on) CalHook.on(kind, msg); };
 /* The iPhone home screen app's fit (2026-11-12): html.hs in a home screen app on touch, html.hsfill and --hsgap when
@@ -2431,13 +2431,13 @@ function signInHTML() {
   if (st === "err") return `<div class="pair" data-si="err"><h2>Sign in</h2><p class="meta">${esc(a.error)}</p><button class="btn pri" id="siRetry">Try again</button></div>`;
   if (st === "first") return `<form class="pair" data-si="first" id="siForm"><h2>Set your password</h2><p class="meta">One time only: enter the Day Quest pairing code, then choose a password of at least 12 characters.</p>
     <input id="siKey" type="password" autocomplete="off" aria-label="Pairing code" placeholder="Pairing code" data-1p-ignore data-lpignore="true">
-    <input type="text" name="username" autocomplete="username" value="junyan" style="display:none">
+    <input type="text" name="username" autocomplete="username" value="${esc(S.auth.user || "JunyanBoon")}" style="display:none">
     <input id="siPw" type="password" autocomplete="new-password" aria-label="New password" placeholder="New password" minlength="12">
     <input id="siPw2" type="password" autocomplete="new-password" aria-label="New password again" placeholder="New password again">
     <button class="btn pri" id="siGo" type="submit">Set password and sign in</button></form>`;
   return `<form class="pair" data-si="${st}" id="siForm"><h2>${st === "back" ? "Welcome back" : "Sign in"}</h2><p class="meta">${st === "back" ? "You have been away 12 hours. Sign in again to see your calendar." : "Your calendar, tasks and cards."}</p>
-    ${a.hasPasskey && PK_OK ? `<button class="btn pri" id="siPk" type="button">Sign in with Face ID</button><p class="meta" style="text-align:center">or use your password</p>` : ""}
-    <input type="text" name="username" autocomplete="username" value="junyan" style="display:none">
+    ${a.hasPasskey && PK_OK ? `<button class="btn pri" id="siPk" type="button">Sign in with Face ID</button><p class="meta" style="text-align:center">or use your user ID and password</p>` : ""}
+    <input id="siUser" type="text" name="username" autocomplete="username" autocapitalize="off" autocorrect="off" spellcheck="false" aria-label="User ID" placeholder="User ID">
     <input id="siPw" type="password" autocomplete="current-password" aria-label="Password" placeholder="Password">
     <button class="btn ${a.hasPasskey && PK_OK ? "" : "pri"}" id="siGo" type="submit">Sign in</button></form>`;
 }
@@ -2447,14 +2447,14 @@ function wireSignIn() {
   const done = () => { Object.assign(S.auth, { signedIn: true, known: true, hasPassword: true }); toast("Signed in"); boot(); };
   f.onsubmit = async (e) => {
     e.preventDefault();
-    const go = $("#siGo"), pw = $("#siPw").value;
-    if (!pw) return;
+    const go = $("#siGo"), pw = $("#siPw").value, user = $("#siUser") ? $("#siUser").value.trim() : "";
+    if (!pw || ($("#siUser") && !user)) return;
     go.disabled = true;
     try {
       if (signInState() === "first") {
         if (pw !== $("#siPw2").value) throw new Error("The two passwords are not the same.");
         await api("/auth/password", { method: "POST", headers: { "X-Quest-Key": $("#siKey").value.trim() }, body: JSON.stringify({ password: pw }) });
-      } else await send("/auth/login", "POST", { password: pw });
+      } else await send("/auth/login", "POST", { user, password: pw });
       done();
     } catch (err) { go.disabled = false; $("#siPw").select(); toast(err.message, { bad: true }); }
   };
@@ -2463,7 +2463,7 @@ function wireSignIn() {
     try { await pkSignIn(); done(); }
     catch (err) { b.disabled = false; if (err.name !== "NotAllowedError") toast(err.message, { bad: true }); }
   };
-  setTimeout(() => { const i = $("#siKey") || (!$("#siPk") && $("#siPw")); if (i && !TOUCH) i.focus(); }, 50);
+  setTimeout(() => { const i = $("#siKey") || (!$("#siPk") && ($("#siUser") && !$("#siUser").value ? $("#siUser") : $("#siPw"))); if (i && !TOUCH) i.focus(); }, 50);
 }
 
 /* ---------- passkeys (d54, d60: Face ID required) ----------
@@ -2513,7 +2513,7 @@ function devicesHTML() {
     <div class="field"><p class="lbl" style="margin:0">Signed in devices</p><div id="devList" class="meta">Loading…</div>
     <div class="r" style="gap:8px;flex-wrap:wrap"><button class="btn" id="soBtn">Sign out</button><button class="btn" id="soAll">Sign out other devices</button><button class="btn" id="pwBtn">Change password</button></div>
     <div id="pwForm" hidden style="display:flex;flex-direction:column;gap:6px;margin-top:6px">
-      <input type="text" name="username" autocomplete="username" value="junyan" style="display:none">
+      <input type="text" name="username" autocomplete="username" value="${esc(S.auth.user || "JunyanBoon")}" style="display:none">
       <input id="pwCur" type="password" autocomplete="current-password" placeholder="Current password" aria-label="Current password">
       <input id="pwNew" type="password" autocomplete="new-password" placeholder="New password (12 or more characters)" aria-label="New password">
       <button class="btn pri" id="pwGo">Save new password</button><div class="meta">This signs out every other device.</div></div></div>`;
