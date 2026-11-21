@@ -14,7 +14,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>Calendar</title>
 <script src="calendar-core.js?v=26"></script>
-<script src="cards.js?v=1"></script>
+<script src="cards-vault.js?v=1"></script><script src="cards.js?v=2"></script>
 <script src="quest-trips.js?v=20261113c" data-helpers></script>
 <script>
 /* The look saved on this device (the Look row in Settings; Studio when none) goes on here, before anything is drawn,
@@ -654,6 +654,7 @@ body.onpage .left,body.onpage .main,body.onpage .panel{display:none}
 @media (max-width:900px){ .pk-ftop .pk-rows{grid-template-columns:minmax(0,1fr)} }
 /* the New task bar would sit over the board; the mock has none */
 body.onpk .drop{display:none}
+body.oncards .drop{display:none}
 /* computer only (d14): no Packing button, and no Packing page, under 768 px */
 @media (max-width:767.98px){ #rail .pk-rail{display:none} }
 
@@ -755,37 +756,147 @@ html.hsfill .toast{bottom:calc(18px + env(safe-area-inset-bottom,0px) - var(--hs
 html.hsfill .panel{bottom:calc(-1 * var(--hsshift,0px))}
 html.hsfill .modal{bottom:calc(-1 * var(--hsshift,0px))}
 html.hsfill body.popen .scrim{bottom:calc(-1 * var(--hsshift,0px))}
+html.hs .x-left{padding-top:calc(14px + env(safe-area-inset-top,0px) + var(--hstop))}
+html.hsfill .x-left{bottom:calc(-1 * var(--hsshift,0px))}
+html.hsfill .page.cards .x-panel{bottom:calc(-1 * var(--hsshift,0px))}
+html.hsfill .x-toast{bottom:calc(22px + env(safe-area-inset-bottom,0px) - var(--hsshift,0px))}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 
-/* Cards page (cards.js) */
-.page.cards{--c:var(--purple)}
-.cgrid{display:grid;grid-template-columns:minmax(260px,340px) minmax(0,1fr);gap:16px;align-items:start;max-width:1200px}
-.ccol{display:flex;flex-direction:column;gap:14px;min-width:0}
-.ctiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px}
-.ctile,.cmrow,.crow{display:block;width:100%;text-align:left;border:1px solid var(--line);background:var(--raise);color:var(--ink);border-radius:12px;padding:10px 12px;font:inherit;cursor:pointer}
-.ctile{border-left:4px solid var(--own)}.ctile.own-j{--own:var(--teal)}.ctile.own-c{--own:var(--pink)}
-.ctile:hover,.cmrow:hover,.crow:hover{background:color-mix(in srgb,var(--c) 10%,var(--raise))}.ctile.on{outline:2px solid var(--c)}
-.cmrow,.crow{border:0;background:none;padding:7px 4px;border-radius:8px}
-.crow{display:grid;grid-template-columns:62px minmax(0,1fr);gap:8px;font-size:13px}.crow small{color:var(--faint)}
-.ctop{display:flex;align-items:baseline;justify-content:space-between;gap:8px}.ctop b{font-size:14px;min-width:0;overflow:hidden;text-overflow:ellipsis}
-.ctile small,.cmrow small{color:var(--soft);font-size:12px}
-.cst{flex:none;font-size:11px;padding:2px 7px;border-radius:99px;background:color-mix(in srgb,var(--sc,var(--stone)) 22%,transparent);color:var(--ink);white-space:nowrap}
-.st-msr{--sc:var(--blue)}.st-open{--sc:var(--emerald)}.st-keeper{--sc:var(--amber)}.st-no-fee{--sc:var(--sand)}.st-need-to-close,.st-pending-close{--sc:var(--pink)}.st-need-to-ps,.st-product-switch{--sc:var(--orange)}.st-card-in-mail,.st-applied{--sc:var(--orange)}.st-closed,.st-rejected{--sc:var(--stone)}
-.cmsr{margin-top:6px}.cmsr small{display:block;margin-top:4px}
-.cbar{height:7px;border-radius:9px;background:color-mix(in srgb,var(--ink) 10%,transparent);overflow:hidden}.cbar i{display:block;height:100%;background:var(--blue);border-radius:9px}
-.cbar.met i{background:var(--ok)}.cbar.soon i{background:var(--amber)}.cbar.late i{background:var(--bad)}
-.cdet{border-color:color-mix(in srgb,var(--c) 40%,var(--line));margin-bottom:14px}.cdet h3{margin:0 0 8px;font-size:20px}
-.cfacts{display:grid;grid-template-columns:110px minmax(0,1fr);gap:4px 10px;margin:6px 0 10px;font-size:13.5px}.cfacts dt{color:var(--faint)}.cfacts dd{margin:0}
-.cnotes{white-space:pre-wrap;color:var(--soft);font-size:13px;line-height:1.45}
-.cdet .r,.cform .r{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:8px 0}
-.ctodos{display:flex;flex-direction:column;gap:2px}.ctodo{display:flex;align-items:center;gap:8px;font-size:13.5px;padding:3px 0}.ctodo span{flex:1}.ctodo.done span{text-decoration:line-through;color:var(--faint)}.ctodo small{color:var(--faint)}
+/* Cards page (cards.js): mockup v3 (c4). Look variables only, so it follows every Day Hub look. */
+.page.cards:not([hidden]){display:grid;grid-template-columns:304px minmax(0,1fr) 348px;grid-template-rows:minmax(0,1fr);padding:0;overflow:hidden;background:var(--bar)}
+.page.cards.nosel:not([hidden]){grid-template-columns:304px minmax(0,1fr)}
+.page.cards.nosel .x-panel{display:none}
+.page.cards.locked:not([hidden]){display:block;overflow-y:auto;background:var(--bg)}
+.page.cards .t-pay{--t:var(--now)}.page.cards .t-spend{--t:var(--blue)}.page.cards .t-close{--t:var(--amber)}.page.cards .t-do{--t:var(--purple)}.page.cards .t-none{--t:transparent}
+.page.cards .btn.pri{background:var(--accent);color:var(--on-accent);border-color:transparent}
+.x-main{display:flex;flex-direction:column;min-width:0;min-height:0;background:var(--bg)}
+.x-back,.x-menu,.x-lh,.x-phone{display:none}
+/* left: every card, one line each */
+.x-left{border-right:1px solid var(--line);display:flex;flex-direction:column;gap:10px;padding:14px 10px 20px;overflow-y:auto;min-height:0;background:var(--bar)}
+.x-find{display:flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:10px;padding:7px 10px;background:var(--raise);margin:0 4px}
+.x-find input{flex:1;min-width:0;border:0;background:none;outline:none}.x-find input::placeholder{color:var(--faint)}
+.x-grp{display:flex;justify-content:space-between;align-items:center;padding:8px 8px 4px;font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;color:var(--faint);font-weight:600}
+.x-c{display:grid;grid-template-columns:8px minmax(0,1fr) auto;gap:9px;align-items:center;width:100%;border:0;background:none;text-align:left;padding:6px 8px;border-radius:9px;line-height:1.25}
+.x-c:hover{background:var(--raise)}.x-c.sel{background:var(--raise2)}
+.x-c .dot{width:8px;height:8px;border-radius:50%;background:var(--t)}
+.x-c .nm{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:13px}
+.x-c .nm small{color:var(--faint);font-size:11.5px;margin-left:5px;font-variant-numeric:tabular-nums}
+.x-c .hint{font-size:11.5px;color:var(--faint);white-space:nowrap;font-variant-numeric:tabular-nums}
+.x-c.has .hint{color:color-mix(in srgb,var(--t) 70%,var(--ink));font-weight:600}
+.x-c.closed .nm{color:var(--faint);text-decoration:line-through}
+.x-more{border:0;background:none;color:var(--faint);font-size:12px;padding:8px;text-align:left;border-radius:9px;width:100%}.x-more:hover{background:var(--raise)}
+.x-safe{margin-top:auto;display:flex;align-items:center;gap:8px;font-size:11.5px;color:var(--faint);padding:8px}
+.x-safe button{margin-left:auto;border:0;background:none;color:var(--soft);text-decoration:underline;font-size:11.5px;padding:0}
+/* middle: what to do, soonest first */
+.x-scroll{flex:1;overflow-y:auto;min-height:0}
+.x-w{max-width:760px;margin:0 auto;padding:10px 20px 90px}
+.x-h{display:flex;align-items:baseline;gap:10px;margin:22px 4px 8px}
+.x-h h2{font-family:var(--display);font-size:13px;margin:0;font-weight:700;letter-spacing:.01em}
+.x-h span{color:var(--faint);font-size:12px}
+.x-box{background:var(--raise);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.x-act{display:grid;grid-template-columns:44px minmax(0,1fr) auto;gap:14px;align-items:center;padding:11px 14px;border-top:1px solid var(--hair);position:relative}
+.x-act:first-child{border-top:0}
+.x-date{text-align:center;line-height:1;border-radius:10px;padding:6px 0 5px;background:var(--raise2);font-variant-numeric:tabular-nums}
+.x-date i{display:block;font-style:normal;font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--faint);font-weight:700}
+.x-date b{display:block;font-family:var(--display);font-size:17px;margin-top:3px}
+.x-date.nd b{font-size:11px;color:var(--faint);text-transform:uppercase;letter-spacing:.06em}
+.x-act.u-now .x-date{background:color-mix(in srgb,var(--now) 20%,var(--raise))}.x-act.u-now .x-date i{color:color-mix(in srgb,var(--now) 75%,var(--ink))}
+.x-line{font-size:14px;line-height:1.3}.x-line b{font-weight:700}
+.x-line .lk{border:0;background:none;padding:0;font-weight:700;text-decoration:underline;text-decoration-color:var(--line);text-underline-offset:3px;text-align:left}
+.x-line .lk:hover{text-decoration-color:var(--ink)}
+.x-line small{color:var(--faint);font-size:12px;font-variant-numeric:tabular-nums}
+.x-vb{display:inline-block;font-size:10px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;border-radius:6px;padding:2px 7px;margin-right:8px;vertical-align:1.5px;background:color-mix(in srgb,var(--t) 20%,transparent);color:color-mix(in srgb,var(--t) 78%,var(--ink))}
+.x-sub{color:var(--faint);font-size:12px;margin-top:2px}
+.x-sub em{font-style:normal;color:var(--soft);font-weight:600}
+.x-act.u-now .x-sub em{color:color-mix(in srgb,var(--now) 75%,var(--ink))}
+.x-prog{display:flex;align-items:center;gap:8px;margin-top:7px;max-width:330px;font-size:11px;color:var(--faint);font-variant-numeric:tabular-nums}
+.x-prog div{flex:1;height:5px;border-radius:5px;background:var(--raise2);overflow:hidden}
+.x-prog div i{display:block;height:100%;border-radius:5px;background:var(--blue);transition:width .5s cubic-bezier(.3,.7,.2,1)}
+.x-bt{display:flex;gap:6px;align-items:center}.x-bt.c{justify-content:center;margin-top:16px}
+.x-bt .btn{padding:6px 12px;font-size:12.5px;white-space:nowrap;font-weight:600}
+.x-bt .go{background:var(--ink);color:var(--bg);border-color:transparent;font-weight:700}
+.x-bt input{width:84px;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:6px 9px;font-variant-numeric:tabular-nums}
+.x-hero{border-color:color-mix(in srgb,var(--t) 45%,var(--line));background:linear-gradient(120deg,color-mix(in srgb,var(--t) 13%,var(--raise)),var(--raise) 60%)}
+.x-hero .x-act{grid-template-columns:56px minmax(0,1fr) auto;padding:18px}
+.x-hero .x-date{padding:9px 0 8px;border-radius:13px}.x-hero .x-date b{font-size:23px}.x-hero .x-date.nd b{font-size:12px}
+.x-hero .x-line{font-family:var(--display);font-size:20px;letter-spacing:-.01em}
+.x-hero .x-vb{vertical-align:3px}
+.x-hero .x-sub{font-size:13px;margin-top:4px}
+.x-hero .x-bt .btn{padding:10px 18px;font-size:14px}
+.x-hero .x-bt .go,.x-clear .go,.x-clash .go{background:var(--accent);color:var(--on-accent)}
+.x-gone{animation:xgone .35s ease forwards}
+@keyframes xgone{to{opacity:0;transform:translateX(24px)}}
+.x-quiet{text-align:center;color:var(--faint);font-size:12.5px;margin-top:22px}
+.x-clear{text-align:center;padding:46px 20px}.x-clear .big{margin-bottom:6px}
+.x-clash{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:12px 14px;margin-top:14px;border-color:color-mix(in srgb,var(--now) 50%,var(--line))}
+/* right: one card, or the lock and copies panel */
+.x-panel{border-left:1px solid var(--line);display:flex;flex-direction:column;background:var(--bar);min-width:0;min-height:0}
+.x-panel .pbody{gap:14px;padding-top:2px}.x-panel .pbody>*{flex:none}
+.x-ph h2{font-family:var(--display);font-size:21px;margin:2px 0 8px;letter-spacing:-.01em}
+.x-ph h2 small{color:var(--faint);font-weight:400;font-size:14px;margin-left:4px}
+.x-chip{display:inline-block;font-size:11px;font-weight:700;border-radius:999px;padding:2px 9px;margin-right:6px;background:color-mix(in srgb,var(--t,var(--stone)) 20%,transparent);color:color-mix(in srgb,var(--t,var(--stone)) 75%,var(--ink))}
+.x-chip.t-none{--t:var(--stone)}
+.x-panel .x-box{border-radius:14px}
+.x-panel .x-act{grid-template-columns:36px minmax(0,1fr);gap:10px;padding:10px 12px}
+.x-panel .x-date b{font-size:14px}.x-panel .x-date i{font-size:8.5px}.x-panel .x-date.nd b{font-size:9.5px}
+.x-panel .x-line{font-size:13px}.x-panel .x-bt{grid-column:2;margin-top:2px}
+.x-ok{padding:12px;color:var(--soft);font-size:13px}
+.x-facts{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--hair);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.x-facts div{background:var(--raise);padding:9px 12px;min-width:0}
+.x-facts .lbl{margin:0 0 2px;font-size:9.5px}
+.x-facts b{font-size:13.5px;font-variant-numeric:tabular-nums}
+.x-li{display:flex;gap:10px;align-items:center;padding:7px 2px;border-top:1px solid var(--hair);font-size:13px}
+.x-li:first-of-type{border-top:0}.x-li .meta{margin-left:auto;white-space:nowrap}
+.x-li input[type=checkbox]{accent-color:var(--accent)}
+.x-li.done span{color:var(--faint);text-decoration:line-through}
+.x-step{width:16px;height:16px;border-radius:50%;border:2px solid var(--blue);flex:none;display:grid;place-items:center;font-size:10px;color:var(--bg)}
+.x-step.on{background:var(--blue)}
+.x-add{display:flex;gap:6px;margin-top:6px}.x-add input{flex:1;min-width:0;background:var(--raise);border:1px solid var(--line);border-radius:10px;padding:6px 9px}.x-add input[type=date]{flex:0 0 122px}
+.x-p{margin:0 0 8px;color:var(--soft);font-size:13px;line-height:1.45}.x-notes{margin:0;white-space:pre-wrap;color:var(--soft);font-size:13px;line-height:1.45}
+.x-psf{display:flex;flex-direction:column;gap:8px;border:1px solid var(--line);border-radius:14px;padding:12px;background:var(--raise)}
 .x{border:0;background:none;color:var(--faint);font-size:16px;cursor:pointer;padding:0 4px}.x:hover{color:var(--ink)}
-.cadd{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0 4px}.cadd input{flex:1 1 120px;min-width:0}
-.cadd input,.cform input,.cform select,.cform textarea{font:inherit;font-size:13px;padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)}
-.cform{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px 10px}.cf{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--soft)}.cf.wide,.cform .wide{grid-column:1/-1}.cf.ck{flex-direction:row;align-items:center;gap:6px}
-.ctx div{display:grid;grid-template-columns:62px minmax(0,1fr) auto auto;gap:8px;font-size:13px;padding:2px 0}.ctx small{color:var(--faint)}
-.btn.pri{background:var(--accent);color:var(--on-accent);border-color:transparent}
-@media (max-width:900px){.cgrid{grid-template-columns:minmax(0,1fr)}}
+.cform{display:grid;grid-template-columns:1fr 1fr;gap:8px 10px}.cf{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--soft);min-width:0}.cf.full,.cform .full{grid-column:1/-1}.cf.ck{flex-direction:row;align-items:center;gap:6px}
+.cform input,.cform select,.cform textarea,.x-psf input{font:inherit;font-size:13px;padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);min-width:0;width:100%}.cf.ck input{width:auto}
+/* the lock screen */
+.x-lock{min-height:100%;display:grid;place-items:center;padding:20px}
+.x-lk{max-width:360px;width:100%;text-align:center;display:flex;flex-direction:column;gap:10px;align-items:center}
+.x-lk .ico{width:64px;height:64px;border-radius:20px;background:var(--raise);border:1px solid var(--line);display:grid;place-items:center;font-size:28px;margin-bottom:6px}
+.x-lk h2{font-family:var(--display);font-size:22px;margin:0}
+.x-lk p{color:var(--soft);margin:0 0 8px;font-size:13.5px;line-height:1.45}
+.x-lk p.x-msg{color:color-mix(in srgb,var(--now) 75%,var(--ink));font-weight:600}
+.x-lk .btn{width:100%;padding:11px;font-size:14px;font-weight:700}
+.x-lk .go,.x-panel .r .go{background:var(--accent);color:var(--on-accent);border-color:transparent}
+.x-lk .txt{border:0;background:none;color:var(--soft);font-size:12.5px;text-decoration:underline;padding:6px}
+.x-lk input{width:100%;text-align:center;font-family:ui-monospace,Menlo,monospace;letter-spacing:.04em;background:var(--raise);border:1px solid var(--line);border-radius:10px;padding:11px;font-size:14px}
+.x-code{width:100%;text-align:center;font-family:ui-monospace,Menlo,monospace;font-size:15px;letter-spacing:.08em;background:var(--raise);border:1.5px dashed var(--line);border-radius:12px;padding:14px;line-height:1.7;user-select:all;-webkit-user-select:all;margin-bottom:8px}
+.x-ways{width:100%;text-align:left;background:var(--raise);border:1px solid var(--line);border-radius:12px;padding:4px 12px;font-size:12.5px}
+.x-ways div{padding:8px 0;border-top:1px solid var(--hair);display:flex;gap:10px}.x-ways div:first-child{border-top:0}
+.x-toast{position:fixed;left:50%;bottom:calc(22px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:60;background:var(--ink);color:var(--bg);border-radius:999px;padding:8px 8px 8px 16px;font-weight:600;display:flex;gap:10px;align-items:center;font-size:13px;white-space:nowrap;max-width:94vw;animation:xup .25s ease}
+.x-toast span{overflow:hidden;text-overflow:ellipsis;padding-right:8px}
+.x-toast button{border:0;border-radius:999px;padding:4px 12px;font-weight:700;background:color-mix(in srgb,var(--bg) 16%,transparent);color:var(--bg)}
+@keyframes xup{from{opacity:0;transform:translate(-50%,10px)}}
+@keyframes xin{from{opacity:0;transform:translateX(30px)}}
+@keyframes xsheet{from{transform:translateY(40px);opacity:0}}
+@media (max-width:1100px){
+  .page.cards:not([hidden]),.page.cards.nosel:not([hidden]){grid-template-columns:260px minmax(0,1fr)}
+  .page.cards .x-panel{position:fixed;top:0;right:0;bottom:0;width:348px;max-width:100%;z-index:30;padding-top:env(safe-area-inset-top,0px);box-shadow:-20px 0 60px color-mix(in srgb,var(--lift) calc(45% * var(--lift-k)),transparent);animation:xin .22s ease}
+}
+@media (max-width:760px){
+  .page.cards:not([hidden]),.page.cards.nosel:not([hidden]){grid-template-columns:minmax(0,1fr)}
+  .x-back,.x-menu{display:inline-block}.x-phone{display:block}
+  .x-lh{display:flex;align-items:center;justify-content:space-between;padding:0 6px 4px;font-family:var(--display);font-size:20px;font-weight:700}
+  .page.cards .bar{flex-wrap:wrap}#xown{order:9;width:100%}#xown button{flex:1;width:auto;padding:6px 10px}
+  .x-left{display:none;position:fixed;inset:0;z-index:35;padding-top:calc(14px + env(safe-area-inset-top,0px))}
+  .page.cards.xlist .x-left{display:flex}
+  .x-c{padding:9px 8px}.x-c .nm{font-size:14.5px}
+  .x-w{padding:6px 12px 110px}
+  .x-act,.x-hero .x-act{grid-template-columns:40px minmax(0,1fr);gap:11px;padding:11px 12px}
+  .x-bt{grid-column:2;flex-wrap:wrap}
+  .x-hero .x-line{font-size:17px}
+  .page.cards .x-panel{top:auto;left:0;width:auto;max-height:88%;border-radius:22px 22px 0 0;border:1px solid var(--line);padding-top:0;animation:xsheet .22s ease}
+  .page.cards input,.page.cards select,.page.cards textarea{font-size:16px}
+  .x-toast{white-space:normal;border-radius:18px}
+}
 </style></head>
 <body>
 <div class="app">
@@ -793,6 +904,7 @@ html.hsfill body.popen .scrim{bottom:calc(-1 * var(--hsshift,0px))}
   <aside class="left">
     <div class="mm"><div class="mhead"><span id="mmTitle"></span><span><button class="icon" id="mmPrev" aria-label="Previous month">&#8249;</button><button class="icon" id="mmNext" aria-label="Next month">&#8250;</button></span></div><div class="mini" id="mini"></div></div>
     <div><p class="lbl">Calendars</p><div class="cals" id="cals"></div></div>
+    <button class="btn x-phone" data-page="cards">💳 Cards</button>
   </aside>
   <div class="main">
     <div class="bar">
@@ -839,7 +951,7 @@ if (TOUCH) for (const g of ["gesturestart", "gesturechange"]) document.addEventL
    which shows this build, the phone's answers and a log of every day change with its cause. Until then CalHook.on is
    null and diag() does nothing. BUILD names this copy of the page, so a screenshot proves which copy ran: change it on
    every change to this page or calendar-readout.js (the date plus a letter). */
-const BUILD = "2026-11-20a cards";
+const BUILD = "2026-11-20b cards lock";
 const CalHook = window.CalHook = { BUILD, on: null };
 const diag = (kind, msg) => { if (CalHook.on) CalHook.on(kind, msg); };
 /* The iPhone home screen app's fit (2026-11-12): html.hs in a home screen app on touch, html.hsfill and --hsgap when
@@ -963,8 +1075,9 @@ function eventsFor(fromDay, toDay) {
   return out;
 }
 /** Cards (cards.js): bill due dates, annual fees, spend deadlines and dated to-dos, as all-day events on the pseudo
-    calendar "cards". They come from this browser's saved cards, not Google, and a tap opens the Cards page. */
-function cardEvents(fromDay, toDay) { return window.Cards ? window.Cards.events(window.Cards.load(store), fromDay, toDay, today()) : []; }
+    calendar "cards". They come from his locked cards, not Google, and a tap opens the Cards page. While the cards are
+    locked the pills say only that something is due ("Card payment due"), with no card names. */
+function cardEvents(fromDay, toDay) { return window.Cards ? window.Cards.calEvents(store, fromDay, toDay, today()) : []; }
 function ghosts() {
   return S.sugg.filter((g) => g.status === "open").map((g) => ({ ...g, ghost: true,
     s: g.allDay ? null : Date.parse(g.start), e: g.allDay ? null : Date.parse(g.end), k: C.kindOf({ title: g.title, kind: g.kind, calName: calOf(g.calId).name }) }));
@@ -1063,7 +1176,7 @@ function renderRail() {
 }
 function renderSide() {
   $("#cals").innerHTML = S.cals.map((c) => `<label class="${S.hidden.has(c.id) ? "off" : ""}" style="--c:${esc(c.color)}"><input type="checkbox" data-id="${esc(c.id)}" ${S.hidden.has(c.id) ? "" : "checked"}>${esc(c.name)}${c.writable ? "" : ' <span class="meta">read-only</span>'}${c.ok === false ? ` <span class="err" title="${esc(c.error)}">not readable</span>` : ""}</label>`).join("") || '<span class="meta">Pair to see your calendars.</span>';
-  if (window.Cards && window.Cards.load(store).cards.length) $("#cals").insertAdjacentHTML("beforeend", `<label class="${S.hidden.has("cards") ? "off" : ""}" style="--c:var(--purple)"><input type="checkbox" data-id="cards" ${S.hidden.has("cards") ? "" : "checked"}>Cards <span class="meta">due, fees, targets</span></label>`);
+  if (window.Cards && window.Cards.hasAny(store)) $("#cals").insertAdjacentHTML("beforeend", `<label class="${S.hidden.has("cards") ? "off" : ""}" style="--c:var(--purple)"><input type="checkbox" data-id="cards" ${S.hidden.has("cards") ? "" : "checked"}>Cards <span class="meta">due, fees, targets</span></label>`);
 }
 function whenText(e) {
   if (e.allDay) return `${e.start}${C.addDays(e.start, 1) === e.end ? "" : " to " + C.addDays(e.end, -1)} (all day)`;
@@ -1098,7 +1211,7 @@ function render() {
   head(); renderSide(); renderRail();
   const v = $("#view");
   if (S.page === "packing") { packShow(); return; }
-  if (S.page === "cards") { const pg = $("#page"), f = document.activeElement; if (!(pg.classList.contains("cards") && pg.contains(f) && /INPUT|TEXTAREA|SELECT/.test(f.tagName))) cardsDraw(); return; }   // cards live in this browser, so the page opens unpaired too   // the Packing page keeps its lists in this browser, so it opens unpaired too
+  if (S.page === "cards") { cardsDraw(true); return; }   // cards live locked in this browser, so the page opens unpaired too; a passive redraw keeps what he is typing
   if (!questKey()) { v.classList.remove("snap"); v.innerHTML = pairHTML(); wirePair(); return; }
   if (S.page !== "cal") { renderPage(); return; }
   if (S.n === "m") { v.classList.remove("snap"); monthView(v); } else strip(v);
@@ -1992,10 +2105,19 @@ function tripWire() {
   }, true);
 }
 /* ---------- the Cards page (cards.js; Junyan's and Caney's credit cards, 2026-11-20) ---------- */
-const cardsCtx = { store, today, toast, redraw: () => { if (S.page === "cards") cardsDraw(); } };
-function cardsDraw() { const pg = $("#page"); pg.className = "page cards"; pg.innerHTML = window.Cards ? window.Cards.page(window.Cards.load(store), today()) : "Cards did not load."; }
-$("#page").addEventListener("click", (e) => { if (S.page === "cards" && window.Cards && !e.target.closest("[data-page]")) window.Cards.onClick(e, cardsCtx); });
-$("#page").addEventListener("submit", (e) => { if (S.page === "cards" && window.Cards) window.Cards.onSubmit(e, cardsCtx); });
+/* The cards are locked (cards-vault.js): a redraw also covers a lock that lands while he is on the calendar, so the
+   open page never lingers behind it, and the calendar's pills go back to "Card payment due". */
+const cardsCtx = { store, today, toast, page: () => $("#page"), api: { base: API, key: questKey },
+  redraw: () => { if (S.page === "cards" || $("#page").classList.contains("cards")) cardsDraw(); if (S.page !== "cards") render(); } };
+function cardsDraw(passive) { if (window.Cards) window.Cards.draw(cardsCtx, passive); else $("#page").textContent = "Cards did not load."; }
+{
+  const pg = $("#page"), on = () => S.page === "cards" && window.Cards;
+  pg.addEventListener("click", (e) => { if (on() && !e.target.closest("[data-page]")) window.Cards.onClick(e, cardsCtx); });
+  pg.addEventListener("submit", (e) => { if (on()) window.Cards.onSubmit(e, cardsCtx); });
+  pg.addEventListener("input", (e) => { if (on()) window.Cards.onInput(e, cardsCtx); });
+  pg.addEventListener("keydown", (e) => { if (on() && window.Cards.onKey(e, cardsCtx)) { e.preventDefault(); e.stopPropagation(); } });
+  addEventListener("focus", () => { if (window.Cards) window.Cards.refresh(cardsCtx); });
+}
 function showPage(k) {
   /* Every type stays in the calendar (Junyan, 2026-11-13: "I want it to stay on the calendar app"; t9's jump to
      Day Quest Trips is gone). The plane's page lists his trips (tripsPage). */
@@ -2003,7 +2125,8 @@ function showPage(k) {
   if (k === "packing" && !WIDE.matches) return;   // computer only (d14)
   if (S.page === "packing") packLeave();
   if (S.page === "cal" && $("#strip")) S.top = $("#view").scrollTop;
-  S.page = k; document.body.classList.toggle("onpage", k !== "cal"); document.body.classList.toggle("onpk", k === "packing"); document.body.classList.remove("popen", "month");
+  if (k === "cards" && window.Cards) window.Cards.refresh(cardsCtx);
+  S.page = k; document.body.classList.toggle("onpage", k !== "cal"); document.body.classList.toggle("onpk", k === "packing"); document.body.classList.toggle("oncards", k === "cards"); document.body.classList.remove("popen", "month");
   $("#page").hidden = k === "cal"; render();
   if (k !== "cal") $("#page").scrollTop = 0;
 }
@@ -2361,7 +2484,7 @@ function setup() {
   document.addEventListener("keydown", function keyRouter(e) {
     if (e.target.matches?.("input,select,textarea") || e.metaKey || e.ctrlKey || e.altKey || $(".modal")) return;
     const k = e.key.toLowerCase();
-    if (k === "escape") { if (S.page !== "cal") showPage("cal"); else { panel("now"); document.body.classList.remove("popen", "month"); } }
+    if (k === "escape") { if (S.page === "cards" && window.Cards && window.Cards.onKey(e, cardsCtx)) return; if (S.page !== "cal") showPage("cal"); else { panel("now"); document.body.classList.remove("popen", "month"); } }
     else if (S.page !== "cal") return;
     else if (k === "arrowleft") step(-1); else if (k === "arrowright") step(1);
     else if (k === "t") goToday(); else if (k === "1" || k === "d") setN(1); else if (k === "3") setN(3); else if (k === "7" || k === "w") setN(7); else if (k === "m") setN("m");
