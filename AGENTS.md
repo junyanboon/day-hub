@@ -5,7 +5,9 @@
 Day Quest (the quest app) lives in two places: the web pages in the `day-hub` repo
 (`still/quest*.html`, `still/quest-*.js`) and the live backend in
 `/Users/jboon/Agent Workspace/personal/still-api` (deployed with its `deploy.sh`). The backend
-folder is not in git yet; the `day-hub/still-api` copy is stale (last touched 2026-08-08).
+is in git (github.com/junyanboon/still-api): change it on a branch in a worktree and open a PR.
+The `day-hub/still-api` copy is stale (last touched 2026-08-08). Since 2026-11-21 the backend
+also serves the calendar page itself at junyan.danceannex.ca, with password and Face ID sign-in.
 
 1. After a change is merged or verified live, remove every working copy or worktree you made
    (`git worktree remove <path>`, and any extra folder or deploy copy).
