@@ -971,7 +971,7 @@ if (TOUCH) for (const g of ["gesturestart", "gesturechange"]) document.addEventL
    which shows this build, the phone's answers and a log of every day change with its cause. Until then CalHook.on is
    null and diag() does nothing. BUILD names this copy of the page, so a screenshot proves which copy ran: change it on
    every change to this page or calendar-readout.js (the date plus a letter). */
-const BUILD = "2026-11-21d sign in";
+const BUILD = "2026-11-21e passkey";
 const CalHook = window.CalHook = { BUILD, on: null };
 const diag = (kind, msg) => { if (CalHook.on) CalHook.on(kind, msg); };
 /* The iPhone home screen app's fit (2026-11-12): html.hs in a home screen app on touch, html.hsfill and --hsgap when
@@ -2436,9 +2436,10 @@ function signInHTML() {
     <input id="siPw2" type="password" autocomplete="new-password" aria-label="New password again" placeholder="New password again">
     <button class="btn pri" id="siGo" type="submit">Set password and sign in</button></form>`;
   return `<form class="pair" data-si="${st}" id="siForm"><h2>${st === "back" ? "Welcome back" : "Sign in"}</h2><p class="meta">${st === "back" ? "You have been away 12 hours. Sign in again to see your calendar." : "Your calendar, tasks and cards."}</p>
+    ${a.hasPasskey && PK_OK ? `<button class="btn pri" id="siPk" type="button">Sign in with Face ID</button><p class="meta" style="text-align:center">or use your password</p>` : ""}
     <input type="text" name="username" autocomplete="username" value="junyan" style="display:none">
     <input id="siPw" type="password" autocomplete="current-password" aria-label="Password" placeholder="Password">
-    <button class="btn pri" id="siGo" type="submit">Sign in</button></form>`;
+    <button class="btn ${a.hasPasskey && PK_OK ? "" : "pri"}" id="siGo" type="submit">Sign in</button></form>`;
 }
 function wireSignIn() {
   if ($("#siRetry")) { $("#siRetry").onclick = () => { S.auth.checked = false; render(); boot(); }; return; }
@@ -2457,12 +2458,59 @@ function wireSignIn() {
       done();
     } catch (err) { go.disabled = false; $("#siPw").select(); toast(err.message, { bad: true }); }
   };
-  setTimeout(() => { const i = $("#siKey") || $("#siPw"); if (i && !TOUCH) i.focus(); }, 50);
+  if ($("#siPk")) $("#siPk").onclick = async () => {
+    const b = $("#siPk"); b.disabled = true;
+    try { await pkSignIn(); done(); }
+    catch (err) { b.disabled = false; if (err.name !== "NotAllowedError") toast(err.message, { bad: true }); }
+  };
+  setTimeout(() => { const i = $("#siKey") || (!$("#siPk") && $("#siPw")); if (i && !TOUCH) i.focus(); }, 50);
+}
+
+/* ---------- passkeys (d54, d60: Face ID required) ----------
+   The server makes the options and checks the answer (still-api src/passkeys.mjs); the page only hands them to the
+   phone's passkey manager (iCloud Keychain or 1Password). */
+const PK_OK = !!(window.PublicKeyCredential && navigator.credentials);
+const b64uDec = (s) => Uint8Array.from(atob(s.replace(/-/g, "+").replace(/_/g, "/")), (c) => c.charCodeAt(0)).buffer;
+const b64uEnc = (b) => btoa(String.fromCharCode(...new Uint8Array(b))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+function pkJSON(c) {
+  if (typeof c.toJSON === "function") { try { return c.toJSON(); } catch (e) {} }
+  const r = c.response, out = { id: c.id, rawId: b64uEnc(c.rawId), type: c.type, clientExtensionResults: c.getClientExtensionResults ? c.getClientExtensionResults() : {}, response: { clientDataJSON: b64uEnc(r.clientDataJSON) } };
+  if (r.attestationObject) { out.response.attestationObject = b64uEnc(r.attestationObject); out.response.transports = r.getTransports ? r.getTransports() : []; }
+  else { out.response.authenticatorData = b64uEnc(r.authenticatorData); out.response.signature = b64uEnc(r.signature); if (r.userHandle) out.response.userHandle = b64uEnc(r.userHandle); }
+  return out;
+}
+const pkList = (l) => (l || []).map((c) => ({ ...c, id: b64uDec(c.id) }));
+async function pkSignIn() {
+  const { flow, options: o } = await send("/auth/passkey/login/start", "POST", {});
+  const c = await navigator.credentials.get({ publicKey: { ...o, challenge: b64uDec(o.challenge), allowCredentials: pkList(o.allowCredentials) } });
+  await send("/auth/passkey/login/finish", "POST", { flow, response: pkJSON(c) });
+}
+async function pkAdd() {
+  try {
+    const { flow, options: o } = await send("/auth/passkey/register/start", "POST", {});
+    const c = await navigator.credentials.create({ publicKey: { ...o, challenge: b64uDec(o.challenge), user: { ...o.user, id: b64uDec(o.user.id) }, excludeCredentials: pkList(o.excludeCredentials) } });
+    await send("/auth/passkey/register/finish", "POST", { flow, response: pkJSON(c) });
+    S.auth.hasPasskey = true; toast("Face ID passkey added"); loadPasskeys();
+  } catch (e) { if (e.name !== "NotAllowedError") toast(e.name === "InvalidStateError" ? "This device already has a passkey here." : e.message, { bad: true }); }
+}
+async function loadPasskeys() {
+  const box = $("#pkList"); if (!box) return;
+  try {
+    const d = await api("/auth/passkey/list");
+    box.innerHTML = d.passkeys.length ? d.passkeys.map((x) => `<div class="r" style="justify-content:space-between;gap:8px"><span>${esc(x.label)}<br><span class="meta">added ${ago(x.created)}${x.used ? ", used " + ago(x.used) : ""}</span></span><button class="btn" data-pkrm="${esc(x.id)}">Remove</button></div>`).join("") : "None yet. Add one to sign in with Face ID.";
+    S.auth.hasPasskey = d.passkeys.length > 0;
+  } catch (e) { box.textContent = "Could not load the passkeys: " + e.message; }
+}
+async function pkRemove(id) {
+  if (!confirm("Remove this passkey? You can still sign in with your password.")) return;
+  try { await send("/auth/passkey/remove", "POST", { id }); toast("Passkey removed"); loadPasskeys(); } catch (e) { toast(e.message, { bad: true }); }
 }
 /* Settings: the devices signed in, sign out, change password (d60: any device can be signed out) */
 function devicesHTML() {
-  setTimeout(loadDevices, 0);
-  return `<div class="field"><p class="lbl" style="margin:0">Signed in devices</p><div id="devList" class="meta">Loading…</div>
+  setTimeout(() => { loadDevices(); loadPasskeys(); }, 0);
+  return `<div class="field"><p class="lbl" style="margin:0">Face ID passkeys</p><div id="pkList" class="meta">Loading…</div>
+    ${PK_OK ? `<button class="btn" id="pkAdd">Add Face ID passkey</button>` : `<div class="meta">This browser cannot use passkeys.</div>`}</div>
+    <div class="field"><p class="lbl" style="margin:0">Signed in devices</p><div id="devList" class="meta">Loading…</div>
     <div class="r" style="gap:8px;flex-wrap:wrap"><button class="btn" id="soBtn">Sign out</button><button class="btn" id="soAll">Sign out other devices</button><button class="btn" id="pwBtn">Change password</button></div>
     <div id="pwForm" hidden style="display:flex;flex-direction:column;gap:6px;margin-top:6px">
       <input type="text" name="username" autocomplete="username" value="junyan" style="display:none">
@@ -2515,7 +2563,7 @@ function wirePair() {
 /* ---------- controls ---------- */
 function setup() {
   document.addEventListener("click", function clickRouter(e) {
-    const t = e.target.closest("[data-railtog],[data-pkday],[data-page],[data-n],[data-p],[data-key],[data-staff],[data-allday],[data-open],[data-acc],[data-skip],[data-go],[data-dur],[data-kind],[data-sheet],[data-triptab],button[data-look],#pSave,#pDel,#pAcc,#pSkip,#pGrab,#pairBtn,[data-end],#soBtn,#soAll,#pwBtn,#pwGo");
+    const t = e.target.closest("[data-railtog],[data-pkday],[data-page],[data-n],[data-p],[data-key],[data-staff],[data-allday],[data-open],[data-acc],[data-skip],[data-go],[data-dur],[data-kind],[data-sheet],[data-triptab],button[data-look],#pSave,#pDel,#pAcc,#pSkip,#pGrab,#pairBtn,[data-end],[data-pkrm],#pkAdd,#soBtn,#soAll,#pwBtn,#pwGo");
     if (!t || t.closest(".ev")) return;
     const d = t.dataset;
     if (t.matches("button[data-look]")) setLook(d.look);
@@ -2544,6 +2592,8 @@ function setup() {
     else if (t.id === "pAcc") acceptSugg(S.ev, { calId: $("#pCal").value, title: $("#pTitle").value.trim() || S.ev.title });
     else if (t.id === "pSkip") skipSugg(S.ev);
     else if (t.id === "soBtn") signOut();
+    else if (t.id === "pkAdd") pkAdd();
+    else if (d.pkrm) pkRemove(d.pkrm);
     else if (t.id === "soAll") endDevices({ all: true });
     else if (d.end) endDevices({ id: d.end });
     else if (t.id === "pwBtn") { const f = $("#pwForm"); f.hidden = !f.hidden; if (!f.hidden) $("#pwCur").focus(); }
