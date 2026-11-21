@@ -13,7 +13,7 @@
 <meta name="apple-mobile-web-app-title" content="Calendar">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>Calendar</title>
-<script src="calendar-core.js?v=26"></script>
+<script src="calendar-core.js?v=27"></script>
 <script src="cards-vault.js?v=2"></script><script src="cards.js?v=7"></script>
 <script src="quest-trips.js?v=20261121a" data-helpers></script>
 <script>
@@ -1041,7 +1041,7 @@ const zoneName = (tz) => (ZONES.find((x) => x[0] === tz) || [0, tz])[1];
 const CACHE_KEY = "cal-app-cache-v1";
 const S = { tz: store.get("cal-tz") || DEVICE_TZ, tz2: store.get("cal-tz2") || "", n: store.get("cal-n") || "3",
   cur: null, win0: null, mini: null, miniLock: false, cals: [], hidden: new Set(JSON.parse(store.get("cal-hidden") || "[]")),
-  months: {}, sugg: [], loading: new Set(), tab: "now", ev: null, form: null, page: "cal", rail: store.get("cal-rail") !== "0", top: null,
+  months: {}, sugg: [], loading: new Set(), tab: "now", ev: null, form: null, page: "cal", rail: store.get("cal-rail") !== "0", routine: store.get("cal-routine") !== "0", autoG: [], top: null,
   look: C.lookId(store.get("cal-look")),
   h: C.startHour({ getItem: store.get }, TOUCH) };   // the hour height in px: 56 on a desktop; a phone's own pinched height (slice 01)
 S.n = S.n === "m" ? "m" : +S.n || 3;
@@ -1116,7 +1116,31 @@ function eventsFor(fromDay, toDay) {
 function cardEvents(fromDay, toDay) { return window.Cards ? window.Cards.calEvents(store, fromDay, toDay, today()) : []; }
 function ghosts() {
   return S.sugg.filter((g) => g.status === "open").map((g) => ({ ...g, ghost: true,
-    s: g.allDay ? null : Date.parse(g.start), e: g.allDay ? null : Date.parse(g.end), k: C.kindOf({ title: g.title, kind: g.kind, calName: calOf(g.calId).name }) }));
+    s: g.allDay ? null : Date.parse(g.start), e: g.allDay ? null : Date.parse(g.end), k: C.kindOf({ title: g.title, kind: g.kind, calName: calOf(g.calId).name }) }))
+    .concat(S.autoG);
+}
+/* The day's own blocks (C.routineBlocks): Domestic, and Wind Down, Sleep and Morning Routine back to back, suggested on
+   today and later days from his free time. They are worked out here, not stored: Accept writes the event to his own
+   calendar, Skip is kept in this browser for that day (Junyan, 2026-11-21). Settings can turn them off. */
+const RSKIP = "cal-routine-skip";
+const ownCal = () => S.cals.find((c) => c.writable && c.name === "Junyan") || homeCal();
+function routineSkips() { try { return JSON.parse(store.get(RSKIP) || "{}"); } catch { return {}; } }
+function autoGhosts(days, evs) {
+  const cal = S.routine && authed() && ownCal(); if (!cal) return [];
+  const t = today(), now = Date.now(), skip = routineSkips(), out = [];
+  // his own time: timed plans on calendars he can write, not studio shifts (they are other people's)
+  const mine = evs.filter((e) => !e.allDay && !e.ghost && calOf(e.calId).writable && !/staff/i.test(calOf(e.calId).name));
+  for (const d of days) {
+    if (d < t) continue;
+    const a = C.instant(d, 0, S.tz), z = C.instant(C.addDays(d, 2), 0, S.tz);   // that day and the next morning only
+    for (const b of C.routineBlocks(d, mine.filter((e) => e.e > a && e.s < z), S.tz, d === t ? now : 0)) {
+      const id = `auto:${b.key}:${d}`;
+      if (skip[id] || b.e <= now) continue;
+      out.push({ id, auto: true, ghost: true, status: "open", allDay: false, calId: cal.id, title: b.title, kind: b.kind, k: b.kind,
+        s: b.s, e: b.e, start: new Date(b.s).toISOString(), end: new Date(b.e).toISOString(), by: "the calendar", why: b.why });
+    }
+  }
+  return out;
 }
 /** Studio shifts: timed events on a Staff Scheduling calendar. They sit in the slim rail, not as blocks. */
 const isStaff = (e) => S.rail && !e.ghost && !e.allDay && /staff/i.test(calOf(e.calId).name);
@@ -1124,8 +1148,8 @@ const isStaff = (e) => S.rail && !e.ghost && !e.allDay && /staff/i.test(calOf(e.
 const staffIcon = (t) => /\b(account\w*|bookkeep\w*|payroll|invoice\w*|tax(es)?|ynab)\b/i.test(t) ? "🧾" : /\b(meet\w*|check-?in|call|1:1|sync|huddle)\b/i.test(t) ? "👥" : "🔑";
 async function loadMonth(m, force) {
   const have = S.months[m];
-  if (!force && have && Date.now() - have.at < 60000) return;
-  if (S.loading.has(m)) return;
+  if (!force && have && Date.now() - have.at < 60000) return false;
+  if (S.loading.has(m)) return false;
   S.loading.add(m);
   try {
     const first = m + "-01", next = C.addMonths(first, 1);
@@ -1133,6 +1157,7 @@ async function loadMonth(m, force) {
     const d = await api(`/planner/events?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`);
     S.months[m] = { at: Date.now(), events: d.events || [] };
     for (const er of d.errors || []) toast(`${er.name}: ${er.error}`, { bad: true });
+    return true;
   } finally { S.loading.delete(m); }
 }
 function viewRange() {
@@ -1144,8 +1169,10 @@ async function refresh(force) {
   const [a, b] = viewRange();
   const ms = [...new Set([...C.monthsFor(a, b), C.monthKey(today())])];
   if (ms.some((m) => !S.months[m])) status("Loading…");
-  try { await Promise.all(ms.map((m) => loadMonth(m, force))); status(""); }
+  let got = true;
+  try { got = (await Promise.all(ms.map((m) => loadMonth(m, force)))).some(Boolean); status(""); }
   catch (e) { status("Could not reach the calendar: " + e.message); }
+  if (!got) return;   // nothing new came in: the caller already drew this, so a second full redraw only slowed each key (2026-11-21)
   saveCache(); render();
 }
 async function loadSide() {
@@ -1267,7 +1294,9 @@ function strip(v) {
   const t = today(), nowW = C.wall(Date.now(), S.tz), nowY = atMin(nowW.min);
   v.style.setProperty("--H", S.h + "px");
   const days = stripDays = Array.from({ length: WIN }, (_, i) => C.addDays(S.win0, i));
-  const evs = eventsFor(days[0], days[WIN - 1]), gh = ghosts();
+  const evs = eventsFor(days[0], days[WIN - 1]);
+  S.autoG = autoGhosts(days, evs);
+  const gh = ghosts();
   const allDay = [...evs.filter((e) => e.allDay), ...gh.filter((g) => g.allDay)];
   const timed = [...evs.filter((e) => !e.allDay), ...gh.filter((g) => !g.allDay)];
   const hours = (tz) => { let s = ""; for (let h = 1; h < 24; h++) s += `<span style="top:calc(${h} * var(--H))">${C.hm(C.wall(C.instant(S.cur, h * 60, S.tz), tz).min)}</span>`; return s; };
@@ -1593,14 +1622,14 @@ function setN(n) {
   if (n === 7) S.cur = C.weekStart(S.cur);
   S.win0 = C.addDays(S.cur, -BACK); render(); refresh();
 }
-function step(d) { if (S.n === "m") { S.cur = C.addMonths(S.cur, d); S.miniLock = false; render(); refresh(); } else goTo(C.addDays(S.cur, d * S.n)); }
-function goToday() {
-  const t = today(); goTo(S.n === 7 ? C.weekStart(t) : S.n === "m" ? t : t);
-  if (S.n !== "m") $("#view").scrollTo({ top: Math.max(0, C.wall(Date.now(), S.tz).min / 60 * S.h - 220), behavior: "smooth" });
+function step(d, smooth = true) { if (S.n === "m") { S.cur = C.addMonths(S.cur, d); S.miniLock = false; render(); refresh(); } else goTo(C.addDays(S.cur, d * S.n), smooth); }
+function goToday(smooth = true) {
+  const t = today(); goTo(S.n === 7 ? C.weekStart(t) : S.n === "m" ? t : t, smooth);
+  if (S.n !== "m") $("#view").scrollTo({ top: Math.max(0, C.wall(Date.now(), S.tz).min / 60 * S.h - 220), behavior: smooth ? "smooth" : "auto" });
 }
 function monthView(v) {
   const first = S.cur.slice(0, 8) + "01", s = C.weekStart(first), t = today(), mo = first.slice(5, 7);
-  const evs = [...eventsFor(s, C.addDays(s, 41)), ...ghosts()].filter((e) => !isStaff(e));
+  const evs = [...eventsFor(s, C.addDays(s, 41)), ...ghosts()].filter((e) => !isStaff(e) && !e.auto);
   let h = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].map((x) => `<div class="mh">${x}</div>`).join("");
   for (let i = 0; i < 42; i++) {
     const k = C.addDays(s, i);
@@ -1638,7 +1667,7 @@ function pNow() {
   const now = Date.now(), t = today();
   const mine = eventsFor(t, C.addDays(t, 7)).filter((e) => !e.allDay && !isStaff(e)).sort((a, b) => a.s - b.s);
   const cur = mine.find((e) => e.s <= now && e.e > now), next = mine.find((e) => e.s > now);
-  const rest = mine.filter((e) => e.e > now && e !== cur && C.wall(e.s, S.tz).day === t), sug = ghosts();
+  const rest = mine.filter((e) => e.e > now && e !== cur && C.wall(e.s, S.tz).day === t), sug = ghosts().filter((g) => !g.auto || g.id.endsWith(":" + t));
   let frac = 0, big = "Free", sub = "Nothing else on the calendar", ico = "🌙", k = "other", lbl = "Up next";
   if (cur) { frac = (now - cur.s) / (cur.e - cur.s); big = untilText((cur.e - now) / 60000) + " left"; sub = "in " + cur.title; ico = KICON[cur.k] || "●"; k = cur.k; lbl = "Right now"; }
   else if (next) { const mins = (next.s - now) / 60000; frac = Math.max(0, 1 - mins / 180); big = untilText(mins); sub = "free until " + next.title; ico = KICON[next.k] || "●"; k = next.k; }
@@ -1795,6 +1824,7 @@ function pSet() {
   const swatch = (l) => { const a = l.day || l, b = l.night || l;
     return `--lk-bg:${a.bg};--lk-bar:${a.theme};--lk-bg2:${b.bg};--lk-bar2:${b.theme};--lk-acc:${a.accent};--lk-1:${a.gels[0]};--lk-2:${a.gels[1]};--lk-3:${a.gels[2]}`; };
   return `<div class="field"><p class="lbl" style="margin:0">Look</p><div class="looks" role="group" aria-label="Look">${C.LOOKS.map((l) => `<button class="look" data-look="${l.id}" aria-pressed="${l.id === S.look}" style="${swatch(l)}"><span class="lk-chip ${l.day ? "split" : ""}" aria-hidden="true"><i></i><i></i><i></i></span><span class="lk-nm">${esc(l.name)}</span></button>`).join("")}</div><div class="meta">Tap one to try it on the whole calendar. This device remembers it. Studio is light by day and dark after sunset.</div></div>
+    <div class="field"><p class="lbl" style="margin:0">Daily blocks</p><label class="sw" for="routineSw">Suggest Domestic, Wind Down, Sleep and Morning Routine<input type="checkbox" id="routineSw" ${S.routine ? "checked" : ""}></label></div>
     <div class="field"><p class="lbl" style="margin:0">Studio shifts</p><label class="sw" for="railSw">Show in a slim rail, not as full blocks<input type="checkbox" id="railSw" ${S.rail ? "checked" : ""}></label></div>
     <div class="field"><p class="lbl" style="margin:0">Time zones</p><label class="sw" for="tz1">Main<select id="tz1">${opts(S.tz)}</select></label><label class="sw" for="tz2">Second<select id="tz2">${opts(S.tz2, true)}</select></label></div>
     <div class="field"><p class="lbl" style="margin:0">Block types</p>${C.KINDS.map(([k, n]) => `<div class="r k-${k}" style="color:var(--soft)"><i style="width:12px;height:12px;border-radius:4px;background:var(--c)"></i>${KICON[k] ? KICON[k] + " " : ""}${n}</div>`).join("")}<div class="meta">Guessed from the title. Change one on its event and it sticks.</div></div>
@@ -1823,11 +1853,17 @@ function pKeys() {
 
 /* ---------- suggestions ---------- */
 async function acceptSugg(g, over = {}) {
+  if (g.auto) { panel("now"); await createEvent({ calId: over.calId || g.calId, title: over.title || g.title, start: g.start, end: g.end, kind: g.kind }); return; }
   panel("now"); status("Saving…");
   try { const d = await send("/planner/suggestions/accept", "POST", { id: g.id, ...over }); S.sugg = S.sugg.filter((x) => x.id !== g.id); dropMonthsAround(g.start); toast("Accepted, on " + calOf(d.suggestion.eventCalId).name); await refresh(true); }
   catch (e) { status(""); toast(e.message, { bad: true }); }
 }
 async function skipSugg(g) {
+  if (g.auto) {
+    const k = routineSkips(), old = C.addDays(today(), -7);
+    for (const id of Object.keys(k)) if (id.slice(-10) < old) delete k[id];   // keep a week of skips, no more
+    k[g.id] = 1; store.set(RSKIP, JSON.stringify(k)); panel("now"); toast("Skipped for that day"); render(); return;
+  }
   panel("now");
   try { await send("/planner/suggestions/skip", "POST", { id: g.id }); S.sugg = S.sugg.filter((x) => x.id !== g.id); toast("Skipped"); render(); }
   catch (e) { toast(e.message, { bad: true }); }
@@ -2603,6 +2639,7 @@ function setup() {
   document.addEventListener("change", (e) => {
     const t = e.target;
     if (t.id === "railSw") { S.rail = t.checked; store.set("cal-rail", S.rail ? "1" : "0"); render(); }
+    else if (t.id === "routineSw") { S.routine = t.checked; store.set("cal-routine", S.routine ? "1" : "0"); render(); }
     else if (t.id === "tz1") { S.tz = t.value; store.set("cal-tz", S.tz); S.months = {}; showLook(); render(); refresh(true); }
     else if (t.id === "tz2") { S.tz2 = t.value; store.set("cal-tz2", S.tz2); render(); }
     else if (t.closest(".sheet") && (t.dataset.f || t.id === "pCal")) { if (t.id === "pCal") { S.form.calId = t.value; sheetPaint(); } else sheetInput(t); }
@@ -2651,8 +2688,8 @@ function setup() {
     const k = e.key.toLowerCase();
     if (k === "escape") { if (S.page === "cards" && window.Cards && window.Cards.onKey(e, cardsCtx)) return; if (S.page !== "cal") showPage("cal"); else { panel("now"); document.body.classList.remove("popen", "month"); } }
     else if (S.page !== "cal") return;
-    else if (k === "arrowleft") step(-1); else if (k === "arrowright") step(1);
-    else if (k === "t") goToday(); else if (k === "1" || k === "d") setN(1); else if (k === "3") setN(3); else if (k === "7" || k === "w") setN(7); else if (k === "m") setN("m");
+    else if (k === "arrowleft") step(-1, false); else if (k === "arrowright") step(1, false);   // a key jumps at once; the slide made it feel slow (2026-11-21)
+    else if (k === "t") goToday(false); else if (k === "1" || k === "d") setN(1); else if (k === "3") setN(3); else if (k === "7" || k === "w") setN(7); else if (k === "m") setN("m");
     else if (k === "n") $("#newTask").focus(); else if (k === "p") $("#panelBtn").click(); else if (k === "?") panel("keys");
     else return;
     e.preventDefault();
