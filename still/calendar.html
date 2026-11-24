@@ -2715,10 +2715,10 @@ const cmCanEdit = (ev) => !!calOf(ev.calId).writable;
    checked (set by Check now). The last answer of each block is also kept in this browser (cal-commute-last, 2 days) only so
    the first Check now after a reload can say what is new. No answer means none of the directions parts is drawn. */
 const WAYNAME = { commute: "Walk", transit: "Transit", drive: "Drive" };
-const cmFmt = (ms) => C.hm(C.wall(ms, S.tz).min);
+const cmFmt = (ms) => (Number.isFinite(ms) ? C.hm(C.wall(ms, S.tz).min) : "");
 const cmLast = () => cmGet("cal-commute-last");
-function cmRemember(key, res) {
-  const all = cmLast(), t = Date.now(); all[key] = { at: t, res };
+function cmRemember(key, res, sig) {
+  const all = cmLast(), t = Date.now(); all[key] = { at: t, res, sig };
   for (const k of Object.keys(all)) if (t - all[k].at > 2 * 86400000) delete all[k];
   const ks = Object.keys(all).sort((a, b) => all[b].at - all[a].at).slice(20);
   for (const k of ks) delete all[k];
@@ -2738,13 +2738,15 @@ const cmDirOf = (ev) => CM.dir[keyOf(ev)] || null;
 async function cmDirections(ev, { fresh = false, auto = false } = {}) {
   const key = keyOf(ev), inp = cmDirInput(ev); if (!inp) return;
   const d = CM.dir[key] || (CM.dir[key] = { res: null, got: 0, prev: null, checked: null, sig: "", autoDone: false, loading: false, error: "" });
-  if (d.loading) return;
+  if (d.loading && (fresh || d.loadSig === inp.sig)) return;   // a changed From or To still goes ahead: it replaces the request in flight
   if (!fresh && d.res && d.sig === inp.sig && Date.now() - d.got < 60000) return;
-  d.loading = true; d.error = ""; if (fresh) d.checked = null;
-  const stored = cmLast()[key], before = d.res || (stored && stored.res) || null;
+  const seq = d.seq = (d.seq || 0) + 1;
+  d.loading = true; d.loadSig = inp.sig; d.error = ""; if (fresh) d.checked = null;
+  const stored = cmLast()[key], before = d.res && d.sig === inp.sig ? d.res : stored && stored.sig === inp.sig ? stored.res : null;   // only an answer for this same trip is compared
   if (S.ev && keyOf(S.ev) === key) cmPaint();
   try {
     const res = await send("/quest/commute/directions", "POST", { from: cmEnd(inp.from), to: cmEnd(inp.t), arriveBy: new Date(inp.arrive.at).toISOString(), fresh });
+    if (d.seq !== seq) return;   // a newer request replaced this one
     d.prev = res.state === "ok" && before && before.state === "ok" ? before : null;
     d.res = res; d.got = Date.now(); d.sig = inp.sig;
     if (fresh && res.state === "ok") {
@@ -2752,8 +2754,8 @@ async function cmDirections(ev, { fresh = false, auto = false } = {}) {
       const w = res.ways && res.ways[CalCommute.WAY[C.modeOf(ev)]], lv = cmUsable(w) ? CalCommute.leaveBy(w, inp.arrive.at) : null;
       if (Number.isFinite(lv) && d.got >= lv - 3600000) d.autoDone = true;   // a check he pressed inside that hour counts as the one
     }
-    if (res.state === "ok") cmRemember(key, res);
-  } catch (e) { d.error = "Directions could not be loaded. Check your connection and try Check now."; }
+    if (res.state === "ok") cmRemember(key, res, inp.sig);
+  } catch (e) { if (d.seq !== seq) return; d.error = "Directions could not be loaded. Check your connection and try Check now."; }
   d.loading = false;
   if (S.ev && keyOf(S.ev) === key) cmPaint();
 }
@@ -2797,6 +2799,7 @@ function cmDirParts(ev, mode, inp) {
   const d = cmDirOf(ev), K = CalCommute, out = { leave: "", way: "", heads: "", check: "", banner: "", ways: null };
   if (!inp) return out;
   if (!d || (!d.res && !d.loading && !d.error)) return out;
+  if (d.res && d.sig !== inp.sig && d.loading) { out.way = `<div class="meta" role="status">Getting directions…</div>`; return out; }   // never show the answer for an earlier From or To
   if (d.loading && !d.res) { out.way = `<div class="meta" role="status">Getting directions…</div>`; return out; }
   if (!d.res) { out.way = `<div class="meta">${esc(d.error)}</div><div class="r"><button class="btn" data-cm="check">Check now</button></div>`; return out; }
   if (d.res.state !== "ok") { out.way = `<div class="meta" role="status">${esc(d.res.state === "no-key" ? "Directions need the Google key" : d.res.message || "Directions are not available.")}</div>`; return out; }
@@ -2811,10 +2814,10 @@ function cmDirParts(ev, mode, inp) {
     out.way = `<div class="field"><p class="lbl" style="margin:0">The way there · ${way.minutes} min${mode === "drive" && way.km ? " · " + way.km + " km" : ""}</p>${cmSteps(way, mode)}</div>`;
     out.heads = cmHeadsUp(d, mode);
     const q = d.checked ? K.quickerThan(ways, mode) : null;
-    if (q) out.heads += `<div class="cmquick"><span><b>${WAYNAME[q.chip]} is quicker right now</b><small>${q.by} min quicker than ${WAYNAME[mode].toLowerCase()}</small></span><button class="btn" data-cm="switch" data-v="${q.chip}">Switch to ${WAYNAME[q.chip]}</button></div>`;
+    if (q) out.heads += `<div class="cmquick"><span><b>${WAYNAME[q.chip]} is quicker right now</b><small>${q.by} min quicker than ${WAYNAME[mode].toLowerCase()}</small></span><button class="btn" data-cm="switch" data-v="${q.chip}" ${cmCanEdit(ev) ? "" : "disabled"}>Switch to ${WAYNAME[q.chip]}</button></div>`;
     const auto = !d.autoDone && Number.isFinite(leave) && leave > Date.now();
     out.check = `<div class="r"><button class="btn pri" data-cm="check" ${d.loading ? "disabled" : ""}>${d.loading ? "Checking…" : "Check now"}</button></div>` +
-      `<div class="meta cmlast">Last checked ${esc(cmFmt(checkedAt))}${auto ? ". While this panel is open, it checks once in the hour before you leave." : ""}</div>`;
+      `<div class="meta cmlast">Last checked ${esc(cmFmt(checkedAt))}${auto ? ". While this panel is open, it checks once in the hour before you leave." : ""}</div>${d.error ? `<div class="meta" role="alert">${esc(d.error)}</div>` : ""}`;
     out.leaveAt = leave;
   } else {
     const e = way && way.tooFar ? `Too far to walk (${way.km} km).` : errs[K.WAY[mode]] === "stopped" ? "Directions are off for the rest of the month. They come back on the 1st." : errs[K.WAY[mode]] || "No directions for this way.";
