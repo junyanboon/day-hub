@@ -19,7 +19,8 @@ const CALS = [
   { id: "caney", name: "Caney", color: "#a98467", writable: false, ok: true },
   { id: "bday", name: "Community Birthdays", color: "#c77dff", writable: false, ok: true },
 ];
-const day0 = new Date(); day0.setHours(0, 0, 0, 0);
+/* DEV_NOW pins the clock the days are counted from (the Commute check sets it, with TZ, so no test reads the real clock) */
+const day0 = new Date(process.env.DEV_NOW || Date.now()); day0.setHours(0, 0, 0, 0);
 const at = (d, h, m = 0) => new Date(day0.getTime() + d * 86400000 + (h * 60 + m) * 60000).toISOString();
 const ymd = (d) => { const x = new Date(day0.getTime() + d * 86400000); return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, "0")}-${String(x.getDate()).padStart(2, "0")}`; };
 let n = 0;
@@ -31,17 +32,20 @@ let events = [
   E(0, 10, 45, 11, 15, "Need FBS · Elena", "staff"), E(0, 11, 30, 12, 10, "Drive"), E(0, 12, 15, 12, 40, "Accounting: month end", "staff"),
   E(0, 12, 30, 15, 0, "Visit Mom"), E(0, 15, 30, 15, 50, "Isha Kriya"), E(0, 16, 15, 16, 40, "Team meeting", "staff"),
   A(1, 1, "Remembrance Day", "bday"), E(1, 8, 30, 9, 30, "901 Bell Internet will expire Nov 24", "staff"), E(1, 10, 0, 11, 30, "Work block"),
-  E(1, 13, 15, 14, 45, "Zouk Training"), E(1, 15, 30, 17, 0, "Studio on-site · 527"), E(1, 17, 50, 18, 15, "Need FBS · Elena", "staff"),
+  E(1, 13, 15, 14, 45, "Zouk Training"), E(1, 15, 30, 17, 0, "Studio on-site · 527", "joint", { location: "527 Bloor St W, Toronto" }), E(1, 17, 50, 18, 15, "Need FBS · Elena", "staff"),
   E(2, 9, 30, 11, 0, "Work block"), E(2, 12, 0, 12, 30, "Close Scotia account"), E(2, 13, 0, 15, 0, "Packing & Errands"),
   A(3, 3, "Stay at FICTION"), A(3, 1, "Caney away", "caney"), A(3, 1, "Pay rent"), E(3, 10, 30, 17, 0, "Drive"), E(3, 17, 0, 17, 30, "Check-in"),
   E(4, 13, 0, 14, 30, "Zouk WS"), E(4, 14, 30, 16, 0, "Lambada WS"), E(4, 16, 0, 17, 0, "Solo Battle WS"),
   A(5, 1, "Caney's Birthday", "bday"), E(5, 12, 0, 13, 0, "Gym · Jack Woods"), E(5, 13, 0, 14, 30, "Lambada WS"), E(5, 16, 0, 17, 0, "Practica"), E(5, 17, 30, 19, 0, "Dinner w/ everyone?"),
+  /* Commute blocks (2026-11-24): one with no address anywhere (asks), one whose next event has an address, one with its own */
+  E(1, 9, 35, 10, 0, "Transit"), E(1, 15, 0, 15, 25, "Bus to studio"), E(2, 8, 30, 9, 15, "Subway to class", "joint", { location: "1 Yonge St, Toronto" }), E(2, 9, 15, 9, 30, "Commute"),
   E(-2, 12, 0, 13, 0, "Gym · Jack Woods"), E(20, 13, 15, 14, 45, "Zouk Training"), E(-20, 13, 15, 14, 45, "Zouk Training"),
 ];
 for (let d = -30; d <= 45; d++) events.push(E(d, 18, 0, 19, 0, "Dinner", "joint", { recurringEventId: "dinner" }), E(d, 6, 45, 8, 0, "Morning Yoga"), E(d, 21, 45, 22, 30, "Wind down"));
 let sugg = [{ id: "sg_1", status: "open", title: "Pack for FICTION stay", start: at(2, 19), end: at(2, 20), calId: "joint", by: "Desk Hand session", why: "You drive out at 10:30 Friday" }];
 const tasks = [];
 let places = [];
+const commuteNotes = [], commuteFiles = {};   // still-api /quest/commute/*, in memory
 const uploads = [];   // reservation files the trip page sent (the e2e reads the request log, this keeps the server honest)
 const FOUND = { "schwartz's deli": { lat: 45.5163, lng: -73.5776 }, "jean-talon market": { lat: 45.5364, lng: -73.6148 } };
 
@@ -73,6 +77,20 @@ http.createServer(async (req, res) => {
     const nm = `Ref._Montreal stay_confirmation.${/pdf/.test(b.data.slice(0, 30)) ? "pdf" : "png"}`;
     uploads.push({ id: b.id, filename: b.filename });
     return send(res, 200, { ok: true, name: nm, item: { id: b.id, files: [{ name: nm, url: "https://files.example/" + encodeURIComponent(nm) }] } });
+  }
+  /* photo notes of Commute blocks (slice 1): still-api's /quest/commute/photo and /quest/commute/photos, faked */
+  if (u.pathname.startsWith("/quest/commute/")) {
+    if (req.headers["x-quest-key"] !== "test") return send(res, 401, { error: "wrong pairing code (the dev server's code is: test)" });
+    if (u.pathname === "/quest/commute/photos") {
+      const pl = u.searchParams.get("place"), bl = u.searchParams.get("block");
+      return send(res, 200, { notes: commuteNotes.filter((x) => (pl ? x.place === pl && x.withPlace : x.block === bl)).sort((a, b) => (b.date + b.at).localeCompare(a.date + a.at)) });
+    }
+    if (u.pathname === "/quest/commute/photo" && req.method === "GET") { const id = u.searchParams.get("id"); return commuteFiles[id] ? send(res, 200, { data: commuteFiles[id] }) : send(res, 404, { error: "no such photo" }); }
+    const b = await readBody(req);
+    if (!b.note && !b.data) return send(res, 400, { error: "send a note or a photo" });
+    const note = { id: "cp-" + (++n), place: b.place || "", placeName: b.placeName || "", block: b.block || "", date: b.date || "", note: b.note || "", withPlace: !!b.withPlace && !!b.place, hasFile: !!b.data, at: String(n).padStart(6, "0") };
+    if (b.data) commuteFiles[note.id] = b.data;
+    commuteNotes.push(note); return send(res, 200, { ok: true, note });
   }
   if (u.pathname === "/quest/trips/one" || u.pathname === "/quest/places") {
     if (req.headers["x-quest-key"] !== "test") return send(res, 401, { error: "wrong pairing code (the dev server's code is: test)" });
