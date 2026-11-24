@@ -46,6 +46,27 @@ let sugg = [{ id: "sg_1", status: "open", title: "Pack for FICTION stay", start:
 const tasks = [];
 let places = [];
 const commuteNotes = [], commuteFiles = {}, commuteRoutes = [];   // still-api /quest/commute/*, in memory
+/* Slice 2: /quest/commute/directions, faked in still-api's answer shape (test/fake-routes.mjs there holds the same sample trip). The
+   times come from the arrive-by the page sends, so nothing here reads a clock. GET /__dev/directions?state=ok|no-key|stopped and
+   ?next=1 (the next answer is a later check: leave 6 min earlier, one alert new, one cleared, drive now quicker) steer it. */
+let dirState = "ok", dirNext = false, dirCalls = [];
+const encPoly = (pts) => { let la = 0, lo = 0, o = ""; const e = (v) => { v = v < 0 ? ~(v << 1) : v << 1; let t = ""; while (v >= 32) { t += String.fromCharCode((32 | (v & 31)) + 63); v >>= 5; } return t + String.fromCharCode(v + 63); }; for (const [a, b] of pts) { const x = Math.round(a * 1e5), y = Math.round(b * 1e5); o += e(x - la) + e(y - lo); la = x; lo = y; } return o; };
+function dirAnswer(b, later) {
+  const arrive = Date.parse(b.arriveBy), M = 60000, f = (b.from && b.from.lat) ?? 45.52, g = (b.from && b.from.lng) ?? -73.58, t = (b.to && b.to.lat) ?? 45.5364, h = (b.to && b.to.lng) ?? -73.6148;
+  const line = encPoly([[f, g], [(f + t) / 2 + 0.004, (g + h) / 2 - 0.004], [t, h]]);
+  const tm = later ? 40 : 34, dm = 27, arriveT = arrive - 1 * M, leaveT = arriveT - tm * M;
+  const ride = (label, headsign, from, to, stops, dep, min, wait) => ({ kind: "transit", vehicle: "SUBWAY", line: label.slice(-1), label, headsign, stops, from, to, departsAt: dep, arriveAt: dep + min * M, minutes: min, wait });
+  const transit = { mode: "transit", minutes: tm, km: 9, leaveAt: leaveT, arriveAt: arriveT, polyline: line, roads: [], trafficMinutes: 0, steps: [
+    { kind: "walk", text: "Walk to Dev Station North", minutes: 6, meters: 450 },
+    ride("Line 1 Dev Line", "Union", "Dev Station North", "Dev Junction", 5, leaveT + 6 * M, 12, 0),
+    ride("Line 2 Test Line", "Kipling", "Dev Junction", "Dev Station East", 2, leaveT + 21 * M, 7, 3),
+    { kind: "walk", text: "Walk to Dev Studio", minutes: 4, meters: 300 }] };
+  const drive = { mode: "drive", minutes: dm, km: 8.1, leaveAt: null, arriveAt: null, polyline: line, steps: [], trafficMinutes: later ? 0 : 5, roads: [{ road: "Dev Avenue", km: 3.2, minutes: 10 }, { road: "Test Street", km: 2.2, minutes: 7 }, { road: "Sample Road", km: 2.7, minutes: 8 }] };
+  const walk = { mode: "walk", tooFar: true, km: 9 };
+  const alerts = [{ id: "ttc:t1", kind: "ttc", mode: "transit", title: "Line 1: trains move slower than usual", detail: "Reduced speed zone, Dev Station North to Dev Junction." }, { id: "wx:snow", kind: "weather", mode: "any", title: "Snow from 1 pm, 2°C", detail: "Roads and sidewalks may be slippery." }];
+  const alerts2 = [{ id: "ttc:t3", kind: "ttc", mode: "transit", title: "Line 2: delays of about 5 minutes", detail: "" }, { id: "wx:snow", kind: "weather", mode: "any", title: "Snow from 1 pm, 2°C", detail: "Roads and sidewalks may be slippery." }, { id: "road:c1", kind: "closure", mode: "drive", title: "Dev Avenue closed near Test Street", detail: "Watermain repair." }];
+  return { state: "ok", checkedAt: new Date(process.env.DEV_NOW || Date.now()).getTime() + (later ? 3 * 60000 : 0), ways: { walk, transit, drive }, errors: {}, alerts: later ? alerts2 : alerts, sourcesDown: b.fresh && later ? ["roads"] : [], cached: {} };
+}
 let routesDown = false;   // GET /__dev/routes?down=1 makes the route calls fail, to check the browser-copy fallback
 const uploads = [];   // reservation files the trip page sent (the e2e reads the request log, this keeps the server honest)
 const FOUND = { "schwartz's deli": { lat: 45.5163, lng: -73.5776 }, "jean-talon market": { lat: 45.5364, lng: -73.6148 } };
@@ -81,6 +102,14 @@ http.createServer(async (req, res) => {
   }
   /* photo notes of Commute blocks (slice 1): still-api's /quest/commute/photo and /quest/commute/photos, faked */
   if (u.pathname === "/__dev/routes") { routesDown = u.searchParams.get("down") === "1"; return send(res, 200, { routesDown }); }
+  if (u.pathname === "/__dev/directions") { if (u.searchParams.get("state")) dirState = u.searchParams.get("state"); if (u.searchParams.get("next")) dirNext = true; if (u.searchParams.get("reset")) { dirNext = false; dirCalls = []; dirState = "ok"; } return send(res, 200, { dirState, dirNext, calls: dirCalls }); }
+  if (u.pathname === "/quest/commute/directions") {
+    if (req.headers["x-quest-key"] !== "test") return send(res, 401, { error: "wrong pairing code (the dev server's code is: test)" });
+    const b = await readBody(req); dirCalls.push({ fresh: b.fresh === true, arriveBy: b.arriveBy, from: b.from && b.from.address, to: b.to && b.to.address });
+    if (dirState === "no-key") return send(res, 200, { state: "no-key", message: "Directions need the Google key" });
+    if (dirState === "stopped") return send(res, 200, { state: "stopped", message: "Directions are off for the rest of this month. They come back on the 1st." });
+    const later = dirNext && b.fresh === true; return send(res, 200, dirAnswer(b, later));
+  }
   if (u.pathname.startsWith("/quest/commute/")) {
     if (req.headers["x-quest-key"] !== "test") return send(res, 401, { error: "wrong pairing code (the dev server's code is: test)" });
     /* d9: a block's typed To and changed From, kept by block key (still-api /quest/commute/route), faked the way the server does it */

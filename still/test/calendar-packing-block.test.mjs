@@ -114,8 +114,8 @@ test("the panel: the Open packing list button is drawn only on a computer, and P
 });
 
 test("the BUILD label names this copy", () => {
-  assert.match(html, /const BUILD = "2026-11-24b commute";/, "top strip colour matches the header (build d, on top of the layout D dash header)");
-  assert.match(html, /calendar-core\.js\?v=30"/, "a new stamp for the changed core (slice 05)");
+  assert.match(html, /const BUILD = "2026-11-24c commute directions";/, "top strip colour matches the header (build d, on top of the layout D dash header)");
+  assert.match(html, /calendar-core\.js\?v=31"/, "a new stamp for the changed core (slice 05)");
 });
 
 test("the page's own script still parses (a stray backtick once broke the whole page and no regex test saw it)", () => {

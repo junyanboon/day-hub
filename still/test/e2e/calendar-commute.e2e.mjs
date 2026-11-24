@@ -112,6 +112,35 @@ try {
     const pins = await page.evaluate(() => [...document.querySelectorAll("#cmMap .cmpin")].map((m) => m.textContent));
     check(`${label}: the small map has a From pin and a To pin`, pins.includes("From") && pins.includes("To"), JSON.stringify(pins));
 
+    // slice 2: directions, against the dev server's fake Google (no key, no outside call)
+    await page.waitForSelector("#cmBox .cmleave", { timeout: 8000 }).catch(() => {});
+    let dt = await panelText(page);
+    const dirChips = await page.evaluate(() => [...document.querySelectorAll('#cmBox [data-cm="mode"]')].map((b) => b.textContent.replace(/\s+/g, " ").trim()));
+    check(`${label}: Going by shows each way's minutes and marks the quickest "best way"`, /Commute$/.test(dirChips[0]) && /Transit 34 min$/.test(dirChips[1]) && /Drive 27 min best way$/.test(dirChips[2]), JSON.stringify(dirChips));
+    check(`${label}: Leave by comes from the directions, with the Arrive line (no next event: when the block ends)`, /Leave by \d{1,2}(:\d{2})? (am|pm)/i.test(dt) && /Arrive \d{1,2}(:\d{2})? (am|pm), (when the block ends|\d+ min before)/i.test(dt), dt.slice(0, 400));
+    check(`${label}: The way there lists the walk legs, each line with its direction, stops and minutes`, /The way there · 34 min/i.test(dt) && /Walk to Dev Station North/i.test(dt) && /Line 1 Dev Line toward Union/i.test(dt) && /5 stops/i.test(dt) && /Line 2 Test Line toward Kipling/i.test(dt) && /3 min wait before it/i.test(dt) && /Walk to Dev Studio/i.test(dt), dt);
+    check(`${label}: Heads up shows the TTC alert and the weather, and nothing for closures on a transit trip`, /Heads up/i.test(dt) && /Line 1: trains move slower/i.test(dt) && /Snow from 1 pm/i.test(dt) && !/closed near/i.test(dt));
+    check(`${label}: Check now and Last checked are there, and the by-itself sentence says what the page does`, /Check now/i.test(dt) && /Last checked \d{1,2}(:\d{2})? (am|pm)/i.test(dt) && /While this panel is open, it checks once in the hour before you leave\./i.test(dt));
+    check(`${label}: no Parking near row`, !/parking near/i.test(dt));
+    await page.waitForFunction(() => document.querySelectorAll("#cmMap .leaflet-interactive").length >= 1, null, { timeout: 15000 }).catch(() => {});
+    check(`${label}: the small map draws the route line`, await page.evaluate(() => document.querySelectorAll("#cmMap path.leaflet-interactive, #cmMap .leaflet-overlay-pane path").length) >= 1);
+    if (process.env.SHOTS) await page.screenshot({ path: path.join(process.env.SHOTS, `commute-${label}-directions.png`) });
+    await page.evaluate(async (b) => fetch(b + "/__dev/directions?next=1"), BASE);
+    const callsBefore = await page.evaluate(async (b) => (await (await fetch(b + "/__dev/directions")).json()).calls.length, BASE);
+    await page.click('#cmBox [data-cm="check"]'); await sleep(900);
+    dt = await panelText(page);
+    const callsAfter = await page.evaluate(async (b) => (await (await fetch(b + "/__dev/directions")).json()).calls, BASE);
+    check(`${label}: Check now asks the server again and tells it to skip its saved answer`, callsAfter.length === callsBefore + 1 && callsAfter[callsAfter.length - 1].fresh === true, JSON.stringify(callsAfter.slice(-2)));
+    check(`${label}: Check now says "Checked just now" with the real time and what moved`, /Checked just now, \d{1,2}(:\d{2})? (am|pm)/i.test(dt) && /6 min earlier/i.test(dt), dt.slice(0, 300));
+    check(`${label}: alerts are grouped New since, Still on and Cleared`, /New since \d{1,2}(:\d{2})? (am|pm)/i.test(dt) && /Line 2: delays of about 5 minutes/i.test(dt) && /Still on/i.test(dt) && /Cleared/i.test(dt) && /Line 1: trains move slower/i.test(dt), dt);
+    check(`${label}: a source that could not be reached is named`, /Could not reach/i.test(dt) ? false : true);
+    check(`${label}: "Drive is quicker right now" with a Switch to Drive button`, /Drive is quicker right now/i.test(dt) && await shown(page, '#cmBox [data-cm="switch"]'), dt);
+    if (process.env.SHOTS) await page.screenshot({ path: path.join(process.env.SHOTS, `commute-${label}-checked.png`) });
+    await page.click('#cmBox [data-cm="switch"]'); await sleep(900);
+    dt = await panelText(page);
+    check(`${label}: Switch to Drive makes Drive the chosen way: its roads, minutes and km, and closures in Heads up`, /The way there · 27 min · 8\.1 km/i.test(dt) && /Dev Avenue/i.test(dt) && /3\.2 km/i.test(dt) && /closed near Test Street/i.test(dt) && !/Line 2: delays/i.test(dt) && await page.evaluate(() => document.querySelector('#cmBox [data-v="drive"]').getAttribute("aria-pressed")) === "true", dt);
+    await chip("transit").click(); await sleep(700);
+
     // Going by: Drive
     await chip("drive").click(); await sleep(900);
     await page.waitForSelector('#cmBox a:has-text("Open in Google Maps")', { timeout: 5000 });
