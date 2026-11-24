@@ -132,6 +132,20 @@ try {
         check(`old server, ${label}: the page still draws its days and shows no error`, (await page.evaluate(() => document.querySelectorAll(".day,.mday").length)) > 0 && errors.length === 0, errors.join(" | "));
         await ctx.close();
       }
+      /* a device that saw the new server earlier keeps a saved copy with the calendar and flagged events in it; the old server
+         then answers without them, and no cake may be left over (once the calendar list has been read) */
+      { const ctx = await browser.newContext(desktop), page = await ctx.newPage(), errors = [];
+        page.on("pageerror", (e) => errors.push(e.message));
+        await page.clock.setFixedTime(NOW);
+        const ym = D(0).slice(0, 7);
+        await page.addInitScript(([ym, d1]) => {
+          localStorage.setItem("quest-key", "test"); localStorage.setItem("cal-n", "7");
+          localStorage.setItem("cal-app-cache-v1", JSON.stringify({ cals: [{ id: "bday", name: "Community Birthdays", color: "#c77dff", writable: false, displayOnly: true, ok: true }],
+            months: { [ym]: { at: Date.now() + 1e9, events: [{ id: "x1", calId: "bday", title: "Remembrance Day", start: d1, end: d1, allDay: true, displayOnly: true }] } }, sugg: [] }));
+        }, [ym, D(1)]);
+        await page.goto(`${BASE2}/still/calendar.html?api=${encodeURIComponent(BASE2)}`); await sleep(1800);
+        check("old server after a saved copy with birthdays: no cake chip, no cake mark, no rail row, no error", await page.evaluate(() => !document.querySelector(".bday,.mday .bd") && !/Community Birthdays/.test(document.querySelector("#cals")?.textContent || "")) && errors.length === 0, errors.join(" | "));
+        await ctx.close(); }
     } finally { old.kill(); } }
 } finally {
   await browser.close(); server.kill();
