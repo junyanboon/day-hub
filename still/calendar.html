@@ -343,7 +343,7 @@ div.month{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));grid-templa
 .cmrem{display:flex;align-items:center;gap:8px}
 .cmmap{height:170px;border-radius:10px;overflow:hidden;border:1px solid var(--line);position:relative;z-index:0}.cmmap.big{height:auto;flex:1;border-radius:0;border:0}
 .cmpin{min-width:34px;height:34px;border-radius:17px;padding:0 6px;display:flex;align-items:center;justify-content:center;font:700 11px system-ui,sans-serif;background:var(--bar);color:var(--ink);border:2px solid var(--k-commute);box-shadow:0 1px 4px var(--line)}
-.cmpin.to{background:var(--k-commute);color:var(--bg)}.cmpin.me{border-style:dashed}
+.cmpin.to{border-width:4px}.cmpin.me{border-style:dashed}
 .cmnote{display:flex;align-items:center;gap:8px;flex-wrap:wrap;border-top:1px solid var(--line);padding-top:6px}.cmnote span{flex:1;min-width:0;overflow-wrap:anywhere}
 .cmbig{position:fixed;top:12px;left:12px;right:12px;height:calc(100% - 24px);z-index:60;display:flex;flex-direction:column;background:var(--bg);border:1px solid var(--line);border-radius:14px;overflow:hidden}
 .cmbar{display:flex;align-items:center;gap:8px;padding:8px 10px;border-bottom:1px solid var(--line);flex-wrap:wrap}
@@ -1683,6 +1683,7 @@ function panel(tab, ev) {
 function paintPanel(anim) {
   $$(".ptabs [data-p]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.p === S.tab)));
   const b = $("#pbody");
+  cmDrop("small");   // the small map of a Commute panel is not kept alive when the panel changes
   if (anim) { b.classList.remove("in"); void b.offsetWidth; b.classList.add("in"); }
   b.innerHTML = S.tab === "event" ? pEvent(S.ev) : S.tab === "list" ? pList(S.ev) : S.tab === "set" ? pSet() : S.tab === "keys" ? pKeys() : pNow();
   if (S.tab === "event" && S.ev && b.querySelector("#cmBox")) cmAfter(S.ev);
@@ -2696,7 +2697,7 @@ function cmPaint() {
   const box = $("#cmBox"), ev = S.ev; if (!box || !ev) return;
   cmDrop("small");
   const mode = C.modeOf(ev), t = cmTarget(ev), from = cmFrom(ev), can = cmCanEdit(ev), ask = CalCommute.needsAsk(t) || CM.edit === keyOf(ev);
-  const asking = CM.places === null ? false : ask, home = cmHome();
+  const asking = ask, home = cmHome();
   const nm = (o) => (o.name && o.name !== o.address ? o.name + ", " : "") + o.address;
   const dis = can ? "" : "disabled";
   let h = `<div class="field"><p class="lbl" style="margin:0">Going by</p><div class="chips">${C.MODES.map(([m, ic, n]) => `<button class="chip k-commute" data-cm="mode" data-v="${m}" aria-pressed="${m === mode}" ${dis}>${ic} ${n}</button>`).join("")}</div></div>`;
@@ -2720,7 +2721,7 @@ function cmPaint() {
   }
   if (!asking && t.address) {
     const mine = (CM.notes && CM.notes.block) || [], past = ((CM.notes && CM.notes.place) || []).filter((n) => n.block !== keyOf(ev));
-    h += `<div class="field"><p class="lbl" style="margin:0">Photos and notes</p><div class="r"><label class="btn cmfile">Add a photo<input type="file" id="cmFile" accept="image/*" capture="environment" hidden ${dis}></label><button class="btn" data-cm="note" ${dis}>Add a note</button></div>
+    h += `<div class="field"><p class="lbl" style="margin:0">Photos and notes</p><div class="r">${can ? '<label class="btn cmfile">Add a photo<input type="file" id="cmFile" accept="image/*" capture="environment" hidden></label>' : ""}<button class="btn" data-cm="note" ${dis}>Add a note</button></div>
       ${mine.length ? mine.map(cmNoteRow).join("") : '<div class="meta">Nothing saved with this block yet.</div>'}</div>
       ${past.length ? `<div class="field"><p class="lbl" style="margin:0">From last time you went here</p>${past.map(cmNoteRow).join("")}</div>` : ""}`;
   }
@@ -2812,12 +2813,13 @@ function cmCompose(ev, data) {
   m._data = data; m._ev = ev; m._pk = pk; m._t = t;
 }
 async function cmSave(m) {
+  const sv = m.querySelector('[data-cm="shotsave"]'); if (sv.disabled) return; sv.disabled = true;
   const ev = m._ev, note = ($("#cmNote").value || "").trim(), data = m._data || undefined, w = $("#cmWith");
-  if (!data && !note) { toast("Add a note or a photo first", { bad: true }); return; }
+  if (!data && !note) { sv.disabled = false; toast("Add a note or a photo first", { bad: true }); return; }
   try {
     await send("/quest/commute/photo", "POST", { place: m._pk || "", placeName: m._t.name || m._t.address || "", block: keyOf(ev), date: cmDay(ev), note, withPlace: !!(w && w.checked), data });
     m.remove(); toast("Saved"); await cmLoadNotes(ev); if (S.ev && keyOf(S.ev) === keyOf(ev)) cmPaint();
-  } catch (e) { toast("Not saved: " + e.message, { bad: true }); }
+  } catch (e) { sv.disabled = false; toast("Not saved: " + e.message, { bad: true }); }
 }
 async function cmSetTarget(ev, o, remember) {
   cmSet(CMK.to, keyOf(ev), o); CM.edit = "";
