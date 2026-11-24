@@ -200,6 +200,33 @@ try {
     pt = await panelText(page);
     check(`${label}: the next event's address is used for the To`, /To Studio on-site · 527, 527 Bloor St W, Toronto/i.test(pt) && !/Where are you going\?/i.test(pt), pt.slice(0, 200));
     check(`${label}: Bus to studio is Transit`, (await chip("transit").getAttribute("aria-pressed")) === "true");
+    // the same block tapped again within a moment: no page error from a map that was already removed, and one small map only
+    await page.waitForFunction(() => document.querySelectorAll("#cmMap .cmpin").length >= 1, null, { timeout: 8000 }).catch(() => {});
+    // the test browser's pinned clock keeps errors thrown inside a timer away from "pageerror", so the map's resize also records what it throws
+    await page.evaluate(() => { window.__mapThrown = []; const o = L.Map.prototype.invalidateSize; L.Map.prototype.invalidateSize = function () { try { return o.apply(this, arguments); } catch (e) { window.__mapThrown.push(e.message); throw e; } }; });
+    const thrown = () => page.evaluate(() => window.__mapThrown.slice());
+    // the timing a repaint makes: the panel draws again just after the map was built, so its 60 ms resize timer meets a removed map
+    const errsT = errors.length;
+    await page.evaluate(async () => { const b = document.querySelector("#cmMap"); await cmMapShow(b, "small"); cmDrop("small"); b.style.height = (b.offsetHeight + 40) + "px"; });   // the box changes size, as it does when the panel draws again
+    await sleep(300);
+    await page.evaluate(() => { document.querySelector("#cmMap").style.height = ""; });
+    check(`${label}: a map removed right after it was built throws no page error from its delayed resize`, errors.length === errsT && (await thrown()).length === 0, errors.slice(errsT).concat(await thrown()).join(" | "));
+    // two overlapping draws of the same small map: the older one gives way, one map is built
+    const errsO = errors.length;
+    const built = await page.evaluate(async () => {
+      const L = await mapLib(); let n = 0; const orig = L.map; L.map = function () { n++; return orig.apply(this, arguments); };
+      const box = document.querySelector("#cmMap"); cmDrop("small");
+      await Promise.all([cmMapShow(box, "small"), cmMapShow(box, "small")]);
+      L.map = orig; return n;
+    });
+    await sleep(300);
+    check(`${label}: two overlapping draws of the small map build one map and throw nothing`, built === 1 && errors.length === errsO && (await thrown()).length === 0 && await page.evaluate(() => document.querySelectorAll("#cmBox .leaflet-container").length) === 1, `built ${built} ${errors.slice(errsO).join(" | ")}`);
+    const errsBefore = errors.length, thrownBefore = (await page.evaluate(() => window.__mapThrown.length));
+    for (let i = 0; i < 3; i++) { await page.evaluate(() => [...document.querySelectorAll(".ev")].find((e) => /Bus to studio/.test(e.innerText))?.click()); await sleep(20); }
+    await sleep(1000);
+    check(`${label}: tapping the same Commute block again three times quickly throws no page error`, errors.length === errsBefore && (await thrown()).length === thrownBefore, errors.slice(errsBefore).concat((await thrown()).slice(thrownBefore)).join(" | "));
+    const maps = await page.evaluate(() => [document.querySelectorAll("#cmBox .leaflet-container").length, document.querySelectorAll("#cmBox .leaflet-map-pane").length, document.querySelectorAll("#cmMap .cmpin").length]);
+    check(`${label}: and exactly one small map is in the panel, with its pins`, maps[0] === 1 && maps[1] === 1 && maps[2] >= 1, JSON.stringify(maps));
     check(`${label}: Subway to class opens`, await open("Subway to class"));
     await page.waitForFunction(() => /\bTo\b/.test(document.querySelector("#cmBox")?.innerText || ""), null, { timeout: 5000 }).catch(() => {});
     check(`${label}: the block's own location is used for the To`, /To 1 Yonge St, Toronto/i.test(await panelText(page)));

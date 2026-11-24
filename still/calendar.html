@@ -2651,7 +2651,7 @@ function wirePair() {
    alerts come in slice 2 and are not drawn here. */
 /* commute:start */
 const CMK = { to: "cal-commute-to", from: "cal-commute-from", spots: "cal-commute-spots" };
-const CM = { places: null, loading: false, notes: null, edit: "", editFrom: false, key: "", big: null, small: null, run: 0, routes: {}, loaded: {}, up: false };
+const CM = { places: null, loading: false, notes: null, edit: "", editFrom: false, key: "", big: null, small: null, seq: {}, run: 0, routes: {}, loaded: {}, up: false };
 const cmGet = (k) => { try { const v = JSON.parse(store.get(k) || "{}"); return v && typeof v === "object" ? v : {}; } catch { return {}; } };
 const cmSet = (k, key, val) => { const o = cmGet(k); if (val) o[key] = val; else delete o[key]; store.set(k, JSON.stringify(o)); };
 const cmHome = () => (CM.places || []).find((p) => p.category === "home" || /^home$/i.test(p.name || "")) || null;
@@ -2784,9 +2784,10 @@ async function cmPins(ev) {
 }
 async function cmMapShow(box, which) {
   const ev = S.ev; if (!box || !ev) return;
-  let L; try { L = await mapLib(); } catch (e) { box.innerHTML = '<div class="meta" style="padding:14px">The map could not load (no connection to the map library).</div>'; return; }
+  const seq = CM.seq[which] = (CM.seq[which] || 0) + 1;   // a draw overtaken by a newer one for the same slot stops before it builds a map
+  let L; try { L = await mapLib(); } catch (e) { if (CM.seq[which] === seq) box.innerHTML = '<div class="meta" style="padding:14px">The map could not load (no connection to the map library).</div>'; return; }
   const pins = await cmPins(ev);
-  if (!box.isConnected) return;
+  if (!box.isConnected || CM.seq[which] !== seq) return;
   if (!pins.length) { box.innerHTML = '<div class="meta" style="padding:14px">No pin yet. The address was not found on the map, and Open in Google Maps still works.</div>'; return; }
   cmDrop(which);
   const map = CM[which] = L.map(box, { zoomControl: which === "big", attributionControl: true, dragging: which === "big" || !L.Browser.mobile, scrollWheelZoom: which === "big" });
@@ -2798,7 +2799,7 @@ async function cmMapShow(box, which) {
     if (p.photos) m.on("click", () => cmSeePhotos(p.photos));
   }
   cmFit(map);
-  setTimeout(() => map.invalidateSize(), 60);
+  setTimeout(() => { if (CM[which] === map) map.invalidateSize(); }, 60);   // only while this map is still the live one: a removed map has no panes left to measure
 }
 function cmFit(map) {
   const ps = map && map._pins; if (!ps || !ps.length) return;
