@@ -12,6 +12,8 @@ import { fileURLToPath } from "node:url";
 const ROOT = process.env.DEV_ROOT || fileURLToPath(new URL("../../..", import.meta.url));
 const PORT = +(process.argv[2] || process.env.PORT || 8791);
 const TYPES = { ".html": "text/html", ".js": "text/javascript", ".mjs": "text/javascript", ".css": "text/css", ".svg": "image/svg+xml", ".png": "image/png", ".json": "application/json", ".webmanifest": "application/manifest+json" };
+/* DEV_NO_BDAY=1 plays the old server: no Community Birthdays calendar in the list and none of its events (the page goes live before the server part does) */
+const NO_BDAY = !!process.env.DEV_NO_BDAY;
 const CALS = [
   { id: "joint", name: "Joint Plans", color: "#33c481", writable: true, ok: true },
   { id: "junyan", name: "Junyan", color: "#f6bf26", writable: true, ok: true },
@@ -157,8 +159,8 @@ http.createServer(async (req, res) => {
   if (u.pathname.startsWith("/planner/")) {
     if (req.headers["x-quest-key"] !== "test") return send(res, 401, { error: "wrong pairing code (the dev server's code is: test)" });
     const b = req.method === "GET" || req.method === "DELETE" ? {} : await readBody(req);
-    if (u.pathname === "/planner/calendars") return send(res, 200, { calendars: CALS });
-    if (u.pathname === "/planner/events") { const f = Date.parse(u.searchParams.get("from")), t = Date.parse(u.searchParams.get("to")); return send(res, 200, { events: events.filter((e) => { const s = Date.parse(e.start), x = Date.parse(e.end); return x > f && s < t; }).map((e) => (e.calId === "bday" ? { ...e, displayOnly: true } : e)) }); }
+    if (u.pathname === "/planner/calendars") return send(res, 200, { calendars: NO_BDAY ? CALS.filter((c) => c.id !== "bday") : CALS });
+    if (u.pathname === "/planner/events") { const f = Date.parse(u.searchParams.get("from")), t = Date.parse(u.searchParams.get("to")); return send(res, 200, { events: events.filter((e) => !(NO_BDAY && e.calId === "bday")).filter((e) => { const s = Date.parse(e.start), x = Date.parse(e.end); return x > f && s < t; }).map((e) => (e.calId === "bday" ? { ...e, displayOnly: true } : e)) }); }
     /* still-api refuses every write to Community Birthdays (displayOnly), whatever Google says */
     if (u.pathname === "/planner/event" && req.method !== "GET" && (b.calId === "bday" || b.toCalId === "bday" || u.searchParams.get("calId") === "bday")) return send(res, 403, { error: "Community Birthdays is read-only here (display only)" });
     if (u.pathname === "/planner/suggestions" && req.method === "GET") return send(res, 200, { suggestions: sugg });

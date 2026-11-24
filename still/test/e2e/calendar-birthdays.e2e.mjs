@@ -115,6 +115,24 @@ try {
     if (SHOTS) await page.screenshot({ path: path.join(SHOTS, "birthdays-phone-list.png") });
     check("phone: no write went out and no page errors", writes.length === 0 && errors.length === 0, errors.join(" | "));
     await ctx.close(); }
+
+  /* ---- an old server: no Community Birthdays calendar and no flagged events (the page goes live before the server does) ---- */
+  { const PORT2 = PORT + 1, BASE2 = `http://localhost:${PORT2}`;
+    const old = spawn(process.execPath, [path.join(here, "calendar-dev.mjs"), String(PORT2)], { stdio: ["ignore", "pipe", "inherit"], env: { ...process.env, DEV_TODAY: "2026-11-24", TZ: "America/Toronto", DEV_NO_BDAY: "1" } });
+    await new Promise((ok) => old.stdout.once("data", ok));
+    try {
+      for (const [label, ctxOpts, n] of [["computer week", desktop, "7"], ["computer month", desktop, "m"], ["phone", phone, "3"]]) {
+        const ctx = await browser.newContext(ctxOpts), page = await ctx.newPage(), errors = [];
+        page.on("pageerror", (e) => errors.push(e.message)); page.on("console", (m) => { if (m.type() === "error") errors.push(m.text()); });
+        await page.clock.setFixedTime(NOW);
+        await page.addInitScript((n) => { localStorage.setItem("quest-key", "test"); localStorage.setItem("cal-n", n); }, n);
+        await page.goto(`${BASE2}/still/calendar.html?api=${encodeURIComponent(BASE2)}`); await sleep(1500);
+        check(`old server, ${label}: no cake chip and no cake mark`, await page.evaluate(() => !document.querySelector(".bday,.mday .bd")));
+        check(`old server, ${label}: the left rail does not list Community Birthdays`, await page.evaluate(() => !/Community Birthdays/.test(document.querySelector("#cals")?.textContent || "")));
+        check(`old server, ${label}: the page still draws its days and shows no error`, (await page.evaluate(() => document.querySelectorAll(".day,.mday").length)) > 0 && errors.length === 0, errors.join(" | "));
+        await ctx.close();
+      }
+    } finally { old.kill(); } }
 } finally {
   await browser.close(); server.kill();
 }
