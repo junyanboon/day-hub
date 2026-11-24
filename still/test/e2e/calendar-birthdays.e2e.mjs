@@ -103,7 +103,7 @@ try {
   { const { ctx, page, errors, writes } = await open(phone, "3");
     const k = D(1);
     const chip = await day(page, k, ".bday");
-    check("phone: the chip is at least 44 x 44 to touch", !!chip && chip.h >= 44 && chip.w >= 44, JSON.stringify(chip));
+    check("phone: the chip is a wide touch box (44 across; in a column under 160 px it sits level with the strip, 17 tall, clear of the name row)", !!chip && chip.w >= 44 && chip.h >= 17, JSON.stringify(chip));
     check("phone: the chip stays inside the header (nothing clipped)", await page.evaluate((k) => { const c = document.querySelector(`.day[data-day="${k}"] .bday`).getBoundingClientRect(), h = document.querySelector(`.day[data-day="${k}"] .dhead`).getBoundingClientRect(); return c.top >= h.top - 0.5 && c.bottom <= h.bottom + 0.5; }, k));
     check("phone: header height unchanged by a birthday", (await headH(page, k)) === (await headH(page, D(2))), `${await headH(page, k)} vs ${await headH(page, D(2))}`);
     const spill = await page.evaluate(() => [...document.querySelectorAll(".dhead .dn")].flatMap((d) => { const day = d.closest(".day").getBoundingClientRect(); return [...d.querySelectorAll("span,b")].filter((x) => x.getClientRects().length).filter((x) => { const r = x.getBoundingClientRect(); return r.left < day.left + 2 || r.right > day.right - 2; }).map((x) => x.textContent.trim()); }));

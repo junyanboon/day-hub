@@ -36,7 +36,7 @@ let events = [
   E(2, 9, 30, 11, 0, "Work block"), E(2, 12, 0, 12, 30, "Close Scotia account"), E(2, 13, 0, 15, 0, "Packing & Errands"),
   A(3, 3, "Stay at FICTION"), A(3, 1, "Caney away", "caney"), A(3, 1, "Pay rent"), E(3, 10, 30, 17, 0, "Drive"), E(3, 17, 0, 17, 30, "Check-in"),
   E(4, 13, 0, 14, 30, "Zouk WS"), E(4, 14, 30, 16, 0, "Lambada WS"), E(4, 16, 0, 17, 0, "Solo Battle WS"),
-  A(5, 1, "Caney's Birthday", "bday"), A(5, 1, "Ada's Birthday", "bday"), E(0, 15, 0, 16, 0, "Cake at the studio", "bday"), E(5, 12, 0, 13, 0, "Gym · Jack Woods"), E(5, 13, 0, 14, 30, "Lambada WS"), E(5, 16, 0, 17, 0, "Practica"), E(5, 17, 30, 19, 0, "Dinner w/ everyone?"),
+  A(5, 1, "Caney's Birthday", "bday"), A(5, 1, "Ada's Birthday", "bday"), E(0, 15, 0, 16, 0, "Cake at the studio", "bday"), E(5, 9, 0, 10, 0, "Need FBS · Elena", "staff"), E(5, 14, 45, 15, 15, "Studio on-site · 527", "staff"), E(5, 12, 0, 13, 0, "Gym · Jack Woods"), E(5, 13, 0, 14, 30, "Lambada WS"), E(5, 16, 0, 17, 0, "Practica"), E(5, 17, 30, 19, 0, "Dinner w/ everyone?"),
   E(-2, 12, 0, 13, 0, "Gym · Jack Woods"), E(20, 13, 15, 14, 45, "Zouk Training"), E(-20, 13, 15, 14, 45, "Zouk Training"),
 ];
 for (let d = -30; d <= 45; d++) events.push(E(d, 18, 0, 19, 0, "Dinner", "joint", { recurringEventId: "dinner" }), E(d, 6, 45, 8, 0, "Morning Yoga"), E(d, 21, 45, 22, 30, "Wind down"));
