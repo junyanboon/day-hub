@@ -155,6 +155,17 @@ test("bus, drive and driving make a Commute only when the title reads as a trip 
   assert.ok(!C.KINDS.some(([k]) => k === "bus" || k === "drive"), "bus and drive are not a travel word");
 });
 
+/* d10 (Junyan, 2026-11-24, "10 yes"): a title that starts with Drive or Driving and has "to" later is a Commute by car */
+test("Drive or Driving at the start of the title, with a later 'to', is a Commute by car (d10)", () => {
+  for (const t of ["Drive Caney to school", "Driving Mom to the airport"]) {
+    assert.equal(C.kindOf({ title: t }), "commute", t);
+    assert.equal(C.modeOf({ title: t }), "drive", t + " has the drive emoji");
+  }
+  assert.deepEqual(C.MODES.find(([m]) => m === C.modeOf({ title: "Drive Caney to school" })).slice(0, 2), ["drive", "\u{1F697}"]);
+  for (const t of ["Google Drive backup to the cloud", "Test drive to decide", "Drive-in movie to remember", "Drives to nowhere", "Take the bus"])
+    assert.notEqual(C.kindOf({ title: t }), "commute", t + " stays off Commute");
+});
+
 test("the mode (its emoji) is guessed from the title, and a hand-picked mode beats the guess", () => {
   const m = (title, mode) => C.modeOf({ title, mode });
   for (const t of ["Transit", "Subway", "TTC to work", "Streetcar", "Bus to Zouk Training", "Take the bus"]) assert.equal(m(t), "transit", t);

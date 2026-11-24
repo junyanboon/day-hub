@@ -63,11 +63,16 @@
   /* d8 (Junyan, 2026-11-24, "8 yes"): commute, commuting, transit, subway, TTC and streetcar count anywhere in the title.
      "bus", "drive" and "driving" count only as a trip: the word is the title ("Drive", "Bus: Mom's"), or is followed by
      to, home, back, there or over ("Take the bus to work"). So "Google Drive backup", "Test drive", "hard drive cleanup",
-     "Bus tickets" and "Business" stay off Commute. They are not in the Travel list either. */
+     "Bus tickets" and "Business" stay off Commute. They are not in the Travel list either.
+     d10 (Junyan, 2026-11-24, "10 yes"): a title that starts with Drive or Driving and has the word "to" later counts too,
+     so "Drive Caney to school" and "Driving Mom to the airport" are a Commute by car. "Google Drive backup to the cloud",
+     "Test drive to decide", "Drive-in movie to remember" and "Drives to nowhere" stay off it ("test drive" is never a trip,
+     even with "to" after it). */
   const COMMUTE_RX = {
     test: (t) => /\b(commute|commuting|transit|subway|ttc|streetcar)\b/i.test(t) ||
-      /\b(bus|drive|driving)\s+(to|home|back|there|over)\b/i.test(t) ||
-      /^[^\p{L}\p{N}]*(bus|drive|driving)\s*($|[:(,\u00b7])/iu.test(t),
+      (/\b(bus|drive|driving)\s+(to|home|back|there|over)\b/i.test(t) && !/\btest\s+drive\b/i.test(t)) ||
+      /^[^\p{L}\p{N}]*(bus|drive|driving)\s*($|[:(,\u00b7])/iu.test(t) ||
+      /^[^\p{L}\p{N}]*(drive|driving)\s+.*\bto\b/iu.test(t),
   };
   const RX = [
     ["pack", /pack/i],

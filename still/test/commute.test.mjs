@@ -82,19 +82,101 @@ test("a photo is shrunk to a long side of about 1600 px and keeps its shape", ()
   assert.deepEqual(K.fitSize(800, 600, 1600), { w: 800, h: 600 }, "never enlarged");
 });
 
-test("slice 2 is not here: the panel code builds no route steps, leave-by time, minutes or alerts", () => {
-  const src = fs.readFileSync(fileURLToPath(new URL("../calendar-commute.js", import.meta.url)), "utf8");
-  for (const word of [/leave by/i, /heads up/i, /check now/i, /\bmin\b walk/i, /arrive \d/i]) assert.doesNotMatch(src, word);
+/* ---- slice 2 (Junyan, 2026-11-24, d1 to d9): the rules behind leave-by, best way, Heads up and the check ---- */
+const NOW = at("2026-11-24T16:00:00Z");
+const hmT = (ms) => globalThis.CalCore.hm(globalThis.CalCore.wall(ms, TZ).min);
+const block = ev("c1", "Commute", "2026-11-24T17:00:00Z", "2026-11-24T18:10:00Z");
+const next = ev("n1", "Zouk Training", "2026-11-24T18:15:00Z", "2026-11-24T19:15:00Z");
+const tgt = () => K.arriveTarget(block, [block, next], TZ);
+test("arrive-by is 5 minutes before the next event that day, else the end of the block", () => {
+  assert.deepEqual(tgt(), { at: at("2026-11-24T18:10:00Z"), nextTitle: "Zouk Training", buffer: 5 });
+  const alone = K.arriveTarget(block, [block], TZ);
+  assert.deepEqual(alone, { at: block.e, nextTitle: "", buffer: 0 });
+  const tomorrow = ev("n2", "Class", "2026-11-25T18:15:00Z", "2026-11-25T19:15:00Z");
+  assert.equal(K.arriveTarget(block, [block, tomorrow], TZ).nextTitle, "", "an event on another day is not the next event");
+});
+test("leave-by per mode: walk and drive count back from arrive-by, transit keeps the server's real departure", () => {
+  const t = tgt();
+  assert.equal(K.leaveBy({ mode: "walk", minutes: 50 }, t.at), t.at - 50 * 60000);
+  assert.equal(K.leaveBy({ mode: "drive", minutes: 27 }, t.at + 30000), t.at - 27 * 60000, "seconds are dropped, never rounded up");
+  assert.equal(K.leaveBy({ mode: "transit", minutes: 34, leaveAt: at("2026-11-24T17:36:00Z") }, t.at), at("2026-11-24T17:36:00Z"));
+  assert.equal(K.leaveBy({ mode: "walk", tooFar: true, km: 9 }, t.at), null);
+  assert.equal(K.leaveBy(null, t.at), null);
+});
+test("the Arrive line: the real spare minutes before the next event, or when the block ends", () => {
+  const t = tgt();
+  assert.equal(K.arriveLine({ minutes: 27 }, t, hmT), "Arrive 1:10 pm, 5 min before Zouk Training");
+  assert.equal(K.arriveLine({ minutes: 34, arriveAt: at("2026-11-24T18:09:00Z") }, t, hmT), "Arrive 1:09 pm, 6 min before Zouk Training", "transit arrives when Google says");
+  assert.equal(K.arriveLine({ minutes: 34, arriveAt: at("2026-11-24T18:20:00Z") }, t, hmT), "Arrive 1:20 pm, 5 min after Zouk Training starts");
+  assert.equal(K.arriveLine({ minutes: 27 }, K.arriveTarget(block, [block], TZ), hmT), "Arrive 1:10 pm, when the block ends");
+  assert.equal(K.arriveLine({ tooFar: true }, t, hmT), "");
+});
+test("best way: the quickest is marked, a walk that is too far never is, and nothing is marked without minutes", () => {
+  assert.equal(K.bestWay({ walk: { minutes: 50 }, transit: { minutes: 34 }, drive: { minutes: 27 } }), "drive");
+  assert.equal(K.bestWay({ walk: { tooFar: true, km: 9 }, transit: { minutes: 34 }, drive: { minutes: 40 } }), "transit");
+  assert.equal(K.bestWay({ walk: { minutes: 20 }, transit: { minutes: 20 } }), "commute", "a tie goes to walking: the walk is the chip named Commute");
+  assert.equal(K.bestWay({}), ""); assert.equal(K.bestWay(null), "");
+});
+test("a way he picked by hand still wins: the quicker row only offers a switch, and only for 3 minutes or more", () => {
+  const ways = { walk: { tooFar: true }, transit: { minutes: 34 }, drive: { minutes: 27 } };
+  assert.deepEqual(K.quickerThan(ways, "transit"), { chip: "drive", by: 7 });
+  assert.equal(K.quickerThan(ways, "drive"), null, "already the quickest");
+  assert.equal(K.quickerThan({ transit: { minutes: 34 }, drive: { minutes: 32 } }, "transit"), null, "2 minutes is not worth a row");
+  assert.equal(K.quickerThan({ transit: { tooFar: true }, drive: { minutes: 5 } }, "transit"), null);
+  const src = fs.readFileSync(new URL("../calendar.html", import.meta.url), "utf8");
+  const fn = src.slice(src.indexOf("function cmPaint()"), src.indexOf("function cmDrop("));
+  assert.match(fn, /const mode = C\.modeOf\(ev\)/, "the way drawn is the one saved on the block");
+  assert.doesNotMatch(src.slice(src.indexOf("/* commute:start */"), src.indexOf("/* commute:end */")), /patchEvent\(ev, \{ mode: best/, "the page never changes the way by itself");
+});
+test("Heads up: TTC only on a transit trip, closures only on a drive, weather on every way", () => {
+  const al = [{ id: "ttc:1", mode: "transit" }, { id: "road:1", mode: "drive" }, { id: "wx:snow", mode: "any" }];
+  assert.deepEqual(K.alertsFor(al, "transit").map((a) => a.id), ["ttc:1", "wx:snow"]);
+  assert.deepEqual(K.alertsFor(al, "drive").map((a) => a.id), ["road:1", "wx:snow"]);
+  assert.deepEqual(K.alertsFor(al, "commute").map((a) => a.id), ["wx:snow"]);
+});
+test("Check now groups alerts into New, Still on and Cleared by their ids", () => {
+  const A = (id) => ({ id }), g = K.groupAlerts([A("a"), A("b")], [A("b"), A("c")]);
+  assert.deepEqual([g.added, g.still, g.cleared].map((x) => x.map((a) => a.id)), [["c"], ["b"], ["a"]]);
+  assert.equal(g.compared, true);
+  const first = K.groupAlerts(null, [A("a")]);
+  assert.deepEqual([first.added.length, first.still.length, first.cleared.length, first.compared], [0, 1, 0, false], "no earlier check: nothing is called new");
+});
+test("the leave-by change reads 6 min earlier or later, and nothing when it did not move", () => {
+  const t = at("2026-11-24T17:36:00Z");
+  assert.equal(K.leaveShift(t, t - 6 * 60000), "6 min earlier");
+  assert.equal(K.leaveShift(t, t + 4 * 60000), "4 min later");
+  assert.equal(K.leaveShift(t, t + 20000), "");
+  assert.equal(K.leaveShift(null, t), "");
+});
+test("the page checks by itself once, only inside the hour before leaving", () => {
+  const leaveAt = at("2026-11-24T17:36:00Z"), m = (min) => leaveAt - min * 60000;
+  assert.equal(K.autoCheckDue({ now: m(61), leaveAt, done: false }), false);
+  assert.equal(K.autoCheckDue({ now: m(60), leaveAt, done: false }), true);
+  assert.equal(K.autoCheckDue({ now: m(1), leaveAt, done: false }), true);
+  assert.equal(K.autoCheckDue({ now: m(1), leaveAt, done: true }), false, "once");
+  assert.equal(K.autoCheckDue({ now: leaveAt, leaveAt, done: false }), false, "not after leaving");
+  assert.equal(K.autoCheckDue({ now: m(10), leaveAt: null, done: false }), false);
+});
+test("the route line decodes Google's encoded polyline", () => {
+  assert.deepEqual(K.decodePolyline("_p~iF~ps|U_ulLnnqC_mqNvxq`@"), [[38.5, -120.2], [40.7, -120.95], [43.252, -126.453]]);
+  assert.deepEqual(K.decodePolyline(""), []);
+});
+test("no tests in this file read the real clock", () => {
+  const me = fs.readFileSync(fileURLToPath(import.meta.url), "utf8");
+  assert.equal(/new Date\(\)|Date\.now\(\)/.test(me), false);
 });
 
-test("the page: the box sits in both panels, only for a Commute block, and shows no slice 2 thing", async () => {
+test("the page: the box sits in both panels, only for a Commute block, and draws no directions of its own", async () => {
   const { readFileSync } = await import("node:fs");
   const html = readFileSync(new URL("../calendar.html", import.meta.url), "utf8");
   assert.equal((html.match(/\$\{commuteBox\(ev\)\}|cm = commuteBox\(ev\)/g) || []).length, 2, "computer panel and phone sheet");
   assert.match(html, /function commuteBox\(ev\) \{ return ev\.k === "commute" && !ev\.isNew && !ev\.ghost/);
   const src = html.slice(html.indexOf("/* commute:start */"), html.indexOf("/* commute:end */"));
   assert.ok(src.length > 3000);
-  for (const w of [/leave by/i, /heads up/i, /check now/i, /get directions/i, /\bmin walk/i, /\barrive\b/i, /closure/i, /weather/i]) assert.doesNotMatch(src, w, String(w));
+  for (const w of [/leave by/i, /heads up/i, /check now/i, /the way there/i, /best way/i]) assert.match(src, w, String(w));
+  assert.doesNotMatch(src, /routes\.googleapis|GOOGLE_ROUTES|api[_-]?key/i, "the key is never on the page");
+  assert.doesNotMatch(src, /parking near/i, "no Parking near row: it has no source");
+  assert.match(src, /Directions need the Google key/);
   assert.match(src, /Where are you going\?/);
   assert.match(src, /Remember for every/);
   assert.match(src, /Open in Google Maps/);
@@ -136,11 +218,11 @@ test("d6: in the computer panel and the phone sheet the Commute box comes right 
   assert.ok(at(pSheet, 'id="cmWhen"') < sbox && at(pSheet, 'id="cmWhen"') > at(pSheet, 'id="pTitle"'), "the time line sits between the title and the box");
   assert.ok(sbox < at(pSheet, 'id="pDel"'));
 });
-test("d6: inside the box the order is Going by, From, To or the ask, Open in Google Maps, the small map, then photos and notes; Home is asked last", async () => {
+test("d6: inside the box the order is Going by, From, To or the ask, Open in Google Maps, the small map, then photos and notes; Home is asked last (slice 2 puts Leave by after Going by, and The way there, Heads up and Check now after To)", async () => {
   const { readFileSync } = await import("node:fs");
   const html = readFileSync(new URL("../calendar.html", import.meta.url), "utf8");
   const src = html.slice(html.indexOf("function cmPaint()"), html.indexOf("function cmDrop("));
-  const order = ['Going by', '<span class="lbl">From</span>', '<span class="lbl">To</span>', 'Where are you going?', 'Open in Google Maps', 'id="cmMap"', 'Photos and notes', 'Add your home address'];
+  const order = ['Going by', 'dp.leave', '<span class="lbl">From</span>', '<span class="lbl">To</span>', 'dp.way + dp.heads + dp.check', 'Where are you going?', 'Open in Google Maps', 'id="cmMap"', 'Photos and notes', 'Add your home address'];
   let last = -1;
   for (const w of order) { const i = src.indexOf(w); assert.ok(i > last, w + " out of order"); last = i; }
 });
