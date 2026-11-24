@@ -76,6 +76,17 @@ try {
     const chips = await page.evaluate(() => [...document.querySelectorAll('#cmBox [data-cm="mode"]')].map((b) => b.textContent + ":" + b.getAttribute("aria-pressed")));
     check(`${label}: Going by has three chips, Transit pressed (guessed from the title)`, JSON.stringify(chips) === '["🚶 Commute:false","🚇 Transit:true","🚗 Drive:false"]', JSON.stringify(chips));
     check(`${label}: no address anywhere, so the panel asks "Where are you going?"`, /Where are you going\?/i.test(pt) && /Not set yet/.test(pt));
+    // d6 (Junyan, 2026-11-24, "6 yes"): the Commute part comes first, right under the title and time
+    const lay = await page.evaluate((isPhone) => {
+      const top = (sel) => { const el = document.querySelector(sel); return el ? el.getBoundingClientRect() : null; };
+      const box = top("#cmBox"), going = top('#cmBox [data-cm="mode"]'), ask = top("#cmAsk"), title = top("#pTitle");
+      const firstLen = document.querySelector("[data-dur]"), firstRow = document.querySelector(".srow"), cal = top("#pCal");
+      return { vh: innerHeight, title: title && [title.top, title.bottom], box: box && [box.top, box.bottom], going: going && going.bottom, ask: ask && ask.bottom,
+        lenTop: firstLen ? firstLen.getBoundingClientRect().top : null, rowTop: firstRow ? firstRow.getBoundingClientRect().top : null, calTop: cal && cal.top, sheet: !!document.querySelector(".sheet") };
+    }, phone);
+    check(`${label}: the Commute part sits right under the title and time, before the usual fields`, lay.box && lay.title && lay.box[0] >= lay.title[1] && (phone ? lay.rowTop > lay.box[0] : lay.lenTop > lay.box[1]) && lay.calTop > lay.box[1], JSON.stringify(lay));
+    if (phone) check(`${label}: on a 390 by 844 phone the Going by row and the ask show without scrolling`, lay.sheet && lay.vh === 844 && lay.going < 844 && lay.ask < 844, JSON.stringify(lay));
+    if (process.env.SHOTS) await page.screenshot({ path: path.join(process.env.SHOTS, `commute-${label}-first-open.png`) });
     check(`${label}: no Google Maps link, no map, no photo buttons before there is an address`, !(await shown(page, "#cmBox a")) && !(await shown(page, "#cmMap")) && !(await shown(page, "#cmFile")) && !/Add a photo/.test(pt));
     check(`${label}: the ask offers Remember for every Work block`, /Remember for every Work block/.test(pt));
     check(`${label}: no route steps, times, alerts or Check now are drawn`, !/leave by|heads up|check now|get directions|\d+ min walk|closure|weather/i.test(pt), pt);
@@ -192,6 +203,62 @@ try {
     check(`${label}: Subway to class opens`, await open("Subway to class"));
     await page.waitForFunction(() => /\bTo\b/.test(document.querySelector("#cmBox")?.innerText || ""), null, { timeout: 5000 }).catch(() => {});
     check(`${label}: the block's own location is used for the To`, /To 1 Yonge St, Toronto/i.test(await panelText(page)));
+
+    // d9 (Junyan, 2026-11-24, "9 yes"): the To and From live on the server and follow the block to another device
+    const keyOfTitle = (t) => page.evaluate((x) => [...document.querySelectorAll(".ev")].find((e) => e.innerText.includes(x))?.dataset.key, t);
+    const srv = (k) => page.evaluate(async ([b, k2]) => (await (await fetch(b + "/quest/commute/route?block=" + encodeURIComponent(k2), { headers: { "X-Quest-Key": "test" } })).json()).route, [BASE, k]);
+    const transitKey = await keyOfTitle("Transit");
+    const r0 = await srv(transitKey);
+    check(`${label}: the To he typed is on the server under the block's key`, r0 && r0.to && /Gladstone/.test(r0.to.address), JSON.stringify(r0));
+    check(`${label}: Transit opens again (From)`, await open("Transit"));
+    await page.waitForSelector('#cmBox [data-cm="editfrom"]', { timeout: 5000 });
+    await page.click('#cmBox [data-cm="editfrom"]'); await page.fill("#cmFromIn", "Queen Station, Toronto"); await page.click('#cmBox [data-cm="gofrom"]'); await sleep(700);
+    check(`${label}: a changed From shows`, /From Queen Station, Toronto/i.test(await panelText(page)));
+    const r1 = await srv(transitKey);
+    check(`${label}: the changed From is on the server too, beside the To`, r1 && r1.from && /Queen Station/.test(r1.from.address) && /Gladstone/.test(r1.to.address), JSON.stringify(r1));
+    check(`${label}: nothing about this block is kept in the browser any more`, await page.evaluate((k) => !(JSON.parse(localStorage.getItem("cal-commute-to") || "{}")[k] || JSON.parse(localStorage.getItem("cal-commute-from") || "{}")[k]), transitKey));
+    // another device: a fresh browser profile (no saved copy at all) sees the same To and From
+    const ctx2 = await browser.newContext({ ...opts, timezoneId: "America/Toronto" });
+    const page2 = await ctx2.newPage(); await page2.clock.install({ time: new Date(NOW) });
+    await page2.route("https://nominatim.openstreetmap.org/**", (route) => route.fulfill({ status: 200, contentType: "application/json", headers: { "access-control-allow-origin": "*" }, body: "[]" }));
+    await page2.route("https://tile.openstreetmap.org/**", (route) => route.fulfill({ status: 200, contentType: "image/png", body: PNG }));
+    await page2.addInitScript(() => { localStorage.setItem("quest-key", "test"); });
+    await page2.goto(URL_); await page2.waitForSelector(".ev", { state: "attached" }); await sleep(500);
+    for (let i = 0; i < 6; i++) {
+      const el = page2.locator('.ev:has-text("Transit")').first();
+      if (await el.count() && await el.isVisible()) { await el.click(); break; }
+      await page2.click("#next"); await sleep(300);
+    }
+    await page2.waitForFunction(() => /\bTo\b/.test(document.querySelector("#cmBox")?.innerText || ""), null, { timeout: 6000 }).catch(() => {});
+    const t2 = flat(await text(page2, "#pbody"));
+    check(`${label}: on another device the same To and From show, with no ask`, /From Queen Station, Toronto/i.test(t2) && /To Gladstone Hotel, Toronto/i.test(t2) && !/Where are you going\?/i.test(t2), t2.slice(0, 240));
+    await ctx2.close();
+    // an address kept in this browser from before is sent up once, only where the server holds none
+    const subKey = await keyOfTitle("Subway to class"), busKey = await keyOfTitle("Bus to studio");
+    await page.evaluate(([a, b]) => { localStorage.setItem("cal-commute-to", JSON.stringify({ [a]: { name: "Old Spot", address: "9 Old Browser Rd", lat: null, lng: null }, [b]: { name: "x", address: "7 Browser Only Ave", lat: null, lng: null } })); }, [subKey, busKey]);
+    await page.evaluate(async ([b, k]) => { await fetch(b + "/quest/commute/route", { method: "POST", headers: { "X-Quest-Key": "test", "Content-Type": "application/json" }, body: JSON.stringify({ block: k, to: { address: "1 Server Wins St" } }) }); }, [BASE, busKey]);
+    await page.reload(); await page.waitForSelector(".ev", { state: "attached" }); await sleep(500);
+    check(`${label}: Subway to class opens (old browser copy)`, await open("Subway to class"));
+    await page.waitForFunction(() => /\bTo\b/.test(document.querySelector("#cmBox")?.innerText || ""), null, { timeout: 6000 }).catch(() => {});
+    await sleep(500);
+    const sub = await srv(subKey), bus = await srv(busKey);
+    check(`${label}: the old browser address went up once and the copy here is dropped`, sub && sub.to && sub.to.address === "9 Old Browser Rd" && await page.evaluate(([a]) => !JSON.parse(localStorage.getItem("cal-commute-to") || "{}")[a], [subKey]), JSON.stringify(sub));
+    check(`${label}: an old copy never overwrites what the server already holds`, bus && /1 Server Wins St/.test(bus.to.address), JSON.stringify(bus));
+    check(`${label}: and it shows as the To`, /To Old Spot, 9 Old Browser Rd/i.test(await panelText(page)), (await panelText(page)).slice(0, 200));
+    // the server cannot be reached: the change is kept in the browser, says so, and goes up next time
+    await page.evaluate(async (b) => { await fetch(b + "/__dev/routes?down=1"); }, BASE);
+    check(`${label}: Bus to studio opens (server down)`, await open("Bus to studio"));
+    await sleep(500);
+    await page.click('#cmBox [data-cm="edit"]'); await page.fill("#cmTo", "55 Offline Ave"); await page.click('#cmAsk [data-cm="go"]'); await sleep(900);
+    check(`${label}: with the server down the To still shows, and a note says it is on this device only`, /To 55 Offline Ave/i.test(await panelText(page)) && /this device only/i.test(await text(page, "#toast")), await text(page, "#toast"));
+    check(`${label}: the browser copy is the fallback, marked pending`, await page.evaluate((k) => { const o = JSON.parse(localStorage.getItem("cal-commute-to") || "{}")[k]; return !!o && o.pending === true && o.address === "55 Offline Ave"; }, busKey));
+    await page.evaluate(async (b) => { await fetch(b + "/__dev/routes?down=0"); }, BASE);
+    await page.reload(); await page.waitForSelector(".ev", { state: "attached" }); await sleep(500);
+    check(`${label}: Bus to studio opens (server back)`, await open("Bus to studio"));
+    await page.waitForFunction(() => /55 Offline Ave/.test(document.querySelector("#cmBox")?.innerText || ""), null, { timeout: 6000 }).catch(() => {});
+    await sleep(500);
+    const bus2 = await srv(busKey);
+    check(`${label}: the change made while offline went up and replaced the old server To`, bus2 && /55 Offline Ave/.test(bus2.to.address) && await page.evaluate((k) => !JSON.parse(localStorage.getItem("cal-commute-to") || "{}")[k], busKey), JSON.stringify(bus2));
 
     // a non-commute block has none of this
     check(`${label}: a plain block has no Commute box`, await open("Work block") && !(await shown(page, "#cmBox")));

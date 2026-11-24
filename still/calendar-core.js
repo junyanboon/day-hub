@@ -60,11 +60,20 @@
   const OLD_KIND = { food: "cook", out: "travel", work: "studio" };
   /* Packing (slice 02, Junyan 2026-11-16, d23: "p1 yes"): "pack" anywhere in the title, any case, so "Pack for FICTION
      stay", "Unpack", and also "backpack" and "Packers". First, so "Pack for the trip" is Packing, not Travel. */
+  /* d8 (Junyan, 2026-11-24, "8 yes"): commute, commuting, transit, subway, TTC and streetcar count anywhere in the title.
+     "bus", "drive" and "driving" count only as a trip: the word is the title ("Drive", "Bus: Mom's"), or is followed by
+     to, home, back, there or over ("Take the bus to work"). So "Google Drive backup", "Test drive", "hard drive cleanup",
+     "Bus tickets" and "Business" stay off Commute. They are not in the Travel list either. */
+  const COMMUTE_RX = {
+    test: (t) => /\b(commute|commuting|transit|subway|ttc|streetcar)\b/i.test(t) ||
+      /\b(bus|drive|driving)\s+(to|home|back|there|over)\b/i.test(t) ||
+      /^[^\p{L}\p{N}]*(bus|drive|driving)\s*($|[:(,\u00b7])/iu.test(t),
+  };
   const RX = [
     ["pack", /pack/i],
     /* Commute (Junyan, 2026-11-24, d1: "1 yes"): one type, three emojis picked by the title (MODES). Before the others so
        "Bus to Zouk Training" and "Drive to the gym" are the trip there, not Dance or Gym. Bus and drive left Travel. */
-    ["commute", /\b(commute|commuting|transit|subway|ttc|streetcar|bus|drive|driving)\b/i],
+    ["commute", COMMUTE_RX],
     ["deep", /\b(work block|deep work|focus block|focus time)\b/i],
     ["wind", /\b(wind.?down|bedtime)\b/i],
     /* Domestic (Junyan, 2026-11-21, d62: "give it a more exciting colour"): its own type and colour, no page of its own */

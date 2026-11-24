@@ -13,7 +13,7 @@
 <meta name="apple-mobile-web-app-title" content="Calendar">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>Calendar</title>
-<script src="calendar-core.js?v=29"></script>
+<script src="calendar-core.js?v=30"></script>
 <script src="calendar-commute.js?v=1"></script>
 <script src="cards-vault.js?v=2"></script><script src="cards.js?v=7"></script>
 <script src="quest-trips.js?v=20261121a" data-helpers></script>
@@ -994,7 +994,7 @@ if (TOUCH) for (const g of ["gesturestart", "gesturechange"]) document.addEventL
    which shows this build, the phone's answers and a log of every day change with its cause. Until then CalHook.on is
    null and diag() does nothing. BUILD names this copy of the page, so a screenshot proves which copy ran: change it on
    every change to this page or calendar-readout.js (the date plus a letter). */
-const BUILD = "2026-11-24a commute";
+const BUILD = "2026-11-24b commute";
 const CalHook = window.CalHook = { BUILD, on: null };
 const diag = (kind, msg) => { if (CalHook.on) CalHook.on(kind, msg); };
 /* The iPhone home screen app's fit (2026-11-12): html.hs in a home screen app on touch, html.hsfill and --hsgap when
@@ -1719,9 +1719,9 @@ function pEvent(ev) {
     ${ev.ghost ? `<div class="meta">Suggested by ${esc(ev.by)}${ev.why ? ": " + esc(ev.why) : ""}</div>` : ""}
     <div class="field"><input class="tinput" id="pTitle" value="${esc(ev.title)}" placeholder="Title" aria-label="Title" ${dis}>
       <div style="color:var(--soft)">${esc(whenText(ev))}${mins > 0 && mins < 1440 ? ` · starts in ${untilText(mins)}` : ""}${two() && !ev.allDay ? `<br>${esc(zoneName(S.tz2))}: ${C.hm(C.wall(ev.s, S.tz2).min)} to ${C.hm(C.wall(ev.e, S.tz2).min)}` : ""}${ev.recurringEventId ? "<br>Repeats" : ""}${ev.location ? "<br>" + esc(ev.location) : ""}</div></div>
+    ${commuteBox(ev)}
     ${ev.allDay || ev.ghost ? "" : `<div class="field"><p class="lbl" style="margin:0">Length</p><div class="chips">${durs.map((m) => `<button class="chip" data-dur="${m}" aria-pressed="${m === S.form.dur}" ${dis}>${C.dur(m)}</button>`).join("")}</div></div>`}
     ${ev.ghost ? "" : `<div class="field"><p class="lbl" style="margin:0">Block type</p><div class="chips"><button class="chip k-${guess}" data-kind="" aria-pressed="${!S.form.kind}" ${dis}>Guess: ${esc(KNAME[guess])}</button>${C.KINDS.map(([k, n]) => `<button class="chip k-${k}" data-kind="${k}" aria-pressed="${S.form.kind === k}" ${dis}>${KICON[k] ? KICON[k] + " " : ""}${n}</button>`).join("")}</div></div>`}
-    ${commuteBox(ev)}
     <div class="field"><label class="lbl" style="margin:0" for="pCal">Calendar</label><select id="pCal" ${dis}>${writable.map((c) => `<option value="${esc(c.id)}" ${c.id === ev.calId ? "selected" : ""}>${esc(c.name)}</option>`).join("")}</select></div>
     ${canEdit ? "" : `<div class="meta">${esc(cal.name)} is read-only here.</div>`}
     <div class="r">${ev.ghost ? `<button class="btn" id="pSkip">Skip</button><span class="spacer"></span><button class="btn pri" id="pAcc">Accept</button>`
@@ -1739,7 +1739,7 @@ function pSheet(ev) {
   if (!S.form || !S.form.sheet) S.form = C.sheetForm(ev, S.tz);
   const f = S.form, dis = canEdit && !ev.ghost ? "" : "disabled", guess = C.kindOf({ title: ev.title, calName: cal.name });
   const writable = S.cals.filter((c) => c.writable || c.id === ev.calId);
-  const rich = C.notesRich(ev.description || "");
+  const rich = C.notesRich(ev.description || ""), cm = commuteBox(ev);   // a Commute block draws its Commute part first (d6)
   const row = (lbl, inner, x = "") => `<label class="srow" ${x}><span>${lbl}</span>${inner}</label>`;
   const tx = sheetTexts(f, ev), out = (k) => `<output data-v="${k}">${esc(tx[k])}</output>`;
   const pick = (type, key, lbl) => `${out(key)}<input class="ov" type="${type}" data-f="${key}" value="${esc(f[key])}" aria-label="${lbl}" ${dis}>`;
@@ -1747,6 +1747,7 @@ function pSheet(ev) {
     <div class="shead"><span></span><b>Event</b>${canEdit && !ev.ghost ? '<button class="btn pri" id="pSave">Save</button>' : "<span></span>"}</div>
     ${ev.ghost ? `<div class="meta">Suggested by ${esc(ev.by)}${ev.why ? ": " + esc(ev.why) : ""}</div>` : ""}
     <input class="tinput" id="pTitle" value="${esc(f.title)}" placeholder="Title" aria-label="Title" autocomplete="off" ${canEdit ? "" : "disabled"}>
+    ${cm ? `<div class="meta" id="cmWhen">${esc(whenText(ev))}</div>${cm}` : ""}
     <div class="rows">
       ${row("Day", pick("date", "day", "Day"))}
       ${row("Starts", pick("time", "start", "Starts"), `data-timed ${f.allDay ? "hidden" : ""}`)}
@@ -1761,7 +1762,6 @@ function pSheet(ev) {
       <div class="chips" data-v="types" hidden><button class="chip k-${guess}" data-kind="" aria-pressed="${!f.kind}">Guess: ${esc(KNAME[guess])}</button>${C.KINDS.map(([k, n]) => `<button class="chip k-${k}" data-kind="${k}" aria-pressed="${f.kind === k}">${KICON[k] ? KICON[k] + " " : ""}${n}</button>`).join("")}</div>`}
       ${row("Calendar", `${out("cal")}<i>&#8250;</i><select class="ov" id="pCal" aria-label="Calendar" ${canEdit ? "" : "disabled"}>${writable.map((c) => `<option value="${esc(c.id)}" ${c.id === f.calId ? "selected" : ""}>${esc(c.name)}</option>`).join("")}</select>`)}
     </div>
-    ${commuteBox(ev)}
     ${isNew || !canEdit || ev.ghost ? "" : '<div class="rows"><button class="srow del" id="pDel">Delete event</button></div>'}
     ${canEdit ? "" : `<div class="meta">${esc(cal.name)} is read-only here.</div>`}
     ${ev.ghost ? `<div class="r"><button class="btn" id="pSkip">Skip</button><span class="spacer"></span><button class="btn pri" id="pAcc">Accept</button></div>` : ""}
@@ -2651,15 +2651,56 @@ function wirePair() {
    alerts come in slice 2 and are not drawn here. */
 /* commute:start */
 const CMK = { to: "cal-commute-to", from: "cal-commute-from", spots: "cal-commute-spots" };
-const CM = { places: null, loading: false, notes: null, edit: "", editFrom: false, key: "", big: null, small: null, run: 0 };
+const CM = { places: null, loading: false, notes: null, edit: "", editFrom: false, key: "", big: null, small: null, run: 0, routes: {}, loaded: {}, up: false };
 const cmGet = (k) => { try { const v = JSON.parse(store.get(k) || "{}"); return v && typeof v === "object" ? v : {}; } catch { return {}; } };
 const cmSet = (k, key, val) => { const o = cmGet(k); if (val) o[key] = val; else delete o[key]; store.set(k, JSON.stringify(o)); };
 const cmHome = () => (CM.places || []).find((p) => p.category === "home" || /^home$/i.test(p.name || "")) || null;
 const cmDay = (ev) => C.wall(ev.s, S.tz).day;
-const cmTarget = (ev) => CalCommute.target({ ev, events: eventsFor(cmDay(ev), cmDay(ev)), tz: S.tz, remembered: CM.places || [], typed: cmGet(CMK.to)[keyOf(ev)] || null });
+/* d9 (Junyan, 2026-11-24, "9 yes"): the To he typed or picked for a block and a From he changed live on the server
+   (still-api /quest/commute/route, keyed by the block), so every device shows them. This browser keeps a copy only as a
+   fallback: while the server cannot be reached a change is kept here marked pending, and goes up the next time it can.
+   An address kept here before this change is sent up once (only where the server holds none), then dropped here. */
+const cmRoute = (ev) => CM.routes[keyOf(ev)] || null;
+const cmTyped = (ev) => (cmRoute(ev) && cmRoute(ev).to) || cmGet(CMK.to)[keyOf(ev)] || null;
+const cmFromPicked = (ev) => (cmRoute(ev) && cmRoute(ev).from) || cmGet(CMK.from)[keyOf(ev)] || null;
+const cmTarget = (ev) => CalCommute.target({ ev, events: eventsFor(cmDay(ev), cmDay(ev)), tz: S.tz, remembered: CM.places || [], typed: cmTyped(ev) });
 function cmFrom(ev) {
-  const f = cmGet(CMK.from)[keyOf(ev)]; if (f) return f;
+  const f = cmFromPicked(ev); if (f) return f;
   const h = cmHome(); return h ? { name: "Home", address: h.address || "", lat: h.lat, lng: h.lng, id: h.id } : null;
+}
+const cmPlaceBody = (o) => ({ name: o.name || "", address: o.address || "", lat: o.lat == null ? null : o.lat, lng: o.lng == null ? null : o.lng, id: o.id || "" });
+/** Save one end of a block's route on the server (side "to" or "from"; o null clears it). false when the server cannot be reached. */
+async function cmSaveRoute(ev, side, o) {
+  const key = keyOf(ev);
+  try {
+    const r = await send("/quest/commute/route", "POST", { block: key, [side]: o ? cmPlaceBody(o) : null });
+    CM.routes[key] = r.route || null; CM.loaded[key] = true; cmSet(side === "to" ? CMK.to : CMK.from, key, null);
+    return true;
+  } catch (e) { return false; }
+}
+/** Read this block's route from the server; the first time the server answers, send up what this browser kept from before. */
+async function cmLoadRoute(ev) {
+  const key = keyOf(ev);
+  try {
+    if (!CM.up) {
+      const to = cmGet(CMK.to), from = cmGet(CMK.from);
+      for (const k of new Set([...Object.keys(to), ...Object.keys(from)])) {
+        for (const pending of [true, false]) {   // a change made while offline overwrites; an old copy only fills an empty end
+          const body = { block: k }, t = to[k], f = from[k];
+          if (t && t.address && !!t.pending === pending) body.to = cmPlaceBody(t);
+          if (f && f.address && !!f.pending === pending) body.from = cmPlaceBody(f);
+          if (body.to === undefined && body.from === undefined) continue;
+          if (!pending) body.onlyIfEmpty = true;
+          await send("/quest/commute/route", "POST", body);
+          if (body.to) cmSet(CMK.to, k, null);
+          if (body.from) cmSet(CMK.from, k, null);
+        }
+      }
+      CM.up = true;
+    }
+    CM.routes[key] = (await api("/quest/commute/route?block=" + encodeURIComponent(key))).route || null;
+  } catch (e) { /* offline: the copy kept here is used */ }
+  CM.loaded[key] = true;
 }
 const cmCanEdit = (ev) => !!calOf(ev.calId).writable;
 /** A pin for an address: the saved one, else one OpenStreetMap lookup kept in this browser (null when it is not found). */
@@ -2682,6 +2723,7 @@ async function cmAfter(ev) {
     try { CM.places = (await api("/quest/places")).places || []; } catch (e) { CM.places = []; }
     if (!same()) return; cmPaint();
   }
+  await cmLoadRoute(ev); if (!same()) return; cmPaint();
   await cmLoadNotes(ev); if (same()) cmPaint();
 }
 async function cmLoadNotes(ev) {
@@ -2701,11 +2743,10 @@ function cmPaint() {
   const nm = (o) => (o.name && o.name !== o.address ? o.name + ", " : "") + o.address;
   const dis = can ? "" : "disabled";
   let h = `<div class="field"><p class="lbl" style="margin:0">Going by</p><div class="chips">${C.MODES.map(([m, ic, n]) => `<button class="chip k-commute" data-cm="mode" data-v="${m}" aria-pressed="${m === mode}" ${dis}>${ic} ${n}</button>`).join("")}</div></div>`;
-  if (CM.places === null) return void (box.innerHTML = h + `<div class="meta">Looking up your places…</div>`);
+  if (CM.places === null || !CM.loaded[keyOf(ev)]) return void (box.innerHTML = h + `<div class="meta">Looking up your places…</div>`);
   h += `<div class="cmroute"><div class="cmr"><span class="lbl">From</span><span class="v">${from ? esc(from.name === "Home" ? "Home" : nm(from)) : "Where you are"}</span>` +
     `${can ? `<button class="btn" data-cm="editfrom">Change</button>` : ""}</div>`;
-  if (CM.editFrom) h += `<div class="cmask"><input id="cmFromIn" placeholder="Address or place name" aria-label="From" autocomplete="off" enterkeyhint="go"><div class="r"><button class="btn pri" data-cm="gofrom">Use this</button>${cmGet(CMK.from)[keyOf(ev)] ? '<button class="btn" data-cm="homeagain">Back to Home</button>' : ""}<button class="btn" data-cm="cancelfrom">Cancel</button></div></div>`;
-  if (!home && !CM.editFrom) h += `<div class="cmask"><div class="meta">Add your home address and every Commute block starts from it.</div><input id="cmHomeIn" placeholder="Your home address" aria-label="Home address" autocomplete="off" enterkeyhint="done"><div class="r"><button class="btn" data-cm="home">Save home</button></div></div>`;
+  if (CM.editFrom) h += `<div class="cmask"><input id="cmFromIn" placeholder="Address or place name" aria-label="From" autocomplete="off" enterkeyhint="go"><div class="r"><button class="btn pri" data-cm="gofrom">Use this</button>${cmFromPicked(ev) ? '<button class="btn" data-cm="homeagain">Back to Home</button>' : ""}<button class="btn" data-cm="cancelfrom">Cancel</button></div></div>`;
   h += `<div class="cmr"><span class="lbl">To</span><span class="v">${asking || !t.address ? "Not set yet" : esc(nm(t))}</span>${!asking && can ? `<button class="btn" data-cm="edit">Change</button>` : ""}</div></div>`;
   if (asking) {
     const saved = CM.places.filter((p) => p.category !== "commute-for" && p.category !== "home" && (p.address || p.lat != null));
@@ -2725,6 +2766,8 @@ function cmPaint() {
       ${mine.length ? mine.map(cmNoteRow).join("") : '<div class="meta">Nothing saved with this block yet.</div>'}</div>
       ${past.length ? `<div class="field"><p class="lbl" style="margin:0">From last time you went here</p>${past.map(cmNoteRow).join("")}</div>` : ""}`;
   }
+  /* the Home prompt sits last, so Going by and the To line (or the ask) stay at the top of a phone sheet */
+  if (!home && !CM.editFrom) h += `<div class="cmask"><div class="meta">Add your home address and every Commute block starts from it.</div><input id="cmHomeIn" placeholder="Your home address" aria-label="Home address" autocomplete="off" enterkeyhint="done"><div class="r"><button class="btn" data-cm="home">Save home</button></div></div>`;
   box.innerHTML = h;
   if (!asking && t.address) cmMapShow($("#cmMap"), "small");
 }
@@ -2822,7 +2865,8 @@ async function cmSave(m) {
   } catch (e) { sv.disabled = false; toast("Not saved: " + e.message, { bad: true }); }
 }
 async function cmSetTarget(ev, o, remember) {
-  cmSet(CMK.to, keyOf(ev), o); CM.edit = "";
+  if (!(await cmSaveRoute(ev, "to", o))) { cmSet(CMK.to, keyOf(ev), { ...o, pending: true }); toast("Saved on this device only. The server could not be reached; it goes up next time.", { bad: true }); }
+  CM.edit = "";
   if (remember) {
     const t = cmTarget(ev), rp = CalCommute.rememberPlace({ title: t.nextTitle || ev.title, address: o.address, lat: o.lat, lng: o.lng });
     if (rp) try {
@@ -2851,8 +2895,14 @@ async function cmAct(t) {
   else if (d.cm === "cancel") { CM.edit = ""; cmPaint(); }
   else if (d.cm === "editfrom") { CM.editFrom = true; cmPaint(); const i = $("#cmFromIn"); if (i) i.focus(); }
   else if (d.cm === "cancelfrom") { CM.editFrom = false; cmPaint(); }
-  else if (d.cm === "homeagain") { cmSet(CMK.from, key, null); CM.editFrom = false; cmPaint(); }
-  else if (d.cm === "gofrom") { const v = ($("#cmFromIn").value || "").trim(); if (!v) return; cmSet(CMK.from, key, await cmFound(v)); CM.editFrom = false; cmPaint(); }
+  else if (d.cm === "homeagain") {
+    if (await cmSaveRoute(ev, "from", null)) { CM.editFrom = false; cmPaint(); } else toast("Not changed: the server could not be reached. Try again.", { bad: true });
+  }
+  else if (d.cm === "gofrom") {
+    const v = ($("#cmFromIn").value || "").trim(); if (!v) return; const o = await cmFound(v);
+    if (!(await cmSaveRoute(ev, "from", o))) { cmSet(CMK.from, key, { ...o, pending: true }); toast("Saved on this device only. The server could not be reached; it goes up next time.", { bad: true }); }
+    CM.editFrom = false; cmPaint();
+  }
   else if (d.cm === "home") {
     const v = ($("#cmHomeIn").value || "").trim(); if (!v) return;
     try { const o = await cmFound(v), r = await send("/quest/places", "POST", { op: "put", place: { name: "Home", address: v, lat: o.lat, lng: o.lng, category: "home", list: "home", savedBy: "Calendar" } });

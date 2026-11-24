@@ -45,7 +45,8 @@ for (let d = -30; d <= 45; d++) events.push(E(d, 18, 0, 19, 0, "Dinner", "joint"
 let sugg = [{ id: "sg_1", status: "open", title: "Pack for FICTION stay", start: at(2, 19), end: at(2, 20), calId: "joint", by: "Desk Hand session", why: "You drive out at 10:30 Friday" }];
 const tasks = [];
 let places = [];
-const commuteNotes = [], commuteFiles = {};   // still-api /quest/commute/*, in memory
+const commuteNotes = [], commuteFiles = {}, commuteRoutes = [];   // still-api /quest/commute/*, in memory
+let routesDown = false;   // GET /__dev/routes?down=1 makes the route calls fail, to check the browser-copy fallback
 const uploads = [];   // reservation files the trip page sent (the e2e reads the request log, this keeps the server honest)
 const FOUND = { "schwartz's deli": { lat: 45.5163, lng: -73.5776 }, "jean-talon market": { lat: 45.5364, lng: -73.6148 } };
 
@@ -79,8 +80,19 @@ http.createServer(async (req, res) => {
     return send(res, 200, { ok: true, name: nm, item: { id: b.id, files: [{ name: nm, url: "https://files.example/" + encodeURIComponent(nm) }] } });
   }
   /* photo notes of Commute blocks (slice 1): still-api's /quest/commute/photo and /quest/commute/photos, faked */
+  if (u.pathname === "/__dev/routes") { routesDown = u.searchParams.get("down") === "1"; return send(res, 200, { routesDown }); }
   if (u.pathname.startsWith("/quest/commute/")) {
     if (req.headers["x-quest-key"] !== "test") return send(res, 401, { error: "wrong pairing code (the dev server's code is: test)" });
+    /* d9: a block's typed To and changed From, kept by block key (still-api /quest/commute/route), faked the way the server does it */
+    if (u.pathname === "/quest/commute/route") {
+      if (routesDown) return send(res, 503, { error: "dev: the server is down" });
+      if (req.method === "GET") return send(res, 200, { route: commuteRoutes.find((x) => x.block === u.searchParams.get("block")) || null });
+      const b = await readBody(req);
+      const cur = commuteRoutes.find((x) => x.block === b.block) || { block: b.block, to: null, from: null };
+      for (const side of ["to", "from"]) if (b[side] !== undefined && !(b.onlyIfEmpty && cur[side])) cur[side] = b[side];
+      if (!commuteRoutes.includes(cur)) commuteRoutes.push(cur);
+      return send(res, 200, { ok: true, route: cur.to || cur.from ? cur : null });
+    }
     if (u.pathname === "/quest/commute/photos") {
       const pl = u.searchParams.get("place"), bl = u.searchParams.get("block");
       return send(res, 200, { notes: commuteNotes.filter((x) => (pl ? x.place === pl && x.withPlace : x.block === bl)).sort((a, b) => (b.date + b.at).localeCompare(a.date + a.at)) });

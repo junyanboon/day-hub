@@ -90,7 +90,7 @@ test("slice 2 is not here: the panel code builds no route steps, leave-by time, 
 test("the page: the box sits in both panels, only for a Commute block, and shows no slice 2 thing", async () => {
   const { readFileSync } = await import("node:fs");
   const html = readFileSync(new URL("../calendar.html", import.meta.url), "utf8");
-  assert.equal((html.match(/\$\{commuteBox\(ev\)\}/g) || []).length, 2, "computer panel and phone sheet");
+  assert.equal((html.match(/\$\{commuteBox\(ev\)\}|cm = commuteBox\(ev\)/g) || []).length, 2, "computer panel and phone sheet");
   assert.match(html, /function commuteBox\(ev\) \{ return ev\.k === "commute" && !ev\.isNew && !ev\.ghost/);
   const src = html.slice(html.indexOf("/* commute:start */"), html.indexOf("/* commute:end */"));
   assert.ok(src.length > 3000);
@@ -114,3 +114,51 @@ test("the card shows the mode's emoji, and Commute has no page of its own", asyn
   assert.match(html, /<span class="ei" aria-hidden="true">\$\{kicon\(e\)\}<\/span>/);
   assert.match(html, /k !== "commute"\);/);
 });
+
+/* ---- d6 (Junyan, 2026-11-24, "6 yes"): a Commute block draws its Commute part first ---- */
+test("d6: in the computer panel and the phone sheet the Commute box comes right after the title and time, before the usual fields", async () => {
+  const { readFileSync } = await import("node:fs");
+  const html = readFileSync(new URL("../calendar.html", import.meta.url), "utf8");
+  const fn = (name, next) => html.slice(html.indexOf("function " + name + "("), html.indexOf(next));
+  const pEvent = fn("pEvent", "/* ---------- the phone's event sheet");
+  const at = (src, needle) => { const i = src.indexOf(needle); assert.ok(i > 0, needle); return i; };
+  assert.equal((pEvent.match(/\$\{commuteBox\(ev\)\}/g) || []).length, 1);
+  const box = at(pEvent, "${commuteBox(ev)}");
+  assert.ok(at(pEvent, 'id="pTitle"') < box, "after the title");
+  for (const later of ['<p class="lbl" style="margin:0">Length</p>', '<p class="lbl" style="margin:0">Block type</p>', 'for="pCal"', 'id="pSave"'])
+    assert.ok(box < at(pEvent, later), "before " + later);
+  const pSheet = fn("pSheet", "/** The words in the sheet's rows");
+  assert.equal((pSheet.match(/\$\{cm\}/g) || []).length, 1);
+  assert.match(pSheet, /cm = commuteBox\(ev\)/);
+  const sbox = at(pSheet, "${cm}");
+  assert.ok(at(pSheet, 'id="pTitle"') < sbox, "after the title");
+  assert.ok(sbox < at(pSheet, '<div class="rows">'), "before Day, Starts, Ends, Location, Notes, Type, Calendar");
+  assert.ok(at(pSheet, 'id="cmWhen"') < sbox && at(pSheet, 'id="cmWhen"') > at(pSheet, 'id="pTitle"'), "the time line sits between the title and the box");
+  assert.ok(sbox < at(pSheet, 'id="pDel"'));
+});
+test("d6: inside the box the order is Going by, From, To or the ask, Open in Google Maps, the small map, then photos and notes; Home is asked last", async () => {
+  const { readFileSync } = await import("node:fs");
+  const html = readFileSync(new URL("../calendar.html", import.meta.url), "utf8");
+  const src = html.slice(html.indexOf("function cmPaint()"), html.indexOf("function cmDrop("));
+  const order = ['Going by', '<span class="lbl">From</span>', '<span class="lbl">To</span>', 'Where are you going?', 'Open in Google Maps', 'id="cmMap"', 'Photos and notes', 'Add your home address'];
+  let last = -1;
+  for (const w of order) { const i = src.indexOf(w); assert.ok(i > last, w + " out of order"); last = i; }
+});
+
+/* ---- d9 (Junyan, 2026-11-24, "9 yes"): the To and From are kept on the server, with this browser as the fallback ---- */
+test("d9: the page saves, reads and clears a block's To and From on the server, and sends an old browser copy up once", async () => {
+  const { readFileSync } = await import("node:fs");
+  const html = readFileSync(new URL("../calendar.html", import.meta.url), "utf8");
+  const src = html.slice(html.indexOf("/* commute:start */"), html.indexOf("/* commute:end */"));
+  assert.match(src, /send\("\/quest\/commute\/route", "POST", \{ block: key, \[side\]: o \? cmPlaceBody\(o\) : null \}\)/, "save and clear one side by the block's key");
+  assert.match(src, /api\("\/quest\/commute\/route\?block=" \+ encodeURIComponent\(key\)\)/, "read it when the panel opens");
+  assert.match(src, /onlyIfEmpty = true/, "an old browser copy only fills an empty end");
+  assert.match(src, /CM\.up = true/, "and is sent once");
+  assert.match(src, /pending: true/, "a change made while offline is kept here, marked pending");
+  assert.match(src, /this device only/, "and says so");
+  assert.match(src, /const cmTyped = \(ev\) => \(cmRoute\(ev\) && cmRoute\(ev\)\.to\) \|\| cmGet\(CMK\.to\)\[keyOf\(ev\)\]/, "the server's To first, the browser copy as fallback");
+  assert.match(src, /const cmFromPicked = \(ev\) => \(cmRoute\(ev\) && cmRoute\(ev\)\.from\) \|\| cmGet\(CMK\.from\)/, "the same for From");
+  assert.doesNotMatch(src, /cmSet\(CMK\.(to|from), key, await cmFound/, "no write goes to the browser alone any more");
+  assert.equal(keyHint(html), true);
+});
+const keyHint = (html) => /const keyOf = \(e\) => \(e\.ghost \? "g\|" : "e\|"\) \+ e\.calId \+ "\|" \+ e\.id;/.test(html);   // the block's key is the same on every device: calendar id and event id

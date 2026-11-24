@@ -129,7 +129,7 @@ test("time labels", () => {
 
 /* Commute blocks (Junyan, 2026-11-24, d1 "1 yes": one block type called Commute, three emojis picked by the title) */
 test("commute, transit and drive titles land on Commute; trip words stay on Travel", () => {
-  for (const t of ["Commute", "Transit", "Subway", "TTC", "Streetcar", "Bus to Zouk Training", "Drive", "Drive home", "Driving", "Morning commute", "Take the bus"])
+  for (const t of ["Commute", "Transit", "Subway", "TTC", "Streetcar", "Bus to Zouk Training", "Drive", "Drive home", "Driving", "Morning commute"])
     assert.equal(C.kindOf({ title: t }), "commute", t);
   for (const t of ["Montreal: train", "Flight to São Paulo", "Airport", "Hotel", "Stay at FICTION", "Check-in", "Ferry", "Airbnb check-out", "Train to Montreal"])
     assert.equal(C.kindOf({ title: t }), "travel", t);
@@ -138,6 +138,21 @@ test("commute, transit and drive titles land on Commute; trip words stay on Trav
   assert.equal(C.kindOf({ title: "Zouk", kind: "commute" }), "commute", "and Commute can be hand-set");
   assert.equal(C.kindOf({ title: "Busy day" }), "other", "bus is a whole word");
   assert.deepEqual(C.KINDS.find(([k]) => k === "commute"), ["commute", "Commute"]);
+});
+
+/* d8 (Junyan, 2026-11-24, "8 yes"): bus, drive and driving count only when the title reads as a trip */
+test("bus, drive and driving make a Commute only when the title reads as a trip (d8)", () => {
+  for (const t of ["Drive", "Bus", "Driving", "Drive home", "Drive to Mom's", "Bus to studio", "Driving to the airport", "Take the bus to work",
+    "Bus back", "Drive over", "Drive there", "Drive: Mom's", "\u{1F697} Drive"])
+    assert.equal(C.kindOf({ title: t }), "commute", t);
+  for (const t of ["Google Drive backup", "Test drive", "hard drive cleanup", "Bus tickets", "Business", "Business plan", "Drive-in movie", "Take the bus", "Driveway sealing", "Drives"])
+    assert.notEqual(C.kindOf({ title: t }), "commute", t + " is not a trip");
+  assert.equal(C.kindOf({ title: "Google Drive backup" }), "other");
+  assert.equal(C.kindOf({ title: "Bus tickets" }), "other");
+  for (const t of ["Morning commute", "Commuting", "Transit", "Subway", "TTC", "Streetcar", "Check the TTC schedule", "Late streetcar"])
+    assert.equal(C.kindOf({ title: t }), "commute", t + " counts anywhere");
+  assert.equal(C.kindOf({ title: "Test drive", kind: "commute" }), "commute", "a hand-set Commute still wins");
+  assert.ok(!C.KINDS.some(([k]) => k === "bus" || k === "drive"), "bus and drive are not a travel word");
 });
 
 test("the mode (its emoji) is guessed from the title, and a hand-picked mode beats the guess", () => {
