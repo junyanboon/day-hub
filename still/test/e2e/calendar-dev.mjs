@@ -17,9 +17,10 @@ const CALS = [
   { id: "junyan", name: "Junyan", color: "#f6bf26", writable: true, ok: true },
   { id: "staff", name: "Staff Scheduling", color: "#ff8a3d", writable: true, ok: true },
   { id: "caney", name: "Caney", color: "#a98467", writable: false, ok: true },
-  { id: "bday", name: "Community Birthdays", color: "#c77dff", writable: false, ok: true },
+  { id: "bday", name: "Community Birthdays", color: "#c77dff", writable: false, displayOnly: true, ok: true },
 ];
-const day0 = new Date(); day0.setHours(0, 0, 0, 0);
+/* DEV_TODAY=YYYY-MM-DD pins "today" so a test never reads the real clock (run with TZ=America/Toronto) */
+const day0 = process.env.DEV_TODAY ? new Date(process.env.DEV_TODAY + "T00:00:00") : new Date(); day0.setHours(0, 0, 0, 0);
 const at = (d, h, m = 0) => new Date(day0.getTime() + d * 86400000 + (h * 60 + m) * 60000).toISOString();
 const ymd = (d) => { const x = new Date(day0.getTime() + d * 86400000); return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, "0")}-${String(x.getDate()).padStart(2, "0")}`; };
 let n = 0;
@@ -35,7 +36,7 @@ let events = [
   E(2, 9, 30, 11, 0, "Work block"), E(2, 12, 0, 12, 30, "Close Scotia account"), E(2, 13, 0, 15, 0, "Packing & Errands"),
   A(3, 3, "Stay at FICTION"), A(3, 1, "Caney away", "caney"), A(3, 1, "Pay rent"), E(3, 10, 30, 17, 0, "Drive"), E(3, 17, 0, 17, 30, "Check-in"),
   E(4, 13, 0, 14, 30, "Zouk WS"), E(4, 14, 30, 16, 0, "Lambada WS"), E(4, 16, 0, 17, 0, "Solo Battle WS"),
-  A(5, 1, "Caney's Birthday", "bday"), E(5, 12, 0, 13, 0, "Gym · Jack Woods"), E(5, 13, 0, 14, 30, "Lambada WS"), E(5, 16, 0, 17, 0, "Practica"), E(5, 17, 30, 19, 0, "Dinner w/ everyone?"),
+  A(5, 1, "Caney's Birthday", "bday"), A(5, 1, "Ada's Birthday", "bday"), E(0, 15, 0, 16, 0, "Cake at the studio", "bday"), E(5, 12, 0, 13, 0, "Gym · Jack Woods"), E(5, 13, 0, 14, 30, "Lambada WS"), E(5, 16, 0, 17, 0, "Practica"), E(5, 17, 30, 19, 0, "Dinner w/ everyone?"),
   E(-2, 12, 0, 13, 0, "Gym · Jack Woods"), E(20, 13, 15, 14, 45, "Zouk Training"), E(-20, 13, 15, 14, 45, "Zouk Training"),
 ];
 for (let d = -30; d <= 45; d++) events.push(E(d, 18, 0, 19, 0, "Dinner", "joint", { recurringEventId: "dinner" }), E(d, 6, 45, 8, 0, "Morning Yoga"), E(d, 21, 45, 22, 30, "Wind down"));
@@ -99,7 +100,9 @@ http.createServer(async (req, res) => {
     if (req.headers["x-quest-key"] !== "test") return send(res, 401, { error: "wrong pairing code (the dev server's code is: test)" });
     const b = req.method === "GET" || req.method === "DELETE" ? {} : await readBody(req);
     if (u.pathname === "/planner/calendars") return send(res, 200, { calendars: CALS });
-    if (u.pathname === "/planner/events") { const f = Date.parse(u.searchParams.get("from")), t = Date.parse(u.searchParams.get("to")); return send(res, 200, { events: events.filter((e) => { const s = Date.parse(e.start), x = Date.parse(e.end); return x > f && s < t; }) }); }
+    if (u.pathname === "/planner/events") { const f = Date.parse(u.searchParams.get("from")), t = Date.parse(u.searchParams.get("to")); return send(res, 200, { events: events.filter((e) => { const s = Date.parse(e.start), x = Date.parse(e.end); return x > f && s < t; }).map((e) => (e.calId === "bday" ? { ...e, displayOnly: true } : e)) }); }
+    /* still-api refuses every write to Community Birthdays (displayOnly), whatever Google says */
+    if (u.pathname === "/planner/event" && req.method !== "GET" && (b.calId === "bday" || b.toCalId === "bday" || u.searchParams.get("calId") === "bday")) return send(res, 403, { error: "Community Birthdays is read-only here (display only)" });
     if (u.pathname === "/planner/suggestions" && req.method === "GET") return send(res, 200, { suggestions: sugg });
     if (u.pathname === "/planner/suggestions/accept") { const g = sugg.find((x) => x.id === b.id); sugg = sugg.filter((x) => x !== g); events.push({ id: "e" + (++n), calId: b.calId || g.calId, title: b.title || g.title, start: g.start, end: g.end, allDay: false }); return send(res, 200, { suggestion: { eventCalId: b.calId || g.calId } }); }
     if (u.pathname === "/planner/suggestions/skip") { sugg = sugg.filter((x) => x.id !== b.id); return send(res, 200, { ok: true }); }
