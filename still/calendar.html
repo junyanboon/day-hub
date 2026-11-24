@@ -13,7 +13,8 @@
 <meta name="apple-mobile-web-app-title" content="Calendar">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>Calendar</title>
-<script src="calendar-core.js?v=29"></script>
+<script src="calendar-core.js?v=33"></script>
+<script src="calendar-commute.js?v=2"></script>
 <script src="cards-vault.js?v=2"></script><script src="cards.js?v=7"></script>
 <script src="quest-trips.js?v=20261121a" data-helpers></script>
 <script>
@@ -68,7 +69,7 @@
    - solid header and footer bars with a hairline edge; nothing shows through them. */
 :root{
 /* the palette */
---fuchsia:#e040fb;--amber:#fbbf24;--orange:#fb923c;--lime:#a3e635;--emerald:#34d399;--cyan:#22d3ee;--blue:#60a5fa;
+--fuchsia:#e040fb;--amber:#fbbf24;--orange:#fb923c;--lime:#a3e635;--emerald:#34d399;--cyan:#22d3ee;--blue:#60a5fa;--azure:#006b97;
 --indigo:#818cf8;--purple:#c084fc;--pink:#f472b6;--slate:#94a3b8;--sand:#d6bc8a;--stone:#a8a29e;--red:#ff4f5e;--teal:#13aea4;
 /* surfaces and text */
 --bg:#0e1015;--bar:#14171e;--raise:#1a1e27;--raise2:#232835;--line:rgba(255,255,255,.09);--hair:rgba(255,255,255,.05);
@@ -91,7 +92,7 @@
 --status:transparent;
 /* block types: colour means type (Packing, slice 02 d23: a teal of its own, kept clear of Social and Yoga in every look) */
 --k-deep:var(--amber);--k-studio:var(--orange);--k-yoga:var(--cyan);--k-gym:var(--purple);--k-dance:var(--pink);--k-cook:var(--lime);
---k-travel:var(--blue);--k-pack:var(--teal);--k-social:var(--emerald);--k-errand:var(--indigo);--k-wind:var(--slate);--k-rest:var(--sand);--k-home:var(--fuchsia);--k-other:var(--stone);
+--k-travel:var(--blue);--k-commute:var(--azure);--k-pack:var(--teal);--k-social:var(--emerald);--k-errand:var(--indigo);--k-wind:var(--slate);--k-rest:var(--sand);--k-home:var(--fuchsia);--k-other:var(--stone);
 /* old names some rules still use */
 --glass:var(--raise);--glass2:var(--raise2);--panel:var(--bar);--pin:var(--bar);--deep:var(--bar);
 --H:56px;--hh:68px;--gut:56px;--rail:56px;--radius:8px;
@@ -109,7 +110,7 @@
    iPhone strip behind the clock is the header bar's cream (2026-11-18: a dark strip there looked grey to black
    against the cream header); big shadows are a soft warm brown, not black. */
 :root[data-look="studio-day"]{
---fuchsia:#e038f8;--amber:#9a7d00;--orange:#a35a0a;--lime:#4f9418;--emerald:#14946a;--cyan:#0e8fa3;--blue:#2563c8;--teal:#147169;
+--fuchsia:#e038f8;--amber:#9a7d00;--orange:#a35a0a;--lime:#4f9418;--emerald:#14946a;--cyan:#0e8fa3;--blue:#2563c8;--azure:#008fe0;--teal:#147169;
 --indigo:#6358d0;--purple:#9a46c8;--pink:#c7317f;--slate:#5f6f86;--sand:#a1865a;--stone:#857d77;--red:#c42b3c;
 --bg:#faf6ef;--bar:#fffdf9;--raise:#f4eee4;--raise2:#e8dfd1;--line:rgba(96,72,40,.16);--hair:rgba(96,72,40,.09);
 --ink:#1f1b16;--soft:#5e554a;--faint:#736a5e;
@@ -121,7 +122,7 @@
 /* Night: a flat neutral charcoal with off-white text and no tint, the header and bottom bar a touch lifted from the
    page. The same coral, brightened for the dark; Studio On-Site a yellower tangerine to stay clear of it. */
 :root[data-look="studio-night"]{
---fuchsia:#e040f8;--amber:#fbbf24;--orange:#fc980c;--lime:#a3e635;--emerald:#34d399;--cyan:#22d3ee;--blue:#60a5fa;
+--fuchsia:#e040f8;--amber:#fbbf24;--orange:#fc980c;--lime:#a3e635;--emerald:#34d399;--cyan:#22d3ee;--blue:#60a5fa;--azure:#0075a2;
 --indigo:#818cf8;--purple:#c084fc;--pink:#f472b6;--slate:#94a3b8;--sand:#d6bc8a;--stone:#a8a29e;--red:#ff5a5f;--teal:#13aea4;
 --bg:#1c1c1c;--bar:#262626;--raise:#2e2e2e;--raise2:#3a3a3a;--line:rgba(255,255,255,.10);--hair:rgba(255,255,255,.055);
 --ink:#e6e6e6;--soft:#ababab;--faint:#8c8c8c;
@@ -131,7 +132,7 @@
 /* Stage Lights: the moment before the curtain. A plum-black stage, spotlight gold for "now", jewel-tone gels that glow.
    Gold sits near Deep Work, so Deep Work turns a deep amber-orange and Studio On-Site a vermilion. */
 :root[data-look="stage"]{
---fuchsia:#f010e0;--amber:#e08000;--orange:#ff5c3a;--lime:#a6ec3c;--emerald:#28e0a0;--cyan:#2ee0e8;--blue:#3d8bff;--teal:#08966c;
+--fuchsia:#f010e0;--amber:#e08000;--orange:#ff5c3a;--lime:#a6ec3c;--emerald:#28e0a0;--cyan:#2ee0e8;--blue:#3d8bff;--azure:#00bdff;--teal:#08966c;
 --indigo:#8a80ff;--purple:#c46cf5;--pink:#ff4fae;--slate:#9ea6cf;--sand:#c8b49c;--stone:#a39aa3;--red:#ff5c6c;
 --bg:#120d1a;--bar:#1d1529;--raise:#251b34;--raise2:#302343;--line:rgba(236,220,255,.10);--hair:rgba(236,220,255,.055);
 --ink:#f7f1fb;--soft:#bdb1cc;--faint:#8a7d9e;
@@ -141,7 +142,7 @@
 /* Velvet & Brass: a quiet, premium front office. Emerald-black, warm cream text, brushed brass for "now", calmer
    gem tones. Brass sits near Deep Work and Rest, so Deep Work is a bright citrine and Rest a pale linen. */
 :root[data-look="velvet"]{
---fuchsia:#e038f8;--amber:#f5cc1f;--orange:#d0603e;--lime:#a3c45c;--emerald:#4cbf86;--cyan:#3cc6c0;--blue:#4f88e0;--teal:#0d94a0;
+--fuchsia:#e038f8;--amber:#f5cc1f;--orange:#d0603e;--lime:#a3c45c;--emerald:#4cbf86;--cyan:#3cc6c0;--blue:#4f88e0;--azure:#00c3ff;--teal:#0d94a0;
 --indigo:#9097ec;--purple:#b97ad9;--pink:#d9668f;--slate:#8ea2ac;--sand:#e0d6c2;--stone:#a39c92;--red:#e0605a;
 --bg:#0b1a17;--bar:#11251f;--raise:#16302a;--raise2:#1e3c34;--line:rgba(243,234,216,.10);--hair:rgba(243,234,216,.055);
 --ink:#f3ead8;--soft:#b8b4a0;--faint:#82907f;
@@ -156,7 +157,7 @@ button,input,select{font:inherit;color:inherit}button{cursor:pointer}
 button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--now);outline-offset:1px}
 [hidden]{display:none!important}
 .k-deep{--c:var(--k-deep)}.k-studio{--c:var(--k-studio)}.k-yoga{--c:var(--k-yoga)}.k-gym{--c:var(--k-gym)}.k-dance{--c:var(--k-dance)}.k-cook{--c:var(--k-cook)}
-.k-travel{--c:var(--k-travel)}.k-pack{--c:var(--k-pack)}.k-social{--c:var(--k-social)}.k-errand{--c:var(--k-errand)}.k-wind{--c:var(--k-wind)}.k-rest{--c:var(--k-rest)}.k-home{--c:var(--k-home)}.k-other{--c:var(--k-other)}
+.k-travel{--c:var(--k-travel)}.k-commute{--c:var(--k-commute)}.k-pack{--c:var(--k-pack)}.k-social{--c:var(--k-social)}.k-errand{--c:var(--k-errand)}.k-wind{--c:var(--k-wind)}.k-rest{--c:var(--k-rest)}.k-home{--c:var(--k-home)}.k-other{--c:var(--k-other)}
 .app{display:grid;grid-template-columns:var(--rail) 236px minmax(0,1fr) 324px;height:100%;padding-top:env(safe-area-inset-top,0px);background:var(--bar)}
 body.nopanel .app{grid-template-columns:var(--rail) 236px minmax(0,1fr) 0}
 body.railopen{--rail:186px}
@@ -302,6 +303,12 @@ body.touch .pane{overflow-x:clip}
    title still reads at 4.5:1 or better in every look (see-through washed it out on the cream look) */
 .ev.done:not(.ghost),.day.past .ev:not(.ghost){background:color-mix(in srgb,var(--c) var(--dim-fill),var(--bg));color:color-mix(in srgb,var(--c) var(--dim-title),var(--dim-ink))}
 .ev.done:not(.ghost):hover,.day.past .ev:not(.ghost):hover{background:color-mix(in srgb,var(--c) calc(var(--dim-fill) + 4%),var(--bg))}
+/* Commute (d3, mockup Main.dc.html): the same card in diagonal stripes, a band of the type colour and a paler one; the
+   paler band is nearer the page colour, so the title reads at least as well as on a plain card */
+.ev.k-commute:not(.ghost){background:repeating-linear-gradient(135deg,color-mix(in srgb,var(--c) var(--ev-fill),var(--bg)) 0 6px,color-mix(in srgb,var(--c) calc(var(--ev-fill) - 5%),var(--bg)) 6px 12px)}
+.ev.k-commute:not(.ghost):hover{background:repeating-linear-gradient(135deg,color-mix(in srgb,var(--c) calc(var(--ev-fill) + 4%),var(--bg)) 0 6px,color-mix(in srgb,var(--c) calc(var(--ev-fill) - 1%),var(--bg)) 6px 12px)}
+.ev.done.k-commute:not(.ghost),.day.past .ev.k-commute:not(.ghost){background:repeating-linear-gradient(135deg,color-mix(in srgb,var(--c) var(--dim-fill),var(--bg)) 0 6px,color-mix(in srgb,var(--c) calc(var(--dim-fill) - 3%),var(--bg)) 6px 12px)}
+.ev.done.k-commute:not(.ghost):hover,.day.past .ev.k-commute:not(.ghost):hover{background:repeating-linear-gradient(135deg,color-mix(in srgb,var(--c) calc(var(--dim-fill) + 4%),var(--bg)) 0 6px,color-mix(in srgb,var(--c) var(--dim-fill),var(--bg)) 6px 12px)}
 .ev.done small,.day.past .ev small{color:var(--dim-time)}.ev.done .ei,.day.past .ev .ei{opacity:.6}
 .strip.narrow .dn>span{display:flex;flex-direction:column;align-items:center;gap:2px;line-height:1.1}
 .strip.narrow .ev{padding:3px 3px 3px 6px;font-size:10.5px;line-height:1.2}.strip.narrow .ev .ei{display:none}
@@ -346,6 +353,27 @@ div.month{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));grid-templa
 .field input,.field select{width:100%;background:var(--raise);border:1px solid var(--line);border-radius:10px;padding:8px 10px}
 .tinput{font-family:var(--display);font-size:20px!important;font-weight:700}
 .chips{display:flex;gap:6px;flex-wrap:wrap}
+/* Commute panel (slice 1): colours come from the look variables only */
+.cmbox{display:flex;flex-direction:column;gap:10px;border:1px solid var(--line);border-radius:12px;padding:10px;background:color-mix(in srgb,var(--k-commute) 8%,var(--bg))}
+.cmbox a.btn{color:var(--ink);text-decoration:none}
+.cmroute{display:flex;flex-direction:column;gap:6px}.cmr{display:flex;align-items:center;gap:8px}.cmr .lbl{margin:0;width:42px}.cmr .v{flex:1;min-width:0;overflow-wrap:anywhere}
+.cmask{display:flex;flex-direction:column;gap:6px}.cmask input[type=text],.cmask input:not([type]),.cmask textarea,.cmmodal textarea{width:100%;background:var(--raise);border:1px solid var(--line);border-radius:10px;padding:8px 10px}
+.cmrem{display:flex;align-items:center;gap:8px}
+.cmmap{height:170px;border-radius:10px;overflow:hidden;border:1px solid var(--line);position:relative;z-index:0}.cmmap.big{height:auto;flex:1;border-radius:0;border:0}
+.cmpin{min-width:34px;height:34px;border-radius:17px;padding:0 6px;display:flex;align-items:center;justify-content:center;font:700 11px system-ui,sans-serif;background:var(--bar);color:var(--ink);border:2px solid var(--k-commute);box-shadow:0 1px 4px var(--line)}
+.cmpin.to{border-width:4px}.cmpin.me{border-style:dashed}
+.cmnote{display:flex;align-items:center;gap:8px;flex-wrap:wrap;border-top:1px solid var(--line);padding-top:6px}.cmnote span{flex:1;min-width:0;overflow-wrap:anywhere}
+.cmbox .chip .cmm{opacity:.85;font-variant-numeric:tabular-nums}.cmbest{display:inline-block;margin-left:4px;padding:1px 6px;border-radius:8px;font-size:10px;font-weight:700;background:var(--k-commute);color:var(--bg)}
+.cmchk{display:flex;flex-direction:column;gap:2px;border-left:4px solid var(--k-commute);padding:6px 10px;background:var(--raise);border-radius:8px}.cmchk small{color:var(--soft)}
+.cmleave{display:flex;flex-direction:column;gap:2px}.cmleave .lbl{margin:0}.cmleave .big{font-size:28px;font-weight:700;line-height:1.1;display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}.cmshift{font-size:13px;font-weight:600;color:var(--soft)}
+.cmsteps{list-style:none;margin:6px 0 0;padding:0;display:flex;flex-direction:column;gap:6px}.cmsteps li{display:flex;gap:8px;align-items:flex-start}.cmsteps li>div{flex:1;min-width:0;overflow-wrap:anywhere}.cmsteps b{display:block;font-weight:600}.cmsteps small,.cmalert small{display:block;color:var(--soft);font-size:12px}.cmsteps .sm{white-space:nowrap;color:var(--soft);font-size:12px}.cmsteps .si,.cmalert .si{width:22px;text-align:center}
+.cmalert{display:flex;gap:8px;align-items:flex-start;padding:6px 8px;border:1px solid var(--line);border-radius:10px;background:var(--raise)}.cmalert>div{flex:1;min-width:0;overflow-wrap:anywhere}.cmalert.gone{opacity:.6}.cmalert.gone b{text-decoration:line-through}.cmgrp{margin:6px 0 0}
+.cmquick{display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap;border:1px solid var(--k-commute);border-radius:10px;padding:6px 8px}.cmquick small{display:block;color:var(--soft);font-size:12px}.cmlast{margin-top:-4px}
+.cmbig{position:fixed;top:12px;left:12px;right:12px;height:calc(100% - 24px);z-index:60;display:flex;flex-direction:column;background:var(--bg);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.cmbar{display:flex;align-items:center;gap:8px;padding:8px 10px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.cmmodal{position:fixed;top:0;left:0;right:0;height:100%;z-index:70;display:flex;align-items:center;justify-content:center;padding:16px;background:color-mix(in srgb,var(--bg) 70%,transparent)}
+.cmcard{width:min(520px,100%);max-height:100%;overflow:auto;display:flex;flex-direction:column;gap:10px;background:var(--bar);border:1px solid var(--line);border-radius:14px;padding:12px}
+.cmcard .r{display:flex;align-items:center;gap:8px}.cmcard img{max-width:100%;border-radius:10px}.cmfig{margin:0;display:flex;flex-direction:column;gap:6px}
 .chip{border:1px solid var(--line);background:none;border-radius:999px;padding:4px 10px;color:var(--soft)}
 .chip[aria-pressed=true]{background:color-mix(in srgb,var(--c,var(--neutral)) 22%,var(--bar));border-color:var(--c,var(--ink));color:var(--ink);font-weight:600}
 .chip:disabled{opacity:.5;cursor:default}
@@ -934,6 +962,7 @@ html.hsfill .x-toast{bottom:calc(22px + env(safe-area-inset-bottom,0px) - var(--
   .page.cards input,.page.cards select,.page.cards textarea{font-size:16px}
   .x-toast{white-space:normal;border-radius:18px}
 }
+@media (max-width:760px){.cmbig{top:0;left:0;right:0;height:100%;border-radius:0;border:0}.cmmap{height:150px}}
 </style></head>
 <body>
 <div class="app">
@@ -989,7 +1018,7 @@ if (TOUCH) for (const g of ["gesturestart", "gesturechange"]) document.addEventL
    which shows this build, the phone's answers and a log of every day change with its cause. Until then CalHook.on is
    null and diag() does nothing. BUILD names this copy of the page, so a screenshot proves which copy ran: change it on
    every change to this page or calendar-readout.js (the date plus a letter). */
-const BUILD = "2026-11-24 birthdays b";
+const BUILD = "2026-11-24e commute directions birthdays";
 const CalHook = window.CalHook = { BUILD, on: null };
 const diag = (kind, msg) => { if (CalHook.on) CalHook.on(kind, msg); };
 /* The iPhone home screen app's fit (2026-11-12): html.hs in a home screen app on touch, html.hsfill and --hsgap when
@@ -1044,8 +1073,10 @@ const store = { get(k) { try { return localStorage.getItem(k); } catch { return 
   set(k, v) { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch {} } };
 const MON = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 const DOW = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"], DOWM = ["Mo","Tu","We","Th","Fr","Sa","Su"];
-const KICON = { deep: "🎯", studio: "🔑", yoga: "🪔", gym: "🏋️", dance: "💃", cook: "🍳", travel: "✈️", pack: "🧳", social: "💛", errand: "🧭", wind: "🌙", rest: "🌀", home: "🧺", other: "" };
-const KNAME = Object.fromEntries(C.KINDS), TYPES = C.KINDS.map((x) => x[0]).filter((k) => k !== "other" && k !== "pack" && k !== "home");   // Domestic has no page of its own (d62)
+const KICON = { deep: "🎯", studio: "🔑", yoga: "🪔", gym: "🏋️", dance: "💃", cook: "🍳", travel: "✈️", commute: "🚶", pack: "🧳", social: "💛", errand: "🧭", wind: "🌙", rest: "🌀", home: "🧺", other: "" };
+/** A Commute block shows its mode: 🚶, 🚇 or 🚗 (calendar-core.js modeOf: the pick in the panel, else the title). */
+const kicon = (e) => (e.k === "commute" ? (C.MODES.find((m) => m[0] === C.modeOf(e)) || C.MODES[0])[1] : KICON[e.k]);
+const KNAME = Object.fromEntries(C.KINDS), TYPES = C.KINDS.map((x) => x[0]).filter((k) => k !== "other" && k !== "pack" && k !== "home" && k !== "commute");   // Domestic has no page of its own (d62); Commute has none either: its panel is in the event
 /* Packing (slice 02, d23) has no tab of its own: the rail's Packing button after Travel is its page (d17). */
 const KFROM = { deep: "your Tasks Inbox and your Claude sessions", studio: "the maintenance tab in FBS", yoga: "the new Yoga tab", gym: "your Gym tab",
   dance: "your Zouk Training pages in Notion", cook: "the Meal prep tab", travel: "your Travel Planner in Notion", social: "your own notes",
@@ -1350,7 +1381,7 @@ function strip(v) {
       const e = p.ev, cal = calOf(e.calId), ro = !e.ghost && !cal.writable, m = p.bot - p.top;
       h += `<div class="ev k-${e.k} ${C.cardFit(m, S.h)} ${e.ghost ? "ghost" : ""} ${ro ? "ro" : ""} ${k === t && p.bot <= nowW.min ? "done" : ""} ${S.ev && keyOf(S.ev) === keyOf(e) ? "on" : ""}" role="button" tabindex="0" data-key="${esc(keyOf(e))}" data-m="${m}"
         style="top:${atMin(p.top)};height:calc(max(${m / 60} * var(--H), 19px) - 2px);left:calc((100% - ${rr}px) * ${p.col / p.cols} + 2px);width:calc((100% - ${rr}px) * ${1 / p.cols} - 3px)" title="${esc(e.title)} · ${esc(cal.name)}">
-        <b>${KICON[e.k] && !e.title.includes(KICON[e.k]) ? `<span class="ei" aria-hidden="true">${KICON[e.k]}</span>` : ""}<span class="t">${esc(e.title)}</span></b><small><span class="t1">${C.hm(C.wall(e.s, S.tz).min)}${two() ? " · " + C.hm(C.wall(e.s, S.tz2).min) : ""}</span><span class="t2">${cardTimeOf(e, S.tz)}${two() ? `<span class="z2">${cardTimeOf(e, S.tz2)}</span>` : ""}</span></small>${ro || e.ghost ? "" : '<span class="h"></span>'}</div>`;
+        <b>${kicon(e) && !e.title.includes(kicon(e)) ? `<span class="ei" aria-hidden="true">${kicon(e)}</span>` : ""}<span class="t">${esc(e.title)}</span></b><small><span class="t1">${C.hm(C.wall(e.s, S.tz).min)}${two() ? " · " + C.hm(C.wall(e.s, S.tz2).min) : ""}</span><span class="t2">${cardTimeOf(e, S.tz)}${two() ? `<span class="z2">${cardTimeOf(e, S.tz2)}</span>` : ""}</span></small>${ro || e.ghost ? "" : '<span class="h"></span>'}</div>`;
     }
     for (const p of staff) h += `<button class="pip" data-key="${esc(p.id)}" title="${esc(p.ev.title)} · ${C.hm(p.top)}" style="top:${atMin(p.top)};height:max(16px, calc(${(p.bot - p.top) / 60} * var(--H) - 2px))">${staffIcon(p.ev.title)}</button>`;
     if (k === t) h += `<div class="nowline" id="nowline" style="top:${nowY}"></div>`;
@@ -1692,8 +1723,10 @@ function panel(tab, ev) {
 function paintPanel(anim) {
   $$(".ptabs [data-p]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.p === S.tab)));
   const b = $("#pbody");
+  cmDrop("small");   // the small map of a Commute panel is not kept alive when the panel changes
   if (anim) { b.classList.remove("in"); void b.offsetWidth; b.classList.add("in"); }
   b.innerHTML = S.tab === "event" ? pEvent(S.ev) : S.tab === "list" ? pList(S.ev) : S.tab === "set" ? pSet() : S.tab === "keys" ? pKeys() : pNow();
+  if (S.tab === "event" && S.ev && b.querySelector("#cmBox")) cmAfter(S.ev);
 }
 const untilText = (min) => min < 60 ? `${Math.max(1, Math.round(min))} min` : min < 1440 ? C.dur(Math.round(min)) : `${Math.round(min / 1440)} days`;
 const rowHTML = (e, withDay) => `<button class="row k-${e.k}" data-key="${esc(keyOf(e))}" ${withDay ? 'style="grid-template-columns:104px 8px minmax(0,1fr)"' : ""}><small>${e.allDay ? "All day" : (withDay ? DOW[C.wall(e.s, S.tz).dow] + " " : "") + C.hm(C.wall(e.s, S.tz).min)}</small><i></i><span>${e.ghost ? "Suggested: " : ""}${esc(e.title)}</span></button>`;
@@ -1705,8 +1738,8 @@ function pNow() {
   const cur = mine.find((e) => e.s <= now && e.e > now), next = mine.find((e) => e.s > now);
   const rest = mine.filter((e) => e.e > now && e !== cur && C.wall(e.s, S.tz).day === t), sug = ghosts().filter((g) => !g.auto || g.id.endsWith(":" + t));
   let frac = 0, big = "Free", sub = "Nothing else on the calendar", ico = "🌙", k = "other", lbl = "Up next";
-  if (cur) { frac = (now - cur.s) / (cur.e - cur.s); big = untilText((cur.e - now) / 60000) + " left"; sub = "in " + cur.title; ico = KICON[cur.k] || "●"; k = cur.k; lbl = "Right now"; }
-  else if (next) { const mins = (next.s - now) / 60000; frac = Math.max(0, 1 - mins / 180); big = untilText(mins); sub = "free until " + next.title; ico = KICON[next.k] || "●"; k = next.k; }
+  if (cur) { frac = (now - cur.s) / (cur.e - cur.s); big = untilText((cur.e - now) / 60000) + " left"; sub = "in " + cur.title; ico = kicon(cur) || "●"; k = cur.k; lbl = "Right now"; }
+  else if (next) { const mins = (next.s - now) / 60000; frac = Math.max(0, 1 - mins / 180); big = untilText(mins); sub = "free until " + next.title; ico = kicon(next) || "●"; k = next.k; }
   const R = 2 * Math.PI * 32;
   return `<div class="card nowcard"><div class="ring"><svg width="76" height="76" viewBox="0 0 76 76"><circle cx="38" cy="38" r="32" fill="none" style="stroke:var(--track)" stroke-width="6"/><circle cx="38" cy="38" r="32" fill="none" stroke="var(--k-${k})" stroke-width="6" stroke-linecap="round" stroke-dasharray="${R}" stroke-dashoffset="${R * (1 - frac)}"/></svg><span>${ico}</span></div>
       <div style="min-width:0"><p class="lbl" style="margin:0 0 4px">${lbl}</p><div class="big">${esc(big)}</div><div style="font-size:13px;color:var(--soft);overflow-wrap:anywhere">${esc(sub)}</div></div></div>
@@ -1728,6 +1761,7 @@ function pEvent(ev) {
     ${ev.ghost ? `<div class="meta">Suggested by ${esc(ev.by)}${ev.why ? ": " + esc(ev.why) : ""}</div>` : ""}
     <div class="field"><input class="tinput" id="pTitle" value="${esc(ev.title)}" placeholder="Title" aria-label="Title" ${dis}>
       <div style="color:var(--soft)">${esc(whenText(ev))}${mins > 0 && mins < 1440 ? ` · starts in ${untilText(mins)}` : ""}${two() && !ev.allDay ? `<br>${esc(zoneName(S.tz2))}: ${C.hm(C.wall(ev.s, S.tz2).min)} to ${C.hm(C.wall(ev.e, S.tz2).min)}` : ""}${ev.recurringEventId ? "<br>Repeats" : ""}${ev.location ? "<br>" + esc(ev.location) : ""}</div></div>
+    ${commuteBox(ev)}
     ${ev.allDay || ev.ghost ? "" : `<div class="field"><p class="lbl" style="margin:0">Length</p><div class="chips">${durs.map((m) => `<button class="chip" data-dur="${m}" aria-pressed="${m === S.form.dur}" ${dis}>${C.dur(m)}</button>`).join("")}</div></div>`}
     ${ev.ghost ? "" : `<div class="field"><p class="lbl" style="margin:0">Block type</p><div class="chips"><button class="chip k-${guess}" data-kind="" aria-pressed="${!S.form.kind}" ${dis}>Guess: ${esc(KNAME[guess])}</button>${C.KINDS.map(([k, n]) => `<button class="chip k-${k}" data-kind="${k}" aria-pressed="${S.form.kind === k}" ${dis}>${KICON[k] ? KICON[k] + " " : ""}${n}</button>`).join("")}</div></div>`}
     <div class="field"><label class="lbl" style="margin:0" for="pCal">Calendar</label><select id="pCal" ${dis}>${writable.map((c) => `<option value="${esc(c.id)}" ${c.id === ev.calId ? "selected" : ""}>${esc(c.name)}</option>`).join("")}</select></div>
@@ -1747,7 +1781,7 @@ function pSheet(ev) {
   if (!S.form || !S.form.sheet) S.form = C.sheetForm(ev, S.tz);
   const f = S.form, dis = canEdit && !ev.ghost ? "" : "disabled", guess = C.kindOf({ title: ev.title, calName: cal.name });
   const writable = S.cals.filter((c) => c.writable || c.id === ev.calId);
-  const rich = C.notesRich(ev.description || "");
+  const rich = C.notesRich(ev.description || ""), cm = commuteBox(ev);   // a Commute block draws its Commute part first (d6)
   const row = (lbl, inner, x = "") => `<label class="srow" ${x}><span>${lbl}</span>${inner}</label>`;
   const tx = sheetTexts(f, ev), out = (k) => `<output data-v="${k}">${esc(tx[k])}</output>`;
   const pick = (type, key, lbl) => `${out(key)}<input class="ov" type="${type}" data-f="${key}" value="${esc(f[key])}" aria-label="${lbl}" ${dis}>`;
@@ -1755,6 +1789,7 @@ function pSheet(ev) {
     <div class="shead"><span></span><b>Event</b>${canEdit && !ev.ghost ? '<button class="btn pri" id="pSave">Save</button>' : "<span></span>"}</div>
     ${ev.ghost ? `<div class="meta">Suggested by ${esc(ev.by)}${ev.why ? ": " + esc(ev.why) : ""}</div>` : ""}
     <input class="tinput" id="pTitle" value="${esc(f.title)}" placeholder="Title" aria-label="Title" autocomplete="off" ${canEdit ? "" : "disabled"}>
+    ${cm ? `<div class="meta" id="cmWhen">${esc(whenText(ev))}</div>${cm}` : ""}
     <div class="rows">
       ${row("Day", pick("date", "day", "Day"))}
       ${row("Starts", pick("time", "start", "Starts"), `data-timed ${f.allDay ? "hidden" : ""}`)}
@@ -2651,6 +2686,429 @@ function wirePair() {
 }
 
 /* ---------- controls ---------- */
+/* ---------- Commute blocks, slice 1 (Junyan, 2026-11-24: "1 yes, 2 A, 3 yes, 4 A") ----------
+   The panel of a Commute block: Going by, From and To, the ask when there is no address, a link to Google Maps, a map he
+   can move (Leaflet and OpenStreetMap, as the Trips map) and photo notes kept in still-api /quest/commute/*. The rules
+   are in calendar-commute.js (tested in still/test/commute.test.mjs). Slice 2 adds the time to leave, the way there step
+   by step, Heads up and Check now, all from the server's directions answer (below). */
+/* commute:start */
+const CMK = { to: "cal-commute-to", from: "cal-commute-from", spots: "cal-commute-spots" };
+const CM = { dir: {}, places: null, loading: false, notes: null, edit: "", editFrom: false, key: "", big: null, small: null, seq: {}, run: 0, routes: {}, loaded: {}, up: false };
+const cmGet = (k) => { try { const v = JSON.parse(store.get(k) || "{}"); return v && typeof v === "object" ? v : {}; } catch { return {}; } };
+const cmSet = (k, key, val) => { const o = cmGet(k); if (val) o[key] = val; else delete o[key]; store.set(k, JSON.stringify(o)); };
+const cmHome = () => (CM.places || []).find((p) => p.category === "home" || /^home$/i.test(p.name || "")) || null;
+const cmDay = (ev) => C.wall(ev.s, S.tz).day;
+/* d9 (Junyan, 2026-11-24, "9 yes"): the To he typed or picked for a block and a From he changed live on the server
+   (still-api /quest/commute/route, keyed by the block), so every device shows them. This browser keeps a copy only as a
+   fallback: while the server cannot be reached a change is kept here marked pending, and goes up the next time it can.
+   An address kept here before this change is sent up once (only where the server holds none), then dropped here. */
+const cmRoute = (ev) => CM.routes[keyOf(ev)] || null;
+const cmTyped = (ev) => (cmRoute(ev) && cmRoute(ev).to) || cmGet(CMK.to)[keyOf(ev)] || null;
+const cmFromPicked = (ev) => (cmRoute(ev) && cmRoute(ev).from) || cmGet(CMK.from)[keyOf(ev)] || null;
+const cmTarget = (ev) => CalCommute.target({ ev, events: eventsFor(cmDay(ev), cmDay(ev)), tz: S.tz, remembered: CM.places || [], typed: cmTyped(ev) });
+function cmFrom(ev) {
+  const f = cmFromPicked(ev); if (f) return f;
+  const h = cmHome(); return h ? { name: "Home", address: h.address || "", lat: h.lat, lng: h.lng, id: h.id } : null;
+}
+const cmPlaceBody = (o) => ({ name: o.name || "", address: o.address || "", lat: o.lat == null ? null : o.lat, lng: o.lng == null ? null : o.lng, id: o.id || "" });
+/** Save one end of a block's route on the server (side "to" or "from"; o null clears it). false when the server cannot be reached. */
+async function cmSaveRoute(ev, side, o) {
+  const key = keyOf(ev);
+  try {
+    const r = await send("/quest/commute/route", "POST", { block: key, [side]: o ? cmPlaceBody(o) : null });
+    CM.routes[key] = r.route || null; CM.loaded[key] = true; cmSet(side === "to" ? CMK.to : CMK.from, key, null);
+    return true;
+  } catch (e) { return false; }
+}
+/** Read this block's route from the server; the first time the server answers, send up what this browser kept from before. */
+async function cmLoadRoute(ev) {
+  const key = keyOf(ev);
+  try {
+    if (!CM.up) {
+      const to = cmGet(CMK.to), from = cmGet(CMK.from);
+      for (const k of new Set([...Object.keys(to), ...Object.keys(from)])) {
+        for (const pending of [true, false]) {   // a change made while offline overwrites; an old copy only fills an empty end
+          const body = { block: k }, t = to[k], f = from[k];
+          if (t && t.address && !!t.pending === pending) body.to = cmPlaceBody(t);
+          if (f && f.address && !!f.pending === pending) body.from = cmPlaceBody(f);
+          if (body.to === undefined && body.from === undefined) continue;
+          if (!pending) body.onlyIfEmpty = true;
+          await send("/quest/commute/route", "POST", body);
+          if (body.to) cmSet(CMK.to, k, null);
+          if (body.from) cmSet(CMK.from, k, null);
+        }
+      }
+      CM.up = true;
+    }
+    CM.routes[key] = (await api("/quest/commute/route?block=" + encodeURIComponent(key))).route || null;
+  } catch (e) { /* offline: the copy kept here is used */ }
+  CM.loaded[key] = true;
+}
+const cmCanEdit = (ev) => !!calOf(ev.calId).writable;
+/* ---------- slice 2: directions (Junyan, 2026-11-24, d1 to d9) ----------
+   Everything comes from still-api /quest/commute/directions (Google's key lives on the server, never here). CM.dir keeps one
+   answer per block: res (the server's answer), got (when this page received it), prev (the answer before it, for "New since"),
+   checked (set by Check now). The last answer of each block is also kept in this browser (cal-commute-last, 2 days) only so
+   the first Check now after a reload can say what is new. No answer means none of the directions parts is drawn. */
+const WAYNAME = { commute: "Walk", transit: "Transit", drive: "Drive" };
+const cmFmt = (ms) => (Number.isFinite(ms) ? C.hm(C.wall(ms, S.tz).min) : "");
+const cmLast = () => cmGet("cal-commute-last");
+function cmRemember(key, res, sig) {
+  const all = cmLast(), t = Date.now(); all[key] = { at: t, res, sig };
+  for (const k of Object.keys(all)) if (t - all[k].at > 2 * 86400000) delete all[k];
+  const ks = Object.keys(all).sort((a, b) => all[b].at - all[a].at).slice(20);
+  for (const k of ks) delete all[k];
+  store.set("cal-commute-last", JSON.stringify(all));
+}
+const cmEnd = (o) => ({ name: o.name || "", address: o.address || "", lat: o.lat == null ? null : o.lat, lng: o.lng == null ? null : o.lng });
+/** The inputs a directions answer needs, or null: no To, no From address, a block that has ended, or a day too far off. */
+function cmDirInput(ev) {
+  const t = cmTarget(ev), from = cmFrom(ev);
+  if (CalCommute.needsAsk(t) || !t.address || !from || !from.address || !(ev.e > Date.now())) return null;
+  const arrive = CalCommute.arriveTarget(ev, eventsFor(cmDay(ev), cmDay(ev)), S.tz);
+  if (!(arrive.at > Date.now() - 3600000) || arrive.at > Date.now() + 14 * 86400000) return null;
+  return { t, from, arrive, sig: [from.address, t.address, Math.floor(arrive.at / 60000)].join("|") };
+}
+const cmDirOf = (ev) => CM.dir[keyOf(ev)] || null;
+/** Ask the server. fresh skips its saved answer (Check now); auto marks the page's own once-only check. */
+async function cmDirections(ev, { fresh = false, auto = false } = {}) {
+  const key = keyOf(ev), inp = cmDirInput(ev); if (!inp) return;
+  const d = CM.dir[key] || (CM.dir[key] = { res: null, got: 0, prev: null, checked: null, sig: "", autoDone: false, loading: false, error: "" });
+  if (d.loading && (fresh || d.loadSig === inp.sig)) return;   // a changed From or To still goes ahead: it replaces the request in flight
+  if (!fresh && d.res && d.sig === inp.sig && Date.now() - d.got < 60000) return;
+  const seq = d.seq = (d.seq || 0) + 1;
+  d.loading = true; d.loadSig = inp.sig; d.error = ""; if (fresh) d.checked = null;
+  const stored = cmLast()[key], before = d.res && d.sig === inp.sig ? d.res : stored && stored.sig === inp.sig ? stored.res : null;   // only an answer for this same trip is compared
+  if (S.ev && keyOf(S.ev) === key) cmPaint();
+  try {
+    const res = await send("/quest/commute/directions", "POST", { from: cmEnd(inp.from), to: cmEnd(inp.t), arriveBy: new Date(inp.arrive.at).toISOString(), fresh });
+    if (d.seq !== seq) return;   // a newer request replaced this one
+    d.prev = res.state === "ok" && before && before.state === "ok" ? before : null;
+    d.res = res; d.got = Date.now(); d.sig = inp.sig;
+    if (fresh && res.state === "ok") {
+      d.checked = { auto, at: d.got };
+      const w = res.ways && res.ways[CalCommute.WAY[C.modeOf(ev)]], lv = cmUsable(w) ? CalCommute.leaveBy(w, inp.arrive.at) : null;
+      if (Number.isFinite(lv) && d.got >= lv - 3600000) d.autoDone = true;   // a check he pressed inside that hour counts as the one
+    }
+    if (res.state === "ok") cmRemember(key, res, inp.sig);
+  } catch (e) { if (d.seq !== seq) return; d.error = "Directions could not be loaded. Check your connection and try Check now."; }
+  d.loading = false;
+  if (S.ev && keyOf(S.ev) === key) cmPaint();
+}
+/** The way for the chip the block is set to, from the server's answer. */
+const cmWay = (d, mode) => (d && d.res && d.res.state === "ok" && d.res.ways && d.res.ways[CalCommute.WAY[mode]]) || null;
+const cmUsable = (w) => !!w && !w.tooFar && Number.isFinite(w.minutes);
+const CM_ICON = { SUBWAY: "🚇", BUS: "🚌", TRAM: "🚊", RAIL: "🚆", HEAVY_RAIL: "🚆", COMMUTER_TRAIN: "🚆", LIGHT_RAIL: "🚊" };
+const cmSteps = (w, mode) => {
+  const li = (ic, title, sub, min) => `<li><span class="si" aria-hidden="true">${ic}</span><div><b>${esc(title)}</b>${sub ? `<small>${esc(sub)}</small>` : ""}</div>${min ? `<span class="sm">${min} min</span>` : ""}</li>`;
+  let rows = "";
+  if (mode === "transit") rows = (w.steps || []).map((x) => x.kind === "walk" ? li("🚶", x.text || "Walk", x.meters ? (x.meters >= 1000 ? (x.meters / 1000).toFixed(1) + " km" : Math.round(x.meters / 10) * 10 + " m") : "", x.minutes)
+    : li(CM_ICON[x.vehicle] || "🚆", `${x.label || x.line}${x.headsign ? " toward " + x.headsign : ""}`,
+      [x.from && x.to ? x.from + " to " + x.to : "", x.stops != null ? x.stops + (x.stops === 1 ? " stop" : " stops") : "", x.departsAt ? "departs " + cmFmt(x.departsAt) : "", x.wait > 0 ? x.wait + " min wait before it" : ""].filter(Boolean).join(" · "), x.minutes)).join("");
+  else if (mode === "drive") rows = (w.roads || []).map((x) => li("🚗", x.road, x.km + " km", x.minutes)).join("") +
+    (w.trafficMinutes > 0 ? `<li class="note"><div><small>Traffic adds about ${w.trafficMinutes} min at that time (Google's estimate).</small></div></li>` : "");
+  else rows = li("🚶", "Walk the whole way", w.km ? w.km + " km" : "", w.minutes);
+  return rows ? `<ol class="cmsteps">${rows}</ol>` : "";
+};
+const CM_SRC = { ttc: "TTC alerts", roads: "road closures", weather: "the weather" };
+const CM_AICON = { ttc: "🚇", closure: "🚧", weather: "🌦" };
+const cmAlert = (a) => `<div class="cmalert"><span class="si" aria-hidden="true">${CM_AICON[a.kind] || "⚠"}</span><div><b>${esc(a.title)}</b>${a.detail ? `<small>${esc(a.detail)}</small>` : ""}</div></div>`;
+/** Heads up: the alerts that touch this way, grouped New / Still on / Cleared once there is an earlier check to compare with. */
+function cmHeadsUp(d, mode) {
+  const res = d.res, K = CalCommute, now = K.alertsFor(res.alerts, mode);
+  const down = (res.sourcesDown || []).filter((x) => (x === "ttc" ? mode === "transit" : x === "roads" ? mode === "drive" : true)).map((x) => CM_SRC[x]).filter(Boolean);
+  let h = `<div class="field"><p class="lbl" style="margin:0">Heads up</p>`;
+  const g = d.checked && d.prev ? K.groupAlerts(K.alertsFor(d.prev.alerts, mode), now) : null;
+  if (g) {
+    const when = cmFmt(d.prev.checkedAt);
+    if (g.added.length) h += `<p class="lbl cmgrp">New since ${esc(when)}</p>${g.added.map(cmAlert).join("")}`;
+    if (g.still.length) h += `<p class="lbl cmgrp">Still on</p>${g.still.map(cmAlert).join("")}`;
+    if (g.cleared.length) h += `<p class="lbl cmgrp">Cleared</p>${g.cleared.map((a) => cmAlert(a).replace('class="cmalert"', 'class="cmalert gone"')).join("")}`;
+    if (!now.length && !g.cleared.length) h += `<div class="meta">No alerts on this trip.</div>`;
+    else if (!now.length) h += `<div class="meta">Nothing on now.</div>`;
+  } else h += now.length ? now.map(cmAlert).join("") : `<div class="meta">No alerts on this trip.</div>`;
+  if (down.length) h += `<div class="meta">Could not reach: ${esc(down.join(", "))}.</div>`;
+  return h + "</div>";
+}
+/** Everything the directions answer adds to the box: {chips, leave, way, heads, check}. Empty strings when there is no answer. */
+function cmDirParts(ev, mode, inp) {
+  const d = cmDirOf(ev), K = CalCommute, out = { leave: "", way: "", heads: "", check: "", banner: "", ways: null };
+  if (!inp) return out;
+  if (!d || (!d.res && !d.loading && !d.error)) return out;
+  if (d.res && d.sig !== inp.sig && d.loading) { out.way = `<div class="meta" role="status">Getting directions…</div>`; return out; }   // never show the answer for an earlier From or To
+  if (d.loading && !d.res) { out.way = `<div class="meta" role="status">Getting directions…</div>`; return out; }
+  if (!d.res) { out.way = `<div class="meta">${esc(d.error)}</div><div class="r"><button class="btn" data-cm="check">Check now</button></div>`; return out; }
+  if (d.res.state !== "ok") { out.way = `<div class="meta" role="status">${esc(d.res.state === "no-key" ? "Directions need the Google key" : d.res.message || "Directions are not available.")}</div>`; return out; }
+  const ways = d.res.ways || {}; out.ways = ways;
+  const way = cmWay(d, mode), errs = d.res.errors || {};
+  const checkedAt = d.res.checkedAt, fresh = d.checked && Date.now() - checkedAt < 120000;
+  if (d.checked) out.banner = `<div class="cmchk" role="status"><b>${fresh ? "Checked just now" : "Checked"}, ${esc(cmFmt(checkedAt))}</b>${d.checked.auto ? '<small>Checked by itself, the hour before you leave</small>' : ""}</div>`;
+  if (cmUsable(way)) {
+    const arriveAt = inp.arrive.at, leave = K.leaveBy(way, arriveAt), prevWay = d.checked && d.prev && d.prev.ways ? d.prev.ways[K.WAY[mode]] : null;
+    const shift = prevWay && cmUsable(prevWay) ? K.leaveShift(K.leaveBy(prevWay, arriveAt), leave) : "";
+    out.leave = `<div class="cmleave"><span class="lbl">Leave by</span><div class="big">${esc(cmFmt(leave))}${shift ? `<span class="cmshift">${esc(shift)}</span>` : ""}</div><div class="meta">${esc(K.arriveLine(way, inp.arrive, cmFmt))}</div></div>`;
+    out.way = `<div class="field"><p class="lbl" style="margin:0">The way there · ${way.minutes} min${mode === "drive" && way.km ? " · " + way.km + " km" : ""}</p>${cmSteps(way, mode)}</div>`;
+    out.heads = cmHeadsUp(d, mode);
+    const q = d.checked ? K.quickerThan(ways, mode) : null;
+    if (q) out.heads += `<div class="cmquick"><span><b>${WAYNAME[q.chip]} is quicker right now</b><small>${q.by} min quicker than ${WAYNAME[mode].toLowerCase()}</small></span><button class="btn" data-cm="switch" data-v="${q.chip}" ${cmCanEdit(ev) ? "" : "disabled"}>Switch to ${WAYNAME[q.chip]}</button></div>`;
+    const auto = !d.autoDone && Number.isFinite(leave) && leave > Date.now();
+    out.check = `<div class="r"><button class="btn pri" data-cm="check" ${d.loading ? "disabled" : ""}>${d.loading ? "Checking…" : "Check now"}</button></div>` +
+      `<div class="meta cmlast">Last checked ${esc(cmFmt(checkedAt))}${auto ? ". While this panel is open, it checks once in the hour before you leave." : ""}</div>${d.error ? `<div class="meta" role="alert">${esc(d.error)}</div>` : ""}`;
+    out.leaveAt = leave;
+  } else {
+    const e = way && way.tooFar ? `Too far to walk (${way.km} km).` : errs[K.WAY[mode]] === "stopped" ? "Directions are off for the rest of the month. They come back on the 1st." : errs[K.WAY[mode]] || "No directions for this way.";
+    out.way = `<div class="meta">${esc(e)}</div>`;
+    out.check = `<div class="r"><button class="btn pri" data-cm="check" ${d.loading ? "disabled" : ""}>${d.loading ? "Checking…" : "Check now"}</button></div><div class="meta cmlast">Last checked ${esc(cmFmt(checkedAt))}</div>`;
+  }
+  return out;
+}
+/** A pin for an address: the saved one, else one OpenStreetMap lookup kept in this browser (null when it is not found). */
+async function cmPin(o) {
+  if (!o) return null;
+  if (o.lat != null && o.lng != null) return { lat: o.lat, lng: o.lng };
+  const a = String(o.address || o.name || "").trim().toLowerCase(); if (!a) return null;
+  const all = cmGet(CMK.spots); if (all[a]) return all[a];
+  const g = await geocode(a); if (g) { all[a] = g; store.set(CMK.spots, JSON.stringify(all)); }
+  return g || null;
+}
+function commuteBox(ev) { return ev.k === "commute" && !ev.isNew && !ev.ghost && ev.s ? '<div class="cmbox" id="cmBox"></div>' : ""; }
+/** The panel just drew: load his saved places and this place's notes once, then fill the box. */
+async function cmAfter(ev) {
+  const key = keyOf(ev), run = ++CM.run;
+  if (CM.key !== key) { CM.key = key; CM.edit = ""; CM.editFrom = false; CM.notes = null; }
+  cmPaint();
+  const same = () => CM.run === run && S.ev && keyOf(S.ev) === key && $("#cmBox");
+  if (CM.places === null) {
+    try { CM.places = (await api("/quest/places")).places || []; } catch (e) { CM.places = []; }
+    if (!same()) return; cmPaint();
+  }
+  await cmLoadRoute(ev); if (!same()) return; cmPaint();
+  const dirs = cmDirections(ev);   // paints itself when the answer arrives
+  await cmLoadNotes(ev); if (same()) cmPaint();
+  await dirs;
+}
+async function cmLoadNotes(ev) {
+  const t = cmTarget(ev), pk = CalCommute.placeKey(t), out = { block: [], place: [] };
+  try { out.block = (await api("/quest/commute/photos?block=" + encodeURIComponent(keyOf(ev)))).notes || []; } catch (e) {}
+  if (pk) try { out.place = (await api("/quest/commute/photos?place=" + encodeURIComponent(pk))).notes || []; } catch (e) {}
+  CM.notes = out;
+}
+function cmNoteRow(n) {
+  return `<div class="cmnote"><b>${esc(C.dayText(n.date || ""))}</b>${n.note ? `<span>${esc(n.note)}</span>` : ""}${n.hasFile ? `<button class="btn" data-cm="see" data-id="${esc(n.id)}">See the photo</button>` : ""}</div>`;
+}
+function cmPaint() {
+  const box = $("#cmBox"), ev = S.ev; if (!box || !ev) return;
+  cmDrop("small");
+  const mode = C.modeOf(ev), t = cmTarget(ev), from = cmFrom(ev), can = cmCanEdit(ev), ask = CalCommute.needsAsk(t) || CM.edit === keyOf(ev);
+  const asking = ask, home = cmHome();
+  const nm = (o) => (o.name && o.name !== o.address ? o.name + ", " : "") + o.address;
+  const dis = can ? "" : "disabled";
+  const inp = !asking ? cmDirInput(ev) : null, dp = cmDirParts(ev, mode, inp), best = dp.ways && Object.values(dp.ways).filter(cmUsable).length > 1 ? CalCommute.bestWay(dp.ways) : "";
+  const chip = ([m, ic, n]) => { const w = dp.ways && dp.ways[CalCommute.WAY[m]]; return `<button class="chip k-commute" data-cm="mode" data-v="${m}" aria-pressed="${m === mode}" ${dis}>${ic} ${n}${cmUsable(w) ? ` <span class="cmm">${w.minutes} min</span>` : ""}${best === m ? ' <small class="cmbest">best way</small>' : ""}</button>`; };
+  let h = `<div class="field"><p class="lbl" style="margin:0">Going by</p><div class="chips">${C.MODES.map(chip).join("")}</div></div>`;
+  if (CM.places === null || !CM.loaded[keyOf(ev)]) return void (box.innerHTML = h + `<div class="meta">Looking up your places…</div>`);
+  h += dp.banner + dp.leave;
+  h += `<div class="cmroute"><div class="cmr"><span class="lbl">From</span><span class="v">${from ? esc(from.name === "Home" ? "Home" : nm(from)) : "Where you are"}</span>` +
+    `${can ? `<button class="btn" data-cm="editfrom">Change</button>` : ""}</div>`;
+  if (CM.editFrom) h += `<div class="cmask"><input id="cmFromIn" placeholder="Address or place name" aria-label="From" autocomplete="off" enterkeyhint="go"><div class="r"><button class="btn pri" data-cm="gofrom">Use this</button>${cmFromPicked(ev) ? '<button class="btn" data-cm="homeagain">Back to Home</button>' : ""}<button class="btn" data-cm="cancelfrom">Cancel</button></div></div>`;
+  h += `<div class="cmr"><span class="lbl">To</span><span class="v">${asking || !t.address ? "Not set yet" : esc(nm(t))}</span>${!asking && can ? `<button class="btn" data-cm="edit">Change</button>` : ""}</div></div>`;
+  if (!asking) h += dp.way + dp.heads + dp.check;
+  if (asking) {
+    const saved = CM.places.filter((p) => p.category !== "commute-for" && p.category !== "home" && (p.address || p.lat != null));
+    h += `<div class="cmask" id="cmAsk"><b>Where are you going?</b><div class="meta">Type an address or a place name.</div>
+      <input id="cmTo" placeholder="Address or place name" aria-label="Where are you going" autocomplete="off" enterkeyhint="go" ${dis}>
+      ${saved.length ? `<p class="lbl" style="margin:6px 0 0">Saved places</p><div class="chips">${saved.slice(0, 12).map((p) => `<button class="chip" data-cm="pick" data-id="${esc(p.id)}" ${dis}>${esc(p.name)}</button>`).join("")}</div>` : ""}
+      ${t.nextTitle ? `<label class="cmrem"><input type="checkbox" role="switch" id="cmRem" ${dis}> <span>Remember for every ${esc(t.nextTitle)}</span></label>` : ""}
+      <div class="r"><button class="btn pri" data-cm="go" ${dis}>Use this</button>${CalCommute.needsAsk(t) ? "" : '<button class="btn" data-cm="cancel">Cancel</button>'}</div></div>`;
+  } else if (t.address) {
+    const link = CalCommute.mapsLink({ from: from && from.address, to: t.address, mode });
+    h += `<div class="r"><a class="btn" href="${esc(link)}" target="_blank" rel="noopener">Open in Google Maps</a><button class="btn" data-cm="map">Open map</button></div>
+      <div class="cmmap" id="cmMap" role="region" aria-label="Map"></div>`;
+  }
+  if (!asking && t.address) {
+    const mine = (CM.notes && CM.notes.block) || [], past = ((CM.notes && CM.notes.place) || []).filter((n) => n.block !== keyOf(ev));
+    h += `<div class="field"><p class="lbl" style="margin:0">Photos and notes</p><div class="r">${can ? '<label class="btn cmfile">Add a photo<input type="file" id="cmFile" accept="image/*" capture="environment" hidden></label>' : ""}<button class="btn" data-cm="note" ${dis}>Add a note</button></div>
+      ${mine.length ? mine.map(cmNoteRow).join("") : '<div class="meta">Nothing saved with this block yet.</div>'}</div>
+      ${past.length ? `<div class="field"><p class="lbl" style="margin:0">From last time you went here</p>${past.map(cmNoteRow).join("")}</div>` : ""}`;
+  }
+  /* the Home prompt sits last, so Going by and the To line (or the ask) stay at the top of a phone sheet */
+  if (!home && !CM.editFrom) h += `<div class="cmask"><div class="meta">Add your home address and every Commute block starts from it.</div><input id="cmHomeIn" placeholder="Your home address" aria-label="Home address" autocomplete="off" enterkeyhint="done"><div class="r"><button class="btn" data-cm="home">Save home</button></div></div>`;
+  box.innerHTML = h;
+  if (!asking && t.address) cmMapShow($("#cmMap"), "small");
+}
+function cmDrop(w) { if (CM[w]) { try { CM[w].remove(); } catch (e) {} CM[w] = null; } }
+/** The pins: From, To, and a camera where this block's and earlier photos belong (a photo is tied to the place, not to a spot). */
+async function cmPins(ev) {
+  const t = cmTarget(ev), from = cmFrom(ev), pins = [];
+  const a = await cmPin(from), b = await cmPin(t.address ? t : null);
+  if (a) pins.push({ id: "from", ...a, html: "From", label: "From" + (from.name ? ": " + from.name : "") });
+  if (b) pins.push({ id: "to", ...b, html: "To", label: "To: " + (t.name || t.address) });
+  const n = CM.notes ? [...CM.notes.block, ...CM.notes.place.filter((x) => x.block !== keyOf(ev))].filter((x) => x.hasFile) : [];
+  if (b && n.length) pins.push({ id: "photo", lat: b.lat, lng: b.lng, anchor: [-6, 54], html: "📷" + (n.length > 1 ? n.length : ""), label: "Photos here", photos: n });
+  return pins;
+}
+async function cmMapShow(box, which) {
+  const ev = S.ev; if (!box || !ev) return;
+  const seq = CM.seq[which] = (CM.seq[which] || 0) + 1;   // a draw overtaken by a newer one for the same slot stops before it builds a map
+  let L; try { L = await mapLib(); } catch (e) { if (CM.seq[which] === seq) box.innerHTML = '<div class="meta" style="padding:14px">The map could not load (no connection to the map library).</div>'; return; }
+  const pins = await cmPins(ev);
+  if (!box.isConnected || CM.seq[which] !== seq) return;
+  if (!pins.length) { box.innerHTML = '<div class="meta" style="padding:14px">No pin yet. The address was not found on the map, and Open in Google Maps still works.</div>'; return; }
+  const dd = cmDirOf(ev), way = cmWay(dd, C.modeOf(ev)), line = cmUsable(way) && way.polyline ? CalCommute.decodePolyline(way.polyline) : [];
+  cmDrop(which);
+  const map = CM[which] = L.map(box, { zoomControl: which === "big", attributionControl: true, dragging: which === "big" || !L.Browser.mobile, scrollWheelZoom: which === "big" });
+  L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "© OpenStreetMap contributors" }).addTo(map);
+  map._pins = pins; map._line = line;
+  if (line.length > 1) L.polyline(line, { color: getComputedStyle(document.documentElement).getPropertyValue("--k-commute").trim() || "#2a7", weight: 5, opacity: 0.85, interactive: false }).addTo(map);   // the way there, between the From and To pins
+  for (const p of pins) {
+    const icon = L.divIcon({ className: "", html: `<div class="cmpin ${p.id}">${esc(p.html)}</div>`, iconSize: [34, 34], iconAnchor: p.anchor || [17, 17] });   // the camera sits above the To pin, so both can be tapped
+    const m = L.marker([p.lat, p.lng], { icon, title: p.label, alt: p.label, keyboard: true }).addTo(map);
+    if (p.photos) m.on("click", () => cmSeePhotos(p.photos));
+  }
+  cmFit(map);
+  setTimeout(() => { if (CM[which] === map) map.invalidateSize(); }, 60);   // only while this map is still the live one: a removed map has no panes left to measure
+}
+function cmFit(map) {
+  const ps = map && map._pins; if (!ps || !ps.length) return;
+  const pts = [...ps.map((p) => [p.lat, p.lng]), ...(map._line || [])];
+  if (pts.length === 1) map.setView(pts[0], 15); else map.fitBounds(pts, { padding: [36, 36], maxZoom: 15 });
+}
+function cmClose() { cmDrop("big"); document.querySelectorAll(".cmbig,.cmmodal").forEach((x) => x.remove()); }
+function cmOpenBig() {
+  const ev = S.ev; if (!ev) return; cmClose();
+  const o = document.createElement("div"); o.className = "cmbig"; o.setAttribute("role", "dialog"); o.setAttribute("aria-label", "Map");
+  o.innerHTML = `<div class="cmbar"><b>${esc(ev.title)}</b><span class="spacer"></span><button class="btn" data-cm="gps">Show where I am</button><button class="btn" data-cm="fit">Whole trip</button><button class="btn pri" data-cm="close">Close</button></div><div class="cmmap big" id="cmBigMap"></div>`;
+  document.body.appendChild(o); cmMapShow($("#cmBigMap"), "big");
+}
+function cmGps() {
+  const map = CM.big; if (!map) return;
+  if (!navigator.geolocation) { toast("This browser cannot find where you are", { bad: true }); return; }
+  navigator.geolocation.getCurrentPosition((p) => {
+    const L = window.L, ll = [p.coords.latitude, p.coords.longitude];
+    if (map._me) map._me.remove();
+    map._me = L.marker(ll, { icon: L.divIcon({ className: "", html: '<div class="cmpin me">You</div>', iconSize: [34, 34], iconAnchor: [17, 17] }), title: "You are here", alt: "You are here" }).addTo(map);
+    map.setView(ll, Math.max(map.getZoom(), 15));
+  }, () => toast("Could not find where you are. Allow location for this page and try again.", { bad: true }), { enableHighAccuracy: true, timeout: 10000 });
+}
+function cmModal(inner) {
+  document.querySelectorAll(".cmmodal").forEach((x) => x.remove());
+  const m = document.createElement("div"); m.className = "cmmodal"; m.setAttribute("role", "dialog");
+  m.innerHTML = `<div class="cmcard">${inner}</div>`; document.body.appendChild(m);
+  m.onclick = (e) => { if (e.target === m) m.remove(); };
+  return m;
+}
+/** Show photos (a note row's "See the photo", or a tap on the camera pin). The picture is fetched when it is wanted. */
+function cmSeePhotos(list) {
+  const m = cmModal(`<div class="r"><b>Photos</b><span class="spacer"></span><button class="btn" data-cm="closemodal">Close</button></div>` +
+    list.map((n) => `<figure class="cmfig"><div class="meta">Loading the photo…</div>${n.note ? `<figcaption>${esc(n.note)}</figcaption>` : ""}</figure>`).join(""));
+  list.forEach(async (n, i) => {
+    const fig = m.querySelectorAll(".cmfig")[i];
+    try { const d = await api("/quest/commute/photo?id=" + encodeURIComponent(n.id)); fig.querySelector(".meta").outerHTML = `<img alt="${esc(n.note || "Photo")}" src="${esc(d.data)}">`; }
+    catch (e) { fig.querySelector(".meta").textContent = "The photo could not be loaded."; }
+  });
+}
+/** Shrink a picture in the browser: long side about 1600px, same orientation as it was taken. */
+async function cmShrink(file, max = 1600) {
+  const bmp = await createImageBitmap(file, { imageOrientation: "from-image" });
+  const { w, h } = CalCommute.fitSize(bmp.width, bmp.height, max);
+  const cv = document.createElement("canvas"); cv.width = w; cv.height = h;
+  cv.getContext("2d").drawImage(bmp, 0, 0, w, h); if (bmp.close) bmp.close();
+  return cv.toDataURL("image/jpeg", 0.82);
+}
+/** The photo screen: the picture, an optional note, and "The place too" (on). Also the note-only screen. */
+function cmCompose(ev, data) {
+  const t = cmTarget(ev), pk = CalCommute.placeKey(t);
+  const m = cmModal(`<div class="r"><b>${data ? "Add this photo" : "Add a note"}</b><span class="spacer"></span><button class="btn" data-cm="closemodal">Cancel</button><button class="btn pri" data-cm="shotsave">Save</button></div>
+    ${data ? `<img class="cmshot" alt="The photo you took" src="${esc(data)}">` : ""}
+    <textarea id="cmNote" rows="3" placeholder="${data ? "Add a note (optional)" : "What should you remember?"}" aria-label="Note"></textarea>
+    ${pk ? `<label class="cmrem"><input type="checkbox" role="switch" id="cmWith" checked> <span>The place too</span></label><div class="meta">Also shows it the next time you go to ${esc(t.name || t.address)}.</div>` : ""}`);
+  m._data = data; m._ev = ev; m._pk = pk; m._t = t;
+}
+async function cmSave(m) {
+  const sv = m.querySelector('[data-cm="shotsave"]'); if (sv.disabled) return; sv.disabled = true;
+  const ev = m._ev, note = ($("#cmNote").value || "").trim(), data = m._data || undefined, w = $("#cmWith");
+  if (!data && !note) { sv.disabled = false; toast("Add a note or a photo first", { bad: true }); return; }
+  try {
+    await send("/quest/commute/photo", "POST", { place: m._pk || "", placeName: m._t.name || m._t.address || "", block: keyOf(ev), date: cmDay(ev), note, withPlace: !!(w && w.checked), data });
+    m.remove(); toast("Saved"); await cmLoadNotes(ev); if (S.ev && keyOf(S.ev) === keyOf(ev)) cmPaint();
+  } catch (e) { sv.disabled = false; toast("Not saved: " + e.message, { bad: true }); }
+}
+async function cmSetTarget(ev, o, remember) {
+  if (!(await cmSaveRoute(ev, "to", o))) { cmSet(CMK.to, keyOf(ev), { ...o, pending: true }); toast("Saved on this device only. The server could not be reached; it goes up next time.", { bad: true }); }
+  CM.edit = "";
+  if (remember) {
+    const t = cmTarget(ev), rp = CalCommute.rememberPlace({ title: t.nextTitle || ev.title, address: o.address, lat: o.lat, lng: o.lng });
+    if (rp) try {
+      const old = (CM.places || []).find((p) => p.category === "commute-for" && p.list === rp.list); if (old) rp.id = old.id;
+      const d = await send("/quest/places", "POST", { op: "put", place: rp });
+      CM.places = (CM.places || []).filter((p) => p.id !== d.place.id).concat(d.place); toast("Remembered for every " + (t.nextTitle || ev.title));
+    } catch (e) { toast("Not remembered: " + e.message, { bad: true }); }
+  }
+  cmPaint(); cmDirections(ev); await cmLoadNotes(ev); cmPaint();
+}
+async function cmFound(text) {
+  const g = await geocode(text);
+  return { name: text, address: text, lat: g ? g.lat : null, lng: g ? g.lng : null };
+}
+async function cmAct(t) {
+  const ev = S.ev, d = t.dataset, key = ev && keyOf(ev);
+  if (d.cm === "close") cmClose();
+  else if (d.cm === "closemodal") document.querySelectorAll(".cmmodal").forEach((x) => x.remove());
+  else if (d.cm === "gps") cmGps();
+  else if (d.cm === "fit") cmFit(CM.big);
+  else if (d.cm === "see") { const n = [...((CM.notes && CM.notes.block) || []), ...((CM.notes && CM.notes.place) || [])].find((x) => x.id === d.id); if (n) cmSeePhotos([n]); }
+  else if (d.cm === "shotsave") cmSave(t.closest(".cmmodal"));
+  if (!ev || ev.k !== "commute") return;
+  if (d.cm === "mode") { const r = await patchEvent(ev, { mode: d.v }, "Change the way of going for"); if (r) { const e2 = findByKey(key); if (e2) panel("event", e2); } }
+  else if (d.cm === "edit") { CM.edit = key; cmPaint(); const i = $("#cmTo"); if (i) i.focus(); }
+  else if (d.cm === "cancel") { CM.edit = ""; cmPaint(); }
+  else if (d.cm === "editfrom") { CM.editFrom = true; cmPaint(); const i = $("#cmFromIn"); if (i) i.focus(); }
+  else if (d.cm === "cancelfrom") { CM.editFrom = false; cmPaint(); }
+  else if (d.cm === "homeagain") {
+    if (await cmSaveRoute(ev, "from", null)) { CM.editFrom = false; cmPaint(); cmDirections(ev); } else toast("Not changed: the server could not be reached. Try again.", { bad: true });
+  }
+  else if (d.cm === "gofrom") {
+    const v = ($("#cmFromIn").value || "").trim(); if (!v) return; const o = await cmFound(v);
+    if (!(await cmSaveRoute(ev, "from", o))) { cmSet(CMK.from, key, { ...o, pending: true }); toast("Saved on this device only. The server could not be reached; it goes up next time.", { bad: true }); }
+    CM.editFrom = false; cmPaint(); cmDirections(ev);
+  }
+  else if (d.cm === "home") {
+    const v = ($("#cmHomeIn").value || "").trim(); if (!v) return;
+    try { const o = await cmFound(v), r = await send("/quest/places", "POST", { op: "put", place: { name: "Home", address: v, lat: o.lat, lng: o.lng, category: "home", list: "home", savedBy: "Calendar" } });
+      CM.places = (CM.places || []).filter((p) => p.id !== r.place.id).concat(r.place); toast("Home saved"); cmPaint(); cmDirections(ev); }
+    catch (e) { toast("Not saved: " + e.message, { bad: true }); }
+  }
+  else if (d.cm === "go") { const v = ($("#cmTo").value || "").trim(); if (!v) { $("#cmTo").focus(); return; } const rem = $("#cmRem"); cmSetTarget(ev, await cmFound(v), rem && rem.checked); }
+  else if (d.cm === "pick") { const p = (CM.places || []).find((x) => x.id === d.id); if (p) { const rem = $("#cmRem"); cmSetTarget(ev, { name: p.name, address: p.address || p.name, lat: p.lat, lng: p.lng, id: p.id }, rem && rem.checked); } }
+  else if (d.cm === "map") cmOpenBig();
+  else if (d.cm === "check") cmDirections(ev, { fresh: true });
+  else if (d.cm === "switch") { const r = await patchEvent(ev, { mode: d.v }, "Change the way of going for"); if (r) { const e2 = findByKey(key); if (e2) panel("event", e2); } }
+  else if (d.cm === "note") cmCompose(ev, null);
+}
+/** The page's own check: only while this panel is open, once per block, in the hour before leaving. Nothing runs on the server or the phone. */
+function cmAutoTick() {
+  const ev = S.ev; if (!ev || ev.k !== "commute" || !document.querySelector("#cmBox")) return;
+  const d = cmDirOf(ev); if (!d || !d.res || d.res.state !== "ok" || d.loading) return;
+  const inp = cmDirInput(ev), way = inp && cmWay(d, C.modeOf(ev)); if (!cmUsable(way)) return;
+  const leaveAt = CalCommute.leaveBy(way, inp.arrive.at);
+  if (CalCommute.autoCheckDue({ now: Date.now(), leaveAt, done: d.autoDone })) { d.autoDone = true; cmDirections(ev, { fresh: true, auto: true }); }
+}
+function commuteWire() {
+  setInterval(cmAutoTick, 60000);
+  document.addEventListener("click", (e) => { const t = e.target.closest("[data-cm]"); if (t) cmAct(t); });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && document.querySelector(".cmbig,.cmmodal")) { cmClose(); return; }
+    if (e.key !== "Enter") return;
+    const id = e.target.id, go = { cmTo: "go", cmFromIn: "gofrom", cmHomeIn: "home" }[id];
+    if (go) { e.preventDefault(); const b = $(`[data-cm="${go}"]`); if (b) b.click(); }
+  });
+  document.addEventListener("change", async (e) => {
+    const t = e.target; if (t.id !== "cmFile" || !t.files || !t.files[0] || !S.ev) return;
+    const f = t.files[0]; t.value = "";
+    try { cmCompose(S.ev, await cmShrink(f)); } catch (err) { toast("This picture could not be read here. Try a JPEG or PNG.", { bad: true }); }
+  });
+}
+/* commute:end */
 function setup() {
   document.addEventListener("click", function clickRouter(e) {
     const t = e.target.closest("[data-railtog],[data-pkday],[data-page],[data-n],[data-p],[data-key],[data-staff],[data-bday],[data-allday],[data-open],[data-acc],[data-skip],[data-go],[data-dur],[data-kind],[data-sheet],[data-triptab],button[data-look],#pSave,#pDel,#pAcc,#pSkip,#pGrab,#pairBtn,[data-end],[data-pkrm],#pkAdd,#soBtn,#soAll,#pwBtn,#pwGo");
@@ -2762,6 +3220,6 @@ function readout() {
   const s = document.createElement("script"); s.src = "calendar-readout.js?v=7"; document.head.appendChild(s);
 }
 async function boot() { if (SIGNIN && !S.auth.checked) await authMe(); render(); loadSide(); refresh(); }
-setup(); boot();
+commuteWire(); setup(); boot();
 </script>
 </body></html>

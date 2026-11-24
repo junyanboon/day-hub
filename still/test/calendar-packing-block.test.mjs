@@ -64,8 +64,8 @@ test("a hand-set Packing wins over the guess, and a hand-set type wins over \"pa
   assert.equal(C.kindOf({ title: "Pack for FICTION stay", kind: "travel" }), "travel");
 });
 
-test("the chips: 🧳 Packing comes right after Travel, before Social and Errands", () => {
-  assert.deepEqual(C.KINDS.map((x) => x[0]), ["deep", "studio", "yoga", "gym", "dance", "cook", "travel", "pack", "social", "errand", "wind", "rest", "home", "other"]);
+test("the chips: 🧳 Packing comes after Travel and Commute, before Social and Errands", () => {
+  assert.deepEqual(C.KINDS.map((x) => x[0]), ["deep", "studio", "yoga", "gym", "dance", "cook", "travel", "commute", "pack", "social", "errand", "wind", "rest", "home", "other"]);
   assert.deepEqual(C.KINDS.find((x) => x[0] === "pack"), ["pack", "Packing"]);
   assert.match(html, /const KICON = \{[^}]*\bpack: "🧳"/, "the chip shows the suitcase");
 });
@@ -102,7 +102,7 @@ test("no trip after the block, or no trips read yet: null, so the Packing page o
 });
 
 test("the panel: the Open packing list button is drawn only on a computer, and Packing gets no tab of its own", () => {
-  assert.match(html, /TYPES = C\.KINDS\.map\(\(x\) => x\[0\]\)\.filter\(\(k\) => k !== "other" && k !== "pack" && k !== "home"\)/, "no second Packing tab beside the Packing button");
+  assert.match(html, /TYPES = C\.KINDS\.map\(\(x\) => x\[0\]\)\.filter\(\(k\) => k !== "other" && k !== "pack" && k !== "home" && k !== "commute"\)/, "no second Packing tab (nor a Commute page: its panel is in the event) beside the Packing button");
   const btn = html.match(/[^\n]*Open packing list[^\n]*/g) || [];
   assert.equal(btn.length, 1, "one button, in the computer panel");
   assert.match(btn[0], /WIDE\.matches/, "drawn only at 768 px and up (d14)");
@@ -114,8 +114,8 @@ test("the panel: the Open packing list button is drawn only on a computer, and P
 });
 
 test("the BUILD label names this copy", () => {
-  assert.match(html, /const BUILD = "2026-11-24 birthdays b";/, "top strip colour matches the header (build d, on top of the layout D dash header)");
-  assert.match(html, /calendar-core\.js\?v=29"/, "a new stamp for the changed core (slice 05)");
+  assert.match(html, /const BUILD = "2026-11-24e commute directions birthdays";/, "top strip colour matches the header (build d, on top of the layout D dash header)");
+  assert.match(html, /calendar-core\.js\?v=33"/, "a new stamp for the changed core (slice 05)");
 });
 
 test("the page's own script still parses (a stray backtick once broke the whole page and no regex test saw it)", () => {
