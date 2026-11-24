@@ -13,7 +13,7 @@
 <meta name="apple-mobile-web-app-title" content="Calendar">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>Calendar</title>
-<script src="calendar-core.js?v=32"></script>
+<script src="calendar-core.js?v=33"></script>
 <script src="calendar-commute.js?v=2"></script>
 <script src="cards-vault.js?v=2"></script><script src="cards.js?v=7"></script>
 <script src="quest-trips.js?v=20261121a" data-helpers></script>
@@ -251,9 +251,27 @@ body.touch .pane{overflow-x:clip}
 .day.today .dn{color:var(--ink);font-weight:600}
 .day.today .dn b{background:var(--accent);color:var(--on-accent);border-radius:7px;padding:1px 7px;font-weight:700}
 .dn .keys{font-size:10.5px;font-weight:600;background:color-mix(in srgb,var(--k-studio) 18%,var(--bar));color:var(--k-studio);border:0;border-radius:999px;padding:2px 8px;line-height:1.3}
+/* Fit (2026-11-24): the name and number win the header. Under 110 px (Week with the panel open) the row shrinks so the name and
+   the key chip both fit (main clipped the name there already); under 160 px the cake leaves the row (below). */
+.strip.tight .dn{gap:3px;font-size:13px}.strip.tight .dn .keys{font-size:10px;padding:1px 3px}.strip.tight .dhead{padding-left:3px;padding-right:3px}
+.strip.tight .day.today .dn b{padding:1px 4px}
 .strip.narrow .dn{flex-direction:column;gap:1px;font-size:10px;min-height:0}
 .strip.narrow .dn b{font-size:13px}.strip.narrow .day.today .dn b{padding:0 5px}
 .strip.narrow .dn .keys{display:none}
+/* Community Birthdays (display only): a small cake chip by the day number, a cake mark in the month. Neutral, so it reads in every look. */
+.dn .bday{border:0;font-size:11px;font-weight:600;line-height:1.3;padding:0;background:none;color:var(--ink);cursor:pointer}
+.dn .bday span{display:inline-block;border-radius:999px;padding:2px 7px;background:color-mix(in srgb,var(--faint) 24%,var(--bar))}
+.mday .n{display:flex;align-items:center;justify-content:flex-end}.mday .bd{font-style:normal;font-size:11px;line-height:1;margin-right:auto}
+.row.plain{cursor:default}.row.plain:hover{background:none}
+@media(max-width:760px){.dn .bday{min-width:44px;min-height:44px;margin:-8px 0 -14px;display:flex;align-items:flex-start;justify-content:center}.dn .bday span{margin-top:10px}}
+/* A column under 160 px (Week with the panel open, 3 or 7 days on a phone): the cake is a bare small mark at the right end of the thin
+   strip under the day name, where it costs the name row no width. The strip stops short of it. The tap box is 44 wide (28 in a
+   narrow column) and 17 tall, starting under the name row so it never covers the key chip. It sits at a fixed height, level with
+   the strip, so a day with all-day pills below keeps it there. */
+.strip.snug .dn .bday{position:absolute;right:0;top:29px;width:44px;max-width:50%;height:17px;min-width:0;min-height:0;margin:0;padding:0;display:flex;align-items:center;justify-content:flex-end;z-index:1}
+.strip.snug .dn .bday span{background:none;border-radius:0;padding:0;margin:0 3px 0 0;font-size:10px;line-height:12px}
+.strip.snug .dhead.hasbd .shape{margin-right:28px}
+.strip.narrow .dn .bday{width:28px;top:36px}.strip.narrow .dhead.hasbd .shape{margin-right:24px}
 .shape{position:relative;height:3px;border-radius:2px;background:var(--hair);margin:0 6px;overflow:hidden;flex:none}
 .shape i{position:absolute;top:0;bottom:0;background:var(--c);border-radius:2px}
 .pill{display:block;width:100%;text-align:left;border:0;font-size:11.5px;font-weight:600;border-radius:6px;padding:3px 7px;box-shadow:inset 3px 0 0 var(--c);background:color-mix(in srgb,var(--c) var(--pill-fill),var(--bar));color:color-mix(in srgb,var(--c) var(--ev-title),var(--ev-ink));white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:none}
@@ -1000,7 +1018,7 @@ if (TOUCH) for (const g of ["gesturestart", "gesturechange"]) document.addEventL
    which shows this build, the phone's answers and a log of every day change with its cause. Until then CalHook.on is
    null and diag() does nothing. BUILD names this copy of the page, so a screenshot proves which copy ran: change it on
    every change to this page or calendar-readout.js (the date plus a letter). */
-const BUILD = "2026-11-24d commute directions";
+const BUILD = "2026-11-24e commute directions birthdays";
 const CalHook = window.CalHook = { BUILD, on: null };
 const diag = (kind, msg) => { if (CalHook.on) CalHook.on(kind, msg); };
 /* The iPhone home screen app's fit (2026-11-12): html.hs in a home screen app on touch, html.hsfill and --hsgap when
@@ -1135,12 +1153,26 @@ function eventsFor(fromDay, toDay) {
   const seen = new Set(), out = [];
   for (const m of C.monthsFor(fromDay, toDay)) for (const e of (S.months[m]?.events || [])) {
     const key = e.calId + "|" + e.id;
-    if (seen.has(key) || S.hidden.has(e.calId)) continue;
+    if (seen.has(key) || S.hidden.has(e.calId) || C.isDisplayOnly(e, calOf(e.calId))) continue;
     seen.add(key); out.push(norm(e));
   }
   if (!S.hidden.has("cards")) for (const e of cardEvents(fromDay, toDay)) out.push(norm(e));
   return out;
 }
+/** Display-only events (Community Birthdays) on one day, unless their calendar is unticked in the rail. They are kept
+    out of eventsFor, so no pill, block, plan, count or suggestion ever sees them; only the day header's cake chip and
+    the month's cake mark read this (Junyan, 2026-11-24: "put it somewhere that it doesn't get in the way"). */
+function birthdaysOn(k) {
+  const seen = new Set(), out = [];
+  for (const m of C.monthsFor(k, k)) for (const e of (S.months[m]?.events || [])) {
+    if (!C.isDisplayOnly(e, calOf(e.calId)) || S.hidden.has(e.calId)) continue;
+    const key = e.calId + "|" + e.id; if (seen.has(key)) continue;
+    const on = e.allDay ? C.coversDay(e, k) : C.wall(Date.parse(e.start), S.tz).day === k;
+    if (on) { seen.add(key); out.push({ ...e, k: "other", displayOnly: true, s: e.allDay ? null : Date.parse(e.start) }); }
+  }
+  return out;
+}
+const bdayChip = (k) => { const n = birthdaysOn(k).length; return n ? `<button class="bday" data-bday="${k}" title="Birthdays" aria-label="${n} birthday${n > 1 ? "s" : ""}"><span>${C.birthdayChip(n)}</span></button>` : ""; };
 /** Cards (cards.js): bill due dates, annual fees, spend deadlines and dated to-dos, as all-day events on the pseudo
     calendar "cards". They come from his locked cards, not Google, and a tap opens the Cards page. While the cards are
     locked the pills say only that something is due ("Card payment due"), with no card names. */
@@ -1337,9 +1369,10 @@ function strip(v) {
     const ad = allDay.filter((a) => C.coversDay(a, k)), ps = [], staff = [];
     for (const e of timed) for (const p of C.pieces({ start: e.s, end: e.e }, [k], S.tz)) (isStaff(e) ? staff : ps).push({ id: keyOf(e), s: p.top, e: Math.max(p.bottom, p.top + 20), top: p.top, bot: p.bottom, ev: e });
     const shape = ps.map((p) => { const a = Math.max(0, (p.top - 360) / 960), b = Math.min(1, (p.bot - 360) / 960); return b > a ? `<i class="k-${p.ev.k}" style="left:${a * 100}%;width:${(b - a) * 100}%"></i>` : ""; }).join("");
+    const bd = birthdaysOn(k).length;
     const pill = (a) => `<button class="pill k-${a.k} ${a.ghost ? "ghost" : ""}" data-key="${esc(keyOf(a))}">${esc(a.title)}</button>`;
-    h += `<section class="day ${k === t ? "today" : ""} ${k < t ? "past" : ""}" data-day="${k}" data-ad="${Math.min(ad.length, 2)}"><header class="dhead">
-      <div class="dn"><span data-open="${k}">${DOW[C.dowOf(k)]} <b>${+k.slice(8)}</b></span>${staff.length ? `<button class="keys" data-staff="${k}" title="Studio shifts">🔑 ${staff.length}</button>` : ""}</div>
+    h += `<section class="day ${k === t ? "today" : ""} ${k < t ? "past" : ""}" data-day="${k}" data-ad="${Math.min(ad.length, 2)}"><header class="dhead${bd ? " hasbd" : ""}">
+      <div class="dn"><span data-open="${k}">${DOW[C.dowOf(k)]} <b>${+k.slice(8)}</b></span>${staff.length ? `<button class="keys" data-staff="${k}" title="Studio shifts">🔑 ${staff.length}</button>` : ""}${bdayChip(k)}</div>
       <div class="shape" title="The shape of the day, 6 am to 10 pm">${shape}</div>
       ${ad.length <= 2 ? ad.map(pill).join("") : pill(ad[0]) + `<button class="pill more" data-allday="${k}">${ad.length - 1} more</button>`}</header><div class="col" data-day="${k}">`;
     if (k === t) h += `<div class="shade" id="shade" style="height:${nowY}"></div>`;
@@ -1367,6 +1400,7 @@ function size() {
   v.style.setProperty("--gut", g + "px");
   dw = (v.clientWidth - g) / S.n; st.style.setProperty("--dw", dw + "px");
   st.classList.toggle("narrow", dw < 72);
+  st.classList.toggle("tight", dw < 110); st.classList.toggle("snug", dw < 160);
   fitHead();
   if (TOUCH && !pinch) { const lo = hourLow(v); if (S.h < lo) setHour(lo, $$("#strip .ev[data-m]")); }   // a taller screen (a turn): the day never fits loosely
   if (TOUCH) slideTo(dayDiff(S.cur, S.win0) * dw); else v.scrollLeft = dayDiff(S.cur, S.win0) * dw;
@@ -1389,7 +1423,7 @@ function findByKey(key) {
   const [g, ...rest] = key.split("|"); const id = rest.pop(), calId = rest.join("|");
   if (g === "g") return ghosts().find((x) => x.id === id);
   if (calId === "cards") { const day = id.split(":")[2] || today(); const e = cardEvents(C.addDays(day, -400), C.addDays(day, 400)).find((x) => x.id === id); return e ? norm(e) : null; }
-  for (const m of Object.values(S.months)) { const e = (m.events || []).find((x) => x.id === id && x.calId === calId); if (e) return norm(e); }
+  for (const m of Object.values(S.months)) { const e = (m.events || []).find((x) => x.id === id && x.calId === calId); if (e) return C.isDisplayOnly(e, calOf(e.calId)) ? null : norm(e); }
   return null;
 }
 const yToMin = (col, clientY) => Math.max(0, Math.min(1440 - SNAP, Math.floor((clientY - col.getBoundingClientRect().top) / S.h * 60 / SNAP) * SNAP));
@@ -1668,7 +1702,7 @@ function monthView(v) {
     const tm = evs.filter((e) => !e.allDay && C.wall(e.s, S.tz).day === k).sort((a, b) => a.s - b.s);
     const all = [...ad.map((a) => `<div class="p ad k-${a.k}">${esc(a.title)}</div>`),
       ...tm.map((e) => `<div class="p k-${e.k}" ${e.ghost ? 'style="opacity:.7;font-style:italic"' : ""}><i></i><span class="t">${esc(e.title)}</span> <span class="meta">${C.hm(C.wall(e.s, S.tz).min)}</span></div>`)];
-    h += `<div class="mday ${k.slice(5, 7) !== mo ? "out" : ""} ${k === t ? "today" : ""}" data-k="${k}"><div class="n"><span>${+k.slice(8)}</span></div>${all.slice(0, 4).join("")}${all.length > 4 ? `<div class="more">${all.length - 4} more</div>` : ""}</div>`;
+    h += `<div class="mday ${k.slice(5, 7) !== mo ? "out" : ""} ${k === t ? "today" : ""}" data-k="${k}"><div class="n">${birthdaysOn(k).length ? '<em class="bd" title="Birthdays" aria-hidden="true">🎂</em>' : ""}<span>${+k.slice(8)}</span></div>${all.slice(0, 4).join("")}${all.length > 4 ? `<div class="more">${all.length - 4} more</div>` : ""}</div>`;
   }
   v.innerHTML = `<div class="month">${h}</div>`;
   v.querySelectorAll(".mday").forEach((m) => m.onclick = () => { S.cur = m.dataset.k; setN(3); });
@@ -1696,6 +1730,8 @@ function paintPanel(anim) {
 }
 const untilText = (min) => min < 60 ? `${Math.max(1, Math.round(min))} min` : min < 1440 ? C.dur(Math.round(min)) : `${Math.round(min / 1440)} days`;
 const rowHTML = (e, withDay) => `<button class="row k-${e.k}" data-key="${esc(keyOf(e))}" ${withDay ? 'style="grid-template-columns:104px 8px minmax(0,1fr)"' : ""}><small>${e.allDay ? "All day" : (withDay ? DOW[C.wall(e.s, S.tz).dow] + " " : "") + C.hm(C.wall(e.s, S.tz).min)}</small><i></i><span>${e.ghost ? "Suggested: " : ""}${esc(e.title)}</span></button>`;
+/** A display-only row (a birthday): plain text, no button, no key, so a tap opens nothing and it can never be edited. */
+const plainRow = (e) => `<div class="row plain"><small>${e.allDay ? "All day" : C.hm(C.wall(e.s, S.tz).min)}</small><i></i><span>${esc(e.title)}</span></div>`;
 function pNow() {
   const now = Date.now(), t = today();
   const mine = eventsFor(t, C.addDays(t, 7)).filter((e) => !e.allDay && !isStaff(e)).sort((a, b) => a.s - b.s);
@@ -1851,7 +1887,7 @@ async function saveEvent() {
 /** A plain list in the panel: {title, sub, events}. Used for a day's studio shifts and its all-day events. */
 function pList(x) {
   return `<div class="r"><button class="btn" data-p="now">&#8249; Now</button></div><div><div class="big" style="font-size:20px">${esc(x.title)}</div><div class="meta" style="font-size:13px">${esc(x.sub)}</div></div>
-    <div>${x.events.map((e) => rowHTML(e)).join("") || '<span class="meta">Nothing here.</span>'}</div>${x.foot ? `<p class="meta">${esc(x.foot)}</p>` : ""}`;
+    <div>${x.events.map((e) => e.displayOnly ? plainRow(e) : rowHTML(e)).join("") || '<span class="meta">Nothing here.</span>'}</div>${x.foot ? `<p class="meta">${esc(x.foot)}</p>` : ""}`;
 }
 const dayLabel = (k) => `${DOW[C.dowOf(k)]} ${MON[+k.slice(5, 7) - 1]} ${+k.slice(8)}`;
 function pSet() {
@@ -3075,7 +3111,7 @@ function commuteWire() {
 /* commute:end */
 function setup() {
   document.addEventListener("click", function clickRouter(e) {
-    const t = e.target.closest("[data-railtog],[data-pkday],[data-page],[data-n],[data-p],[data-key],[data-staff],[data-allday],[data-open],[data-acc],[data-skip],[data-go],[data-dur],[data-kind],[data-sheet],[data-triptab],button[data-look],#pSave,#pDel,#pAcc,#pSkip,#pGrab,#pairBtn,[data-end],[data-pkrm],#pkAdd,#soBtn,#soAll,#pwBtn,#pwGo");
+    const t = e.target.closest("[data-railtog],[data-pkday],[data-page],[data-n],[data-p],[data-key],[data-staff],[data-bday],[data-allday],[data-open],[data-acc],[data-skip],[data-go],[data-dur],[data-kind],[data-sheet],[data-triptab],button[data-look],#pSave,#pDel,#pAcc,#pSkip,#pGrab,#pairBtn,[data-end],[data-pkrm],#pkAdd,#soBtn,#soAll,#pwBtn,#pwGo");
     if (!t || t.closest(".ev")) return;
     const d = t.dataset;
     if (t.matches("button[data-look]")) setLook(d.look);
@@ -3086,6 +3122,7 @@ function setup() {
     else if (d.n) setN(d.n === "m" ? "m" : +d.n);
     else if (d.p) panel(d.p);
     else if (d.staff) { const k = d.staff; panel("list", { title: "Studio shifts", sub: dayLabel(k), events: eventsFor(k, k).filter((x) => isStaff(x) && C.pieces({ start: x.s, end: x.e }, [k], S.tz).length).sort((a, b) => a.s - b.s), foot: "From Staff Scheduling. They sit in the slim rail so they stop covering your own plans. Settings can turn the rail off." }); }
+    else if (d.bday) { const k = d.bday; panel("list", { title: "Birthdays", sub: dayLabel(k), events: birthdaysOn(k), foot: "From Community Birthdays. Display only: they cannot be edited here." }); }
     else if (d.allday) { const k = d.allday; panel("list", { title: "All day", sub: dayLabel(k), events: [...eventsFor(k, k), ...ghosts()].filter((x) => x.allDay && C.coversDay(x, k)) }); }
     else if (d.open) { S.cur = d.open; setN(1); }
     else if (d.key && d.key.startsWith("e|cards|")) { const ev = findByKey(d.key); if (ev && window.Cards) { window.Cards.select(ev.cardId); showPage("cards"); } }

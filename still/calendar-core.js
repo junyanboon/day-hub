@@ -1139,3 +1139,16 @@
 
   Object.assign(root.CalCore, { pinMatch, mapStart, gdir, tripMap, placeAdd, placeToast, placeRemove, tripSeed, tripHead, TRIP_TABS, tripRead });
 })(typeof window !== "undefined" ? window : globalThis);
+
+/* ---- display-only calendars: Community Birthdays (Junyan, 2026-11-24: "put it somewhere that it doesn't get in the way") ----
+   Its events never draw as pills, blocks or month pills and feed no count, plan or suggestion. A day that has one shows a
+   small cake chip in the day header (a count when there are several), and the month a small cake mark. The server flags
+   the calendar and each of its events displayOnly (still-api src/planner.mjs). */
+(function (root) {
+  /** A birthday-style event: its calendar or the event itself is flagged display only. */
+  const isDisplayOnly = (e, cal) => !!((e && e.displayOnly) || (cal && cal.displayOnly));
+  /** The chip's words for n birthdays: "" for none, the cake for one, the cake and a count for more. */
+  const birthdayChip = (n) => (n > 0 ? (n > 1 ? "🎂 " + n : "🎂") : "");
+  root.CalCore.isDisplayOnly = isDisplayOnly;
+  root.CalCore.birthdayChip = birthdayChip;
+})(typeof window !== "undefined" ? window : globalThis);
