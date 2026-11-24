@@ -333,3 +333,20 @@ test("the title: month bold and the year light where there is room; a phone show
   const phone = css.slice(css.indexOf("@media (max-width:760px)"));
   assert.match(phone, /\.bar h1 span,\.status\{display:none\}/);
 });
+
+/* Commute blocks (Junyan, 2026-11-24, d3 "3 yes", mockups Main.dc.html): the Commute card is the striped blue one. */
+test("Commute is an azure blue of its own in every look, and its card is drawn in stripes from look variables only", () => {
+  for (const id of faceIds) {
+    const vars = varsFor(id);
+    assert.match(vars["k-commute"], /^var\(--azure\)$/, `${id}: --k-commute`);
+    assert.match(resolver(vars)(vars.azure), /^#[0-9a-f]{6}$/i, `${id}: --azure`);
+    const [h] = hueChroma(colour(vars, "k-commute"));
+    assert.ok(h > 235 && h < 280, `${id}: Commute should read as blue (hue ${h.toFixed(0)})`);
+  }
+  const rule = css.match(/\.ev\.k-commute:not\(\.ghost\)\{([^}]*)\}/);
+  assert.ok(rule, "a stripe rule for .ev.k-commute");
+  assert.match(rule[1], /repeating-linear-gradient\(135deg/);
+  assert.match(rule[1], /var\(--c\)/);
+  assert.doesNotMatch(rule[1], /#[0-9a-f]{3,8}\b|rgba?\(/i, "no fixed colours in the stripes");
+  for (const sel of [".ev.k-commute:not(.ghost):hover{", ".ev.done.k-commute:not(.ghost)", ".day.past .ev.k-commute:not(.ghost)"]) assert.ok(css.includes(sel), sel);
+});

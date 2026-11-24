@@ -52,7 +52,7 @@ test("kind is guessed from the title (d96), a hand-set kind wins", () => {
   assert.equal(C.kindOf({ title: "Packing & Errands" }), "pack");   // "pack" wins since slice 02 (d23)
   assert.equal(C.kindOf({ title: "Montreal: train" }), "travel");
   assert.equal(C.kindOf({ title: "Flight to São Paulo" }), "travel");
-  assert.equal(C.kindOf({ title: "Drive" }), "travel");
+  assert.equal(C.kindOf({ title: "Drive" }), "commute");   // Commute blocks, 2026-11-24: bus and drive left Travel
   assert.equal(C.kindOf({ title: "Stay at FICTION" }), "travel");
   assert.equal(C.kindOf({ title: "Viewing, Studio B", calName: "Staff scheduling" }), "studio");
   assert.equal(C.kindOf({ title: "Need FBS", calName: "Staff scheduling" }), "studio");
@@ -65,7 +65,7 @@ test("kind is guessed from the title (d96), a hand-set kind wins", () => {
   assert.equal(C.kindOf({ title: "Call the bank", kind: "ex" }), "gym");
   assert.equal(C.kindOf({ title: "Zouk night", kind: "ex" }), "dance");
   assert.equal(C.kindOf({ title: "Zouk night", kind: "other" }), "other");
-  assert.deepEqual(C.KINDS.map((x) => x[0]), ["deep", "studio", "yoga", "gym", "dance", "cook", "travel", "pack", "social", "errand", "wind", "rest", "home", "other"]);
+  assert.deepEqual(C.KINDS.map((x) => x[0]), ["deep", "studio", "yoga", "gym", "dance", "cook", "travel", "commute", "pack", "social", "errand", "wind", "rest", "home", "other"]);
 });
 
 test("overlapping events share the width, others take all of it", () => {
@@ -125,4 +125,55 @@ test("time labels", () => {
   assert.equal(C.hm(12 * 60), "12 pm");
   assert.equal(C.dur(90), "1 h 30 min");
   assert.equal(C.dur(45), "45 min");
+});
+
+/* Commute blocks (Junyan, 2026-11-24, d1 "1 yes": one block type called Commute, three emojis picked by the title) */
+test("commute, transit and drive titles land on Commute; trip words stay on Travel", () => {
+  for (const t of ["Commute", "Transit", "Subway", "TTC", "Streetcar", "Bus to Zouk Training", "Drive", "Drive home", "Driving", "Morning commute"])
+    assert.equal(C.kindOf({ title: t }), "commute", t);
+  for (const t of ["Montreal: train", "Flight to São Paulo", "Airport", "Hotel", "Stay at FICTION", "Check-in", "Ferry", "Airbnb check-out", "Train to Montreal"])
+    assert.equal(C.kindOf({ title: t }), "travel", t);
+  assert.equal(C.kindOf({ title: "Pack for the drive" }), "pack", "Packing still comes first");
+  assert.equal(C.kindOf({ title: "Drive", kind: "social" }), "social", "a hand-set type still wins");
+  assert.equal(C.kindOf({ title: "Zouk", kind: "commute" }), "commute", "and Commute can be hand-set");
+  assert.equal(C.kindOf({ title: "Busy day" }), "other", "bus is a whole word");
+  assert.deepEqual(C.KINDS.find(([k]) => k === "commute"), ["commute", "Commute"]);
+});
+
+/* d8 (Junyan, 2026-11-24, "8 yes"): bus, drive and driving count only when the title reads as a trip */
+test("bus, drive and driving make a Commute only when the title reads as a trip (d8)", () => {
+  for (const t of ["Drive", "Bus", "Driving", "Drive home", "Drive to Mom's", "Bus to studio", "Driving to the airport", "Take the bus to work",
+    "Bus back", "Drive over", "Drive there", "Drive: Mom's", "\u{1F697} Drive"])
+    assert.equal(C.kindOf({ title: t }), "commute", t);
+  for (const t of ["Google Drive backup", "Test drive", "hard drive cleanup", "Bus tickets", "Business", "Business plan", "Drive-in movie", "Take the bus", "Driveway sealing", "Drives"])
+    assert.notEqual(C.kindOf({ title: t }), "commute", t + " is not a trip");
+  assert.equal(C.kindOf({ title: "Google Drive backup" }), "other");
+  assert.equal(C.kindOf({ title: "Bus tickets" }), "other");
+  for (const t of ["Morning commute", "Commuting", "Transit", "Subway", "TTC", "Streetcar", "Check the TTC schedule", "Late streetcar"])
+    assert.equal(C.kindOf({ title: t }), "commute", t + " counts anywhere");
+  assert.equal(C.kindOf({ title: "Test drive", kind: "commute" }), "commute", "a hand-set Commute still wins");
+  assert.ok(!C.KINDS.some(([k]) => k === "bus" || k === "drive"), "bus and drive are not a travel word");
+});
+
+/* d10 (Junyan, 2026-11-24, "10 yes"): a title that starts with Drive or Driving and has "to" later is a Commute by car */
+test("Drive or Driving at the start of the title, with a later 'to', is a Commute by car (d10)", () => {
+  for (const t of ["Drive Caney to school", "Driving Mom to the airport"]) {
+    assert.equal(C.kindOf({ title: t }), "commute", t);
+    assert.equal(C.modeOf({ title: t }), "drive", t + " has the drive emoji");
+  }
+  assert.deepEqual(C.MODES.find(([m]) => m === C.modeOf({ title: "Drive Caney to school" })).slice(0, 2), ["drive", "\u{1F697}"]);
+  for (const t of ["Google Drive backup to the cloud", "Test drive to decide", "Drive-in movie to remember", "Drives to nowhere", "Take the bus"])
+    assert.notEqual(C.kindOf({ title: t }), "commute", t + " stays off Commute");
+});
+
+test("the mode (its emoji) is guessed from the title, and a hand-picked mode beats the guess", () => {
+  const m = (title, mode) => C.modeOf({ title, mode });
+  for (const t of ["Transit", "Subway", "TTC to work", "Streetcar", "Bus to Zouk Training", "Take the bus"]) assert.equal(m(t), "transit", t);
+  for (const t of ["Drive", "Drive home", "Driving", "Take the car"]) assert.equal(m(t), "drive", t);
+  for (const t of ["Commute", "Morning commute", "Walk to work", ""]) assert.equal(m(t), "commute", t);
+  assert.equal(m("Drive", "transit"), "transit", "picked by hand");
+  assert.equal(m("Commute", "drive"), "drive");
+  assert.equal(m("Drive", "rocket"), "drive", "an unknown mode is ignored");
+  assert.equal(m("Drive to the subway"), "drive", "the first word wins");
+  assert.deepEqual(C.MODES.map((x) => [x[0], x[1], x[2]]), [["commute", "🚶", "Commute"], ["transit", "🚇", "Transit"], ["drive", "🚗", "Drive"]]);
 });

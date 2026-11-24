@@ -54,14 +54,31 @@
   /* ---- block types (2026-11-10, one-system ticket 026): eleven kinds of block, each with its own colour,
      helper and page, plus "other". Guessed from the title, first match wins; a hand-set kind wins over the guess. ---- */
   const KINDS = [["deep", "Deep Work"], ["studio", "Studio On-Site"], ["yoga", "Yoga"], ["gym", "Gym"], ["dance", "Dance"],
-    ["cook", "Culinary"], ["travel", "Travel"], ["pack", "Packing"], ["social", "Social"], ["errand", "Errands"], ["wind", "Wind Down"],
+    ["cook", "Culinary"], ["travel", "Travel"], ["commute", "Commute"], ["pack", "Packing"], ["social", "Social"], ["errand", "Errands"], ["wind", "Wind Down"],
     ["rest", "Rest"], ["home", "Domestic"], ["other", "Other"]];
   /* Hand-set kinds saved before the eleven types (ex, food, out, work). "ex" is guessed again: gym or dance. */
   const OLD_KIND = { food: "cook", out: "travel", work: "studio" };
   /* Packing (slice 02, Junyan 2026-11-16, d23: "p1 yes"): "pack" anywhere in the title, any case, so "Pack for FICTION
      stay", "Unpack", and also "backpack" and "Packers". First, so "Pack for the trip" is Packing, not Travel. */
+  /* d8 (Junyan, 2026-11-24, "8 yes"): commute, commuting, transit, subway, TTC and streetcar count anywhere in the title.
+     "bus", "drive" and "driving" count only as a trip: the word is the title ("Drive", "Bus: Mom's"), or is followed by
+     to, home, back, there or over ("Take the bus to work"). So "Google Drive backup", "Test drive", "hard drive cleanup",
+     "Bus tickets" and "Business" stay off Commute. They are not in the Travel list either.
+     d10 (Junyan, 2026-11-24, "10 yes"): a title that starts with Drive or Driving and has the word "to" later counts too,
+     so "Drive Caney to school" and "Driving Mom to the airport" are a Commute by car. "Google Drive backup to the cloud",
+     "Test drive to decide", "Drive-in movie to remember" and "Drives to nowhere" stay off it ("test drive" is never a trip,
+     even with "to" after it). */
+  const COMMUTE_RX = {
+    test: (t) => /\b(commute|commuting|transit|subway|ttc|streetcar)\b/i.test(t) ||
+      (/\b(bus|drive|driving)\s+(to|home|back|there|over)\b/i.test(t) && !/\btest\s+drive\b/i.test(t)) ||
+      /^[^\p{L}\p{N}]*(bus|drive|driving)\s*($|[:(,\u00b7])/iu.test(t) ||
+      /^[^\p{L}\p{N}]*(drive|driving)\s+.*\bto\b/iu.test(t),
+  };
   const RX = [
     ["pack", /pack/i],
+    /* Commute (Junyan, 2026-11-24, d1: "1 yes"): one type, three emojis picked by the title (MODES). Before the others so
+       "Bus to Zouk Training" and "Drive to the gym" are the trip there, not Dance or Gym. Bus and drive left Travel. */
+    ["commute", COMMUTE_RX],
     ["deep", /\b(work block|deep work|focus block|focus time)\b/i],
     ["wind", /\b(wind.?down|bedtime)\b/i],
     /* Domestic (Junyan, 2026-11-21, d62: "give it a more exciting colour"): its own type and colour, no page of its own */
@@ -72,7 +89,7 @@
     ["gym", /\b(gym|workout|climb\w*|run|running|swim\w*|bike|cycling|pilates|stretch\w*|hike|boxing|tennis|squash|cardio|training)\b/i],
     ["studio", /\b(studio|viewing|renter|booking|payroll|team check-?in|on-?site|fbs)\b/i],
     ["social", /\b(birthday|party|wedding|visit|mom|dad|friends?|everyone|date night|hang ?out)\b/i],
-    ["travel", /\b(train|trip|flight|fly|airport|bus|drive|hotel|check-?in|check-?out|travel|stay at|airbnb|ferry|festival|carnaval|carnival)\b/i],
+    ["travel", /\b(train|trip|flight|fly|airport|hotel|check-?in|check-?out|travel|stay at|airbnb|ferry|festival|carnaval|carnival)\b/i],
     ["errand", /\b(errands?|bank|branch|scotia|bmo|pharmacy|post office|pick ?up|drop ?off|return|dentist|doctor|clinic|appointment|appt|haircut|ikea|passport)\b/i],
     ["cook", /\b(dinner|lunch|brunch|breakfast|groceries|grocery|market|gaia|hot pot|cook\w*|meal|prep|eat|restaurant|coffee|caf[eé]|snack|picnic|potluck|veggie|pudding|focaccia)\b/i],
     ["rest", /\b(nap|rest|sauna|cold plunge|massage|walk)\b/i],
@@ -81,6 +98,16 @@
     const t = String(title || "");
     for (const [k, rx] of RX) if (rx.test(t)) return k;
     return /staff/i.test(calName || "") ? "studio" : "other";
+  }
+  /* A Commute block's "Going by": walking or whatever is best (🚶), transit (🚇) or driving (🚗). Guessed from the title,
+     the earlier word wins; a mode picked by hand is kept on the event (extendedProperties.private.mode) and beats the guess. */
+  const MODES = [["commute", "🚶", "Commute"], ["transit", "🚇", "Transit"], ["drive", "🚗", "Drive"]];
+  const MODE_RX = [["transit", /\b(transit|subway|ttc|streetcar|bus)\b/i], ["drive", /\b(drive|driving|car)\b/i]];
+  function modeOf(ev) {
+    if (ev.mode && MODES.some(([m]) => m === ev.mode)) return ev.mode;
+    const t = String(ev.title || ""); let best = "commute", at = Infinity;
+    for (const [m, rx] of MODE_RX) { const i = t.search(rx); if (i >= 0 && i < at) { best = m; at = i; } }
+    return best;
   }
   /** {title, calName?, kind?} → one of KINDS. A hand-set kind wins. */
   function kindOf(ev) {
@@ -504,7 +531,7 @@
   const clock = (min) => { const h = Math.floor(min / 60) % 24; return `${h % 12 || 12}:${String(min % 60).padStart(2, "0")} ${h < 12 ? "AM" : "PM"}`; };
 
   root.CalCore = { wall, instant, offset, addDays, dowOf, weekStart, isoWeek, addMonths, monthKey, monthsFor,
-    KINDS, guessKind, kindOf, layout, pieces, coversDay, routineBlocks, ROUTINE, orderBetween, groupOf, dropTask, blockMinutes, hm, dur, SWIPE, swipeLock, swipeCommit, HOUR, pinchHeight, hourMin, pinchMinute, pinchScroll, cardFit, cardTime, startHour, LOOKS, lookId, startLook, LOOK_RESET, placeOf, sunTimes, sunHalf, lookFace, tripCards, tripLinks, homeFit, homeShift,
+    KINDS, MODES, modeOf, guessKind, kindOf, layout, pieces, coversDay, routineBlocks, ROUTINE, orderBetween, groupOf, dropTask, blockMinutes, hm, dur, SWIPE, swipeLock, swipeCommit, HOUR, pinchHeight, hourMin, pinchMinute, pinchScroll, cardFit, cardTime, startHour, LOOKS, lookId, startLook, LOOK_RESET, placeOf, sunTimes, sunHalf, lookFace, tripCards, tripLinks, homeFit, homeShift,
     sheetForm, sheetWhen, sheetPatch, sheetLength, sheetStart, sheetEnd, sheetDay, sheetEndDay, sheetAllDay, notesRich, notesText, dayText, clock, toMin };
 })(typeof window !== "undefined" ? window : globalThis);
 
