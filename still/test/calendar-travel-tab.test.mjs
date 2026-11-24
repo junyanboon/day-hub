@@ -61,12 +61,11 @@ test("a trip's own icon wins over the suitcase", () => {
   assert.equal(c.upcoming[0].title, "⛷️ Ski week");
 });
 
-test("Local and + New trip are plain links to Day Quest's own Local tab and new-trip flow, ?api= carried along", () => {
+test("Local is a plain link to Day Quest's own Local tab, ?api= carried along; no + New trip link", () => {
   assert.deepEqual({ ...C.tripLinks("?api=http%3A%2F%2Flocalhost%3A8806") }, {
     local: "quest.html?api=http%3A%2F%2Flocalhost%3A8806#trips-local",
-    add: "quest.html?api=http%3A%2F%2Flocalhost%3A8806#trips-new",
   });
-  assert.deepEqual({ ...C.tripLinks("") }, { local: "quest.html#trips-local", add: "quest.html#trips-new" });
+  assert.deepEqual({ ...C.tripLinks("") }, { local: "quest.html#trips-local" });
 });
 
 test("the calendar can load quest-trips.js for its helpers without Day Quest's sidebar drawing on it", () => {
@@ -85,6 +84,6 @@ test("Day Quest opens on its Trips page, its Local tab or its new-trip flow from
   assert.equal(T.startView("#trips"), "trips");
   assert.equal(T.startView("#Trips"), "trips");
   assert.equal(T.startView("#trips-local"), "local", "the calendar's Local tab lands on Day Quest's Local tab");
-  assert.equal(T.startView("#trips-new"), "new", "the calendar's + New trip starts Day Quest's new-trip flow");
+  assert.equal(T.startView("#trips-new"), "new", "Day Quest's own new-trip link still works");
   for (const h of ["", "#", "#pair=abc123", "#tripsx", "#gym", "#trips-localx", "#trips-"]) assert.equal(T.startView(h), null, h);
 });

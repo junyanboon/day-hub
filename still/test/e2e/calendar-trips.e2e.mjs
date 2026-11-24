@@ -1,10 +1,10 @@
 // The plane in the calendar's left rail opens the calendar's own Trips page (Junyan, 2026-11-13: "I want it to stay on
 // the calendar app"), drawn as look A (d3: "3A"): tabs Upcoming / Past / Local, one card per trip with Day Quest's
-// chips, side by side on a computer and stacked on a phone. Upcoming and Past switch in place; Local and + New trip are
-// links to Day Quest (d4: "4 no"); a card opens that trip (slice 04; calendar-trip-map.e2e.mjs tests the trip itself). "‹ Calendar" goes back. The browser clock is pinned to
+// chips, side by side on a computer and stacked on a phone. Upcoming and Past switch in place; Local is a
+// link to Day Quest (d4: "4 no"); there is no + New trip (removed 2026-11-23: it only led to Day Quest); a card opens that trip (slice 04; calendar-trip-map.e2e.mjs tests the trip itself). "‹ Calendar" goes back. The browser clock is pinned to
 // 2026-11-13 so "Now" and "50 days away" never depend on today.
-// On a phone (under 768 px, the same rule quest-trips.js uses to switch Day Quest's Trips view off) Local and + New trip
-// are hidden until the Trips page is ported into the calendar (Junyan, 2026-11-13, d6: "6 yes, hide"): the tabs are
+// On a phone (under 768 px, the same rule quest-trips.js uses to switch Day Quest's Trips view off) Local
+// is hidden until the Trips page is ported into the calendar (Junyan, 2026-11-13, d6: "6 yes, hide"): the tabs are
 // Upcoming and Past only, with no gap in the pill. 767 and 768 px are checked so the two rules never disagree.
 // Not part of `node --test`: it needs playwright-core and the test browser (`sh scripts/install-test-browser.sh`).
 //   PW_DIR=<folder with node_modules/playwright-core> node still/test/e2e/calendar-trips.e2e.mjs
@@ -58,9 +58,8 @@ try {
       back: document.querySelector('#page .phead [data-page="cal"]')?.textContent,
       add: ((el) => el && el.getClientRects().length ? el.textContent : null)(document.querySelector("#page #tripNew")) }));
     const phone = label === "phone";
-    check(phone ? `${label}: header reads ‹ Calendar, Trips, From your Travel Planner in Notion, and no + New trip`
-      : `${label}: header reads ‹ Calendar, Trips, From your Travel Planner in Notion, + New trip`,
-      head.back === "‹ Calendar" && head.h2 === "Trips" && head.meta === "From your Travel Planner in Notion" && head.add === (phone ? null : "+ New trip"), JSON.stringify(head));
+    check(`${label}: header reads ‹ Calendar, Trips, From your Travel Planner in Notion, and no + New trip`,
+      head.back === "‹ Calendar" && head.h2 === "Trips" && head.meta === "From your Travel Planner in Notion" && head.add === null, JSON.stringify(head));
     const tabs = await page.evaluate((src) => { const shown = eval(src);
       return [...document.querySelectorAll("#page .ttabs > *")].filter(shown).map((b) => [b.textContent, b.getAttribute("aria-pressed")]); }, shown.toString());
     const want = [["Upcoming2", "true"], ["Past1", "false"], ...(phone ? [] : [["Local", null]])];
@@ -100,8 +99,8 @@ try {
     check(`${label}: Upcoming switches back`, (await cards(page)).length === 2);
     if (!phone) {
       const hrefs = await page.evaluate(() => [document.querySelector("#page .ttabs .tlink")?.getAttribute("href"), document.querySelector("#page #tripNew")?.getAttribute("href")]);
-      check(`${label}: Local and + New trip link to Day Quest's Local tab and new-trip flow`,
-        hrefs[0] === `quest.html${location_search()}#trips-local` && hrefs[1] === `quest.html${location_search()}#trips-new`, JSON.stringify(hrefs));
+      check(`${label}: Local links to Day Quest's Local tab, and there is no + New trip link`,
+        hrefs[0] === `quest.html${location_search()}#trips-local` && hrefs[1] == null, JSON.stringify(hrefs));
     } else {
       check(`${label}: no tap target leads to Day Quest's Trips (it does nothing on a phone)`, await page.evaluate((src) => { const shown = eval(src);
         return ![...document.querySelectorAll('#page a[href*="quest.html"]')].some(shown); }, shown.toString()));
@@ -117,7 +116,7 @@ try {
     check(`${label}: no page errors`, !errors.length, errors.join(" | "));
     await ctx.close();
   }
-  // The edge: Day Quest's Trips view is off under 768 px (quest-trips.js, WIDE), so the calendar hides the two links
+  // The edge: Day Quest's Trips view is off under 768 px (quest-trips.js, WIDE), so the calendar hides the Local link
   // exactly there. 767 px: hidden. 768 px: shown.
   // read Day Quest's own switch from quest-trips.js, so a change to its width breaks this check
   const wide = /const WIDE = window\.matchMedia\("\(min-width: (\d+)px\)"\)/.exec(readFileSync(path.join(here, "../../quest-trips.js"), "utf8"));
@@ -129,10 +128,10 @@ try {
     await page.addInitScript(() => { localStorage.setItem("quest-key", "test"); });
     await page.goto(URL_); await page.waitForSelector('#rail [data-page="travel"]', { state: "attached" }); await sleep(400);
     await page.evaluate(() => document.querySelector('#rail [data-page="travel"]').click()); await sleep(400);
-    const vis = await page.evaluate((src) => { const shown = eval(src); return [shown(document.querySelector("#page .ttabs .tlink")), shown(document.querySelector("#page #tripNew"))]; }, shown.toString());
+    const vis = await page.evaluate((src) => { const shown = eval(src); return [shown(document.querySelector("#page .ttabs .tlink"))]; }, shown.toString());
     const on = w >= +(wide?.[1] || 768);   // Day Quest's Trips view runs at this width
-    check(`${w} px: Local and + New trip ${on ? "shown" : "hidden"}, the same as Day Quest's Trips view (${on ? "on" : "off"})`,
-      JSON.stringify(vis) === JSON.stringify([on, on]), JSON.stringify(vis));
+    check(`${w} px: Local ${on ? "shown" : "hidden"}, the same as Day Quest's Trips view (${on ? "on" : "off"})`,
+      JSON.stringify(vis) === JSON.stringify([on]), JSON.stringify(vis));
     await ctx.close();
   }
   // Day Quest's side of the two links: #trips-local opens its Trips page on the Local tab (computer width, where its

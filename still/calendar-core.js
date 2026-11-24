@@ -415,9 +415,10 @@
     const upcoming = (sp.upcoming || []).map(card), past = (sp.past || []).map(card), needsDates = (sp.needsDates || []).map(card);
     return { upcoming, past, needsDates, counts: { upcoming: upcoming.length, past: past.length + needsDates.length } };
   }
-  /* Local and + New trip stay in Day Quest (Junyan, 2026-11-13, d4: "4 no"): plain links to its Local tab and its
-     new-trip flow (QuestTrips.startView reads the hash). search is the calendar's location.search, so ?api= goes along. */
-  const tripLinks = (search) => ({ local: `quest.html${search || ""}#trips-local`, add: `quest.html${search || ""}#trips-new` });
+  /* Local stays in Day Quest (Junyan, 2026-11-13, d4: "4 no"): a plain link to its Local tab (QuestTrips.startView
+     reads the hash). The calendar's + New trip link to Day Quest was removed (Junyan, 2026-11-23: "maybe we just remove
+     it"). search is the calendar's location.search, so ?api= goes along. */
+  const tripLinks = (search) => ({ local: `quest.html${search || ""}#trips-local` });
 
   /* ---- the event sheet on the phone (slice 02, Junyan 2026-11-12, d2 and d6: "the event sheet as editable rows").
      The sheet keeps a form: {title, calId, kind, location, description, allDay, day, start, end, days, endDay}.
