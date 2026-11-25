@@ -35,19 +35,34 @@ test("a late night: wind down starts when the evening ends, and sleep gets short
 });
 
 test("Domestic: the first free hour after 9 am; less when no hour is free; none under 30 min", () => {
-  const day = [ev("Work", DAY, 9, 0, 10, 0), ev("Lunch", DAY, 10, 30, 11, 0), ev("Samba", DAY, 11, 0, 13, 0)];
+  const day = [ev("Work", DAY, 9, 0, 10, 0), ev("Lunch", DAY, 10, 15, 11, 0), ev("Samba", DAY, 11, 0, 13, 0)];
   const d = by(C.routineBlocks(DAY, day, TO)).domestic;
   assert.equal(hm(d.s), "21 1:00 pm"); assert.equal(d.e - d.s, 3600000);
   const full = [ev("A", DAY, 9, 0, 10, 0), ev("B", DAY, 10, 45, 12, 0), ev("C", DAY, 12, 20, 23, 30)];
   const f = by(C.routineBlocks(DAY, full, TO)).domestic;
-  assert.equal(hm(f.s), "21 10:00 am"); assert.equal(f.e - f.s, 45 * 60000); assert.match(f.why, /Only/);
+  assert.equal(hm(f.s), "21 10:00 am"); assert.equal(f.e - f.s, 45 * 60000); assert.equal(f.why, "Your first free 45 min");
   const packed = [ev("A", DAY, 9, 0, 10, 0), ev("B", DAY, 10, 20, 23, 30)];
   assert.equal(by(C.routineBlocks(DAY, packed, TO)).domestic, undefined);
 });
 
-test("today: Domestic starts no earlier than now, rounded up to the quarter hour", () => {
-  const d = by(C.routineBlocks(DAY, [], TO, at(DAY, 16, 40))).domestic;
-  assert.equal(hm(d.s), "21 4:45 pm");
+test("d70: Domestic takes the EARLIEST free window of 30 min or more, an hour when it fits, else the window rounded down to 15", () => {
+  // his day: nothing free from 9 am until 11:30, then 11:30 to noon free before the 12 pm Drive
+  const day = [ev("Work", DAY, 9, 0, 11, 30), ev("Drive", DAY, 12, 0, 12, 30), ev("Samba", DAY, 12, 30, 14, 0), ev("Pickup", DAY, 14, 0, 14, 30), ev("Nutty pudding", DAY, 15, 0, 16, 0)];
+  const d = by(C.routineBlocks(DAY, day, TO)).domestic;
+  assert.deepEqual([hm(d.s), hm(d.e)], ["21 11:30 am", "21 12:00 pm"]);
+  assert.equal(d.why, "Your first free 30 min");
+  // a longer window later does not win over the earlier 30 minutes
+  assert.equal(hm(by(C.routineBlocks(DAY, [ev("A", DAY, 9, 0, 10, 0), ev("B", DAY, 10, 40, 11, 0)], TO)).domestic.s), "21 10:00 am");
+  // 70 minutes free: an hour; 50 minutes free: 45 (rounded down to 15)
+  const hr = by(C.routineBlocks(DAY, [ev("A", DAY, 9, 0, 10, 0), ev("B", DAY, 11, 10, 12, 0)], TO)).domestic;
+  assert.deepEqual([hm(hr.s), hr.e - hr.s, hr.why], ["21 10:00 am", 3600000, "Your first free hour"]);
+  const m50 = by(C.routineBlocks(DAY, [ev("A", DAY, 9, 0, 10, 0), ev("B", DAY, 10, 50, 12, 0)], TO)).domestic;
+  assert.equal(m50.e - m50.s, 45 * 60000);
+});
+
+test("d70: today is searched from 9 am too, so the suggestion stays where it was (the clock is no longer an input)", () => {
+  assert.equal(C.routineBlocks.length, 3, "routineBlocks(day, events, tz): no now");
+  assert.equal(hm(by(C.routineBlocks(DAY, [], TO)).domestic.s), "21 9:00 am");
 });
 
 test("a block he already has is not suggested again, and the others keep their times", () => {

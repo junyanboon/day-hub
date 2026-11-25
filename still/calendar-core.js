@@ -169,9 +169,9 @@
   const RX_DOMESTIC = /\b(domestic|chores?|clean(ing)?|laundry|tidy(ing)?|housework)\b/i;
   const RX_WIND = /\b(wind.?down|bedtime)\b/i, RX_SLEEP = /\bsleep\b/i, RX_MORNING = /\bmorning routine\b/i;
   /** Suggested blocks for one day. events: his own timed events {title, s, e} in ms (no all-day, no studio shifts, no
-      suggestions), covering the day and the next morning. now (ms) cuts today's Domestic search short.
-      Returns [{key, kind, title, s, e, why}]; a block he already has (by title) is left out, the rest keep their times. */
-  function routineBlocks(day, events, tz, now = 0) {
+      suggestions), covering the day and the next morning. Domestic is searched over the whole day from 9 am, today included,
+      so it stays where it was and can be accepted late (Junyan, 2026-11-25, d70). Returns [{key, kind, title, s, e, why}]; a block he already has (by title) is left out, the rest keep their times. */
+  function routineBlocks(day, events, tz) {
     const R = ROUTINE, M = 60000, next = addDays(day, 1), [d0, d1] = dayBounds(day, tz), [, n1] = dayBounds(next, tz);
     const own = (e) => RX_WIND.test(e.title) || RX_SLEEP.test(e.title) || RX_MORNING.test(e.title) || RX_DOMESTIC.test(e.title);
     const busy = events.filter((e) => e.e > e.s && !own(e)).sort((a, b) => a.s - b.s);
@@ -195,18 +195,18 @@
       why: sleepEnd - sleepStart < R.sleep * M ? `${h(sleepEnd - sleepStart)}, the evening runs late` : "8 hours" });
     if (!has(RX_MORNING, d1, n1)) out.push({ key: "morning", kind: "yoga", title: "Morning Routine", s: mStart, e: mEnd,
       why: first ? `Before ${first.title}` : "Before your day starts" });
-    // Domestic: the first free hour between 9 am (or now) and wind down; else the longest free stretch of 30 min or more
+    // Domestic (d70): the EARLIEST free window of 30 min or more between 9 am and wind down, an hour long when the hour fits there,
+    // else the window's length rounded down to 15 minutes. Today is searched from 9 am too, so the block does not move as the day goes.
     if (!has(RX_DOMESTIC, d0, d1)) {
-      const q = 15 * M, from = Math.ceil(Math.max(instant(day, R.dayFrom, tz), now) / q) * q, to = Math.min(windStart, d1);
+      const q = 15 * M, from = Math.ceil(instant(day, R.dayFrom, tz) / q) * q, to = Math.min(windStart, d1);
       const gaps = []; let at = from;
       for (const e of busy) { if (e.e <= at || e.s >= to) continue; if (e.s > at) gaps.push([at, e.s]); at = Math.max(at, e.e); }
       if (to > at) gaps.push([at, to]);
-      const fits = gaps.find(([a, b]) => b - a >= R.domestic * M);
-      const best = fits || gaps.filter(([a, b]) => b - a >= R.domesticMin * M).sort((x, y) => (y[1] - y[0]) - (x[1] - x[0]))[0];
+      const best = gaps.find(([a, b]) => b - a >= R.domesticMin * M);
       if (best) {
-        const len = fits ? R.domestic * M : Math.floor((best[1] - best[0]) / q) * q;
+        const len = Math.min(R.domestic * M, Math.floor((best[1] - best[0]) / q) * q);
         out.push({ key: "domestic", kind: "home", title: "Domestic", s: best[0], e: best[0] + len,
-          why: fits ? "Your first free hour" : `Only ${h(len)} free today` });
+          why: len >= R.domestic * M ? "Your first free hour" : `Your first free ${h(len)}` });
       }
     }
     return out;

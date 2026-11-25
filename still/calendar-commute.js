@@ -107,7 +107,12 @@
     const forText = (text) => locationMemory(remembered, text);
     if (typed && clean(typed.address)) return out("typed", typed);
     if (own) { const m = forText(ev.location); return m ? out("location", { ...m, name: clean(ev.location) }) : out("block", { address: ev.location }); }
-    if (nextLoc) { const m = forText(next.location); return m ? out("location", { ...m, name: clean(next.location) }) : out("next", { address: next.location, name: next.title }); }
+    if (nextLoc) {
+      const m = forText(next.location);
+      if (m) return out("location", { ...m, name: clean(next.location) });
+      if (home && !samePlace(from, home) && isHome({ address: nextLoc, id: "", text: nextLoc }, home)) return out("home", { ...home, name: "Home" });   // the next plan is at Home ("Home" or its address): go there as Home (d67 trip home)
+      return out("next", { address: next.location, name: next.title });
+    }
     const mem = next ? titleMemory(remembered, next.title) : null;
     if (mem) return out("remembered", { ...mem, name: placeNameOf(mem) });   // its saved name is the event title; the place's own name, when one was picked, is in its notes
     if (home && (clean(home.address) || home.id) && !samePlace(from, home)) return out("home", { ...home, name: "Home" });
@@ -118,7 +123,7 @@
   /** Where the trip starts when he did not pick it: the place of the block before it that day. Walk back through that day's
       earlier timed events (not all-day, not a suggestion), take the first with a place: a Commute block gives its To
       (targetOf), any other block its location. null when nothing before it has one. */
-  function previousPlace({ ev, events, tz, targetOf }) {
+  function previousPlace({ ev, events, tz, targetOf, remembered = [] }) {
     const day = C().wall(ev.s, tz).day;
     const before = (events || []).filter((x) => x.id !== ev.id && !x.allDay && !x.ghost && x.s < ev.s && C().wall(x.s, tz).day === day)
       .sort((a, b) => b.s - a.s || b.e - a.e);
@@ -127,13 +132,14 @@
         const t = targetOf ? targetOf(x) : null;
         if (t && !needsAsk(t) && clean(t.address)) return { name: clean(t.name), address: clean(t.address), lat: t.lat == null ? null : t.lat, lng: t.lng == null ? null : t.lng, id: t.id || "", title: x.title };
       } else if (clean(x.location)) return { name: "", address: clean(x.location), lat: null, lng: null, id: "", title: x.title };
+      else { const m = titleMemory(remembered, x.title); if (m) return { name: placeNameOf(m), address: clean(m.address), lat: m.lat == null ? null : m.lat, lng: m.lng == null ? null : m.lng, id: m.id || "", title: x.title }; }   // a place remembered for its name (d67: the trip home leaves from it)
     }
     return null;
   }
   /** The From of a block: the one he picked for it, else where the block before it ended, else Home, else null ("Where you are"). */
-  function fromFor({ ev, events, tz, targetOf, picked = null, home = null }) {
+  function fromFor({ ev, events, tz, targetOf, picked = null, home = null, remembered = [] }) {
     if (picked) return picked;
-    const prev = previousPlace({ ev, events, tz, targetOf });
+    const prev = previousPlace({ ev, events, tz, targetOf, remembered });
     if (prev) return prev;
     return home && (clean(home.address) || home.id) ? { name: "Home", address: home.address || "", lat: home.lat == null ? null : home.lat, lng: home.lng == null ? null : home.lng, id: home.id || "" } : null;
   }
@@ -170,22 +176,26 @@
     if (!place || !home || !(clean(home.address) || home.id)) return false;
     return samePlace(place, home) || (!!place.text && place.text.toLowerCase() === "home");
   }
-  /** One short key per event, safe for the page's ^auto:(\w+):(.+)$ id pattern: "cm" and two 32 bit hashes of calendar and event id. */
-  function suggestionKey(x) {
+  /** One short key per event, safe for the page's ^auto:(\w+):(.+)$ id pattern: "cm" and two 32 bit hashes of calendar and event id.
+      The trip home passes "cm_h": base 36 never holds an underscore, so its key can never equal a "To X" key. */
+  function suggestionKey(x, pre = "cm") {
     const s = String(x.calId) + "|" + String(x.id);
     let a = 0x811c9dc5, b = 5381;
     for (let i = 0; i < s.length; i++) { a = Math.imul(a ^ s.charCodeAt(i), 16777619) >>> 0; b = (Math.imul(b, 33) + s.charCodeAt(i)) >>> 0; }
-    return "cm" + a.toString(36) + b.toString(36);
+    return pre + a.toString(36) + b.toString(36);
   }
   /** The Commute suggestions for one day. events: his own timed events (the page already left out other people's calendars), each with
-      title, location, s, e (ms), allDay, ghost, k. remembered: the places rows. home: his Home place or null. now: ms. Returns
-      [{key, kind: "commute", title: "Commute", s, e, why, forId}], earliest first. */
+      title, location, s, e (ms), allDay, ghost, k. remembered: the places rows. home: his Home place or null. now: ms (a day before
+      today's date in tz has none; today keeps every suggestion until the day ends, d68). Returns
+      [{key, kind: "commute", title: "Commute", s, e, why, forId}], earliest first: "To X" before a plan away from Home, and
+      "Home" after one (d67, tripHome below). */
   function commuteSuggestions({ day, events, remembered = [], home = null, tz, now = 0 }) {
     const M = 60000, timed = (events || []).filter((x) => x && !x.allDay && !x.ghost && Number.isFinite(x.s) && Number.isFinite(x.e));
+    if (now && day < C().wall(now, tz).day) return [];   // a past day shows none; today's earlier suggestions stay until the day ends (d68)
     const onDay = timed.filter((x) => C().wall(x.s, tz).day === day).sort((a, b) => a.s - b.s || a.e - b.e);
     const out = [];
     for (const ev of onDay) {
-      if (ev.k === "commute" || ev.s <= now) continue;   // not for a Commute block itself, nor an event that has started
+      if (ev.k === "commute") continue;   // not for a Commute block itself
       const place = eventPlace(ev, remembered);
       if (!place || isHome(place, home)) continue;
       const before = onDay.filter((x) => x !== ev && x.s < ev.s), last = before[before.length - 1] || null;
@@ -198,6 +208,37 @@
       const s = Math.min(ends.length ? Math.max(...ends) : winStart, ev.s - SUGG_FLOOR * M);
       if (before.some((x) => x.e > ev.s)) continue;   // an earlier plan still runs when this one starts (overlap): no trip to suggest
       out.push({ key: suggestionKey(ev), kind: "commute", title: "Commute", s, e: ev.s, why: "To " + clean(ev.title), forId: ev.id });
+    }
+    return out.concat(tripHome({ day, onDay, remembered, home, tz, to: out })).sort((a, b) => a.s - b.s || a.e - b.e);
+  }
+  /** d67 (Junyan, 2026-11-25: "67 yes"): the trip home. After a plan at a place away from Home, when the next plan that day is at Home or has
+      no place (or nothing else is planned), a Commute for the way home: it starts at the first free moment at or after that plan ends
+      (a plan that sits right after it is skipped over), runs 30 minutes, ends when the next plan starts, and is left out under 15 minutes.
+      None when the next plan is at another away place (its "To X" covers that) or at the same one, when a Commute block already sits
+      between the two, when what sits right after has a place of its own (a Home plan: he is there already; another place: that plan's
+      own trip is the one), or when it would overlap a suggestion already made. `to` holds the "To X" suggestions. */
+  function tripHome({ day, onDay, remembered, home, tz, to }) {
+    const M = 60000, dayEnd = C().instant(C().addDays(day, 1), 0, tz), plans = onDay.filter((x) => x.k !== "commute"), out = [];
+    for (const a of plans) {
+      const place = eventPlace(a, remembered);
+      if (!place || isHome(place, home)) continue;   // only after a plan at a place away from Home
+      const next = plans.find((x) => x !== a && x.s >= a.e) || null, nextPlace = next ? eventPlace(next, remembered) : null;
+      if (nextPlace && !isHome(nextPlace, home)) continue;   // the next plan is at an away place (the same or another): no trip home
+      if (onDay.some((x) => x.k === "commute" && x.s >= a.s && (!next || x.s < next.s))) continue;   // a Commute block already sits between
+      let s = a.e, atPlace = false;
+      for (let moved = true; moved && !atPlace;) {
+        moved = false;
+        for (const x of onDay) {
+          if (x === a || !(x.s <= s && x.e > s)) continue;
+          if (x.k !== "commute" && eventPlace(x, remembered)) { atPlace = true; break; }   // what sits right after has a place: he is there, or its own trip covers it
+          s = x.e; moved = true;
+        }
+      }
+      if (atPlace) continue;
+      const later = onDay.filter((x) => x.s > s).map((x) => x.s);
+      const e = Math.min(s + SUGG_MIN * M, later.length ? Math.min(...later) : Infinity, dayEnd);
+      if (e - s < SUGG_FLOOR * M || to.concat(out).some((t) => t.s < e && t.e > s)) continue;   // under 15 minutes, or on top of a suggestion already made
+      out.push({ key: suggestionKey(a, "cm_h"), kind: "commute", title: "Commute", s, e, why: "Home", forId: a.id });
     }
     return out;
   }

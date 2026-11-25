@@ -91,7 +91,7 @@ try {
       const open = async (title) => {
         if (phone && await page.evaluate(() => document.body.classList.contains("popen"))) { await page.evaluate(() => document.querySelector("#scrim").click()); await sleep(400); }
         for (let i = 0; i < 14; i++) {
-          const el = page.locator(`.ev:has-text("${title}")`).first();
+          const el = page.locator(`.ev:not(.ghost):has-text("${title}")`).first();
           const inView = await el.count() && await el.evaluate((n) => { const r = n.getBoundingClientRect(); return r.width > 0 && r.right > 0 && r.left < innerWidth; });
           if (inView) { await el.scrollIntoViewIfNeeded(); await el.click(); await sleep(400); await page.waitForFunction(() => !/Looking up/.test(document.querySelector("#cmBox")?.innerText || "x"), null, { timeout: 5000 }).catch(() => {}); await sleep(500); return true; }
           await page.evaluate(() => document.querySelector("#next").click()); await sleep(400);   // the phone hides the arrows; this is the same step

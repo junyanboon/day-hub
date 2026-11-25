@@ -29,6 +29,8 @@ const KEY = { "X-Quest-Key": "test", "content-type": "application/json" };
 
 const EV = (id, title, s, e, x = {}) => ({ id, calId: "joint", title, start: s, end: e, allDay: false, htmlLink: "https://calendar.google.com", ...x });
 const SEED = [
+  // today (the clock is 10:00 am Wed 25th): a plan at 9:30 am with a place, so its Commute suggestion (9:00 to 9:30) and the 9:00 to 9:30 Domestic are both over already (d68, d70)
+  EV("ct1", "Early meeting", "2026-11-25T14:30:00Z", "2026-11-25T15:00:00Z", { location: "4 Early St, Toronto" }),
   // Thursday 26th
   EV("cs1", "Studio hour 1", "2026-11-26T13:00:00Z", "2026-11-26T14:00:00Z", { location: "9 Park Rd, Toronto" }),
   EV("cs2", "Studio hour 2", "2026-11-26T14:00:00Z", "2026-11-26T14:30:00Z", { location: "9 Park Rd, Toronto" }),   // same place as the plan before: none
@@ -86,7 +88,8 @@ try {
       await page.addInitScript(() => { localStorage.setItem("quest-key", "test"); });
       const load = async () => { await page.goto(URL_); await page.waitForSelector(".ev", { state: "attached" }); await sleep(900); };
       const goDay = async (d) => { await page.evaluate((x) => goTo(x, false), d); await sleep(500); };
-      const sugg = (day) => page.evaluate((d) => S.autoG.filter((g) => g.kind === "commute" && g.id.endsWith(":" + d)).map((g) => ({ id: g.id, why: g.why, s: g.s, e: g.e, calId: g.calId, title: g.title })), day);
+      const sugg = (day) => page.evaluate((d) => S.autoG.filter((g) => g.kind === "commute" && g.why !== "Home" && g.id.endsWith(":" + d)).map((g) => ({ id: g.id, why: g.why, s: g.s, e: g.e, calId: g.calId, title: g.title })), day);
+      const homeSugg = (day) => page.evaluate((d) => S.autoG.filter((g) => g.kind === "commute" && g.why === "Home" && g.id.endsWith(":" + d)).map((g) => ({ id: g.id, s: g.s, e: g.e, calId: g.calId, title: g.title })), day);
       const whys = async (day) => (await sugg(day)).map((g) => g.why);
       const toastText = () => page.evaluate(() => document.querySelector("#toast")?.innerText || "");
       const tap = async (sel) => { const el = page.locator(sel).first(); await el.scrollIntoViewIfNeeded(); await el.click(); };
@@ -123,6 +126,12 @@ try {
       check(`${label}: no directions, places-search, weather or Google request while suggestions are on screen`, calls.length === 0, calls.join(" | "));
       check(`${label}: the page's own GET /quest/places was asked exactly once`, reqs.filter((u) => u === "GET " + BASE + "/quest/places").length === 1, reqs.filter((u) => /quest\/places/.test(u)).join(" | "));
 
+      // 1b. d68 and d70: today's earlier suggestions stay until the day ends
+      const today = await sugg("2026-11-25");
+      check(`${label}: d68: today's Commute suggestion before the 9:30 am plan is still shown at 10:00 am`, today.length === 1 && today[0].why === "To Early meeting" && today[0].e === Date.parse("2026-11-25T14:30:00Z") && today[0].e < Date.parse(NOW), JSON.stringify(today));
+      const domToday = await page.evaluate(() => { const g = S.autoG.find((x) => x.id === "auto:domestic:2026-11-25"); return g && { s: g.s, e: g.e, why: g.why }; });
+      check(`${label}: d70: today's Domestic is the earliest free 30 minutes (9:00 to 9:30 am), still shown after it has passed`, !!domToday && domToday.s === Date.parse("2026-11-25T14:00:00Z") && domToday.e === Date.parse("2026-11-25T14:30:00Z") && domToday.e < Date.parse(NOW) && domToday.why === "Your first free 30 min", JSON.stringify(domToday));
+
       // 2. a failed places load: quiet, Location-based ones still draw, name-based ones do not
       const p2 = await ctx.newPage(); placesFail = true;
       await p2.clock.install({ time: new Date(NOW) });
@@ -130,7 +139,7 @@ try {
       await p2.route("**/quest/places", (route) => route.request().method() === "GET" ? route.fulfill({ status: 500, contentType: "application/json", headers: { "access-control-allow-origin": "*" }, body: JSON.stringify({ error: "the server said no" }) }) : route.continue());
       await p2.addInitScript(() => { localStorage.setItem("quest-key", "test"); });
       await p2.goto(URL_); await p2.waitForSelector(".ev", { state: "attached" }); await sleep(900);
-      const w2 = await p2.evaluate(() => S.autoG.filter((g) => g.kind === "commute" && g.id.endsWith(":2026-11-26")).map((g) => g.why));
+      const w2 = await p2.evaluate(() => S.autoG.filter((g) => g.kind === "commute" && g.why !== "Home" && g.id.endsWith(":2026-11-26")).map((g) => g.why));
       const bad2 = await p2.evaluate(() => !!document.querySelector("#toast.bad") || /places/i.test(document.querySelector("#toast")?.innerText || ""));
       check(`${label}: places server down: the Location-based suggestions still draw (Home is unknown, so the Home plan too), the name-based one does not, and no error toast`, JSON.stringify(w2) === JSON.stringify(["To Studio hour 1", "To Dentist", "To Dinner at home"]) && !bad2, JSON.stringify(w2));
       await p2.close(); placesFail = false;
@@ -155,6 +164,25 @@ try {
       check(`${label}: ...and only now is Google asked (directions for this block)`, reqs.filter((u) => /commute\/directions/.test(u)).length >= 1);
       const walk = await page.evaluate(() => document.querySelector('#cmBox .chip[data-v="commute"]')?.getAttribute("aria-pressed"));
       check(`${label}: it starts as Walk`, walk === "true", String(walk));
+      await closeSheet();
+
+      // 3b. d67: the trip home. Tutoring (away, ends 4 pm) is followed by Dinner at home at 5 pm: 4:00 to 4:30 pm, why "Home"
+      const tripH = await homeSugg("2026-11-26");
+      check(`${label}: Thursday has one trip home: 30 minutes from when Tutoring ends, before Dinner at home, why "Home"`, tripH.length === 1 && tripH[0].s === Date.parse("2026-11-26T21:00:00Z") && tripH[0].e === Date.parse("2026-11-26T21:30:00Z") && tripH[0].calId === "joint" && tripH[0].title === "Commute", JSON.stringify(tripH));
+      await goDay("2026-11-26");
+      check(`${label}: ...drawn dashed like the other suggestions`, await page.evaluate((id) => { const el = document.querySelector(`.ev.ghost[data-key="g|joint|${id}"]`); return !!el && getComputedStyle(el).borderTopStyle === "dashed"; }, tripH[0].id));
+      const beforeHome = reqs.filter((u) => CALL.test(u)).length;
+      await closeSheet(); await goDay("2026-11-26");
+      await tap(`.ev[data-key="g|joint|${tripH[0].id}"]`); await sleep(500);
+      check(`${label}: opening it says Suggested by the calendar: Home`, /Suggested by the calendar: Home/.test(flat(await page.evaluate(() => document.querySelector("#pbody").innerText))));
+      await tap("#pAcc"); await sleep(1500);
+      const mkH = (await serverEvents()).find((e) => e.title === "Commute" && Date.parse(e.start) === tripH[0].s);
+      check(`${label}: Accept wrote a Commute block of the same times to Joint Plans, and the suggestion is gone`, !!mkH && mkH.calId === "joint" && Date.parse(mkH.end) === tripH[0].e && (await homeSugg("2026-11-26")).length === 0, JSON.stringify(mkH));
+      await closeSheet(); await goDay("2026-11-26");
+      await tap(`.ev[data-key="e|joint|${mkH.id}"]`); await sleep(600);
+      await page.waitForFunction(() => !/Looking up/.test(document.querySelector("#cmBox")?.innerText || "x"), null, { timeout: 5000 }).catch(() => {}); await sleep(600);
+      const fromH = flat(await page.evaluate(() => document.querySelector("#cmVfrom")?.innerText || "")), toH = flat(await page.evaluate(() => document.querySelector("#cmVto")?.innerText || ""));
+      check(`${label}: the trip home block's panel: From is the place he is leaving (Tutoring's), To is Home`, /7 Hill St, Toronto/.test(fromH) && /^Home\b/.test(toH), fromH + " | " + toH);
       await closeSheet();
 
       // 4. Skip: hides it, and it stays hidden after a reload

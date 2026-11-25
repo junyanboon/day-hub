@@ -56,7 +56,7 @@ try {
     const open = async (title) => {
       if (phone && await page.evaluate(() => document.body.classList.contains("popen"))) { await page.evaluate(() => document.querySelector("#scrim").click()); await sleep(400); }   // the phone sheet covers the cards
       for (let i = 0; i < 6; i++) {
-        const el = page.locator(`.ev:has-text("${title}")`).first();
+        const el = page.locator(`.ev:not(.ghost):has-text("${title}")`).first();
         if (await el.count() && await el.isVisible()) { await el.click(); await sleep(400); return true; }
         await page.click("#next"); await sleep(300);
       }
