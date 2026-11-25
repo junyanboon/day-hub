@@ -510,9 +510,9 @@ test("d29: the Saved places chips show Home first, then kept places, then the Tr
   const remembered = { id: "r1", name: "DM", category: "commute-for", address: "a" };
   const noPin = { id: "n1", name: "Nothing", category: "place", address: "", lat: null };
   const chips = K.savedChips([home, remembered, ...trips, noPin, kept], home);
-  assert.deepEqual(chips.map((p) => p.id), ["h", "k1", "t0", "t1", "t2", "t3", "t4", "t5", "t6", "t7", "t8", "t9", "t10"].slice(0, 13), "Home, then the kept one, then 11 trips places");
+  assert.deepEqual(chips.map((p) => p.id), ["h", "k1", "t0", "t1", "t2", "t3", "t4", "t5", "t6", "t7", "t8", "t9", "t10", "t11"], "Home, then the kept one, then the 12 Trips places");
   assert.equal(chips[0].name, "Home");
-  assert.equal(chips.filter((p) => p.id !== "h").length, 12, "12 saved places at most");
+  assert.equal(chips.filter((p) => p.id !== "h").length, 13, "the kept place never pushes a Trips place out of its 12");
   assert.equal(chips.some((p) => p.id === "r1" || p.id === "n1"), false, "remembered-for and pin-less places stay out");
   assert.deepEqual(K.savedChips([], null), []); assert.deepEqual(K.savedChips(null, null), []);
   assert.deepEqual(K.savedChips(trips.slice(0, 2), null).map((p) => p.id), ["t0", "t1"], "no Home saved: no Home chip");

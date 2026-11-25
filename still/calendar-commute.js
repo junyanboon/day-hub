@@ -219,10 +219,10 @@
     return places.some((p) => p && keyText(p.name) === n && keyText(p.address) === a);
   }
   /** The Saved places chips of a From or To box: Home first, then the places kept from here, then the Trips places as before
-      (12 saved places at most). Remembered-for places, the Home card itself and places with no address and no pin stay out. */
+      (the Trips places keep their 12). Remembered-for places, the Home card itself and places with no address and no pin stay out. */
   function savedChips(places, home) {
     const all = (Array.isArray(places) ? places : []).filter((p) => p && p.category !== "commute-for" && p.category !== "home" && p !== home && (p.address || p.lat != null));
-    const rest = [...all.filter((p) => p.category === "saved"), ...all.filter((p) => p.category !== "saved")].slice(0, 12);
+    const rest = [...all.filter((p) => p.category === "saved"), ...all.filter((p) => p.category !== "saved").slice(0, 12)];
     return [...(home ? [{ id: home.id, name: "Home" }] : []), ...rest];
   }
   /** How a place reads on a From or To row: the name over its address (Home alone, a typed place once). */

@@ -2721,6 +2721,8 @@ function makePlaceList({ id, rowAttr, nearOf, ready = () => true }) {
     clearTimeout(L.timer);
     Object.assign(L, { side, session: Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2), q: "", items: [], stopped: false, seq: L.seq + 1, busy: false });
   };
+  /** Hide the rows but keep the session (he is still in the field): Enter, a tap elsewhere, Tab. */
+  L.hide = () => { clearTimeout(L.timer); Object.assign(L, { items: [], stopped: false, seq: L.seq + 1 }); L.draw(); };
   L.close = () => { clearTimeout(L.timer); Object.assign(L, { side: "", q: "", items: [], stopped: false, seq: L.seq + 1, busy: false }); };
   /** He typed: from 3 characters and a 300 ms pause, ask the server for places. */
   L.type = (side, text) => {
@@ -3237,14 +3239,15 @@ function commuteWire() {
     if (e.key === "Escape" && document.querySelector(".cmmodal")) { cmClose(); return; }
     if (e.key !== "Enter") return;
     const id = e.target.id;
-    if (isLocInput(e.target)) { LOC.close(); LOC.draw(); }   // Enter keeps the typed text, as before
+    if (isLocInput(e.target)) LOC.hide();   // Enter keeps the typed text, as before
     else if (id === "cmTo" || id === "cmFromIn") { e.preventDefault(); if (S.ev) cmGo(S.ev, id === "cmTo" ? "to" : "from"); }
     else if (id === "cmHomeIn") { e.preventDefault(); const b = $('[data-cm="home"]'); if (b) b.click(); }
   });
   document.addEventListener("input", (e) => { const id = e.target.id; if (id === "cmTo" || id === "cmFromIn") cmSugType(id === "cmTo" ? "to" : "from", e.target.value); else if (isLocInput(e.target)) LOC.type("loc", e.target.value); });
   /* the Location row: a fresh session each time the field gets focus; Enter keeps what he typed and closes the list; a tap anywhere else closes it */
   document.addEventListener("focusin", (e) => { if (isLocInput(e.target) && !e.target.disabled) { LOC.open("loc"); LOC.draw(); } });
-  document.addEventListener("pointerdown", (e) => { if ((LOC.items.length || LOC.stopped) && !e.target.closest("#locSug") && !isLocInput(e.target)) { LOC.close(); LOC.draw(); } });
+  document.addEventListener("pointerdown", (e) => { if ((LOC.items.length || LOC.stopped) && !e.target.closest("#locSug") && !isLocInput(e.target)) LOC.hide(); });
+  document.addEventListener("focusout", (e) => { if (isLocInput(e.target) && e.relatedTarget && !e.relatedTarget.closest("#locSug")) LOC.hide(); });
   document.addEventListener("click", (e) => { const t = e.target.closest('[data-loc="sug"]'); if (t) locPick(t.dataset.pid); });
   document.addEventListener("change", async (e) => {
     const t = e.target; if (t.id !== "cmFile" || !t.files || !t.files[0] || !S.ev) return;
