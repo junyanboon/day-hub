@@ -14,7 +14,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>Calendar</title>
 <script src="calendar-core.js?v=34"></script>
-<script src="calendar-commute.js?v=4"></script>
+<script src="calendar-commute.js?v=5"></script>
 <script src="cards-vault.js?v=2"></script><script src="cards.js?v=7"></script>
 <script src="quest-trips.js?v=20261121a" data-helpers></script>
 <script>
@@ -361,15 +361,17 @@ button.cmr{border:1px solid var(--line);background:var(--raise);border-radius:10
 .cmsug{display:flex;flex-direction:column}.cmsug button{display:flex;align-items:center;gap:8px;min-height:44px;width:100%;text-align:left;border:0;border-top:1px solid var(--line);background:none;color:inherit;font:inherit;padding:6px 4px}.cmsug button:hover{background:var(--raise)}.cmsug small{display:block;color:var(--soft);font-size:12px}.cmsug .cmstop{color:var(--soft);padding:6px 4px}.locsug:empty{display:none}.locsug button{padding:6px 14px}.locsug .cmstop{padding:6px 14px}
 .cmask{display:flex;flex-direction:column;gap:6px}.cmask input[type=text],.cmask input:not([type]),.cmask textarea,.cmmodal textarea{width:100%;background:var(--raise);border:1px solid var(--line);border-radius:10px;padding:8px 10px}
 .cmrem{display:flex;align-items:center;gap:8px}
-.cmwx{display:flex;align-items:center;gap:12px;min-height:72px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--raise)}.cmwx .wxi{font-size:34px;line-height:1;flex:none}.cmwx .wxb{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}.cmwx .big{font-size:22px;font-weight:700;line-height:1.15}.cmwx .wxtip{font-weight:600}
+.cmwx{display:flex;align-items:center;gap:10px;padding:6px 10px;border:1px solid var(--line);border-radius:10px;background:var(--raise)}.cmwx .wxi{font-size:22px;line-height:1;flex:none}.cmwx .wxb{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}.cmwx .wxl{display:flex;align-items:baseline;gap:4px 8px;flex-wrap:wrap}.cmwx .big{font-size:16px;font-weight:700;line-height:1.2}.cmwx .meta{font-size:12px}.cmwx .wxtip{font-weight:600}
 .locin{width:100%;background:var(--raise);border:1px solid var(--line);border-radius:10px;padding:8px 10px}
 .cmnote{display:flex;align-items:center;gap:8px;flex-wrap:wrap;border-top:1px solid var(--line);padding-top:6px}.cmnote span{flex:1;min-width:0;overflow-wrap:anywhere}
 .cmbox .chip .cmm{opacity:.85;font-variant-numeric:tabular-nums}.cmbest{display:inline-block;margin-left:4px;padding:1px 6px;border-radius:8px;font-size:10px;font-weight:700;background:var(--k-commute);color:var(--bg)}
-.cmchk{display:flex;flex-direction:column;gap:2px;border-left:4px solid var(--k-commute);padding:6px 10px;background:var(--raise);border-radius:8px}.cmchk small{color:var(--soft)}
+.cmchecked{font-size:12px;color:var(--soft);margin-top:2px}.cmlink{border:0;background:none;color:inherit;font:inherit;text-decoration:underline;padding:8px 2px;margin:-8px 0;cursor:pointer}.cmlink:disabled{opacity:.6;text-decoration:none;cursor:default}
+.cmfold{display:flex;flex-direction:column;gap:6px}.cmfh,.cmatog{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;text-align:left;color:inherit;font:inherit}.cmfh{min-height:44px;border:1px solid var(--line);background:var(--raise);border-radius:10px;padding:6px 10px}.cmfh:hover{background:var(--raise2)}.cmfh .t{font-weight:600}
+.cmatog{border:0;background:none;padding:0;min-height:32px}.cmatog>span:first-child{flex:1;min-width:0}.cmchev{flex:none;color:var(--soft);transition:transform .15s}.cmchev::before{content:"\25B8"}[aria-expanded="true"]>.cmchev{transform:rotate(90deg)}.cmadet{font-size:12px;color:var(--soft);margin-top:2px;overflow-wrap:anywhere}.cmalert .cmatog b{display:block}.cmalert .cmatog small{display:block}
 .cmleave{display:flex;flex-direction:column;gap:2px}.cmleave .lbl{margin:0}.cmleave .big{font-size:28px;font-weight:700;line-height:1.1;display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}.cmshift{font-size:13px;font-weight:600;color:var(--soft)}
 .cmsteps{list-style:none;margin:6px 0 0;padding:0;display:flex;flex-direction:column;gap:6px}.cmsteps li{display:flex;gap:8px;align-items:flex-start}.cmsteps li>div{flex:1;min-width:0;overflow-wrap:anywhere}.cmsteps b{display:block;font-weight:600}.cmsteps small,.cmalert small{display:block;color:var(--soft);font-size:12px}.cmsteps .sm{white-space:nowrap;color:var(--soft);font-size:12px}.cmsteps .si,.cmalert .si{width:22px;text-align:center}
 .cmalert{display:flex;gap:8px;align-items:flex-start;padding:6px 8px;border:1px solid var(--line);border-radius:10px;background:var(--raise)}.cmalert>div{flex:1;min-width:0;overflow-wrap:anywhere}.cmalert.gone{opacity:.6}.cmalert.gone b{text-decoration:line-through}.cmgrp{margin:6px 0 0}
-.cmquick{display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap;border:1px solid var(--k-commute);border-radius:10px;padding:6px 8px}.cmquick small{display:block;color:var(--soft);font-size:12px}.cmlast{margin-top:-4px}
+.cmquick{display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap;border:1px solid var(--k-commute);border-radius:10px;padding:6px 8px}.cmquick small{display:block;color:var(--soft);font-size:12px}
 .cmmodal{position:fixed;top:0;left:0;right:0;height:100%;z-index:70;display:flex;align-items:center;justify-content:center;padding:16px;background:color-mix(in srgb,var(--bg) 70%,transparent)}
 .cmcard{width:min(520px,100%);max-height:100%;overflow:auto;display:flex;flex-direction:column;gap:10px;background:var(--bar);border:1px solid var(--line);border-radius:14px;padding:12px}
 .cmcard .r{display:flex;align-items:center;gap:8px}.cmcard img{max-width:100%;border-radius:10px}.cmfig{margin:0;display:flex;flex-direction:column;gap:6px}
@@ -1026,7 +1028,7 @@ if (TOUCH) for (const g of ["gesturestart", "gesturechange"]) document.addEventL
    which shows this build, the phone's answers and a log of every day change with its cause. Until then CalHook.on is
    null and diag() does nothing. BUILD names this copy of the page, so a screenshot proves which copy ran: change it on
    every change to this page or calendar-readout.js (the date plus a letter). */
-const BUILD = "2026-11-25b remove a kept place";
+const BUILD = "2026-11-25c tidy commute panel";
 const CalHook = window.CalHook = { BUILD, on: null };
 const diag = (kind, msg) => { if (CalHook.on) CalHook.on(kind, msg); };
 /* The iPhone home screen app's fit (2026-11-12): html.hs in a home screen app on touch, html.hsfill and --hsgap when
@@ -1724,6 +1726,7 @@ function panel(tab, ev) {
   if (tab !== "event") clearDraft();
   LOC.close();   // a Location list never carries over to another panel
   S.tab = tab; S.ev = ev || null; S.form = null;
+  cmFoldReset(tab, ev);   // a panel opens: the folds of the Commute box start over (the same block drawn again keeps them)
   paintPanel(true);
   if (tab !== "now" || ev) document.body.classList.add("popen");
   document.body.classList.remove("nopanel");
@@ -2708,7 +2711,7 @@ function wirePair() {
    The panel of a Commute block: Going by, From and To, the ask when there is no address, a link to Google Maps, a map he
    can move (Leaflet and OpenStreetMap, as the Trips map) and photo notes kept in still-api /quest/commute/*. The rules
    are in calendar-commute.js (tested in still/test/commute.test.mjs). Slice 2 adds the time to leave, the way there step
-   by step, Heads up and Check now, all from the server's directions answer (below). */
+   by step, Heads up and the Checked line, all from the server's directions answer (below). */
 /* commute:start */
 const CMK = { to: "cal-commute-to", from: "cal-commute-from", spots: "cal-commute-spots" };
 /** One places list, shared by the Commute box (CMS) and the event's Location row (LOC): each has its own state, its own element and its
@@ -2752,7 +2755,7 @@ const CMS = makePlaceList({ id: "cmSug", rowAttr: 'data-cm="sug"', ready: () => 
   nearOf: (side) => { const ev = S.ev, other = ev && (side === "from" ? cmTarget(ev) : cmFrom(ev)); return other && (other.lat != null && other.lng != null ? other : cmSpot(other)); } });
 /** The Location row of the phone sheet: a point is known only from Home's saved coordinates (nobody is asked just for the bias). */
 const LOC = makePlaceList({ id: "locSug", rowAttr: 'data-loc="sug"', nearOf: () => { const h = cmHome(); return h && h.lat != null && h.lng != null ? h : null; } });
-const CM = { dir: {}, places: null, loading: false, notes: null, edit: "", editFrom: false, rm: false, key: "", run: 0, routes: {}, loaded: {}, up: false };
+const CM = { noPin: {}, dir: {}, places: null, loading: false, notes: null, edit: "", editFrom: false, rm: false, key: "", run: 0, routes: {}, loaded: {}, up: false };
 const cmGet = (k) => { try { const v = JSON.parse(store.get(k) || "{}"); return v && typeof v === "object" ? v : {}; } catch { return {}; } };
 const cmSet = (k, key, val) => { const o = cmGet(k); if (val) o[key] = val; else delete o[key]; store.set(k, JSON.stringify(o)); };
 const cmHome = () => (CM.places || []).find((p) => p.category === "home" || /^home$/i.test(p.name || "")) || null;
@@ -2810,8 +2813,8 @@ const cmCanEdit = (ev) => !!calOf(ev.calId).writable;
 /* ---------- slice 2: directions (Junyan, 2026-11-24, d1 to d9) ----------
    Everything comes from still-api /quest/commute/directions (Google's key lives on the server, never here). CM.dir keeps one
    answer per block: res (the server's answer), got (when this page received it), prev (the answer before it, for "New since"),
-   checked (set by Check now). The last answer of each block is also kept in this browser (cal-commute-last, 2 days) only so
-   the first Check now after a reload can say what is new. No answer means none of the directions parts is drawn. */
+   checked (set by a Check again). The last answer of each block is also kept in this browser (cal-commute-last, 2 days) only so
+   the first Check again after a reload can say what is new. No answer means none of the directions parts is drawn. */
 const WAYNAME = { commute: "Walk", transit: "Transit", drive: "Drive" };
 const cmFmt = (ms) => (Number.isFinite(ms) ? C.hm(C.wall(ms, S.tz).min) : "");
 const cmLast = () => cmGet("cal-commute-last");
@@ -2826,13 +2829,13 @@ const cmEnd = (o) => ({ name: o.name || "", address: o.address || "", lat: o.lat
 /** The inputs a directions answer needs, or null: no To, no From address, a block that has ended, or a day too far off. */
 function cmDirInput(ev) {
   const t = cmTarget(ev), from = cmFrom(ev);
-  if (CalCommute.needsAsk(t) || !t.address || !from || !from.address || !(ev.e > Date.now())) return null;
+  if (CalCommute.needsAsk(t) || !t.address || !from || !from.address || !Number.isFinite(ev.e) || CalCommute.blockEnded(ev.e, Date.now())) return null;
   const arrive = CalCommute.arriveTarget(ev, eventsFor(cmDay(ev), cmDay(ev)), S.tz);
   if (!(arrive.at > Date.now() - 3600000) || arrive.at > Date.now() + 14 * 86400000) return null;
   return { t, from, arrive, sig: [from.address, t.address, Math.floor(arrive.at / 60000)].join("|") };
 }
 const cmDirOf = (ev) => CM.dir[keyOf(ev)] || null;
-/** Ask the server. fresh skips its saved answer (Check now); auto marks the page's own once-only check. */
+/** Ask the server. fresh skips its saved answer (Check again); auto marks the page's own once-only check. */
 async function cmDirections(ev, { fresh = false, auto = false } = {}) {
   const key = keyOf(ev), inp = cmDirInput(ev); if (!inp) return;
   const d = CM.dir[key] || (CM.dir[key] = { res: null, got: 0, prev: null, checked: null, sig: "", autoDone: false, loading: false, error: "" });
@@ -2853,7 +2856,7 @@ async function cmDirections(ev, { fresh = false, auto = false } = {}) {
       if (Number.isFinite(lv) && d.got >= lv - 3600000) d.autoDone = true;   // a check he pressed inside that hour counts as the one
     }
     if (res.state === "ok") cmRemember(key, res, inp.sig);
-  } catch (e) { if (d.seq !== seq) return; d.error = "Directions could not be loaded. Check your connection and try Check now."; }
+  } catch (e) { if (d.seq !== seq) return; d.error = "Directions could not be loaded. Check your connection and try again."; }
   d.loading = false;
   if (S.ev && keyOf(S.ev) === key) cmPaint();
 }
@@ -2874,53 +2877,83 @@ const cmSteps = (w, mode) => {
 };
 const CM_SRC = { ttc: "TTC alerts", roads: "road closures", weather: "the weather" };
 const CM_AICON = { ttc: "🚇", closure: "🚧", weather: "🌦" };
-const cmAlert = (a) => `<div class="cmalert"><span class="si" aria-hidden="true">${CM_AICON[a.kind] || "⚠"}</span><div><b>${esc(a.title)}</b>${a.detail ? `<small>${esc(a.detail)}</small>` : ""}</div></div>`;
-/** Heads up: the alerts that touch this way, grouped New / Still on / Cleared once there is an earlier check to compare with. */
-function cmHeadsUp(d, mode) {
+/** Which folds are open in the panel that is open now: the way there starts closed and Heads up open every time a panel opens; a repaint draws
+    from here, so it never closes a fold he opened or opens one he closed. alerts holds the Heads up rows he tapped open (by alert id). */
+const CM_FOLD = { key: "", way: false, heads: true, alerts: {} };
+/** A panel opens (another block, or the panel closed and opened again): the folds go back to their start. The same block drawn again keeps them. */
+function cmFoldReset(tab, ev) {
+  const key = tab === "event" && ev ? keyOf(ev) : "";
+  if (key && key === CM_FOLD.key) return;
+  Object.assign(CM_FOLD, { key, way: false, heads: true, alerts: {} });
+}
+const CM_AUTO_NOTE = "While this panel is open, it checks once in the hour before you leave.";
+/** A fold: a real button with aria-expanded over the body it opens. */
+const cmFold = (id, label, open, body) => `<div class="cmfold" id="${id}"><button type="button" class="cmfh" data-cm="fold" data-v="${id === "cmWay" ? "way" : "heads"}" aria-expanded="${open}" aria-controls="${id}Body"><span class="t">${esc(label)}</span><span class="cmchev" aria-hidden="true"></span></button><div id="${id}Body" ${open ? "" : "hidden"}>${body}</div></div>`;
+/** One Heads up row: the title and one short line; a long description waits behind a tap on that row (shown as given). */
+function cmAlert(a, mode, way, gone) {
+  const K = CalCommute, ln = K.alertLine(a, { onRoute: K.onRoute(a, way, mode) }), open = !!CM_FOLD.alerts[a.id], cls = gone ? "cmalert gone" : "cmalert";
+  const head = `<b>${esc(a.title)}</b>${ln.short ? `<small>${esc(ln.short)}</small>` : ""}`;
+  const mid = ln.expandable ? `<button type="button" class="cmatog" data-cm="alert" data-id="${esc(a.id)}" aria-expanded="${open}"><span>${head}</span><span class="cmchev" aria-hidden="true"></span></button><div class="cmadet" ${open ? "" : "hidden"}>${esc(ln.detail)}</div>` : head;
+  return `<div class="${cls}"><span class="si" aria-hidden="true">${CM_AICON[a.kind] || "⚠"}</span><div>${mid}</div></div>`;
+}
+/** Heads up: a fold (open at first) with the alerts that touch this way, grouped New / Still on / Cleared once there is an earlier check to compare
+    with. "" when nothing is on, nothing was cleared and no source is down. */
+function cmHeadsUp(d, mode, way) {
   const res = d.res, K = CalCommute, now = K.alertsFor(res.alerts, mode);
   const down = (res.sourcesDown || []).filter((x) => (x === "ttc" ? mode === "transit" : x === "roads" ? mode === "drive" : true)).map((x) => CM_SRC[x]).filter(Boolean);
-  let h = `<div class="field"><p class="lbl" style="margin:0">Heads up</p>`;
   const g = d.checked && d.prev ? K.groupAlerts(K.alertsFor(d.prev.alerts, mode), now) : null;
+  if (!now.length && !down.length && !(g && g.cleared.length)) return "";
+  const row = (a, gone) => cmAlert(a, mode, way, gone);
+  let h = "";
   if (g) {
     const when = cmFmt(d.prev.checkedAt);
-    if (g.added.length) h += `<p class="lbl cmgrp">New since ${esc(when)}</p>${g.added.map(cmAlert).join("")}`;
-    if (g.still.length) h += `<p class="lbl cmgrp">Still on</p>${g.still.map(cmAlert).join("")}`;
-    if (g.cleared.length) h += `<p class="lbl cmgrp">Cleared</p>${g.cleared.map((a) => cmAlert(a).replace('class="cmalert"', 'class="cmalert gone"')).join("")}`;
+    if (g.added.length) h += `<p class="lbl cmgrp">New since ${esc(when)}</p>${g.added.map((a) => row(a)).join("")}`;
+    if (g.still.length) h += `<p class="lbl cmgrp">Still on</p>${g.still.map((a) => row(a)).join("")}`;
+    if (g.cleared.length) h += `<p class="lbl cmgrp">Cleared</p>${g.cleared.map((a) => row(a, true)).join("")}`;
     if (!now.length && !g.cleared.length) h += `<div class="meta">No alerts on this trip.</div>`;
     else if (!now.length) h += `<div class="meta">Nothing on now.</div>`;
-  } else h += now.length ? now.map(cmAlert).join("") : `<div class="meta">No alerts on this trip.</div>`;
+  } else h += now.length ? now.map((a) => row(a)).join("") : `<div class="meta">No alerts on this trip.</div>`;
   if (down.length) h += `<div class="meta">Could not reach: ${esc(down.join(", "))}.</div>`;
-  return h + "</div>";
+  return cmFold("cmHeads", `Heads up · ${now.length}`, CM_FOLD.heads, h);
 }
-/** Everything the directions answer adds to the box: {chips, leave, way, heads, check}. Empty strings when there is no answer. */
+/** The one quiet line under Leave by: when it was checked and a link-style "Check again" (it replaces the blue banner, the big button and the second line).
+    A failed re-check shows its error right under it. */
+function cmChecked(d, checkedAt, note) {
+  const line = CalCommute.checkedLine({ at: checkedAt, auto: !!(d.checked && d.checked.auto), fmt: cmFmt });
+  const btn = `<button type="button" class="cmlink" data-cm="check" ${d.loading ? "disabled" : ""}${note ? ` title="${esc(note)}"` : ""}>${d.loading ? "Checking…" : "Check again"}</button>`;
+  return `<div class="cmchecked">${line ? esc(line) + " · " : ""}${btn}</div>${d.error ? `<div class="meta" role="alert">${esc(d.error)}</div>` : ""}`;
+}
+/** The words for a way with no directions (d37): Too far to walk, the monthly stop, or no route (naming the To when the page's own lookup found no spot for it). */
+function cmWayError(ev, d, mode) {
+  const K = CalCommute, way = cmWay(d, mode), err = (d.res.errors || {})[K.WAY[mode]], t = cmTarget(ev);
+  if (way && way.tooFar) return `Too far to walk (${way.km} km).`;
+  if (err === "stopped") return "Directions are off for the rest of the month. They come back on the 1st.";
+  return K.noRouteText({ err, to: K.rowText(t).main, noPin: !!CM.noPin[cmPinKey(t)] && !cmSpot(t) });
+}
+/** Everything the directions answer adds to the box: {leave (with the quiet checked line), way, heads, quick, ways}. Empty strings when there is no answer. */
 function cmDirParts(ev, mode, inp) {
-  const d = cmDirOf(ev), K = CalCommute, out = { leave: "", way: "", heads: "", check: "", banner: "", ways: null };
+  const d = cmDirOf(ev), K = CalCommute, out = { leave: "", way: "", heads: "", quick: "", ways: null };
   if (!inp) return out;
   if (!d || (!d.res && !d.loading && !d.error)) return out;
   if (d.res && d.sig !== inp.sig && d.loading) { out.way = `<div class="meta" role="status">Getting directions…</div>`; return out; }   // never show the answer for an earlier From or To
   if (d.loading && !d.res) { out.way = `<div class="meta" role="status">Getting directions…</div>`; return out; }
-  if (!d.res) { out.way = `<div class="meta">${esc(d.error)}</div><div class="r"><button class="btn" data-cm="check">Check now</button></div>`; return out; }
+  if (!d.res) { out.way = `<div class="meta">${esc(d.error)}</div><div class="r"><button class="btn" data-cm="check">Try again</button></div>`; return out; }
   if (d.res.state !== "ok") { out.way = `<div class="meta" role="status">${esc(d.res.state === "no-key" ? "Directions need the Google key" : d.res.message || "Directions are not available.")}</div>`; return out; }
   const ways = d.res.ways || {}; out.ways = ways;
-  const way = cmWay(d, mode), errs = d.res.errors || {};
-  const checkedAt = d.res.checkedAt, fresh = d.checked && Date.now() - checkedAt < 120000;
-  if (d.checked) out.banner = `<div class="cmchk" role="status"><b>${fresh ? "Checked just now" : "Checked"}, ${esc(cmFmt(checkedAt))}</b>${d.checked.auto ? '<small>Checked by itself, the hour before you leave</small>' : ""}</div>`;
+  const way = cmWay(d, mode), checkedAt = d.res.checkedAt;
   if (cmUsable(way)) {
     const arriveAt = inp.arrive.at, leave = K.leaveBy(way, arriveAt), prevWay = d.checked && d.prev && d.prev.ways ? d.prev.ways[K.WAY[mode]] : null;
     const shift = prevWay && cmUsable(prevWay) ? K.leaveShift(K.leaveBy(prevWay, arriveAt), leave) : "";
-    out.leave = `<div class="cmleave"><span class="lbl">Leave by</span><div class="big">${esc(cmFmt(leave))}${shift ? `<span class="cmshift">${esc(shift)}</span>` : ""}</div><div class="meta">${esc(K.arriveLine(way, inp.arrive, cmFmt))}</div></div>`;
-    out.way = `<div class="field"><p class="lbl" style="margin:0">The way there · ${way.minutes} min${mode === "drive" && way.km ? " · " + way.km + " km" : ""}</p>${cmSteps(way, mode)}</div>`;
-    out.heads = cmHeadsUp(d, mode);
-    const q = d.checked ? K.quickerThan(ways, mode) : null;
-    if (q) out.heads += `<div class="cmquick"><span><b>${WAYNAME[q.chip]} is quicker right now</b><small>${q.by} min quicker than ${WAYNAME[mode].toLowerCase()}</small></span><button class="btn" data-cm="switch" data-v="${q.chip}" ${cmCanEdit(ev) ? "" : "disabled"}>Switch to ${WAYNAME[q.chip]}</button></div>`;
     const auto = !d.autoDone && Number.isFinite(leave) && leave > Date.now();
-    out.check = `<div class="r"><button class="btn pri" data-cm="check" ${d.loading ? "disabled" : ""}>${d.loading ? "Checking…" : "Check now"}</button></div>` +
-      `<div class="meta cmlast">Last checked ${esc(cmFmt(checkedAt))}${auto ? ". While this panel is open, it checks once in the hour before you leave." : ""}</div>${d.error ? `<div class="meta" role="alert">${esc(d.error)}</div>` : ""}`;
+    out.leave = `<div class="cmleave"><span class="lbl">Leave by</span><div class="big">${esc(cmFmt(leave))}${shift ? `<span class="cmshift">${esc(shift)}</span>` : ""}</div><div class="meta">${esc(K.arriveLine(way, inp.arrive, cmFmt))}</div>${cmChecked(d, checkedAt, auto ? CM_AUTO_NOTE : "")}</div>`;
+    out.way = cmFold("cmWay", `The way there · ${way.minutes} min${mode === "drive" && way.km ? " · " + way.km + " km" : ""}`, CM_FOLD.way, cmSteps(way, mode));
+    out.heads = cmHeadsUp(d, mode, way);
+    const q = d.checked ? K.quickerThan(ways, mode) : null;
+    if (q) out.quick = `<div class="cmquick"><span><b>${WAYNAME[q.chip]} is quicker right now</b><small>${q.by} min quicker than ${WAYNAME[mode].toLowerCase()}</small></span><button class="btn" data-cm="switch" data-v="${q.chip}" ${cmCanEdit(ev) ? "" : "disabled"}>Switch to ${WAYNAME[q.chip]}</button></div>`;
     out.leaveAt = leave;
   } else {
-    const e = way && way.tooFar ? `Too far to walk (${way.km} km).` : errs[K.WAY[mode]] === "stopped" ? "Directions are off for the rest of the month. They come back on the 1st." : errs[K.WAY[mode]] || "No directions for this way.";
-    out.way = `<div class="meta">${esc(e)}</div>`;
-    out.check = `<div class="r"><button class="btn pri" data-cm="check" ${d.loading ? "disabled" : ""}>${d.loading ? "Checking…" : "Check now"}</button></div><div class="meta cmlast">Last checked ${esc(cmFmt(checkedAt))}</div>`;
+    out.leave = `<div class="cmleave">${cmChecked(d, checkedAt, "")}</div>`;
+    out.way = `<div class="meta" id="cmNoRoute">${esc(cmWayError(ev, d, mode))}</div>`;
   }
   return out;
 }
@@ -3023,21 +3056,17 @@ function cmPaint() {
   const mode = C.modeOf(ev), t = cmTarget(ev), from = cmFrom(ev), can = cmCanEdit(ev), ask = !CM.editFrom && (CalCommute.needsAsk(t) || CM.edit === keyOf(ev));
   if (!ask && !CM.editFrom) CM.rm = false;   // no box open: no remove mode
   const asking = ask, home = cmHome(), inPlace = ask && !CalCommute.needsAsk(t);   // an ask for a To that is set replaces the To row; the first ask sits under the rows
-  const keep = cmKeepTyped(box);
+  const keep = cmKeepTyped(box), onFold = fo && fo.closest && fo.closest("#cmBox") && fo.dataset && (fo.dataset.cm === "fold" || fo.dataset.cm === "alert") ? { cm: fo.dataset.cm, v: fo.dataset.v || "", id: fo.dataset.id || "" } : null;   // a repaint keeps focus on a fold he is on
   const dis = can ? "" : "disabled";
   const inp = !asking ? cmDirInput(ev) : null, dp = cmDirParts(ev, mode, inp), best = dp.ways && Object.values(dp.ways).filter(cmUsable).length > 1 ? CalCommute.bestWay(dp.ways) : "";
   const chip = ([m, ic, n]) => { const w = dp.ways && dp.ways[CalCommute.WAY[m]]; return `<button class="chip k-commute" data-cm="mode" data-v="${m}" aria-pressed="${m === mode}" ${dis}>${ic} ${n}${cmUsable(w) ? ` <span class="cmm">${w.minutes} min</span>` : ""}${best === m ? ' <small class="cmbest">best way</small>' : ""}</button>`; };
   let h = `<div class="field"><p class="lbl" style="margin:0">Going by</p><div class="chips">${C.MODES.map(chip).join("")}</div></div>`;
   if (CM.places === null || !CM.loaded[keyOf(ev)]) return void (box.innerHTML = h + `<div class="meta">Looking up your places…</div>`);
-  h += dp.banner + dp.leave;
+  h += dp.leave;
   h += `<div class="cmroute">${CM.editFrom ? cmEditBox(ev, "from", t) : cmRow("from", from, can)}` +
     `${inPlace ? cmEditBox(ev, "to", t) : cmRow("to", asking || !t.address ? null : t, can)}</div>`;
-  if (!asking) h += dp.way + dp.heads + dp.check;
-  if (asking) {
-    if (!inPlace) h += cmEditBox(ev, "to", t);
-  } else if (t.address) {
-    h += `<div class="r" id="cmLinks">${cmLinksHtml(ev)}</div>` + cmWxBox(ev);
-  }
+  if (!asking) h += (t.address ? cmWxBox(ev) : "") + dp.heads + dp.quick + dp.way + (t.address ? `<div class="r" id="cmLinks">${cmLinksHtml(ev)}</div>` : "");   // the tidy order (d40): weather, Heads up, the way there, the map buttons
+  else if (!inPlace) h += cmEditBox(ev, "to", t);
   if (!asking && t.address) {
     const mine = (CM.notes && CM.notes.block) || [], past = ((CM.notes && CM.notes.place) || []).filter((n) => n.block !== keyOf(ev));
     h += `<div class="field"><p class="lbl" style="margin:0">Photos and notes</p><div class="r">${can ? '<label class="btn cmfile">Add a photo<input type="file" id="cmFile" accept="image/*" capture="environment" hidden></label>' : ""}<button class="btn" data-cm="note" ${dis}>Add a note</button></div>
@@ -3048,6 +3077,7 @@ function cmPaint() {
   if (!home && !CM.editFrom) h += `<div class="cmask"><div class="meta">Add your home address and every Commute block starts from it.</div><input id="cmHomeIn" placeholder="Your home address" aria-label="Home address" autocomplete="off" enterkeyhint="done"><div class="r"><button class="btn" data-cm="home">Save home</button></div></div>`;
   box.innerHTML = h;
   cmRestoreTyped(box, keep);
+  if (onFold) { const b = box.querySelector(`[data-cm="${onFold.cm}"]` + (onFold.cm === "fold" ? `[data-v="${onFold.v}"]` : `[data-id="${CSS.escape(onFold.id)}"]`)); if (b) b.focus(); }
   if (!asking && t.address) cmWxRun(ev);
 }
 /* ---------- d31 B (Junyan, 2026-11-25: "31 B"): the weather box, where the small map was ----------
@@ -3081,9 +3111,9 @@ function cmWxPlan(ev) {
 }
 function cmWxCard(entry, plan) {
   const K = CalCommute, hr = K.pickHour(entry.res, plan.at);
-  if (!hr) return `<div class="meta" role="status">${esc(entry.res && Array.isArray(entry.res.hourly && entry.res.hourly.time) && plan.at > entry.res.hourly.time[entry.res.hourly.time.length - 1] * 1000 ? K.WX_TEXT.far : K.WX_TEXT.none)}</div>`;
-  const c = K.weatherCard({ hr, at: plan.at, leaving: plan.leaving, outside: plan.outside, fmt: cmFmt });
-  return `<div class="wxi" aria-hidden="true">${c.icon}</div><div class="wxb"><div class="big">${esc(c.big)}</div><div class="meta">${esc(c.small)}</div>${c.tip ? `<div class="wxtip">${esc(c.tip)}</div>` : ""}</div>`;
+  if (!hr) return `<div class="meta" role="status">${esc(K.WX_TEXT[K.missingHour(entry.res, plan.at)])}</div>`;
+  const c = K.weatherCard({ hr, leaving: plan.leaving, outside: plan.outside });
+  return `<div class="wxi" aria-hidden="true">${c.icon}</div><div class="wxb"><div class="wxl"><span class="big">${esc(c.big)}</span><span class="meta">${esc(c.small)}</span></div>${c.tip ? `<div class="meta wxtip">${esc(c.tip)}</div>` : ""}</div>`;
 }
 /** Write the weather box and nothing else (never the whole Commute box), only while this block's panel is still the one open. */
 function cmWxSet(ev) {
@@ -3115,7 +3145,10 @@ async function cmWxRun(ev) {
 /** The pins: the From and the To are looked up (kept in this browser), and the Open in Organic Maps button is redrawn with them. Returns the From pin. */
 async function cmLookups(ev) {
   const t = cmTarget(ev), from = cmFrom(ev);
-  const a = await cmPin(from); await cmPin(t.address ? t : null);
+  const a = await cmPin(from), b = t.address ? await cmPin(t) : null, tk = cmPinKey(t);
+  if (t.address && !b) CM.noPin[tk] = true; else delete CM.noPin[tk];   // the lookup found no spot for the To: the no-route words name it (d37)
+  const nr = $("#cmNoRoute"), d = cmDirOf(ev), mode = C.modeOf(ev);
+  if (nr && d && d.res && d.res.state === "ok" && !cmUsable(cmWay(d, mode)) && S.ev && keyOf(S.ev) === keyOf(ev)) { const m = cmWayError(ev, d, mode); if (nr.textContent !== m) nr.textContent = m; }   // written in place: no repaint of the box
   const lk = $("#cmLinks"); if (lk && S.ev && keyOf(S.ev) === keyOf(ev)) lk.innerHTML = cmLinksHtml(ev);   // the lookups just kept their pins: the Organic Maps button can use them
   return a;
 }
@@ -3281,8 +3314,17 @@ async function cmAct(t) {
     catch (e) { toast("Not saved: " + e.message, { bad: true }); }
   }
   else if (d.cm === "check") cmDirections(ev, { fresh: true });
+  else if (d.cm === "fold" || d.cm === "alert") cmToggle(t);
   else if (d.cm === "switch") { const r = await patchEvent(ev, { mode: d.v }, "Change the way of going for"); if (r) { const e2 = findByKey(key); if (e2) panel("event", e2); } }
   else if (d.cm === "note") cmCompose(ev, null);
+}
+/** Open or close one fold or one alert row where it stands (no repaint, so nothing he is typing moves). The state is kept in CM_FOLD for the next repaint. */
+function cmToggle(t) {
+  const d = t.dataset, on = d.cm === "alert" ? (CM_FOLD.alerts[d.id] = !CM_FOLD.alerts[d.id]) : (CM_FOLD[d.v] = !CM_FOLD[d.v]);
+  if (!t.isConnected) return void cmPaint();   // a box he was typing in repainted just before this tap
+  t.setAttribute("aria-expanded", String(on));
+  const body = d.cm === "alert" ? t.nextElementSibling : document.getElementById(t.getAttribute("aria-controls"));
+  if (body) body.hidden = !on;
 }
 /** The page's own check: only while this panel is open, once per block, in the hour before leaving. Nothing runs on the server or the phone. */
 function cmAutoTick() {

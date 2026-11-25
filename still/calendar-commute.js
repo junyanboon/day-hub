@@ -261,14 +261,15 @@
     return "https://api.open-meteo.com/v1/forecast?latitude=" + p.lat + "&longitude=" + p.lng + "&hourly=" + WX_FIELDS +
       "&timezone=" + encodeURIComponent(tz) + "&timeformat=unixtime&forecast_days=" + WX_DAYS;
   }
-  /** WMO weather code (open-meteo.com/en/docs) to an icon and plain words. An unknown code keeps a plain icon and no words. */
+  /** WMO weather code (open-meteo.com/en/docs) to an icon and plain words. An unknown code keeps a plain icon and no words.
+      The optional third entry marks the codes that mean rain or snow; the two lists below are read from it, not repeated. */
   const WX_CODES = {
     0: ["☀️", "clear"], 1: ["🌤️", "mostly clear"], 2: ["⛅", "partly cloudy"], 3: ["☁️", "overcast"], 45: ["🌫️", "fog"], 48: ["🌫️", "fog"],
-    51: ["🌦️", "light drizzle"], 53: ["🌦️", "drizzle"], 55: ["🌦️", "heavy drizzle"], 56: ["🌧️", "freezing drizzle"], 57: ["🌧️", "freezing drizzle"],
-    61: ["🌧️", "light rain"], 63: ["🌧️", "rain"], 65: ["🌧️", "heavy rain"], 66: ["🌧️", "freezing rain"], 67: ["🌧️", "freezing rain"],
-    71: ["🌨️", "light snow"], 73: ["🌨️", "snow"], 75: ["🌨️", "heavy snow"], 77: ["🌨️", "snow grains"],
-    80: ["🌦️", "light showers"], 81: ["🌦️", "showers"], 82: ["🌧️", "heavy showers"], 85: ["🌨️", "snow showers"], 86: ["🌨️", "heavy snow showers"],
-    95: ["⛈️", "thunderstorm"], 96: ["⛈️", "thunderstorm with hail"], 97: ["⛈️", "thunderstorm"], 99: ["⛈️", "thunderstorm with hail"] };
+    51: ["🌦️", "light drizzle", "rain"], 53: ["🌦️", "drizzle", "rain"], 55: ["🌦️", "heavy drizzle", "rain"], 56: ["🌧️", "freezing drizzle", "rain"], 57: ["🌧️", "freezing drizzle", "rain"],
+    61: ["🌧️", "light rain", "rain"], 63: ["🌧️", "rain", "rain"], 65: ["🌧️", "heavy rain", "rain"], 66: ["🌧️", "freezing rain", "rain"], 67: ["🌧️", "freezing rain", "rain"],
+    71: ["🌨️", "light snow", "snow"], 73: ["🌨️", "snow", "snow"], 75: ["🌨️", "heavy snow", "snow"], 77: ["🌨️", "snow grains", "snow"],
+    80: ["🌦️", "light showers", "rain"], 81: ["🌦️", "showers", "rain"], 82: ["🌧️", "heavy showers", "rain"], 85: ["🌨️", "snow showers", "snow"], 86: ["🌨️", "heavy snow showers", "snow"],
+    95: ["⛈️", "thunderstorm", "rain"], 96: ["⛈️", "thunderstorm with hail", "rain"], 97: ["⛈️", "thunderstorm", "rain"], 99: ["⛈️", "thunderstorm with hail", "rain"] };
   function weatherWords(code) { const x = WX_CODES[code]; return x ? { icon: x[0], words: x[1] } : { icon: "🌡️", words: "" }; }
   const HOUR = 3600000;
   /** The hour of the answer to read for instant `at`: the entry nearest to it, within half an hour (half past goes to the later hour). null when
@@ -283,10 +284,17 @@
     const temp = v("temperature_2m"); if (temp == null) return null;
     return { temp, feels: v("apparent_temperature"), pop: v("precipitation_probability"), code: v("weather_code") };
   }
+  /** Why no hour could be read: "far" when the instant is after the last hour the answer holds, else "none". */
+  function missingHour(res, at) {
+    const t = res && res.hourly && res.hourly.time;
+    return Array.isArray(t) && t.length && at > t[t.length - 1] * 1000 ? "far" : "none";
+  }
+  /** (d36) One rule for "the block is over": its end is known and is now or earlier. The directions and the weather both ask it. */
+  const blockEnded = (end, now) => Number.isFinite(end) && end <= now;
   /** "ended": the block is over, so no box at all. "far": the day is past what the forecast reaches (today and 15 days more, on the calendar's
       clock). Otherwise "ok". */
   function weatherWindow({ at, end, now, tz }) {
-    if (Number.isFinite(end) && end <= now) return "ended";
+    if (blockEnded(end, now)) return "ended";
     return C().wall(at, tz).day > C().addDays(C().wall(now, tz).day, WX_DAYS - 1) ? "far" : "ok";
   }
   /** How much of the trip is outside: the whole of a walk, the walking legs of transit, nothing said for a drive. null when none or no way. */
@@ -297,7 +305,8 @@
     else if (chip === "transit") n = (way.steps || []).filter((x) => x && x.kind === "walk" && Number.isFinite(x.minutes)).reduce((a, x) => a + x.minutes, 0);
     return n > 0 ? Math.round(n) : null;
   }
-  const RAIN = new Set([51, 53, 55, 56, 57, 61, 63, 65, 66, 67, 80, 81, 82, 95, 96, 97, 99]), SNOW = new Set([71, 73, 75, 77, 85, 86]);
+  const codesOf = (kind) => new Set(Object.keys(WX_CODES).filter((c) => WX_CODES[c][2] === kind).map(Number));
+  const RAIN = codesOf("rain"), SNOW = codesOf("snow");
   /** One tip line, or "": rain or snow is likely at that hour (the words say so, or the chance is 50 percent or more). The minutes outside
       ride on the tip and never stand alone. */
   function weatherTip(hr, outside) {
@@ -309,15 +318,47 @@
     return tip && Number.isFinite(outside) && outside >= 1 ? tip + ` About ${Math.round(outside)} min of the trip is outside.` : tip;
   }
   const deg = (x) => { const r = Math.sign(x) * Math.round(Math.abs(x)); return (r === 0 ? 0 : r) + "°"; };
-  /** What the box says: icon, big line "3° · light rain", small line with the hour and feels like, and the tip. fmt turns an instant into "12:36 pm". */
-  function weatherCard({ hr, at, leaving, outside, fmt }) {
-    const w = weatherWords(hr.code);
+  /** What the box says: icon, big line "3° · light rain", the small words after it ("feels like 0° when you leave"), and the tip. */
+  function weatherCard({ hr, leaving, outside }) {
+    const w = weatherWords(hr.code), when = leaving ? "when you leave" : "when the block starts";
     return { icon: w.icon, big: deg(hr.temp) + (w.words ? " · " + w.words : ""),
-      small: `${leaving ? "When you leave" : "When the block starts"}, ${fmt(at)}.` + (Number.isFinite(hr.feels) ? ` Feels like ${deg(hr.feels)}.` : ""),
+      small: Number.isFinite(hr.feels) ? `feels like ${deg(hr.feels)} ${when}` : when,
       tip: weatherTip(hr, outside) };
   }
   /** An answer kept in memory is fresh for 30 minutes; a failed ask is remembered for 2 so a repaint does not ask again at once. */
   const wxFresh = (e, now) => !!e && now - e.at < (e.fail ? 2 : 30) * 60000;
 
-  root.CalCommute = { arriveTarget, leaveBy, arriveLine, bestWay, quickerThan, alertsFor, groupAlerts, leaveShift, autoCheckDue, decodePolyline, WAY, CHIP, mapsLink, organicMapsLink, placesAskable, readSuggestions, readPlace, locationText, keepPlace, alreadyKept, savedChips, removableChip, anyRemovable, rowText, weatherUrl, weatherPlace, weatherKey, weatherWords, pickHour, weatherWindow, outsideMinutes, weatherTip, weatherCard, wxFresh, WX_TEXT, titleKey, rememberPlace, nextEvent, target, needsAsk, samePlace, previousPlace, fromFor, stepDur, placeKey, fitSize, TRAVELMODE };
+  /* ---------- the tidy panel (Junyan, 2026-11-25, d36, d37, d40) ---------- */
+  /** The one quiet line under Leave by: "Checked 10:45 am", or "Checked by itself 10:45 am" when the page's own check made the answer. */
+  function checkedLine({ at, auto, fmt }) {
+    const t = Number.isFinite(at) ? clean(fmt(at)) : "";
+    return t ? `Checked ${auto ? "by itself " : ""}${t}` : "";
+  }
+  const lowerWords = (s) => clean(String(s || "").toLowerCase().replace(/[.,]/g, " ").replace(/[^a-z0-9\s]/g, " ")).split(" ").filter(Boolean)
+    .map((w) => ({ st: "street", ave: "avenue", rd: "road", blvd: "boulevard", dr: "drive", hwy: "highway", pkwy: "parkway", cres: "crescent", ln: "lane", ct: "court", w: "west", e: "east", n: "north", s: "south" }[w] || w)).join(" ");
+  /** A drive closure is on the route when the street it names is one of the roads of the chosen way (same words, abbreviations ignored).
+      The server's closure title is "<road> is closed ...", and a way's roads come from the same directions answer. Nothing else is guessed. */
+  function onRoute(alert, way, chip) {
+    if (chip !== "drive" || !alert || alert.kind !== "closure" || !way || !Array.isArray(way.roads)) return false;
+    const road = lowerWords(String(alert.title || "").replace(/\s+is closed\b.*$/i, ""));
+    return !!road && way.roads.some((r) => lowerWords(r && r.road) === road);
+  }
+  /** What one Heads up alert shows: a short line (on your route, until when) and whether the long description waits behind a tap.
+      A description that is already short is the line itself. */
+  function alertLine(a, { onRoute: on = false } = {}) {
+    const detail = clean(a && a.detail), until = /^(Until [^.]+)\./.exec(detail), rest = until ? clean(detail.slice(until[0].length)) : detail;
+    const parts = [on ? "On your route" : "", until ? until[1] : ""].filter(Boolean);
+    if (!parts.length && detail && detail.length <= 60) return { short: detail, expandable: false, detail: "" };
+    const expandable = !!rest;
+    return { short: parts.join(" · ") || (expandable ? "Tap for details" : ""), expandable, detail: expandable ? detail : "" };
+  }
+  const NO_ROUTE = "Google found no route.";
+  /** (d37) The words for a way with no directions: when Google found no route and the To has no pin, say which place it cannot find. */
+  function noRouteText({ err, to, noPin }) {
+    const e = clean(err), name = clean(to);
+    if (e === NO_ROUTE && noPin && name) return `Google cannot find "${name}". Tap To and pick the real place.`;
+    return e || "No directions for this way.";
+  }
+
+  root.CalCommute = { checkedLine, onRoute, alertLine, noRouteText, blockEnded, missingHour, RAIN_CODES: RAIN, SNOW_CODES: SNOW, arriveTarget, leaveBy, arriveLine, bestWay, quickerThan, alertsFor, groupAlerts, leaveShift, autoCheckDue, decodePolyline, WAY, CHIP, mapsLink, organicMapsLink, placesAskable, readSuggestions, readPlace, locationText, keepPlace, alreadyKept, savedChips, removableChip, anyRemovable, rowText, weatherUrl, weatherPlace, weatherKey, weatherWords, pickHour, weatherWindow, outsideMinutes, weatherTip, weatherCard, wxFresh, WX_TEXT, titleKey, rememberPlace, nextEvent, target, needsAsk, samePlace, previousPlace, fromFor, stepDur, placeKey, fitSize, TRAVELMODE };
 })(typeof window !== "undefined" ? window : globalThis);

@@ -123,13 +123,13 @@ test("the card: icon, the big line, the small line with the hour and feels like,
   const fmt = (ms) => globalThis.CalCore.hm(globalThis.CalCore.wall(ms, TZ).min);
   const hr = { temp: 2.6, feels: -0.4, pop: 70, code: 61 };
   const leaving = K.weatherCard({ hr, at: at("2026-11-25T12:36:00-05:00"), leaving: true, outside: 9, fmt });
-  assert.deepEqual(leaving, { icon: "🌧️", big: "3° · light rain", small: "When you leave, 12:36 pm. Feels like 0°.", tip: "Bring an umbrella. About 9 min of the trip is outside." });
+  assert.deepEqual(leaving, { icon: "🌧️", big: "3° · light rain", small: "feels like 0° when you leave", tip: "Bring an umbrella. About 9 min of the trip is outside." });
   const starts = K.weatherCard({ hr: { temp: -3.4, feels: -9.5, pop: 0, code: 0 }, at: at("2026-11-25T08:00:00-05:00"), leaving: false, outside: null, fmt });
-  assert.deepEqual(starts, { icon: "☀️", big: "-3° · clear", small: "When the block starts, 8 am. Feels like -10°.", tip: "" });
+  assert.deepEqual(starts, { icon: "☀️", big: "-3° · clear", small: "feels like -10° when the block starts", tip: "" });
   assert.equal(K.weatherCard({ hr: { temp: 0.2, feels: -0.3, pop: 0, code: 0 }, at: at("2026-11-25T08:00:00-05:00"), leaving: true, fmt }).big, "0° · clear", "no minus zero");
-  assert.equal(K.weatherCard({ hr: { temp: 0.2, feels: -0.3, pop: 0, code: 0 }, at: at("2026-11-25T08:00:00-05:00"), leaving: true, fmt }).small, "When you leave, 8 am. Feels like 0°.");
+  assert.equal(K.weatherCard({ hr: { temp: 0.2, feels: -0.3, pop: 0, code: 0 }, at: at("2026-11-25T08:00:00-05:00"), leaving: true, fmt }).small, "feels like 0° when you leave");
   assert.equal(K.weatherCard({ hr: { temp: 5, feels: null, pop: null, code: 1234 }, at: at("2026-11-25T08:00:00-05:00"), leaving: true, fmt }).big, "5°", "no words for an unknown code");
-  assert.equal(K.weatherCard({ hr: { temp: 5, feels: null, pop: null, code: 1234 }, at: at("2026-11-25T08:00:00-05:00"), leaving: true, fmt }).small, "When you leave, 8 am.", "no feels like when the answer has none");
+  assert.equal(K.weatherCard({ hr: { temp: 5, feels: null, pop: null, code: 1234 }, at: at("2026-11-25T08:00:00-05:00"), leaving: true, fmt }).small, "when you leave", "no feels like when the answer has none");
 });
 
 test("the exact words of the four quiet states", () => {

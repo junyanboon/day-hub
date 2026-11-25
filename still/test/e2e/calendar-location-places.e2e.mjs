@@ -56,7 +56,7 @@ try {
     const ok = await page.evaluate(([title, d]) => { const k = C.addDays(today(), d); const ev = [...eventsFor(k, k), ...ghosts()].find((e) => e.title === title && (e.allDay ? C.coversDay(e, k) : C.wall(e.s, S.tz).day === k)); if (ev) panel("event", ev); return !!ev; }, [title, d]);
     await sleep(500); await page.waitForFunction(() => !/Looking up/.test(document.querySelector("#cmBox")?.innerText || "x"), null, { timeout: 5000 }).catch(() => {}); return ok;
   };
-  const tapEl = async (sel) => { const [x, y] = await page.evaluate((s) => { const r = document.querySelector(s).getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; }, sel); await page.touchscreen.tap(x, y); await sleep(250); };
+  const tapEl = async (sel) => { const [x, y] = await page.evaluate((s) => { document.querySelector(s).scrollIntoView({ block: "center" }); const r = document.querySelector(s).getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; }, sel); await page.touchscreen.tap(x, y); await sleep(250); };
   const typeLoc = async (text) => { await page.evaluate(() => document.activeElement && document.activeElement.blur()); await page.focus('.sheet [data-f="location"]'); await page.fill('.sheet [data-f="location"]', ""); await page.keyboard.type(text, { delay: 20 }); };
   const lastPatch = () => [...sent].reverse().find((x) => x.m === "PATCH")?.b;
 
