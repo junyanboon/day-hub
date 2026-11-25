@@ -14,7 +14,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>Calendar</title>
 <script src="calendar-core.js?v=34"></script>
-<script src="calendar-commute.js?v=7"></script>
+<script src="calendar-commute.js?v=8"></script>
 <script src="cards-vault.js?v=2"></script><script src="cards.js?v=7"></script>
 <script src="quest-trips.js?v=20261121a" data-helpers></script>
 <script>
@@ -1029,7 +1029,7 @@ if (TOUCH) for (const g of ["gesturestart", "gesturechange"]) document.addEventL
    which shows this build, the phone's answers and a log of every day change with its cause. Until then CalHook.on is
    null and diag() does nothing. BUILD names this copy of the page, so a screenshot proves which copy ran: change it on
    every change to this page or calendar-readout.js (the date plus a letter). */
-const BUILD = "2026-11-25e forget a location text";
+const BUILD = "2026-11-25f directions stay after a block";
 const CalHook = window.CalHook = { BUILD, on: null };
 const diag = (kind, msg) => { if (CalHook.on) CalHook.on(kind, msg); };
 /* The iPhone home screen app's fit (2026-11-12): html.hs in a home screen app on touch, html.hsfill and --hsgap when
@@ -1787,7 +1787,7 @@ function pEvent(ev) {
     <div class="field"><label class="lbl" style="margin:0" for="pCal">Calendar</label><select id="pCal" ${dis}>${writable.map((c) => `<option value="${esc(c.id)}" ${c.id === ev.calId ? "selected" : ""}>${esc(c.name)}</option>`).join("")}</select></div>
     ${canEdit ? "" : `<div class="meta">${esc(cal.name)} is read-only here.</div>`}
     <div class="r">${ev.ghost ? `<button class="btn" id="pSkip">Skip</button><span class="spacer"></span><button class="btn pri" id="pAcc">Accept</button>`
-      : `${isNew || !canEdit ? "" : '<button class="btn del" id="pDel">Delete</button>'}${ev.htmlLink ? `<a class="meta" href="${esc(ev.htmlLink)}" target="_blank" rel="noopener">Open in Google</a>` : ""}<span class="spacer"></span>${canEdit ? '<button class="btn pri" id="pSave">Save</button>' : ""}`}</div>
+      : `${isNew || !canEdit ? "" : '<button class="btn del" id="pDel">Delete</button>'}<span class="spacer"></span>${canEdit ? '<button class="btn pri" id="pSave">Save</button>' : ""}`}</div>
     ${!isNew && !ev.ghost && TYPES.includes(ev.k) ? `<button class="btn k-${ev.k}" data-page="${ev.k}" style="border-color:color-mix(in srgb,var(--c) 50%,transparent)">${esc(`Open the ${KNAME[ev.k]} page`)} &#8250;</button>` : ""}
     ${!isNew && !ev.ghost && ev.k === "pack" && WIDE.matches ? `<button class="btn k-pack" data-pkday="${esc(packDayOf(ev))}" style="border-color:color-mix(in srgb,var(--c) 50%,transparent)">Open packing list &#8250;</button>` : ""}`;
 
@@ -1828,7 +1828,6 @@ function pSheet(ev) {
     ${isNew || !canEdit || ev.ghost ? "" : '<div class="rows"><button class="srow del" id="pDel">Delete event</button></div>'}
     ${canEdit ? "" : `<div class="meta">${esc(cal.name)} is read-only here.</div>`}
     ${ev.ghost ? `<div class="r"><button class="btn" id="pSkip">Skip</button><span class="spacer"></span><button class="btn pri" id="pAcc">Accept</button></div>` : ""}
-    ${ev.htmlLink ? `<a class="meta" href="${esc(ev.htmlLink)}" target="_blank" rel="noopener">Open in Google</a>` : ""}
     ${!isNew && !ev.ghost && TYPES.includes(ev.k) ? `<button class="btn k-${ev.k}" data-page="${ev.k}" style="border-color:color-mix(in srgb,var(--c) 50%,transparent)">${esc(`Open the ${KNAME[ev.k]} page`)} &#8250;</button>` : ""}
   </div>`;
 }
@@ -2827,13 +2826,23 @@ function cmRemember(key, res, sig) {
   store.set("cal-commute-last", JSON.stringify(all));
 }
 const cmEnd = (o) => ({ name: o.name || "", address: o.address || "", lat: o.lat == null ? null : o.lat, lng: o.lng == null ? null : o.lng });
+/** One trip's signature: From, To and arrive time. An answer is only used for the trip it was made for (cmDirInput and cmEndedInput share it). */
+const cmSig = (from, t, arrive) => [from.address, t.address, Math.floor(arrive.at / 60000)].join("|");
 /** The inputs a directions answer needs, or null: no To, no From address, a block that has ended, or a day too far off. */
 function cmDirInput(ev) {
   const t = cmTarget(ev), from = cmFrom(ev);
   if (CalCommute.needsAsk(t) || !t.address || !from || !from.address || !Number.isFinite(ev.e) || CalCommute.blockEnded(ev.e, Date.now())) return null;
   const arrive = CalCommute.arriveTarget(ev, eventsFor(cmDay(ev), cmDay(ev)), S.tz);
   if (!(arrive.at > Date.now() - 3600000) || arrive.at > Date.now() + 14 * 86400000) return null;
-  return { t, from, arrive, sig: [from.address, t.address, Math.floor(arrive.at / 60000)].join("|") };
+  return { t, from, arrive, sig: cmSig(from, t, arrive) };
+}
+/** (d45) The trip of a block that is over, for finding the answer kept for it: the same sig as cmDirInput made while it ran, with no clock window
+    and never a request. null: the block is not over, or it has no To or From address. */
+function cmEndedInput(ev) {
+  const t = cmTarget(ev), from = cmFrom(ev);
+  if (!Number.isFinite(ev.e) || !CalCommute.blockEnded(ev.e, Date.now()) || CalCommute.needsAsk(t) || !t.address || !from || !from.address) return null;
+  const arrive = CalCommute.arriveTarget(ev, eventsFor(cmDay(ev), cmDay(ev)), S.tz);
+  return { t, from, arrive, sig: cmSig(from, t, arrive) };
 }
 const cmDirOf = (ev) => CM.dir[keyOf(ev)] || null;
 /** Ask the server. fresh skips its saved answer (Check again); auto marks the page's own once-only check. */
@@ -2843,21 +2852,25 @@ async function cmDirections(ev, { fresh = false, auto = false } = {}) {
   if (d.loading && (fresh || d.loadSig === inp.sig)) return;   // a changed From or To still goes ahead: it replaces the request in flight
   if (!fresh && d.res && d.sig === inp.sig && Date.now() - d.got < 60000) return;
   const seq = d.seq = (d.seq || 0) + 1;
-  d.loading = true; d.loadSig = inp.sig; d.error = ""; if (fresh) d.checked = null;
+  const wasChecked = d.checked;
+  d.loading = true; d.loadSig = inp.sig; d.error = ""; d.note = ""; if (fresh) d.checked = null;
   const stored = cmLast()[key], before = d.res && d.sig === inp.sig ? d.res : stored && stored.sig === inp.sig ? stored.res : null;   // only an answer for this same trip is compared
   if (S.ev && keyOf(S.ev) === key) cmPaint();
   try {
     const res = await send("/quest/commute/directions", "POST", { from: cmEnd(inp.from), to: cmEnd(inp.t), arriveBy: new Date(inp.arrive.at).toISOString(), fresh });
     if (d.seq !== seq) return;   // a newer request replaced this one
-    d.prev = res.state === "ok" && before && before.state === "ok" ? before : null;
-    d.res = res; d.got = Date.now(); d.sig = inp.sig;
-    if (fresh && res.state === "ok") {
-      d.checked = { auto, at: d.got };
-      const w = res.ways && res.ways[CalCommute.WAY[C.modeOf(ev)]], lv = cmUsable(w) ? CalCommute.leaveBy(w, inp.arrive.at) : null;
-      if (Number.isFinite(lv) && d.got >= lv - 3600000) d.autoDone = true;   // a check he pressed inside that hour counts as the one
+    if (!CalCommute.replacesHeld({ held: d.res, heldSig: d.sig, sig: inp.sig, res })) { d.note = CalCommute.notOkText(res); d.checked = wasChecked; }   // d45: a not-ok re-check never throws away the good directions he has
+    else {
+      d.prev = res.state === "ok" && before && before.state === "ok" ? before : null;
+      d.res = res; d.got = Date.now(); d.sig = inp.sig;
+      if (fresh && res.state === "ok") {
+        d.checked = { auto, at: d.got };
+        const w = res.ways && res.ways[CalCommute.WAY[C.modeOf(ev)]], lv = cmUsable(w) ? CalCommute.leaveBy(w, inp.arrive.at) : null;
+        if (Number.isFinite(lv) && d.got >= lv - 3600000) d.autoDone = true;   // a check he pressed inside that hour counts as the one
+      }
+      if (res.state === "ok") cmRemember(key, res, inp.sig);
     }
-    if (res.state === "ok") cmRemember(key, res, inp.sig);
-  } catch (e) { if (d.seq !== seq) return; d.error = "Directions could not be loaded. Check your connection and try again."; }
+  } catch (e) { if (d.seq !== seq) return; d.error = "Directions could not be loaded. Check your connection and try again."; if (fresh) d.checked = wasChecked; }
   d.loading = false;
   if (S.ev && keyOf(S.ev) === key) cmPaint();
 }
@@ -2921,9 +2934,12 @@ function cmHeadsUp(d, mode, way) {
     A failed re-check shows its error right under it. */
 function cmChecked(d, checkedAt, note) {
   const line = CalCommute.checkedLine({ at: checkedAt, auto: !!(d.checked && d.checked.auto), fmt: cmFmt });
-  const btn = `<button type="button" class="cmlink" data-cm="check" ${d.loading ? "disabled" : ""}${note ? ` title="${esc(note)}"` : ""}>${d.loading ? "Checking…" : "Check again"}</button>`;
-  return `<div class="cmchecked">${line ? esc(line) + " · " : ""}${btn}</div>${d.error ? `<div class="meta" role="alert">${esc(d.error)}</div>` : ""}`;
+  const btn = `<button type="button" class="cmlink" data-cm="check" ${d.loading ? "disabled" : ""}${note ? ` title="${esc(note)}"` : ""}>${d.loading ? "Checking…" : d.error ? "Try again" : "Check again"}</button>`;
+  const msg = d.error || d.note;   // d45: a failed load or a not-ok re-check leaves the good directions on screen and says why right here
+  return `<div class="cmchecked">${line ? esc(line) + " · " : ""}${btn}</div>${msg && !d.loading ? `<div class="meta" role="alert">${esc(msg)}</div>` : ""}`;
 }
+/** (d45) The Leave by area's quiet lines for a block that is over: when the answer was checked (no Check again) and that the block is over. */
+const cmOver = (v) => (v.checked ? `<div class="cmchecked">${esc(v.checked)}</div>` : "") + `<div class="cmchecked" id="cmOver">${esc(v.over)}</div>`;
 /** The words for a way with no directions (d37): Too far to walk, the monthly stop, or no route (naming the To when the page's own lookup found no spot for it). */
 function cmWayError(ev, d, mode) {
   const K = CalCommute, way = cmWay(d, mode), err = (d.res.errors || {})[K.WAY[mode]], t = cmTarget(ev);
@@ -2934,26 +2950,38 @@ function cmWayError(ev, d, mode) {
 /** Everything the directions answer adds to the box: {leave (with the quiet checked line), way, heads, quick, ways}. Empty strings when there is no answer. */
 function cmDirParts(ev, mode, inp) {
   const d = cmDirOf(ev), K = CalCommute, out = { leave: "", way: "", heads: "", quick: "", ways: null };
-  if (!inp) return out;
+  if (!inp) return cmEndedParts(ev, mode, out);
   if (!d || (!d.res && !d.loading && !d.error)) return out;
   if (d.res && d.sig !== inp.sig && d.loading) { out.way = `<div class="meta" role="status">Getting directions…</div>`; return out; }   // never show the answer for an earlier From or To
   if (d.loading && !d.res) { out.way = `<div class="meta" role="status">Getting directions…</div>`; return out; }
-  if (!d.res) { out.way = `<div class="meta">${esc(d.error)}</div><div class="r"><button class="btn" data-cm="check">Try again</button></div>`; return out; }
-  if (d.res.state !== "ok") { out.way = `<div class="meta" role="status">${esc(d.res.state === "no-key" ? "Directions need the Google key" : d.res.message || "Directions are not available.")}</div>`; return out; }
-  const ways = d.res.ways || {}; out.ways = ways;
+  if (!d.res || d.sig !== inp.sig) { if (d.error) out.way = `<div class="meta">${esc(d.error)}</div><div class="r"><button class="btn" data-cm="check">Try again</button></div>`; return out; }
+  if (d.res.state !== "ok") { out.way = `<div class="meta" role="status">${esc(K.notOkText(d.res))}</div>`; return out; }
+  return cmOkParts(ev, mode, inp, d, null, out);
+}
+/** (d45) A block that is over: no request, ever. It draws the last good answer for this same trip (memory, else this browser) with the quiet
+    "This block is over." line and no Check again; with none kept, only that line. */
+function cmEndedParts(ev, mode, out) {
+  const e = cmEndedInput(ev), K = CalCommute; if (!e) return out;
+  const key = keyOf(ev), kept = K.keptAnswer({ mem: CM.dir[key], stored: cmLast()[key], sig: e.sig }), v = K.endedView({ kept, fmt: cmFmt });
+  if (v.show === "none") { out.leave = `<div class="cmleave">${cmOver(v)}</div>`; return out; }
+  return cmOkParts(ev, mode, e, { res: kept.res, sig: kept.sig, checked: null, prev: null, loading: false, error: "", note: "", autoDone: true }, v, out);
+}
+/** The drawn parts of an ok answer. over: the ended view when the block is over (no Check again, no quicker row). */
+function cmOkParts(ev, mode, inp, d, over, out) {
+  const K = CalCommute, ways = d.res.ways || {}; out.ways = ways;
   const way = cmWay(d, mode), checkedAt = d.res.checkedAt;
   if (cmUsable(way)) {
     const arriveAt = inp.arrive.at, leave = K.leaveBy(way, arriveAt), prevWay = d.checked && d.prev && d.prev.ways ? d.prev.ways[K.WAY[mode]] : null;
     const shift = prevWay && cmUsable(prevWay) ? K.leaveShift(K.leaveBy(prevWay, arriveAt), leave) : "";
     const auto = !d.autoDone && Number.isFinite(leave) && leave > Date.now();
-    out.leave = `<div class="cmleave"><span class="lbl">Leave by</span><div class="big">${esc(cmFmt(leave))}${shift ? `<span class="cmshift">${esc(shift)}</span>` : ""}</div><div class="meta">${esc(K.arriveLine(way, inp.arrive, cmFmt))}</div>${cmChecked(d, checkedAt, auto ? CM_AUTO_NOTE : "")}</div>`;
+    out.leave = `<div class="cmleave"><span class="lbl">Leave by</span><div class="big">${esc(cmFmt(leave))}${shift ? `<span class="cmshift">${esc(shift)}</span>` : ""}</div><div class="meta">${esc(K.arriveLine(way, inp.arrive, cmFmt))}</div>${over ? cmOver(over) : cmChecked(d, checkedAt, auto ? CM_AUTO_NOTE : "")}</div>`;
     out.way = cmFold("cmWay", `The way there · ${way.minutes} min${mode === "drive" && way.km ? " · " + way.km + " km" : ""}`, CM_FOLD.way, cmSteps(way, mode));
     out.heads = cmHeadsUp(d, mode, way);
-    const q = d.checked ? K.quickerThan(ways, mode) : null;
+    const q = d.checked && !over ? K.quickerThan(ways, mode) : null;
     if (q) out.quick = `<div class="cmquick"><span><b>${WAYNAME[q.chip]} is quicker right now</b><small>${q.by} min quicker than ${WAYNAME[mode].toLowerCase()}</small></span><button class="btn" data-cm="switch" data-v="${q.chip}" ${cmCanEdit(ev) ? "" : "disabled"}>Switch to ${WAYNAME[q.chip]}</button></div>`;
     out.leaveAt = leave;
   } else {
-    out.leave = `<div class="cmleave">${cmChecked(d, checkedAt, "")}</div>`;
+    out.leave = `<div class="cmleave">${over ? cmOver(over) : cmChecked(d, checkedAt, "")}</div>`;
     out.way = `<div class="meta" id="cmNoRoute">${esc(cmWayError(ev, d, mode))}</div>`;
   }
   return out;

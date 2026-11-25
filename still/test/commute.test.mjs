@@ -176,7 +176,7 @@ test("the page: the box sits in both panels, only for a Commute block, and draws
   for (const w of [/leave by/i, /heads up/i, /check again/i, /the way there/i, /best way/i]) assert.match(src, w, String(w));
   assert.doesNotMatch(src, /routes\.googleapis|GOOGLE_ROUTES|api[_-]?key/i, "the key is never on the page");
   assert.doesNotMatch(src, /parking near/i, "no Parking near row: it has no source");
-  assert.match(src, /Directions need the Google key/);
+  assert.match(readFileSync(new URL("../calendar-commute.js", import.meta.url), "utf8"), /Directions need the Google key/, "the words for a missing key now live in the rule file (notOkText)");
   assert.match(src, /Where are you going\?/);
   assert.match(src, /Remember for every/);
   assert.match(src, /Open in Google Maps/);

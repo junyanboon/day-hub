@@ -59,7 +59,8 @@ try {
     /* Junyan, 2026-11-24 (d17 A, d18 yes): the desktop panel's Length row and Block type row are redesigned on purpose, so the compare leaves out
        everything from the first of them to the Calendar field; the rest of the panel must still equal origin/main's. */
     /* Junyan, 2026-11-25 (d33 yes): the desktop panel also gets its own Location box, so that field (label to list box) is left out too. */
-    const noLoc = (h) => h.replace(/<div class="field"><label class="lbl" style="margin:0" for="pLoc">[\s\S]*?id="locSug"[^>]*><\/div><\/div>/, "").replace(/>\s+</g, "><");
+    /* Junyan, 2026-11-25 (d46 yes): the Open in Google link is gone from the panel on purpose, so origin/main's copy is compared without it. */
+    const noLoc = (h) => h.replace(/<div class="field"><label class="lbl" style="margin:0" for="pLoc">[\s\S]*?id="locSug"[^>]*><\/div><\/div>/, "").replace(/<a class="meta" href="[^"]*" target="_blank" rel="noopener">Open in Google<\/a>/, "").replace(/>\s+</g, "><");
     const norm = (h) => noLoc(h).replace(/<div class="field"(?: id="typeBox")?>(?:<p class="lbl" style="margin:0">(?:Length|Block type)<\/p>|<div class="typeline")[\s\S]*?(?=<div class="field"><label class="lbl" style="margin:0" for="pCal">)/, "");
     const html = async (page, title, d) => { await openEv(page, title, d); return norm(await page.evaluate(() => document.querySelector("#pbody").innerHTML)); };
     for (const [title, d] of [["Work block", 2], ["Caney away", 3], ["Dinner", 2], ["Stay at FICTION", 3], ["Pack for FICTION stay", 2], ["Packing & Errands", 2]]) {
@@ -156,8 +157,8 @@ try {
     check("reopened, location and notes show again", back[0] === "527 Bloor St W" && back[1] === "Bring the keys\nand the mop", JSON.stringify(back));
     /* notes with Google formatting are read-only */
     await page.evaluate(() => { const ev = S.ev; ev.description = 'See <a href="https://x.ca">the plan</a><br>Fish &amp; chips'; panel("event", ev); });
-    const rich = await page.evaluate(() => [!!document.querySelector(".sheet textarea"), document.querySelector(".sheet .snotes")?.textContent, !!document.querySelector('.sheet a[href*="calendar.google"]')]);
-    check("notes with Google formatting show as text, not a box, with Open in Google", !rich[0] && rich[1] === "See the plan\nFish & chips" && rich[2], JSON.stringify(rich));
+    const rich = await page.evaluate(() => [!!document.querySelector(".sheet textarea"), document.querySelector(".sheet .snotes")?.textContent, !!document.querySelector('.sheet a[href*="calendar.google"]'), /Open in Google/.test(document.querySelector(".sheet")?.textContent || "")]);
+    check("notes with Google formatting show as text, not a box (and the Open in Google link is gone, d46)", !rich[0] && rich[1] === "See the plan\nFish & chips" && !rich[2] && !rich[3], JSON.stringify(rich));
     await tap(page, "#pSave"); await sleep(400);
     check("Save with formatted notes sends no description", !("description" in (last(sent) || {})) || last(sent) === b);
     check("no page errors (location and notes)", !errors.length, errors.join("; "));
