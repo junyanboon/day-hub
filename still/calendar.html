@@ -3202,9 +3202,9 @@ async function cmSave(m) {
   } catch (e) { sv.disabled = false; toast("Not saved: " + e.message, { bad: true }); }
 }
 /** Save one remembered row (a repeat replaces the row of the same list, never adds a second). Never throws: { ok: true } or { ok: false, error }. */
-async function cmPutRemembered(row) {
+async function cmPutRemembered(place) {
   try {
-    const old = (CM.places || []).find((p) => p.category === "commute-for" && p.list === row.list); if (old) row.id = old.id;
+    const row = { ...place }, old = (CM.places || []).find((p) => p.category === "commute-for" && p.list === row.list); if (old) row.id = old.id;
     const d = await send("/quest/places", "POST", { op: "put", place: row });
     CM.places = (CM.places || []).filter((p) => p.id !== d.place.id).concat(d.place);
     return { ok: true };
@@ -3221,6 +3221,7 @@ async function cmForgetLoc(ev, id) {
   CM.fgBusy = false;
   CM.places = (CM.places || []).filter((x) => x.id !== id);
   toast(`Forgot "${text}".`); cmPaint(); cmDirections(ev);
+  const nf = $("#cmRemLoc") || $("#cmTo"); if (nf && !nf.disabled) nf.focus();   // the Forget button is gone: keep the place in the box for keyboard and screen reader users
 }
 async function cmSetTarget(ev, o, remember, rememberLoc) {
   if (!(await cmSaveRoute(ev, "to", o))) { cmSet(CMK.to, keyOf(ev), { ...o, pending: true }); toast("Saved on this device only. The server could not be reached; it goes up next time.", { bad: true }); }
@@ -3229,10 +3230,11 @@ async function cmSetTarget(ev, o, remember, rememberLoc) {
   if (remember) {
     const rp = CalCommute.rememberPlace({ title: t.nextTitle || ev.title, address: o.address, lat: o.lat, lng: o.lng });
     if (rp) res.t = await cmPutRemembered(rp);
+    else if (rememberLoc) res.t = { ok: false, error: "that title cannot be kept" };   // two switches on: say so rather than leave it out of the one message
   }
   if (rememberLoc) {
     const rl = CalCommute.rememberLocation({ text: t.locText, address: o.address, lat: o.lat, lng: o.lng });
-    res.l = rl ? await cmPutRemembered(rl) : { ok: false, error: "that text cannot be kept as a place" };
+    res.l = rl ? await cmPutRemembered(rl) : { ok: false, error: "nothing to keep for that text" };
   }
   const m = res.t || res.l ? CalCommute.rememberToast({ title: t.nextTitle || ev.title, text: t.locText, t: res.t, l: res.l }) : null;
   if (m) toast(m.text, { bad: m.bad });
