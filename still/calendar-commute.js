@@ -196,6 +196,7 @@
       if (prevPlace && samePlace(prevPlace, place)) continue;   // already there
       const ends = before.map((x) => x.e).filter((e) => e > winStart && e <= ev.s);
       const s = Math.min(ends.length ? Math.max(...ends) : winStart, ev.s - SUGG_FLOOR * M);
+      if (before.some((x) => x.e > ev.s)) continue;   // an earlier plan still runs when this one starts (overlap): no trip to suggest
       out.push({ key: suggestionKey(ev), kind: "commute", title: "Commute", s, e: ev.s, why: "To " + clean(ev.title), forId: ev.id });
     }
     return out;
