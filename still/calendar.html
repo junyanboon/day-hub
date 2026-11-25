@@ -356,7 +356,9 @@ div.month{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));grid-templa
 /* Commute panel (slice 1): colours come from the look variables only */
 .cmbox{display:flex;flex-direction:column;gap:10px;border:1px solid var(--line);border-radius:12px;padding:10px;background:color-mix(in srgb,var(--k-commute) 8%,var(--bg))}
 .cmbox a.btn{color:var(--ink);text-decoration:none}
-.cmroute{display:flex;flex-direction:column;gap:6px}.cmr{display:flex;align-items:center;gap:8px}.cmr .lbl{margin:0;width:42px}.cmr .v{flex:1;min-width:0;overflow-wrap:anywhere}
+.cmroute{display:flex;flex-direction:column;gap:6px}.cmr{display:flex;align-items:center;gap:8px;width:100%;min-height:44px;text-align:left;color:inherit;font:inherit}.cmr .lbl{margin:0;width:42px;flex:none}.cmr .v{flex:1;min-width:0;overflow-wrap:anywhere}.cmr .v small{display:block;color:var(--soft);font-size:12px}
+button.cmr{border:1px solid var(--line);background:var(--raise);border-radius:10px;padding:6px 10px}button.cmr:hover{background:var(--raise2)}
+.cmsug{display:flex;flex-direction:column}.cmsug button{display:flex;align-items:center;gap:8px;min-height:44px;width:100%;text-align:left;border:0;border-top:1px solid var(--line);background:none;color:inherit;font:inherit;padding:6px 4px}.cmsug button:hover{background:var(--raise)}.cmsug small{display:block;color:var(--soft);font-size:12px}.cmsug .cmstop{color:var(--soft);padding:6px 4px}
 .cmask{display:flex;flex-direction:column;gap:6px}.cmask input[type=text],.cmask input:not([type]),.cmask textarea,.cmmodal textarea{width:100%;background:var(--raise);border:1px solid var(--line);border-radius:10px;padding:8px 10px}
 .cmrem{display:flex;align-items:center;gap:8px}
 .cmmap{height:170px;border-radius:10px;overflow:hidden;border:1px solid var(--line);position:relative;z-index:0}
@@ -1020,7 +1022,7 @@ if (TOUCH) for (const g of ["gesturestart", "gesturechange"]) document.addEventL
    which shows this build, the phone's answers and a log of every day change with its cause. Until then CalHook.on is
    null and diag() does nothing. BUILD names this copy of the page, so a screenshot proves which copy ran: change it on
    every change to this page or calendar-readout.js (the date plus a letter). */
-const BUILD = "2026-11-24e commute directions birthdays";
+const BUILD = "2026-11-24f commute places";
 const CalHook = window.CalHook = { BUILD, on: null };
 const diag = (kind, msg) => { if (CalHook.on) CalHook.on(kind, msg); };
 /* The iPhone home screen app's fit (2026-11-12): html.hs in a home screen app on touch, html.hsfill and --hsgap when
@@ -2701,6 +2703,7 @@ function wirePair() {
    by step, Heads up and Check now, all from the server's directions answer (below). */
 /* commute:start */
 const CMK = { to: "cal-commute-to", from: "cal-commute-from", spots: "cal-commute-spots" };
+const CMS = { side: "", session: "", q: "", items: [], stopped: false, seq: 0, timer: 0, busy: false };   // the places list of the one open From or To box
 const CM = { dir: {}, places: null, loading: false, notes: null, edit: "", editFrom: false, key: "", small: null, seq: {}, run: 0, routes: {}, loaded: {}, up: false };
 const cmGet = (k) => { try { const v = JSON.parse(store.get(k) || "{}"); return v && typeof v === "object" ? v : {}; } catch { return {}; } };
 const cmSet = (k, key, val) => { const o = cmGet(k); if (val) o[key] = val; else delete o[key]; store.set(k, JSON.stringify(o)); };
@@ -2886,7 +2889,7 @@ function commuteBox(ev) { return ev.k === "commute" && !ev.isNew && !ev.ghost &&
 /** The panel just drew: load his saved places and this place's notes once, then fill the box. */
 async function cmAfter(ev) {
   const key = keyOf(ev), run = ++CM.run;
-  if (CM.key !== key) { CM.key = key; CM.edit = ""; CM.editFrom = false; CM.notes = null; }
+  if (CM.key !== key) { CM.key = key; CM.edit = ""; CM.editFrom = false; CM.notes = null; cmSugClose(); }
   cmPaint();
   const same = () => CM.run === run && S.ev && keyOf(S.ev) === key && $("#cmBox");
   if (CM.places === null) {
@@ -2907,33 +2910,103 @@ async function cmLoadNotes(ev) {
 function cmNoteRow(n) {
   return `<div class="cmnote"><b>${esc(C.dayText(n.date || ""))}</b>${n.note ? `<span>${esc(n.note)}</span>` : ""}${n.hasFile ? `<button class="btn" data-cm="see" data-id="${esc(n.id)}">See the photo</button>` : ""}</div>`;
 }
+/** One From or To line: the label on the left, the place on the right (the name over its address), one big button (d24). */
+function cmRow(side, o, can) {
+  const from = side === "from", r = CalCommute.rowText(o), main = r.main || (from ? "Where you are" : "Not set yet");
+  const v = `<span class="v" id="cmV${side}">${esc(main)}${r.sub ? `<small>${esc(r.sub)}</small>` : ""}</span>`;
+  return can ? `<button type="button" class="cmr" data-cm="row${side}" aria-label="${from ? "Change where you start" : "Change where you are going"}" aria-describedby="cmV${side}"><span class="lbl">${from ? "From" : "To"}</span>${v}</button>`
+    : `<div class="cmr"><span class="lbl">${from ? "From" : "To"}</span>${v}</div>`;
+}
+/** The typing box one row turns into (d24, d25): the box, the places list, Saved places (Home first), Cancel. */
+function cmEditBox(ev, side, t) {
+  const to = side === "to", home = cmHome(), first = to && CalCommute.needsAsk(t), dis = cmCanEdit(ev) ? "" : "disabled";
+  const saved = (CM.places || []).filter((p) => p.category !== "commute-for" && p.category !== "home" && p !== home && (p.address || p.lat != null)).slice(0, 12);
+  const chips = [...(home ? [{ id: home.id, name: "Home" }] : []), ...saved];
+  const id = to ? "cmTo" : "cmFromIn";
+  return `<div class="cmask" id="${to ? "cmAsk" : "cmFromAsk"}">` +
+    (first ? `<b>Where are you going?</b><div class="meta">Type an address or a place name.</div>` : `<label class="lbl" for="${id}" style="margin:0">${to ? "To" : "From"}</label>`) +
+    `<input id="${id}" placeholder="Address or place name" ${first ? 'aria-label="Where are you going"' : ""} autocomplete="off" enterkeyhint="go" aria-controls="cmSug" ${dis}>` +
+    `<div class="cmsug" id="cmSug" aria-live="polite">${cmSugHtml()}</div>` +
+    (chips.length ? `<p class="lbl" style="margin:6px 0 0">Saved places</p><div class="chips">${chips.map((p) => `<button type="button" class="chip" data-cm="pick${side}" data-id="${esc(p.id)}" ${dis}>${esc(p.name)}</button>`).join("")}</div>` : "") +
+    (to && t.nextTitle ? `<label class="cmrem"><input type="checkbox" role="switch" id="cmRem" ${dis}> <span>Remember for every ${esc(t.nextTitle)}</span></label>` : "") +
+    (first ? "" : `<div class="r"><button type="button" class="btn" data-cm="${to ? "cancel" : "cancelfrom"}">Cancel</button></div>`) + `</div>`;
+}
+/** A repaint (directions arriving, a place list) must not wipe what he is typing: keep the text, the cursor and the Remember switch. */
+function cmKeepTyped(box) {
+  const i = box.querySelector("#cmTo, #cmFromIn"); if (!i) return null;
+  const r = box.querySelector("#cmRem");
+  return { id: i.id, v: i.value, focus: document.activeElement === i, at: i.selectionStart, rem: r ? r.checked : null };
+}
+function cmRestoreTyped(box, k) {
+  if (!k) return;
+  const i = box.querySelector("#" + k.id); if (!i) return;
+  i.value = k.v; if (k.focus) { i.focus(); try { i.setSelectionRange(k.at, k.at); } catch (e) {} }
+  const r = box.querySelector("#cmRem"); if (r && k.rem != null) r.checked = k.rem;
+}
+/** The places list (d25): up to 5 rows, the name over the small line, with a pin; or one soft line when the month's budget is spent. */
+function cmSugHtml() {
+  let h = CMS.items.map((x, i) => `<button type="button" data-cm="sug" data-i="${i}"><span aria-hidden="true">📍</span><span>${esc(x.name)}${x.sub ? `<small>${esc(x.sub)}</small>` : ""}</span></button>`).join("");
+  if (CMS.stopped) h += `<div class="meta cmstop" role="status">Place suggestions are off for the rest of the month. Type the full address.</div>`;
+  return h;
+}
+function cmSugDraw() { const el = $("#cmSug"); if (el) el.innerHTML = cmSugHtml(); }
+/** A box opens: a fresh session id (one per opened box) and an empty list. */
+function cmSugOpen(side) {
+  clearTimeout(CMS.timer);
+  Object.assign(CMS, { side, session: Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2), q: "", items: [], stopped: false, seq: CMS.seq + 1, busy: false });
+}
+function cmSugClose() { clearTimeout(CMS.timer); Object.assign(CMS, { side: "", q: "", items: [], stopped: false, seq: CMS.seq + 1, busy: false }); }
+/** He typed in the open box: from 3 characters and a 300 ms pause, ask the server for places. */
+function cmSugType(side, text) {
+  if (CMS.side !== side || !CMS.session) cmSugOpen(side);   // the first ask opens without a tap on a row: its session starts with the first letter
+  clearTimeout(CMS.timer); const q = String(text || "").trim();
+  Object.assign(CMS, { side, q, seq: CMS.seq + 1 });   // an answer still on its way for the earlier text is now out of date
+  if (!CalCommute.placesAskable(q)) { CMS.items = []; CMS.stopped = false; cmSugDraw(); return; }
+  CMS.timer = setTimeout(() => cmAskPlaces(side, q), 300);
+}
+async function cmAskPlaces(side, q) {
+  const ev = S.ev; if (!ev) return;
+  const seq = CMS.seq, other = side === "from" ? cmTarget(ev) : cmFrom(ev), body = { q, session: CMS.session };
+  const spot = other && (other.lat != null && other.lng != null ? other : cmSpot(other));
+  if (spot && spot.lat != null && spot.lng != null) body.near = { lat: spot.lat, lng: spot.lng };
+  let res = null; try { res = await send("/quest/commute/places", "POST", body); } catch (e) { /* 404 (not on the server yet), a failed request: no list, no error */ }
+  if (CMS.seq !== seq || CMS.side !== side || CMS.q !== q) return;   // he changed the text or closed the box meanwhile
+  Object.assign(CMS, CalCommute.readSuggestions(res)); cmSugDraw();
+}
+/** A pin already known for a place (saved coordinates, else one kept from an earlier map lookup), without asking anyone. */
+function cmSpot(o) {
+  if (!o) return null;
+  if (o.lat != null && o.lng != null) return { lat: o.lat, lng: o.lng };
+  const a = String(o.address || o.name || "").trim().toLowerCase();
+  return a ? cmGet(CMK.spots)[a] || null : null;
+}
+/** The row of map links: Google Maps always, Open in Organic Maps when the To has coordinates (d26). */
+function cmLinksHtml(ev) {
+  const t = cmTarget(ev), from = cmFrom(ev), mode = C.modeOf(ev);
+  const gm = CalCommute.mapsLink({ from: from && from.address, to: t.address, mode });
+  const withXY = (o) => { const p = cmSpot(o); return o ? { ...o, lat: p ? p.lat : null, lng: p ? p.lng : null } : null; };
+  const om = CalCommute.organicMapsLink({ from: withXY(from), to: withXY(t.address ? t : null), mode });
+  return `<a class="btn" href="${esc(gm)}" target="_blank" rel="noopener">Open in Google Maps</a>` + (om ? `<a class="btn" href="${esc(om)}" target="_blank" rel="noopener">Open in Organic Maps</a>` : "");
+}
 function cmPaint() {
   const box = $("#cmBox"), ev = S.ev; if (!box || !ev) return;
   cmDrop("small");
-  const mode = C.modeOf(ev), t = cmTarget(ev), from = cmFrom(ev), can = cmCanEdit(ev), ask = CalCommute.needsAsk(t) || CM.edit === keyOf(ev);
-  const asking = ask, home = cmHome();
-  const nm = (o) => (o.name && o.name !== o.address ? o.name + ", " : "") + o.address;
+  const mode = C.modeOf(ev), t = cmTarget(ev), from = cmFrom(ev), can = cmCanEdit(ev), ask = !CM.editFrom && (CalCommute.needsAsk(t) || CM.edit === keyOf(ev));
+  const asking = ask, home = cmHome(), inPlace = ask && !CalCommute.needsAsk(t);   // an ask for a To that is set replaces the To row; the first ask sits under the rows
+  const keep = cmKeepTyped(box);
   const dis = can ? "" : "disabled";
   const inp = !asking ? cmDirInput(ev) : null, dp = cmDirParts(ev, mode, inp), best = dp.ways && Object.values(dp.ways).filter(cmUsable).length > 1 ? CalCommute.bestWay(dp.ways) : "";
   const chip = ([m, ic, n]) => { const w = dp.ways && dp.ways[CalCommute.WAY[m]]; return `<button class="chip k-commute" data-cm="mode" data-v="${m}" aria-pressed="${m === mode}" ${dis}>${ic} ${n}${cmUsable(w) ? ` <span class="cmm">${w.minutes} min</span>` : ""}${best === m ? ' <small class="cmbest">best way</small>' : ""}</button>`; };
   let h = `<div class="field"><p class="lbl" style="margin:0">Going by</p><div class="chips">${C.MODES.map(chip).join("")}</div></div>`;
   if (CM.places === null || !CM.loaded[keyOf(ev)]) return void (box.innerHTML = h + `<div class="meta">Looking up your places…</div>`);
   h += dp.banner + dp.leave;
-  h += `<div class="cmroute"><div class="cmr"><span class="lbl">From</span><span class="v">${from ? esc(from.name === "Home" ? "Home" : nm(from)) : "Where you are"}</span>` +
-    `${can ? `<button class="btn" data-cm="editfrom">Change</button>` : ""}</div>`;
-  if (CM.editFrom) h += `<div class="cmask"><input id="cmFromIn" placeholder="Address or place name" aria-label="From" autocomplete="off" enterkeyhint="go"><div class="r"><button class="btn pri" data-cm="gofrom">Use this</button>${cmFromPicked(ev) ? '<button class="btn" data-cm="homeagain">Back to Home</button>' : ""}<button class="btn" data-cm="cancelfrom">Cancel</button></div></div>`;
-  h += `<div class="cmr"><span class="lbl">To</span><span class="v">${asking || !t.address ? "Not set yet" : esc(t.source === "home" ? "Home" : nm(t))}</span>${!asking && can ? `<button class="btn" data-cm="edit">Change</button>` : ""}</div></div>`;
+  h += `<div class="cmroute">${CM.editFrom ? cmEditBox(ev, "from", t) : cmRow("from", from, can)}` +
+    `${inPlace ? cmEditBox(ev, "to", t) : cmRow("to", asking || !t.address ? null : t, can)}</div>`;
   if (!asking) h += dp.way + dp.heads + dp.check;
   if (asking) {
-    const saved = CM.places.filter((p) => p.category !== "commute-for" && p.category !== "home" && (p.address || p.lat != null));
-    h += `<div class="cmask" id="cmAsk"><b>Where are you going?</b><div class="meta">Type an address or a place name.</div>
-      <input id="cmTo" placeholder="Address or place name" aria-label="Where are you going" autocomplete="off" enterkeyhint="go" ${dis}>
-      ${saved.length ? `<p class="lbl" style="margin:6px 0 0">Saved places</p><div class="chips">${saved.slice(0, 12).map((p) => `<button class="chip" data-cm="pick" data-id="${esc(p.id)}" ${dis}>${esc(p.name)}</button>`).join("")}</div>` : ""}
-      ${t.nextTitle ? `<label class="cmrem"><input type="checkbox" role="switch" id="cmRem" ${dis}> <span>Remember for every ${esc(t.nextTitle)}</span></label>` : ""}
-      <div class="r"><button class="btn pri" data-cm="go" ${dis}>Use this</button>${CalCommute.needsAsk(t) ? "" : '<button class="btn" data-cm="cancel">Cancel</button>'}</div></div>`;
+    if (!inPlace) h += cmEditBox(ev, "to", t);
   } else if (t.address) {
-    const link = CalCommute.mapsLink({ from: from && from.address, to: t.address, mode });
-    h += `<div class="r"><a class="btn" href="${esc(link)}" target="_blank" rel="noopener">Open in Google Maps</a></div>
+    h += `<div class="r" id="cmLinks">${cmLinksHtml(ev)}</div>
       <div class="cmmap" id="cmMap" role="region" aria-label="Map"></div>`;
   }
   if (!asking && t.address) {
@@ -2945,6 +3018,7 @@ function cmPaint() {
   /* the Home prompt sits last, so Going by and the To line (or the ask) stay at the top of a phone sheet */
   if (!home && !CM.editFrom) h += `<div class="cmask"><div class="meta">Add your home address and every Commute block starts from it.</div><input id="cmHomeIn" placeholder="Your home address" aria-label="Home address" autocomplete="off" enterkeyhint="done"><div class="r"><button class="btn" data-cm="home">Save home</button></div></div>`;
   box.innerHTML = h;
+  cmRestoreTyped(box, keep);
   if (!asking && t.address) cmMapShow($("#cmMap"), "small");
 }
 function cmDrop(w) { if (CM[w]) { try { CM[w].remove(); } catch (e) {} CM[w] = null; } }
@@ -2952,6 +3026,7 @@ function cmDrop(w) { if (CM[w]) { try { CM[w].remove(); } catch (e) {} CM[w] = n
 async function cmPins(ev) {
   const t = cmTarget(ev), from = cmFrom(ev), pins = [];
   const a = await cmPin(from), b = await cmPin(t.address ? t : null);
+  const lk = $("#cmLinks"); if (lk && S.ev && keyOf(S.ev) === keyOf(ev)) lk.innerHTML = cmLinksHtml(ev);   // the lookups just kept their pins: the Organic Maps button can use them
   if (a) pins.push({ id: "from", ...a, html: "From", label: "From" + (from.name ? ": " + from.name : "") });
   if (b) pins.push({ id: "to", ...b, html: "To", label: "To: " + (t.name || t.address) });
   const n = CM.notes ? [...CM.notes.block, ...CM.notes.place.filter((x) => x.block !== keyOf(ev))].filter((x) => x.hasFile) : [];
@@ -3045,6 +3120,38 @@ async function cmFound(text) {
   const g = await geocode(text);
   return { name: text, address: text, lat: g ? g.lat : null, lng: g ? g.lng : null };
 }
+/** Save a place as the From of a block: on the server, else kept here as pending. */
+async function cmSetFrom(ev, o) {
+  cmSugClose();
+  if (!(await cmSaveRoute(ev, "from", o))) { cmSet(CMK.from, keyOf(ev), { ...o, pending: true }); toast("Saved on this device only. The server could not be reached; it goes up next time.", { bad: true }); }
+  CM.editFrom = false; cmPaint(); cmDirections(ev);
+}
+/** "Home" on the From line. Where the block's own rule already starts at Home this is "Back to Home" (the pick is cleared); where
+    it would start at the place before (or nowhere), Home is saved as the pick so the From really reads Home. */
+async function cmFromHome(ev) {
+  const home = cmHome(), auto = CalCommute.fromFor({ ev, events: eventsFor(cmDay(ev), cmDay(ev)), tz: S.tz, targetOf: cmTargetOf, picked: null, home });
+  cmSugClose();
+  if (!home || !auto || auto.name === "Home" || CalCommute.samePlace(auto, home)) {
+    if (await cmSaveRoute(ev, "from", null)) { CM.editFrom = false; cmPaint(); cmDirections(ev); } else toast("Not changed: the server could not be reached. Try again.", { bad: true });
+  } else await cmSetFrom(ev, { name: "Home", address: home.address || "", lat: home.lat, lng: home.lng, id: home.id });
+}
+/** Go or Enter with no row picked: the typed text is used as it is (a lookup for the pin, as before). */
+async function cmGo(ev, side) {
+  const i = $(side === "to" ? "#cmTo" : "#cmFromIn"); const v = i ? (i.value || "").trim() : ""; if (!v) { if (i) i.focus(); return; }
+  const rem = $("#cmRem"), keepRem = !!(rem && rem.checked); cmSugClose();
+  const o = await cmFound(v);
+  if (side === "to") cmSetTarget(ev, o, keepRem); else cmSetFrom(ev, o);
+}
+/** A row of the places list was tapped: ask the server for that place and save it (name, address, lat, lng) as this end. */
+async function cmPickSuggestion(ev, i) {
+  const x = CMS.items[i], side = CMS.side; if (!x || !side || CMS.busy) return;
+  CMS.busy = true; const session = CMS.session, rem = $("#cmRem"), keepRem = !!(rem && rem.checked);
+  let o = null; try { o = CalCommute.readPlace(await send("/quest/commute/place", "POST", { id: x.id, session })); } catch (e) { /* falls back to the words on the row */ }
+  if (CMS.side !== side || CMS.session !== session) return;   // the box was closed or reopened while we waited
+  if (!o) o = await cmFound([x.name, x.sub].filter(Boolean).join(", "));
+  cmSugClose();
+  if (side === "to") cmSetTarget(ev, o, keepRem); else cmSetFrom(ev, o);
+}
 async function cmAct(t) {
   const ev = S.ev, d = t.dataset, key = ev && keyOf(ev);
   if (d.cm === "closemodal") document.querySelectorAll(".cmmodal").forEach((x) => x.remove());
@@ -3052,26 +3159,22 @@ async function cmAct(t) {
   else if (d.cm === "shotsave") cmSave(t.closest(".cmmodal"));
   if (!ev || ev.k !== "commute") return;
   if (d.cm === "mode") { const r = await patchEvent(ev, { mode: d.v }, "Change the way of going for"); if (r) { const e2 = findByKey(key); if (e2) panel("event", e2); } }
-  else if (d.cm === "edit") { CM.edit = key; cmPaint(); const i = $("#cmTo"); if (i) i.focus(); }
-  else if (d.cm === "cancel") { CM.edit = ""; cmPaint(); }
-  else if (d.cm === "editfrom") { CM.editFrom = true; cmPaint(); const i = $("#cmFromIn"); if (i) i.focus(); }
-  else if (d.cm === "cancelfrom") { CM.editFrom = false; cmPaint(); }
-  else if (d.cm === "homeagain") {
-    if (await cmSaveRoute(ev, "from", null)) { CM.editFrom = false; cmPaint(); cmDirections(ev); } else toast("Not changed: the server could not be reached. Try again.", { bad: true });
+  else if (d.cm === "rowto") { CM.editFrom = false; CM.edit = key; cmSugOpen("to"); cmPaint(); const i = $("#cmTo"); if (i) i.focus(); }
+  else if (d.cm === "cancel") { CM.edit = ""; cmSugClose(); cmPaint(); }
+  else if (d.cm === "rowfrom") { CM.edit = ""; CM.editFrom = true; cmSugOpen("from"); cmPaint(); const i = $("#cmFromIn"); if (i) i.focus(); }
+  else if (d.cm === "cancelfrom") { CM.editFrom = false; cmSugClose(); cmPaint(); }
+  else if (d.cm === "pickfrom") {
+    const p = (CM.places || []).find((x) => x.id === d.id); if (!p) return;
+    if (p === cmHome()) await cmFromHome(ev); else await cmSetFrom(ev, { name: p.name, address: p.address || p.name, lat: p.lat, lng: p.lng, id: p.id });
   }
-  else if (d.cm === "gofrom") {
-    const v = ($("#cmFromIn").value || "").trim(); if (!v) return; const o = await cmFound(v);
-    if (!(await cmSaveRoute(ev, "from", o))) { cmSet(CMK.from, key, { ...o, pending: true }); toast("Saved on this device only. The server could not be reached; it goes up next time.", { bad: true }); }
-    CM.editFrom = false; cmPaint(); cmDirections(ev);
-  }
+  else if (d.cm === "pickto") { const p = (CM.places || []).find((x) => x.id === d.id); if (p) { const rem = $("#cmRem"); cmSugClose(); cmSetTarget(ev, { name: p.name, address: p.address || p.name, lat: p.lat, lng: p.lng, id: p.id }, rem && rem.checked); } }
+  else if (d.cm === "sug") await cmPickSuggestion(ev, +d.i);
   else if (d.cm === "home") {
     const v = ($("#cmHomeIn").value || "").trim(); if (!v) return;
     try { const o = await cmFound(v), r = await send("/quest/places", "POST", { op: "put", place: { name: "Home", address: v, lat: o.lat, lng: o.lng, category: "home", list: "home", savedBy: "Calendar" } });
       CM.places = (CM.places || []).filter((p) => p.id !== r.place.id).concat(r.place); toast("Home saved"); cmPaint(); cmDirections(ev); }
     catch (e) { toast("Not saved: " + e.message, { bad: true }); }
   }
-  else if (d.cm === "go") { const v = ($("#cmTo").value || "").trim(); if (!v) { $("#cmTo").focus(); return; } const rem = $("#cmRem"); cmSetTarget(ev, await cmFound(v), rem && rem.checked); }
-  else if (d.cm === "pick") { const p = (CM.places || []).find((x) => x.id === d.id); if (p) { const rem = $("#cmRem"); cmSetTarget(ev, { name: p.name, address: p.address || p.name, lat: p.lat, lng: p.lng, id: p.id }, rem && rem.checked); } }
   else if (d.cm === "check") cmDirections(ev, { fresh: true });
   else if (d.cm === "switch") { const r = await patchEvent(ev, { mode: d.v }, "Change the way of going for"); if (r) { const e2 = findByKey(key); if (e2) panel("event", e2); } }
   else if (d.cm === "note") cmCompose(ev, null);
@@ -3090,9 +3193,11 @@ function commuteWire() {
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape" && document.querySelector(".cmmodal")) { cmClose(); return; }
     if (e.key !== "Enter") return;
-    const id = e.target.id, go = { cmTo: "go", cmFromIn: "gofrom", cmHomeIn: "home" }[id];
-    if (go) { e.preventDefault(); const b = $(`[data-cm="${go}"]`); if (b) b.click(); }
+    const id = e.target.id;
+    if (id === "cmTo" || id === "cmFromIn") { e.preventDefault(); if (S.ev) cmGo(S.ev, id === "cmTo" ? "to" : "from"); }
+    else if (id === "cmHomeIn") { e.preventDefault(); const b = $('[data-cm="home"]'); if (b) b.click(); }
   });
+  document.addEventListener("input", (e) => { const id = e.target.id; if (id === "cmTo" || id === "cmFromIn") cmSugType(id === "cmTo" ? "to" : "from", e.target.value); });
   document.addEventListener("change", async (e) => {
     const t = e.target; if (t.id !== "cmFile" || !t.files || !t.files[0] || !S.ev) return;
     const f = t.files[0]; t.value = "";

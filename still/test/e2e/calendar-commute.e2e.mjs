@@ -98,7 +98,7 @@ try {
     check(`${label}: Home is saved and From says Home`, /From Home/i.test(await panelText(page)) && !(await shown(page, "#cmHomeIn")));
 
     // the ask: type, remember
-    await page.fill("#cmTo", "Gladstone Hotel, Toronto"); await page.check("#cmRem"); await page.click('#cmAsk [data-cm="go"]'); await sleep(900);
+    await page.fill("#cmTo", "Gladstone Hotel, Toronto"); await page.check("#cmRem"); await page.press("#cmTo", "Enter"); await sleep(900);
     pt = await panelText(page);
     check(`${label}: To shows what he typed and the ask is gone`, /To Gladstone Hotel, Toronto/i.test(pt) && !/Where are you going\?/i.test(pt), pt.slice(0, 200));
     let href = await page.getAttribute('#cmBox a:has-text("Open in Google Maps")', "href");
@@ -155,14 +155,14 @@ try {
     check(`${label}: Walk is the walking link`, /travelmode=walking$/.test(href), href);
 
     // Change To: the ask comes back with a Cancel
-    await page.click('#cmBox [data-cm="edit"]'); await sleep(200);
-    check(`${label}: Change on To brings the ask back, with Cancel`, await shown(page, "#cmTo") && await shown(page, '#cmAsk [data-cm="cancel"]'));
-    await page.fill("#cmTo", "nowhere land"); await page.click('#cmAsk [data-cm="go"]'); await sleep(700);
+    await page.click('#cmBox [data-cm="rowto"]'); await sleep(200);
+    check(`${label}: tapping the To line brings the box back, with Cancel`, await shown(page, "#cmTo") && await shown(page, '#cmAsk [data-cm="cancel"]'));
+    await page.fill("#cmTo", "nowhere land"); await page.press("#cmTo", "Enter"); await sleep(700);
     check(`${label}: an address the map cannot find still works, with a note that there is no pin`, /To nowhere land/i.test(await panelText(page)));
     const gm = await page.getAttribute('#cmBox a:has-text("Open in Google Maps")', "href");
     check(`${label}: the link still builds for it`, /destination=nowhere%20land/.test(gm), gm);
-    await page.click('#cmBox [data-cm="edit"]'); await sleep(200);
-    await page.fill("#cmTo", "Gladstone Hotel, Toronto"); await page.click('#cmAsk [data-cm="go"]'); await sleep(900);
+    await page.click('#cmBox [data-cm="rowto"]'); await sleep(200);
+    await page.fill("#cmTo", "Gladstone Hotel, Toronto"); await page.press("#cmTo", "Enter"); await sleep(900);
 
     // d21 (Junyan, 2026-11-24): no Open map button, no full screen map, and nothing can open one
     check(`${label}: the panel has no Open map button and no full screen map layer`, !/Open map/.test(await panelText(page)) && await page.locator('#cmBox [data-cm="map"]').count() === 0 && await page.locator(".cmbig").count() === 0);
@@ -213,7 +213,7 @@ try {
     check(`${label}: Bus to studio opens`, await open("Bus to studio"));
     await page.waitForFunction(() => /\bTo\b/.test(document.querySelector("#cmBox")?.innerText || ""), null, { timeout: 5000 }).catch(() => {});
     pt = await panelText(page);
-    check(`${label}: the next event's address is used for the To`, /To Studio on-site · 527, 527 Bloor St W, Toronto/i.test(pt) && !/Where are you going\?/i.test(pt), pt.slice(0, 200));
+    check(`${label}: the next event's address is used for the To`, /To Studio on-site · 527 527 Bloor St W, Toronto/i.test(pt) && !/Where are you going\?/i.test(pt), pt.slice(0, 200));
     check(`${label}: Bus to studio is Transit`, (await chip("transit").getAttribute("aria-pressed")) === "true");
     // the same block tapped again within a moment: no page error from a map that was already removed, and one small map only
     await page.waitForFunction(() => document.querySelectorAll("#cmMap .cmpin").length >= 1, null, { timeout: 8000 }).catch(() => {});
@@ -253,8 +253,8 @@ try {
     const r0 = await srv(transitKey);
     check(`${label}: the To he typed is on the server under the block's key`, r0 && r0.to && /Gladstone/.test(r0.to.address), JSON.stringify(r0));
     check(`${label}: Transit opens again (From)`, await open("Transit"));
-    await page.waitForSelector('#cmBox [data-cm="editfrom"]', { timeout: 5000 });
-    await page.click('#cmBox [data-cm="editfrom"]'); await page.fill("#cmFromIn", "Queen Station, Toronto"); await page.click('#cmBox [data-cm="gofrom"]'); await sleep(700);
+    await page.waitForSelector('#cmBox [data-cm="rowfrom"]', { timeout: 5000 });
+    await page.click('#cmBox [data-cm="rowfrom"]'); await page.fill("#cmFromIn", "Queen Station, Toronto"); await page.press("#cmFromIn", "Enter"); await sleep(700);
     check(`${label}: a changed From shows`, /From Queen Station, Toronto/i.test(await panelText(page)));
     const r1 = await srv(transitKey);
     check(`${label}: the changed From is on the server too, beside the To`, r1 && r1.from && /Queen Station/.test(r1.from.address) && /Gladstone/.test(r1.to.address), JSON.stringify(r1));
@@ -286,12 +286,12 @@ try {
     const sub = await srv(subKey), bus = await srv(busKey);
     check(`${label}: the old browser address went up once and the copy here is dropped`, sub && sub.to && sub.to.address === "9 Old Browser Rd" && await page.evaluate(([a]) => !JSON.parse(localStorage.getItem("cal-commute-to") || "{}")[a], [subKey]), JSON.stringify(sub));
     check(`${label}: an old copy never overwrites what the server already holds`, bus && /1 Server Wins St/.test(bus.to.address), JSON.stringify(bus));
-    check(`${label}: and it shows as the To`, /To Old Spot, 9 Old Browser Rd/i.test(await panelText(page)), (await panelText(page)).slice(0, 200));
+    check(`${label}: and it shows as the To`, /To Old Spot 9 Old Browser Rd/i.test(await panelText(page)), (await panelText(page)).slice(0, 200));
     // the server cannot be reached: the change is kept in the browser, says so, and goes up next time
     await page.evaluate(async (b) => { await fetch(b + "/__dev/routes?down=1"); }, BASE);
     check(`${label}: Bus to studio opens (server down)`, await open("Bus to studio"));
     await sleep(500);
-    await page.click('#cmBox [data-cm="edit"]'); await page.fill("#cmTo", "55 Offline Ave"); await page.click('#cmAsk [data-cm="go"]'); await sleep(900);
+    await page.click('#cmBox [data-cm="rowto"]'); await page.fill("#cmTo", "55 Offline Ave"); await page.press("#cmTo", "Enter"); await sleep(900);
     check(`${label}: with the server down the To still shows, and a note says it is on this device only`, /To 55 Offline Ave/i.test(await panelText(page)) && /this device only/i.test(await text(page, "#toast")), await text(page, "#toast"));
     check(`${label}: the browser copy is the fallback, marked pending`, await page.evaluate((k) => { const o = JSON.parse(localStorage.getItem("cal-commute-to") || "{}")[k]; return !!o && o.pending === true && o.address === "55 Offline Ave"; }, busKey));
     await page.evaluate(async (b) => { await fetch(b + "/__dev/routes?down=0"); }, BASE);

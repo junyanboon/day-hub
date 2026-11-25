@@ -162,5 +162,46 @@
     return out;
   }
 
-  root.CalCommute = { arriveTarget, leaveBy, arriveLine, bestWay, quickerThan, alertsFor, groupAlerts, leaveShift, autoCheckDue, decodePolyline, WAY, CHIP, mapsLink, titleKey, rememberPlace, nextEvent, target, needsAsk, samePlace, previousPlace, fromFor, stepDur, placeKey, fitSize, TRAVELMODE };
+  /* ---------- d24 to d27 (Junyan, 2026-11-24, "Yes to all four") ---------- */
+  /** Organic Maps' own link format (source: omaps.app/api, "om://route" and "om://map"; the https://omaps.app/route and
+      /map forms take the same parameters and open the app, or a web page when it is not installed). Both ends with
+      coordinates: the trip in the picked way. Only the To with coordinates: that spot. No To coordinates: no link. */
+  const OM_TYPE = { transit: "transit", drive: "vehicle", commute: "pedestrian" };
+  const hasXY = (o) => !!o && typeof o.lat === "number" && typeof o.lng === "number" && Number.isFinite(o.lat) && Number.isFinite(o.lng);
+  const omName = (o) => clean(o && o.name) || clean(o && o.address);
+  function organicMapsLink({ from, to, mode }) {
+    if (!hasXY(to)) return "";
+    if (hasXY(from)) {
+      return "https://omaps.app/route?sll=" + from.lat + "," + from.lng + "&saddr=" + encodeURIComponent(omName(from)) +
+        "&dll=" + to.lat + "," + to.lng + "&daddr=" + encodeURIComponent(omName(to)) + "&type=" + (OM_TYPE[mode] || "pedestrian");
+    }
+    return "https://omaps.app/map?v=1&ll=" + to.lat + "," + to.lng + (omName(to) ? "&n=" + encodeURIComponent(omName(to)) : "");
+  }
+  /** The places list starts at 3 characters. */
+  const placesAskable = (q) => clean(q).length >= 3;
+  /** The server's /quest/commute/places answer as the list to draw: up to 5 rows with an id and a name. Only "ok" gives rows;
+      "stopped" is flagged (one soft line); no-key, error and anything odd give nothing and say nothing. */
+  function readSuggestions(res) {
+    if (!res || typeof res !== "object") return { items: [], stopped: false };
+    if (res.state === "stopped") return { items: [], stopped: true };
+    if (res.state !== "ok" || !Array.isArray(res.suggestions)) return { items: [], stopped: false };
+    const items = res.suggestions.filter((x) => x && clean(x.id) && clean(x.name)).slice(0, 5).map((x) => ({ id: String(x.id), name: clean(x.name), sub: clean(x.sub) }));
+    return { items, stopped: false };
+  }
+  /** The server's /quest/commute/place answer as a place to save, or null (it needs coordinates and something to call it). */
+  function readPlace(res) {
+    const p = res && res.state === "ok" && res.place;
+    if (!p || !hasXY(p) || !(clean(p.name) || clean(p.address))) return null;
+    return { name: clean(p.name), address: clean(p.address), lat: p.lat, lng: p.lng };
+  }
+  /** How a place reads on a From or To row: the name over its address (Home alone, a typed place once). */
+  function rowText(o) {
+    if (!o) return { main: "", sub: "" };
+    const name = clean(o.name), addr = clean(o.address);
+    if (name === "Home") return { main: "Home", sub: "" };
+    if (name && addr && name !== addr) return { main: name, sub: addr };
+    return { main: name || addr, sub: "" };
+  }
+
+  root.CalCommute = { arriveTarget, leaveBy, arriveLine, bestWay, quickerThan, alertsFor, groupAlerts, leaveShift, autoCheckDue, decodePolyline, WAY, CHIP, mapsLink, organicMapsLink, placesAskable, readSuggestions, readPlace, rowText, titleKey, rememberPlace, nextEvent, target, needsAsk, samePlace, previousPlace, fromFor, stepDur, placeKey, fitSize, TRAVELMODE };
 })(typeof window !== "undefined" ? window : globalThis);
