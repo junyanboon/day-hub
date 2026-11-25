@@ -16,9 +16,7 @@ const SIG = "100 Queen St W|Gladstone Hotel|1";
 test("keptAnswer: the ok answer in memory wins, else the one kept in this browser, only for the same trip", () => {
   const a = ok(1), b = ok(2);
   assert.equal(K.keptAnswer({ mem: { res: a, sig: SIG }, stored: { res: b, sig: SIG }, sig: SIG }).res, a);
-  assert.equal(K.keptAnswer({ mem: { res: a, sig: SIG }, stored: { res: b, sig: SIG }, sig: SIG }).from, "memory");
-  const s = K.keptAnswer({ mem: null, stored: { at: 5, res: b, sig: SIG }, sig: SIG });
-  assert.equal(s.res, b); assert.equal(s.from, "browser");
+  assert.equal(K.keptAnswer({ mem: null, stored: { at: 5, res: b, sig: SIG }, sig: SIG }).res, b);
 });
 test("keptAnswer: another trip, a not-ok answer or no signature is never returned", () => {
   const a = ok(1);
@@ -30,9 +28,9 @@ test("keptAnswer: another trip, a not-ok answer or no signature is never returne
 });
 test("endedView: a kept answer shows with 'Checked TIME' and no Check again; none shows only the quiet line", () => {
   const v = K.endedView({ kept: { res: ok(Date.parse("2026-11-25T17:20:00Z")) }, fmt });
-  assert.deepEqual(v, { show: "answer", over: "This block is over.", checked: "Checked 17:20", check: false });
+  assert.deepEqual(v, { show: "answer", over: "This block is over.", checked: "Checked 17:20" });
   const none = K.endedView({ kept: null, fmt });
-  assert.deepEqual(none, { show: "none", over: "This block is over.", checked: "", check: false });
+  assert.deepEqual(none, { show: "none", over: "This block is over.", checked: "" });
   assert.equal(K.endedView({ kept: { res: { state: "ok" } }, fmt }).checked, "", "an answer with no time says no time");
 });
 test("replacesHeld: a not-ok answer never replaces an ok one for the same trip; everything else replaces", () => {

@@ -2826,13 +2826,15 @@ function cmRemember(key, res, sig) {
   store.set("cal-commute-last", JSON.stringify(all));
 }
 const cmEnd = (o) => ({ name: o.name || "", address: o.address || "", lat: o.lat == null ? null : o.lat, lng: o.lng == null ? null : o.lng });
+/** One trip's signature: From, To and arrive time. An answer is only used for the trip it was made for (cmDirInput and cmEndedInput share it). */
+const cmSig = (from, t, arrive) => [from.address, t.address, Math.floor(arrive.at / 60000)].join("|");
 /** The inputs a directions answer needs, or null: no To, no From address, a block that has ended, or a day too far off. */
 function cmDirInput(ev) {
   const t = cmTarget(ev), from = cmFrom(ev);
   if (CalCommute.needsAsk(t) || !t.address || !from || !from.address || !Number.isFinite(ev.e) || CalCommute.blockEnded(ev.e, Date.now())) return null;
   const arrive = CalCommute.arriveTarget(ev, eventsFor(cmDay(ev), cmDay(ev)), S.tz);
   if (!(arrive.at > Date.now() - 3600000) || arrive.at > Date.now() + 14 * 86400000) return null;
-  return { t, from, arrive, sig: [from.address, t.address, Math.floor(arrive.at / 60000)].join("|") };
+  return { t, from, arrive, sig: cmSig(from, t, arrive) };
 }
 /** (d45) The trip of a block that is over, for finding the answer kept for it: the same sig as cmDirInput made while it ran, with no clock window
     and never a request. null: the block is not over, or it has no To or From address. */
@@ -2840,7 +2842,7 @@ function cmEndedInput(ev) {
   const t = cmTarget(ev), from = cmFrom(ev);
   if (!Number.isFinite(ev.e) || !CalCommute.blockEnded(ev.e, Date.now()) || CalCommute.needsAsk(t) || !t.address || !from || !from.address) return null;
   const arrive = CalCommute.arriveTarget(ev, eventsFor(cmDay(ev), cmDay(ev)), S.tz);
-  return { t, from, arrive, sig: [from.address, t.address, Math.floor(arrive.at / 60000)].join("|") };
+  return { t, from, arrive, sig: cmSig(from, t, arrive) };
 }
 const cmDirOf = (ev) => CM.dir[keyOf(ev)] || null;
 /** Ask the server. fresh skips its saved answer (Check again); auto marks the page's own once-only check. */
@@ -2859,14 +2861,14 @@ async function cmDirections(ev, { fresh = false, auto = false } = {}) {
     if (d.seq !== seq) return;   // a newer request replaced this one
     if (!CalCommute.replacesHeld({ held: d.res, heldSig: d.sig, sig: inp.sig, res })) { d.note = CalCommute.notOkText(res); d.checked = wasChecked; }   // d45: a not-ok re-check never throws away the good directions he has
     else {
-    d.prev = res.state === "ok" && before && before.state === "ok" ? before : null;
-    d.res = res; d.got = Date.now(); d.sig = inp.sig;
-    if (fresh && res.state === "ok") {
-      d.checked = { auto, at: d.got };
-      const w = res.ways && res.ways[CalCommute.WAY[C.modeOf(ev)]], lv = cmUsable(w) ? CalCommute.leaveBy(w, inp.arrive.at) : null;
-      if (Number.isFinite(lv) && d.got >= lv - 3600000) d.autoDone = true;   // a check he pressed inside that hour counts as the one
-    }
-    if (res.state === "ok") cmRemember(key, res, inp.sig);
+      d.prev = res.state === "ok" && before && before.state === "ok" ? before : null;
+      d.res = res; d.got = Date.now(); d.sig = inp.sig;
+      if (fresh && res.state === "ok") {
+        d.checked = { auto, at: d.got };
+        const w = res.ways && res.ways[CalCommute.WAY[C.modeOf(ev)]], lv = cmUsable(w) ? CalCommute.leaveBy(w, inp.arrive.at) : null;
+        if (Number.isFinite(lv) && d.got >= lv - 3600000) d.autoDone = true;   // a check he pressed inside that hour counts as the one
+      }
+      if (res.state === "ok") cmRemember(key, res, inp.sig);
     }
   } catch (e) { if (d.seq !== seq) return; d.error = "Directions could not be loaded. Check your connection and try again."; if (fresh) d.checked = wasChecked; }
   d.loading = false;

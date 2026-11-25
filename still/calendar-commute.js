@@ -403,15 +403,15 @@
      over, and a re-check that comes back not ok never replaces a good answer for the same trip. Pure rules; the page only draws them. */
   const OVER_TEXT = "This block is over.";
   /** The ok answer the page holds for this same trip (same From, To and arrive time = same sig): the one in memory, else the one kept in
-      this browser. {res, sig, from} or null. An answer that is not ok, or for another trip, is never returned. */
+      this browser. {res, sig} or null. An answer that is not ok, or for another trip, is never returned. */
   function keptAnswer({ mem, stored, sig }) {
     const ok = (x) => !!sig && !!x && !!x.res && x.res.state === "ok" && x.sig === sig;
-    return ok(mem) ? { res: mem.res, sig, from: "memory" } : ok(stored) ? { res: stored.res, sig, from: "browser" } : null;
+    return ok(mem) ? { res: mem.res, sig } : ok(stored) ? { res: stored.res, sig } : null;
   }
-  /** What a block that is over shows: show "answer" with the kept directions, or "none" (only the quiet line). Never a Check again. */
+  /** What a block that is over shows: show "answer" with the kept directions, or "none" (only the quiet line). It never offers a Check again. */
   function endedView({ kept, fmt }) {
     const at = kept && kept.res ? kept.res.checkedAt : NaN, t = Number.isFinite(at) ? clean(fmt(at)) : "";
-    return { show: kept ? "answer" : "none", over: OVER_TEXT, checked: kept && t ? "Checked " + t : "", check: false };
+    return { show: kept ? "answer" : "none", over: OVER_TEXT, checked: kept && t ? "Checked " + t : "" };
   }
   /** Does a new answer replace the one held? Always, unless it is not ok and the held one is ok for the same trip (then the good one stays). */
   const replacesHeld = ({ held, heldSig, sig, res }) => !!res && (res.state === "ok" || !(held && held.state === "ok" && !!sig && heldSig === sig));
