@@ -516,6 +516,14 @@
     return out;
   }
 
+  /** The computer panel's Location box (d33, Junyan 2026-11-25): what Save sends for it. {location} only when the text (trimmed) differs from
+      the event's own; {} when it did not change or the box is not on the page (text undefined). */
+  function locationPatch(ev, text) {
+    if (text == null) return {};
+    const loc = String(text).trim();
+    return loc !== String((ev && ev.location) || "").trim() ? { location: loc } : {};
+  }
+
   /** Notes that carry Google's formatting (HTML tags): shown read-only, so nothing is flattened. */
   const notesRich = (s) => /<\/?[a-z][a-z0-9]*\b[^>]*>/i.test(s || "");
   /** Formatted notes as plain text to read. */
@@ -532,7 +540,7 @@
 
   root.CalCore = { wall, instant, offset, addDays, dowOf, weekStart, isoWeek, addMonths, monthKey, monthsFor,
     KINDS, MODES, modeOf, guessKind, kindOf, layout, pieces, coversDay, routineBlocks, ROUTINE, orderBetween, groupOf, dropTask, blockMinutes, hm, dur, SWIPE, swipeLock, swipeCommit, HOUR, pinchHeight, hourMin, pinchMinute, pinchScroll, cardFit, cardTime, startHour, LOOKS, lookId, startLook, LOOK_RESET, placeOf, sunTimes, sunHalf, lookFace, tripCards, tripLinks, homeFit, homeShift,
-    sheetForm, sheetWhen, sheetPatch, sheetLength, sheetStart, sheetEnd, sheetDay, sheetEndDay, sheetAllDay, notesRich, notesText, dayText, clock, toMin };
+    sheetForm, sheetWhen, sheetPatch, locationPatch, sheetLength, sheetStart, sheetEnd, sheetDay, sheetEndDay, sheetAllDay, notesRich, notesText, dayText, clock, toMin };
 })(typeof window !== "undefined" ? window : globalThis);
 
 /* The Packing page's rules (slice 01, Junyan 2026-11-13, d22: "22 yes"), with no page in them: still/test/packing.test.mjs.

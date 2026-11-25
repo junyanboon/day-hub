@@ -58,11 +58,13 @@ try {
     const a = await open(desk, BASE), m = await open(desk, MAIN);
     /* Junyan, 2026-11-24 (d17 A, d18 yes): the desktop panel's Length row and Block type row are redesigned on purpose, so the compare leaves out
        everything from the first of them to the Calendar field; the rest of the panel must still equal origin/main's. */
-    const norm = (h) => h.replace(/<div class="field"(?: id="typeBox")?>(?:<p class="lbl" style="margin:0">(?:Length|Block type)<\/p>|<div class="typeline")[\s\S]*?(?=<div class="field"><label class="lbl" style="margin:0" for="pCal">)/, "");
+    /* Junyan, 2026-11-25 (d33 yes): the desktop panel also gets its own Location box, so that field (label to list box) is left out too. */
+    const noLoc = (h) => h.replace(/<div class="field"><label class="lbl" style="margin:0" for="pLoc">[\s\S]*?id="locSug"[^>]*><\/div><\/div>/, "").replace(/>\s+</g, "><");
+    const norm = (h) => noLoc(h).replace(/<div class="field"(?: id="typeBox")?>(?:<p class="lbl" style="margin:0">(?:Length|Block type)<\/p>|<div class="typeline")[\s\S]*?(?=<div class="field"><label class="lbl" style="margin:0" for="pCal">)/, "");
     const html = async (page, title, d) => { await openEv(page, title, d); return norm(await page.evaluate(() => document.querySelector("#pbody").innerHTML)); };
     for (const [title, d] of [["Work block", 2], ["Caney away", 3], ["Dinner", 2], ["Stay at FICTION", 3], ["Pack for FICTION stay", 2], ["Packing & Errands", 2]]) {
       const [x, y] = [await html(a.page, title, d), await html(m.page, title, d)];
-      check(`1280px: "${title}" panel HTML equals origin/main's (apart from Length and Block type)`, x === y && x.length > 200, x === y ? `${x.length} chars` : "differs");
+      check(`1280px: "${title}" panel HTML equals origin/main's (apart from Length and Block type)`, x === y && x.length > 200, x === y ? `${x.length} chars` : "differs at " + [...x].findIndex((c, i) => c !== y[i]) + ": " + x.slice([...x].findIndex((c, i) => c !== y[i]) - 60, [...x].findIndex((c, i) => c !== y[i]) + 120).replace(/\n/g, " "));
     }
     const draft = (page) => page.evaluate(() => { const s = C.instant(C.addDays(today(), 2), 180, S.tz); panel("event", { isNew: true, id: "draft", calId: "joint", title: "", s, e: s + 3600000, start: new Date(s).toISOString(), end: new Date(s + 3600000).toISOString(), k: "other" }); return document.querySelector("#pbody").innerHTML; });
     check("1280px: a new event's panel HTML equals origin/main's (apart from Length and Block type)", norm(await draft(a.page)) === norm(await draft(m.page)));

@@ -11,6 +11,7 @@ import { fileURLToPath } from "node:url";
 const require = createRequire(path.join(process.env.PW_DIR || process.cwd(), "x.js"));
 const { chromium } = require("playwright-core");
 import { launchTestBrowser } from "../helpers/test-browser.mjs";
+import { stubOpenMeteo } from "../helpers/open-meteo-stub.mjs";
 const here = path.dirname(fileURLToPath(import.meta.url));
 const PORT = +(process.env.PORT || 8851), BASE = `http://localhost:${PORT}`;
 const URL_ = `${BASE}/still/calendar.html?api=${encodeURIComponent(BASE)}`;
@@ -19,7 +20,6 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const flat = (s) => String(s || "").replace(/\s+/g, " ").trim();
 const results = [];
 const check = (name, ok, detail = "") => { results.push({ name, ok }); console.log(`${ok ? "PASS" : "FAIL"}  ${name}${detail ? "  (" + detail + ")" : ""}`); };
-const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64");
 
 const browser = await launchTestBrowser(chromium);
 const shown = (page, sel) => page.evaluate((s) => { const el = document.querySelector(s); return !!el && el.getClientRects().length > 0; }, sel);
@@ -47,7 +47,7 @@ try {
       const at = /queen/i.test(q) ? { lat: "43.6529", lon: "-79.3849" } : /nowhere/i.test(q) ? null : { lat: "43.6495", lon: "-79.4290" };
       route.fulfill({ status: 200, contentType: "application/json", headers: { "access-control-allow-origin": "*" }, body: JSON.stringify(at ? [at] : []) });
     });
-    await page.route("https://tile.openstreetmap.org/**", (route) => route.fulfill({ status: 200, contentType: "image/png", body: PNG }));
+    stubOpenMeteo(page);
     await page.addInitScript(() => { localStorage.setItem("quest-key", "test"); });
     await page.goto(URL_); await page.waitForSelector(".ev", { state: "attached" }); await sleep(500);
     const open = async (title) => {

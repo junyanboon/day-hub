@@ -234,5 +234,85 @@
     return { main: name || addr, sub: "" };
   }
 
-  root.CalCommute = { arriveTarget, leaveBy, arriveLine, bestWay, quickerThan, alertsFor, groupAlerts, leaveShift, autoCheckDue, decodePolyline, WAY, CHIP, mapsLink, organicMapsLink, placesAskable, readSuggestions, readPlace, locationText, keepPlace, alreadyKept, savedChips, rowText, titleKey, rememberPlace, nextEvent, target, needsAsk, samePlace, previousPlace, fromFor, stepDur, placeKey, fitSize, TRAVELMODE };
+  /* ---------- d31 B (Junyan, 2026-11-25: "31 B"): the weather box that replaces the small map ----------
+     Open-Meteo (free, no key), asked from the page for the From place only. Field names read from open-meteo.com/en/docs and proven
+     with one real call: hourly temperature_2m, apparent_temperature, precipitation_probability, weather_code; timeformat=unixtime gives
+     each hour as seconds (so a daylight saving change cannot shift the hour); forecast_days=16 reaches the end of today plus 15 days. */
+  const WX_FIELDS = "temperature_2m,apparent_temperature,precipitation_probability,weather_code";
+  const WX_DAYS = 16;
+  const WX_TEXT = { loading: "Checking the weather…", far: "No forecast yet for that day.", none: "Weather is not available right now." };
+  /** Two decimals (about 1 km): all the page tells Open-Meteo about where he is. */
+  const r2 = (n) => { const s = Number(n).toFixed(2); return s === "-0.00" ? "0.00" : s; };
+  /** The rounded point of a place with coordinates, or null. */
+  function weatherPlace(o) {
+    if (!hasXY(o)) return null;
+    return { lat: r2(o.lat), lng: r2(o.lng) };
+  }
+  /** The key one answer is kept under: the rounded point. "" with no pin. */
+  function weatherKey(o) { const p = weatherPlace(o); return p ? p.lat + "," + p.lng : ""; }
+  /** The Open-Meteo address: the rounded From point, the hourly fields, the time zone, the day count. Nothing else. "" with no pin. */
+  function weatherUrl({ lat, lng, tz }) {
+    const p = weatherPlace({ lat, lng}); if (!p) return "";
+    return "https://api.open-meteo.com/v1/forecast?latitude=" + p.lat + "&longitude=" + p.lng + "&hourly=" + WX_FIELDS +
+      "&timezone=" + encodeURIComponent(tz) + "&timeformat=unixtime&forecast_days=" + WX_DAYS;
+  }
+  /** WMO weather code (open-meteo.com/en/docs) to an icon and plain words. An unknown code keeps a plain icon and no words. */
+  const WX_CODES = {
+    0: ["☀️", "clear"], 1: ["🌤️", "mostly clear"], 2: ["⛅", "partly cloudy"], 3: ["☁️", "overcast"], 45: ["🌫️", "fog"], 48: ["🌫️", "fog"],
+    51: ["🌦️", "light drizzle"], 53: ["🌦️", "drizzle"], 55: ["🌦️", "heavy drizzle"], 56: ["🌧️", "freezing drizzle"], 57: ["🌧️", "freezing drizzle"],
+    61: ["🌧️", "light rain"], 63: ["🌧️", "rain"], 65: ["🌧️", "heavy rain"], 66: ["🌧️", "freezing rain"], 67: ["🌧️", "freezing rain"],
+    71: ["🌨️", "light snow"], 73: ["🌨️", "snow"], 75: ["🌨️", "heavy snow"], 77: ["🌨️", "snow grains"],
+    80: ["🌦️", "light showers"], 81: ["🌦️", "showers"], 82: ["🌧️", "heavy showers"], 85: ["🌨️", "snow showers"], 86: ["🌨️", "heavy snow showers"],
+    95: ["⛈️", "thunderstorm"], 96: ["⛈️", "thunderstorm with hail"], 97: ["⛈️", "thunderstorm"], 99: ["⛈️", "thunderstorm with hail"] };
+  function weatherWords(code) { const x = WX_CODES[code]; return x ? { icon: x[0], words: x[1] } : { icon: "🌡️", words: "" }; }
+  const HOUR = 3600000;
+  /** The hour of the answer to read for instant `at`: the entry nearest to it, within half an hour (half past goes to the later hour). null when
+      the answer has none (before its first hour or after its last) or is not the shape asked for. */
+  function pickHour(res, at) {
+    const h = res && res.hourly, t = h && h.time;
+    if (!Array.isArray(t) || !Number.isFinite(at)) return null;
+    let best = -1, gap = Infinity;
+    t.forEach((s, i) => { const d = Math.abs(s * 1000 - at); if (Number.isFinite(d) && (d < gap || (d === gap && s * 1000 > t[best] * 1000))) { gap = d; best = i; } });
+    if (best < 0 || gap > HOUR / 2) return null;
+    const v = (k) => { const x = h[k] && h[k][best]; return Number.isFinite(x) ? x : null; };
+    const temp = v("temperature_2m"); if (temp == null) return null;
+    return { temp, feels: v("apparent_temperature"), pop: v("precipitation_probability"), code: v("weather_code") };
+  }
+  /** "ended": the block is over, so no box at all. "far": the day is past what the forecast reaches (today and 15 days more, on the calendar's
+      clock). Otherwise "ok". */
+  function weatherWindow({ at, end, now, tz }) {
+    if (Number.isFinite(end) && end <= now) return "ended";
+    return C().wall(at, tz).day > C().addDays(C().wall(now, tz).day, WX_DAYS - 1) ? "far" : "ok";
+  }
+  /** How much of the trip is outside: the whole of a walk, the walking legs of transit, nothing said for a drive. null when none or no way. */
+  function outsideMinutes(chip, way) {
+    if (!usable(way)) return null;
+    let n = null;
+    if (chip === "commute") n = way.minutes;
+    else if (chip === "transit") n = (way.steps || []).filter((x) => x && x.kind === "walk" && Number.isFinite(x.minutes)).reduce((a, x) => a + x.minutes, 0);
+    return n > 0 ? Math.round(n) : null;
+  }
+  const RAIN = new Set([51, 53, 55, 56, 57, 61, 63, 65, 66, 67, 80, 81, 82, 95, 96, 97, 99]), SNOW = new Set([71, 73, 75, 77, 85, 86]);
+  /** One tip line, or "": rain or snow is likely at that hour (the words say so, or the chance is 50 percent or more). The minutes outside
+      ride on the tip and never stand alone. */
+  function weatherTip(hr, outside) {
+    if (!hr) return "";
+    const snow = SNOW.has(hr.code), rain = RAIN.has(hr.code), likely = Number.isFinite(hr.pop) && hr.pop >= 50;
+    let tip = "";
+    if (snow || (!rain && likely && hr.temp <= 0)) tip = "Snow is likely. Dress for it.";
+    else if (rain || likely) tip = "Bring an umbrella.";
+    return tip && Number.isFinite(outside) && outside >= 1 ? tip + ` About ${Math.round(outside)} min of the trip is outside.` : tip;
+  }
+  const deg = (x) => { const r = Math.sign(x) * Math.round(Math.abs(x)); return (r === 0 ? 0 : r) + "°"; };
+  /** What the box says: icon, big line "3° · light rain", small line with the hour and feels like, and the tip. fmt turns an instant into "12:36 pm". */
+  function weatherCard({ hr, at, leaving, outside, fmt }) {
+    const w = weatherWords(hr.code);
+    return { icon: w.icon, big: deg(hr.temp) + (w.words ? " · " + w.words : ""),
+      small: `${leaving ? "When you leave" : "When the block starts"}, ${fmt(at)}.` + (Number.isFinite(hr.feels) ? ` Feels like ${deg(hr.feels)}.` : ""),
+      tip: weatherTip(hr, outside) };
+  }
+  /** An answer kept in memory is fresh for 30 minutes; a failed ask is remembered for 2 so a repaint does not ask again at once. */
+  const wxFresh = (e, now) => !!e && now - e.at < (e.fail ? 2 : 30) * 60000;
+
+  root.CalCommute = { arriveTarget, leaveBy, arriveLine, bestWay, quickerThan, alertsFor, groupAlerts, leaveShift, autoCheckDue, decodePolyline, WAY, CHIP, mapsLink, organicMapsLink, placesAskable, readSuggestions, readPlace, locationText, keepPlace, alreadyKept, savedChips, rowText, weatherUrl, weatherPlace, weatherKey, weatherWords, pickHour, weatherWindow, outsideMinutes, weatherTip, weatherCard, wxFresh, WX_TEXT, titleKey, rememberPlace, nextEvent, target, needsAsk, samePlace, previousPlace, fromFor, stepDur, placeKey, fitSize, TRAVELMODE };
 })(typeof window !== "undefined" ? window : globalThis);

@@ -13,8 +13,8 @@
 <meta name="apple-mobile-web-app-title" content="Calendar">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>Calendar</title>
-<script src="calendar-core.js?v=33"></script>
-<script src="calendar-commute.js?v=2"></script>
+<script src="calendar-core.js?v=34"></script>
+<script src="calendar-commute.js?v=3"></script>
 <script src="cards-vault.js?v=2"></script><script src="cards.js?v=7"></script>
 <script src="quest-trips.js?v=20261121a" data-helpers></script>
 <script>
@@ -361,9 +361,8 @@ button.cmr{border:1px solid var(--line);background:var(--raise);border-radius:10
 .cmsug{display:flex;flex-direction:column}.cmsug button{display:flex;align-items:center;gap:8px;min-height:44px;width:100%;text-align:left;border:0;border-top:1px solid var(--line);background:none;color:inherit;font:inherit;padding:6px 4px}.cmsug button:hover{background:var(--raise)}.cmsug small{display:block;color:var(--soft);font-size:12px}.cmsug .cmstop{color:var(--soft);padding:6px 4px}.locsug:empty{display:none}.locsug button{padding:6px 14px}.locsug .cmstop{padding:6px 14px}
 .cmask{display:flex;flex-direction:column;gap:6px}.cmask input[type=text],.cmask input:not([type]),.cmask textarea,.cmmodal textarea{width:100%;background:var(--raise);border:1px solid var(--line);border-radius:10px;padding:8px 10px}
 .cmrem{display:flex;align-items:center;gap:8px}
-.cmmap{height:170px;border-radius:10px;overflow:hidden;border:1px solid var(--line);position:relative;z-index:0}
-.cmpin{min-width:34px;height:34px;border-radius:17px;padding:0 6px;display:flex;align-items:center;justify-content:center;font:700 11px system-ui,sans-serif;background:var(--bar);color:var(--ink);border:2px solid var(--k-commute);box-shadow:0 1px 4px var(--line)}
-.cmpin.to{border-width:4px}
+.cmwx{display:flex;align-items:center;gap:12px;min-height:72px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--raise)}.cmwx .wxi{font-size:34px;line-height:1;flex:none}.cmwx .wxb{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}.cmwx .big{font-size:22px;font-weight:700;line-height:1.15}.cmwx .wxtip{font-weight:600}
+.locin{width:100%;background:var(--raise);border:1px solid var(--line);border-radius:10px;padding:8px 10px}
 .cmnote{display:flex;align-items:center;gap:8px;flex-wrap:wrap;border-top:1px solid var(--line);padding-top:6px}.cmnote span{flex:1;min-width:0;overflow-wrap:anywhere}
 .cmbox .chip .cmm{opacity:.85;font-variant-numeric:tabular-nums}.cmbest{display:inline-block;margin-left:4px;padding:1px 6px;border-radius:8px;font-size:10px;font-weight:700;background:var(--k-commute);color:var(--bg)}
 .cmchk{display:flex;flex-direction:column;gap:2px;border-left:4px solid var(--k-commute);padding:6px 10px;background:var(--raise);border-radius:8px}.cmchk small{color:var(--soft)}
@@ -966,7 +965,6 @@ html.hsfill .x-toast{bottom:calc(22px + env(safe-area-inset-bottom,0px) - var(--
   .page.cards input,.page.cards select,.page.cards textarea{font-size:16px}
   .x-toast{white-space:normal;border-radius:18px}
 }
-@media (max-width:760px){.cmmap{height:150px}}
 </style></head>
 <body>
 <div class="app">
@@ -1022,7 +1020,7 @@ if (TOUCH) for (const g of ["gesturestart", "gesturechange"]) document.addEventL
    which shows this build, the phone's answers and a log of every day change with its cause. Until then CalHook.on is
    null and diag() does nothing. BUILD names this copy of the page, so a screenshot proves which copy ran: change it on
    every change to this page or calendar-readout.js (the date plus a letter). */
-const BUILD = "2026-11-24g location places and keep";
+const BUILD = "2026-11-25a commute weather box and location box";
 const CalHook = window.CalHook = { BUILD, on: null };
 const diag = (kind, msg) => { if (CalHook.on) CalHook.on(kind, msg); };
 /* The iPhone home screen app's fit (2026-11-12): html.hs in a home screen app on touch, html.hsfill and --hsgap when
@@ -1728,7 +1726,6 @@ function panel(tab, ev) {
 function paintPanel(anim) {
   $$(".ptabs [data-p]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.p === S.tab)));
   const b = $("#pbody");
-  cmDrop("small");   // the small map of a Commute panel is not kept alive when the panel changes
   if (anim) { b.classList.remove("in"); void b.offsetWidth; b.classList.add("in"); }
   b.innerHTML = S.tab === "event" ? pEvent(S.ev) : S.tab === "list" ? pList(S.ev) : S.tab === "set" ? pSet() : S.tab === "keys" ? pKeys() : pNow();
   if (S.tab === "event" && S.ev && b.querySelector("#cmBox")) cmAfter(S.ev);
@@ -1765,13 +1762,15 @@ function pEvent(ev) {
   const mins = ev.allDay ? 0 : (ev.s - Date.now()) / 60000;
   /* A Commute block shows no date and time line (Junyan, 2026-11-24): it keeps "starts in", the second zone, Repeats and the place. */
   const whenTxt = ev.k === "commute" ? "" : esc(whenText(ev)), soon = mins > 0 && mins < 1440 ? `${whenTxt ? " · " : ""}starts in ${untilText(mins)}` : "";
-  const lines = [whenTxt + soon, two() && !ev.allDay ? `${esc(zoneName(S.tz2))}: ${C.hm(C.wall(ev.s, S.tz2).min)} to ${C.hm(C.wall(ev.e, S.tz2).min)}` : "", ev.recurringEventId ? "Repeats" : "", ev.location ? esc(ev.location) : ""].filter(Boolean).join("<br>");
+  const lines = [whenTxt + soon, two() && !ev.allDay ? `${esc(zoneName(S.tz2))}: ${C.hm(C.wall(ev.s, S.tz2).min)} to ${C.hm(C.wall(ev.e, S.tz2).min)}` : "", ev.recurringEventId ? "Repeats" : ""].filter(Boolean).join("<br>");
   const typeChips = `<div class="chips" id="typeChips" ${isNew ? "" : "hidden"}><button class="chip k-${guess}" data-kind="" aria-pressed="${!S.form.kind}" ${dis}>Guess: ${esc(KNAME[guess])}</button>${C.KINDS.map(([k, n]) => `<button class="chip k-${k}" data-kind="${k}" aria-pressed="${S.form.kind === k}" ${dis}>${KICON[k] ? KICON[k] + " " : ""}${n}</button>`).join("")}</div>`;
   return `<div class="r"><button class="btn" data-p="now">&#8249; Now</button><span class="spacer"></span><span class="meta">${esc(cal.name)}</span></div>
     ${ev.ghost ? `<div class="meta">Suggested by ${esc(ev.by)}${ev.why ? ": " + esc(ev.why) : ""}</div>` : ""}
     <div class="field"><input class="tinput" id="pTitle" value="${esc(ev.title)}" placeholder="Title" aria-label="Title" ${dis}>
       <div style="color:var(--soft)">${lines}</div></div>
     ${commuteBox(ev)}
+    <div class="field"><label class="lbl" style="margin:0" for="pLoc">Location</label><input class="locin" id="pLoc" type="text" value="${esc(ev.location || "")}" placeholder="Add location" autocomplete="off" aria-controls="locSug" ${ev.ghost || !canEdit ? "disabled" : ""}>
+      <div class="cmsug locsug" id="locSug" aria-live="polite"></div></div>
     ${ev.allDay || ev.ghost ? "" : `<div class="field"><p class="lbl" style="margin:0">Length</p><div class="lenrow"><button class="btn" data-lenstep="-1" aria-label="15 minutes shorter" ${dis || S.form.dur <= 15 ? "disabled" : ""}>&minus;</button><b data-lenval>${C.dur(S.form.dur)}</b><button class="btn" data-lenstep="1" aria-label="15 minutes longer" ${dis}>+</button><span class="meta" data-lenends>ends ${esc(endsText(ev, S.form.dur))}</span></div></div>`}
     ${ev.ghost ? "" : isNew ? `<div class="field"><p class="lbl" style="margin:0">Block type</p>${typeChips}</div>`
       : `<div class="field" id="typeBox"><div class="typeline" id="typeLine"><span id="typeName">${esc(KNAME[S.form.kind || guess])}</span> · <button class="linkbtn" data-typechange ${dis}>change</button></div>${typeChips}</div>`}
@@ -1884,11 +1883,12 @@ async function saveEvent() {
   const len = ev.allDay ? 0 : Math.round((ev.e - ev.s) / 60000);
   if (ev.isNew) {
     if (!title) { ti.focus(); return; }
+    const loc = (($("#pLoc") || {}).value || "").trim();   // read before the panel closes
     panel("now");
-    await createEvent({ calId, title, start: new Date(ev.s).toISOString(), end: new Date(ev.s + dur * 60000).toISOString(), ...(kind ? { kind } : {}) });
+    await createEvent({ calId, title, start: new Date(ev.s).toISOString(), end: new Date(ev.s + dur * 60000).toISOString(), ...(kind ? { kind } : {}), ...(loc ? { location: loc } : {}) });
     return;
   }
-  const f = {};
+  const f = { ...C.locationPatch(ev, ($("#pLoc") || {}).value) };
   if (title && title !== ev.title) f.title = title;
   if (calId !== ev.calId) f.toCalId = calId;
   if ((kind || "") !== (ev.kind || "")) f.kind = kind;
@@ -2746,7 +2746,7 @@ const CMS = makePlaceList({ id: "cmSug", rowAttr: 'data-cm="sug"', ready: () => 
   nearOf: (side) => { const ev = S.ev, other = ev && (side === "from" ? cmTarget(ev) : cmFrom(ev)); return other && (other.lat != null && other.lng != null ? other : cmSpot(other)); } });
 /** The Location row of the phone sheet: a point is known only from Home's saved coordinates (nobody is asked just for the bias). */
 const LOC = makePlaceList({ id: "locSug", rowAttr: 'data-loc="sug"', nearOf: () => { const h = cmHome(); return h && h.lat != null && h.lng != null ? h : null; } });
-const CM = { dir: {}, places: null, loading: false, notes: null, edit: "", editFrom: false, key: "", small: null, seq: {}, run: 0, routes: {}, loaded: {}, up: false };
+const CM = { dir: {}, places: null, loading: false, notes: null, edit: "", editFrom: false, key: "", run: 0, routes: {}, loaded: {}, up: false };
 const cmGet = (k) => { try { const v = JSON.parse(store.get(k) || "{}"); return v && typeof v === "object" ? v : {}; } catch { return {}; } };
 const cmSet = (k, key, val) => { const o = cmGet(k); if (val) o[key] = val; else delete o[key]; store.set(k, JSON.stringify(o)); };
 const cmHome = () => (CM.places || []).find((p) => p.category === "home" || /^home$/i.test(p.name || "")) || null;
@@ -3007,7 +3007,6 @@ function cmPaint() {
   const box = $("#cmBox"), ev = S.ev; if (!box || !ev) return;
   const fo = document.activeElement;
   if (fo && (fo.id === "cmTo" || fo.id === "cmFromIn") && box.contains(fo)) { CM.dirty = true; return; }   // never rebuild a box while he types in it: on an iPhone that closes the keyboard (any tap or Enter lets go of the box first)
-  cmDrop("small");
   const mode = C.modeOf(ev), t = cmTarget(ev), from = cmFrom(ev), can = cmCanEdit(ev), ask = !CM.editFrom && (CalCommute.needsAsk(t) || CM.edit === keyOf(ev));
   const asking = ask, home = cmHome(), inPlace = ask && !CalCommute.needsAsk(t);   // an ask for a To that is set replaces the To row; the first ask sits under the rows
   const keep = cmKeepTyped(box);
@@ -3023,8 +3022,7 @@ function cmPaint() {
   if (asking) {
     if (!inPlace) h += cmEditBox(ev, "to", t);
   } else if (t.address) {
-    h += `<div class="r" id="cmLinks">${cmLinksHtml(ev)}</div>
-      <div class="cmmap" id="cmMap" role="region" aria-label="Map"></div>`;
+    h += `<div class="r" id="cmLinks">${cmLinksHtml(ev)}</div>` + cmWxBox(ev);
   }
   if (!asking && t.address) {
     const mine = (CM.notes && CM.notes.block) || [], past = ((CM.notes && CM.notes.place) || []).filter((n) => n.block !== keyOf(ev));
@@ -3036,45 +3034,76 @@ function cmPaint() {
   if (!home && !CM.editFrom) h += `<div class="cmask"><div class="meta">Add your home address and every Commute block starts from it.</div><input id="cmHomeIn" placeholder="Your home address" aria-label="Home address" autocomplete="off" enterkeyhint="done"><div class="r"><button class="btn" data-cm="home">Save home</button></div></div>`;
   box.innerHTML = h;
   cmRestoreTyped(box, keep);
-  if (!asking && t.address) cmMapShow($("#cmMap"), "small");
+  if (!asking && t.address) cmWxRun(ev);
 }
-function cmDrop(w) { if (CM[w]) { try { CM[w].remove(); } catch (e) {} CM[w] = null; } }
-/** The pins: From, To, and a camera where this block's and earlier photos belong (a photo is tied to the place, not to a spot). */
-async function cmPins(ev) {
-  const t = cmTarget(ev), from = cmFrom(ev), pins = [];
-  const a = await cmPin(from), b = await cmPin(t.address ? t : null);
+/* ---------- d31 B (Junyan, 2026-11-25: "31 B"): the weather box, where the small map was ----------
+   The weather where he leaves from (the From place) at the hour he leaves: the Leave by time when directions are loaded, else the block's
+   start. Open-Meteo, free and keyless, asked from this page with only the From point rounded to 2 decimals, the time zone and the field
+   names (calendar-commute.js weatherUrl). One answer per rounded place is kept in memory for 30 minutes (CMW.cache), so retyping or
+   repainting never asks again. The box is filled on its own (cmWxSet): nothing here repaints #cmBox, so the From and To boxes keep focus. */
+const CMW = { cache: {}, flight: {}, nopin: {} };
+/** What the box shows before any asking: from memory when the place's answer is already kept, else a quiet line. null: no box (the block is over). */
+function cmWxBody(ev) {
+  const K = CalCommute, plan = cmWxPlan(ev);
+  if (plan.window === "ended") return null;
+  if (plan.window === "far") return `<div class="meta" role="status">${esc(K.WX_TEXT.far)}</div>`;
+  if (!plan.from) return `<div class="meta" role="status">${esc(K.WX_TEXT.none)}</div>`;
+  const spot = cmSpot(plan.from), key = spot ? K.weatherKey(spot) : "", hit = key && CMW.cache[key];
+  if (hit && K.wxFresh(hit, Date.now())) return cmWxCard(hit, plan);
+  if (!spot && CMW.nopin[cmPinKey(plan.from)] && K.wxFresh(CMW.nopin[cmPinKey(plan.from)], Date.now())) return `<div class="meta" role="status">${esc(K.WX_TEXT.none)}</div>`;
+  return `<div class="meta" role="status">${esc(K.WX_TEXT.loading)}</div>`;
+}
+const cmPinKey = (o) => String((o && (o.address || o.name)) || "").trim().toLowerCase();
+/** The box: always drawn while the block is not over; its inside is cmWxBody. */
+function cmWxBox(ev) {
+  const b = cmWxBody(ev);
+  return b == null ? "" : `<div class="cmwx" id="cmWx" role="region" aria-label="Weather">${b}</div>`;
+}
+/** When and what the weather is for: the Leave by hour when directions are loaded for this trip and way, else the block's start. */
+function cmWxPlan(ev) {
+  const K = CalCommute, inp = cmDirInput(ev), d = cmDirOf(ev), way = inp && d && d.res && d.sig === inp.sig ? cmWay(d, C.modeOf(ev)) : null;
+  const leave = cmUsable(way) ? K.leaveBy(way, inp.arrive.at) : null, at = Number.isFinite(leave) ? leave : ev.s;
+  return { from: cmFrom(ev), at, leaving: Number.isFinite(leave), window: K.weatherWindow({ at, end: ev.e, now: Date.now(), tz: S.tz }), outside: K.outsideMinutes(C.modeOf(ev), way) };
+}
+function cmWxCard(entry, plan) {
+  const K = CalCommute, hr = K.pickHour(entry.res, plan.at);
+  if (!hr) return `<div class="meta" role="status">${esc(entry.res && Array.isArray(entry.res.hourly && entry.res.hourly.time) && plan.at > entry.res.hourly.time[entry.res.hourly.time.length - 1] * 1000 ? K.WX_TEXT.far : K.WX_TEXT.none)}</div>`;
+  const c = K.weatherCard({ hr, at: plan.at, leaving: plan.leaving, outside: plan.outside, fmt: cmFmt });
+  return `<div class="wxi" aria-hidden="true">${c.icon}</div><div class="wxb"><div class="big">${esc(c.big)}</div><div class="meta">${esc(c.small)}</div>${c.tip ? `<div class="wxtip">${esc(c.tip)}</div>` : ""}</div>`;
+}
+/** Write the weather box and nothing else (never the whole Commute box), only while this block's panel is still the one open. */
+function cmWxSet(ev) {
+  const el = $("#cmWx"), b = cmWxBody(ev);
+  if (!el || b == null || !S.ev || keyOf(S.ev) !== keyOf(ev) || el.innerHTML === b) return;
+  el.innerHTML = b;
+}
+/** One ask to Open-Meteo for a place, kept 30 minutes in memory (a failure for 2). Asks of the same place at the same moment share one. */
+async function cmWxFetch(key, url) {
+  const hit = CMW.cache[key]; if (CalCommute.wxFresh(hit, Date.now())) return hit;
+  if (CMW.flight[key]) return CMW.flight[key];
+  return CMW.flight[key] = (async () => {
+    let e;
+    try { const r = await fetch(url); if (!r.ok) throw new Error("weather " + r.status); e = { at: Date.now(), res: await r.json() }; }
+    catch (x) { e = { at: Date.now(), fail: true }; }
+    CMW.cache[key] = e; delete CMW.flight[key]; return e;
+  })();
+}
+/** Look up the pins, keep the Open in Organic Maps button current, then fill the weather box. Never blocks the rest of the panel. */
+async function cmWxRun(ev) {
+  const K = CalCommute, pin = await cmLookups(ev);
+  if (!S.ev || keyOf(S.ev) !== keyOf(ev)) return;
+  const plan = cmWxPlan(ev); if (plan.window !== "ok") return cmWxSet(ev);
+  const key = pin ? K.weatherKey(pin) : "";
+  if (!key) { if (plan.from) CMW.nopin[cmPinKey(plan.from)] = { at: Date.now(), fail: true }; return cmWxSet(ev); }
+  const hit = CMW.cache[key]; if (!K.wxFresh(hit, Date.now())) await cmWxFetch(key, K.weatherUrl({ lat: pin.lat, lng: pin.lng, tz: S.tz }));
+  cmWxSet(ev);
+}
+/** The pins: the From and the To are looked up (kept in this browser), and the Open in Organic Maps button is redrawn with them. Returns the From pin. */
+async function cmLookups(ev) {
+  const t = cmTarget(ev), from = cmFrom(ev);
+  const a = await cmPin(from); await cmPin(t.address ? t : null);
   const lk = $("#cmLinks"); if (lk && S.ev && keyOf(S.ev) === keyOf(ev)) lk.innerHTML = cmLinksHtml(ev);   // the lookups just kept their pins: the Organic Maps button can use them
-  if (a) pins.push({ id: "from", ...a, html: "From", label: "From" + (from.name ? ": " + from.name : "") });
-  if (b) pins.push({ id: "to", ...b, html: "To", label: "To: " + (t.name || t.address) });
-  const n = CM.notes ? [...CM.notes.block, ...CM.notes.place.filter((x) => x.block !== keyOf(ev))].filter((x) => x.hasFile) : [];
-  if (b && n.length) pins.push({ id: "photo", lat: b.lat, lng: b.lng, anchor: [-6, 54], html: "📷" + (n.length > 1 ? n.length : ""), label: "Photos here", photos: n });
-  return pins;
-}
-async function cmMapShow(box, which) {
-  const ev = S.ev; if (!box || !ev) return;
-  const seq = CM.seq[which] = (CM.seq[which] || 0) + 1;   // a draw overtaken by a newer one for the same slot stops before it builds a map
-  let L; try { L = await mapLib(); } catch (e) { if (CM.seq[which] === seq) box.innerHTML = '<div class="meta" style="padding:14px">The map could not load (no connection to the map library).</div>'; return; }
-  const pins = await cmPins(ev);
-  if (!box.isConnected || CM.seq[which] !== seq) return;
-  if (!pins.length) { box.innerHTML = '<div class="meta" style="padding:14px">No pin yet. The address was not found on the map, and Open in Google Maps still works.</div>'; return; }
-  const dd = cmDirOf(ev), way = cmWay(dd, C.modeOf(ev)), line = cmUsable(way) && way.polyline ? CalCommute.decodePolyline(way.polyline) : [];
-  cmDrop(which);
-  const map = CM[which] = L.map(box, { zoomControl: false, attributionControl: true, dragging: !L.Browser.mobile, scrollWheelZoom: false });
-  L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "© OpenStreetMap contributors", referrerPolicy: "strict-origin-when-cross-origin" }).addTo(map);
-  map._pins = pins; map._line = line;
-  if (line.length > 1) L.polyline(line, { color: getComputedStyle(document.documentElement).getPropertyValue("--k-commute").trim() || "#2a7", weight: 5, opacity: 0.85, interactive: false }).addTo(map);   // the way there, between the From and To pins
-  for (const p of pins) {
-    const icon = L.divIcon({ className: "", html: `<div class="cmpin ${p.id}">${esc(p.html)}</div>`, iconSize: [34, 34], iconAnchor: p.anchor || [17, 17] });   // the camera sits above the To pin, so both can be tapped
-    const m = L.marker([p.lat, p.lng], { icon, title: p.label, alt: p.label, keyboard: true }).addTo(map);
-    if (p.photos) m.on("click", () => cmSeePhotos(p.photos));
-  }
-  cmFit(map);
-  setTimeout(() => { if (CM[which] === map) map.invalidateSize(); }, 60);   // only while this map is still the live one: a removed map has no panes left to measure
-}
-function cmFit(map) {
-  const ps = map && map._pins; if (!ps || !ps.length) return;
-  const pts = [...ps.map((p) => [p.lat, p.lng]), ...(map._line || [])];
-  if (pts.length === 1) map.setView(pts[0], 15); else map.fitBounds(pts, { padding: [36, 36], maxZoom: 15 });
+  return a;
 }
 function cmClose() { document.querySelectorAll(".cmmodal").forEach((x) => x.remove()); }
 function cmModal(inner) {
@@ -3191,7 +3220,7 @@ async function locPick(pid) {
   LOC.busy = true; const session = LOC.session;
   let o = null; try { o = CalCommute.readPlace(await send("/quest/commute/place", "POST", { id: x.id, session })); } catch (e) { /* falls back to the words on the row */ }
   if (LOC.session !== session || LOC.side !== "loc") { LOC.busy = false; return; }   // the field was closed or reopened while we waited
-  const text = CalCommute.locationText(o || { name: x.name, address: x.sub }), i = document.querySelector('.sheet [data-f="location"]');
+  const text = CalCommute.locationText(o || { name: x.name, address: x.sub }), i = document.querySelector('.sheet [data-f="location"], #pLoc');
   LOC.close(); LOC.draw();
   if (i && !i.disabled) { i.value = text; sheetInput(i); i.blur(); }
 }
@@ -3231,7 +3260,7 @@ function cmAutoTick() {
   const leaveAt = CalCommute.leaveBy(way, inp.arrive.at);
   if (CalCommute.autoCheckDue({ now: Date.now(), leaveAt, done: d.autoDone })) { d.autoDone = true; cmDirections(ev, { fresh: true, auto: true }); }
 }
-const isLocInput = (el) => !!el && el.matches && el.matches('.sheet [data-f="location"]');
+const isLocInput = (el) => !!el && el.matches && el.matches('.sheet [data-f="location"], #pLoc');   // the phone's row, and the computer panel's box (d33)
 function commuteWire() {
   setInterval(cmAutoTick, 60000);
   document.addEventListener("click", (e) => { const t = e.target.closest("[data-cm]"); if (t) cmAct(t); });

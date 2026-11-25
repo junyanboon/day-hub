@@ -1,9 +1,9 @@
 // Commute blocks, slice 1 (Junyan, 2026-11-24: "1 yes, 2 A, 3 yes, 4 A"). Clicks every control of the Commute panel in
 // the test browser, on a computer and on a phone: Going by, Home, the ask, Remember for every ..., Open in Google Maps,
-// the small map, Add a photo (shrunk to 1600px), Add a note, See the
+// the weather box (d31 B, where the small map was), Add a photo (shrunk to 1600px), Add a note, See the
 // photo, and "From last time you went here" on a later block to the same place.
 // The clock is fixed (Nov 24 2026, 10:00 in Toronto) for the page and for the dev server, so no test reads the real clock.
-// The map lookup (OpenStreetMap search) and the map tiles are answered here; Leaflet itself loads from the internet.
+// The map lookup (OpenStreetMap search) and Open-Meteo are answered here (helpers/open-meteo-stub.mjs); no run calls the real weather service.
 // Not part of `node --test`: it needs playwright-core and the test browser.
 //   PW_DIR=<folder with node_modules/playwright-core> node still/test/e2e/calendar-commute.e2e.mjs
 //   SHOTS=<folder> also saves a computer and a phone screenshot of the panel.
@@ -15,6 +15,7 @@ import { fileURLToPath } from "node:url";
 const require = createRequire(path.join(process.env.PW_DIR || process.cwd(), "x.js"));
 const { chromium } = require("playwright-core");
 import { launchTestBrowser } from "../helpers/test-browser.mjs";
+import { stubOpenMeteo } from "../helpers/open-meteo-stub.mjs";
 const here = path.dirname(fileURLToPath(import.meta.url));
 const PORT = +(process.env.PORT || 8817), BASE = `http://localhost:${PORT}`;
 const URL_ = `${BASE}/still/calendar.html?api=${encodeURIComponent(BASE)}`;
@@ -23,7 +24,6 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const flat = (s) => String(s || "").replace(/\s+/g, " ").trim();
 const results = [];
 const check = (name, ok, detail = "") => { results.push({ name, ok }); console.log(`${ok ? "PASS" : "FAIL"}  ${name}${detail ? "  (" + detail + ")" : ""}`); };
-const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64");
 
 const browser = await launchTestBrowser(chromium);
 const text = (page, sel) => page.evaluate((s) => document.querySelector(s)?.innerText || "", sel);
@@ -50,7 +50,7 @@ try {
       const at = /queen/i.test(q) ? { lat: "43.6529", lon: "-79.3849" } : /nowhere/i.test(q) ? null : { lat: "43.6495", lon: "-79.4290" };
       route.fulfill({ status: 200, contentType: "application/json", headers: { "access-control-allow-origin": "*" }, body: JSON.stringify(at ? [at] : []) });
     });
-    await page.route("https://tile.openstreetmap.org/**", (route) => route.fulfill({ status: 200, contentType: "image/png", body: PNG }));
+    const wx = stubOpenMeteo(page);
     await page.addInitScript(() => { localStorage.setItem("quest-key", "test"); });
     await page.goto(URL_); await page.waitForSelector(".ev", { state: "attached" }); await sleep(500);
     const open = async (title) => {
@@ -87,7 +87,7 @@ try {
     check(`${label}: the Commute part sits right under the title and time, before the usual fields`, lay.box && lay.title && lay.box[0] >= lay.title[1] && (phone ? lay.rowTop > lay.box[0] : lay.lenTop > lay.box[1]) && lay.calTop > lay.box[1], JSON.stringify(lay));
     if (phone) check(`${label}: on a 390 by 844 phone the Going by row and the ask show without scrolling`, lay.sheet && lay.vh === 844 && lay.going < 844 && lay.ask < 844, JSON.stringify(lay));
     if (process.env.SHOTS) await page.screenshot({ path: path.join(process.env.SHOTS, `commute-${label}-first-open.png`) });
-    check(`${label}: no Google Maps link, no map, no photo buttons before there is an address`, !(await shown(page, "#cmBox a")) && !(await shown(page, "#cmMap")) && !(await shown(page, "#cmFile")) && !/Add a photo/.test(pt));
+    check(`${label}: no Google Maps link, no weather box, no photo buttons before there is an address`, !(await shown(page, "#cmBox a")) && !(await shown(page, "#cmWx")) && !(await shown(page, "#cmFile")) && !/Add a photo/.test(pt));
     check(`${label}: the ask offers Remember for every Work block`, /Remember for every Work block/.test(pt));
     check(`${label}: no route steps, times, alerts or Check now are drawn`, !/leave by|heads up|check now|get directions|\d+ min walk|closure|weather/i.test(pt), pt);
     if (process.env.SHOTS) await page.screenshot({ path: path.join(process.env.SHOTS, `commute-${label}-ask.png`) });
@@ -107,10 +107,12 @@ try {
     const places = await page.evaluate(async (b) => (await (await fetch(b + "/quest/places", { headers: { "X-Quest-Key": "test" } })).json()).places, BASE);
     check(`${label}: Home and "Remember for every Work block" are saved places`, places.some((p) => p.category === "home" && p.name === "Home") && places.some((p) => p.category === "commute-for" && p.list === "for:work block" && /Gladstone/.test(p.address)), JSON.stringify(places.map((p) => [p.category, p.list])));
 
-    // the small map
-    await page.waitForFunction(() => document.querySelectorAll("#cmMap .cmpin").length >= 2, null, { timeout: 15000 }).catch(() => {});
-    const pins = await page.evaluate(() => [...document.querySelectorAll("#cmMap .cmpin")].map((m) => m.textContent));
-    check(`${label}: the small map has a From pin and a To pin`, pins.includes("From") && pins.includes("To"), JSON.stringify(pins));
+    // d31 B: the weather box where the small map was. It shows the From place's weather and asks Open-Meteo with only the rounded From point.
+    await page.waitForSelector("#cmWx .big", { timeout: 8000 }).catch(() => {});
+    const wxt = flat(await text(page, "#cmWx"));
+    check(`${label}: the weather box shows a temperature and words (stubbed Open-Meteo)`, /^\S* ?3° · light rain/.test(wxt) && /Feels like 0°/.test(wxt) && /Bring an umbrella\./.test(wxt), wxt);
+    check(`${label}: it asked once, and sent only the rounded From point, the fields and the time zone`, wx.urls.length === 1 && (() => { const u = new URL(wx.urls[0]); return u.searchParams.get("latitude") === "43.65" && u.searchParams.get("longitude") === "-79.38" && u.searchParams.get("timezone") === "America/Toronto" && [...u.searchParams.keys()].sort().join() === "forecast_days,hourly,latitude,longitude,timeformat,timezone"; })(), JSON.stringify(wx.urls));
+    check(`${label}: no map is drawn in the panel (no Leaflet, no #cmMap)`, await page.locator("#cmMap, #cmBox .leaflet-container").count() === 0);
 
     // slice 2: directions, against the dev server's fake Google (no key, no outside call)
     await page.waitForSelector("#cmBox .cmleave", { timeout: 8000 }).catch(() => {});
@@ -122,8 +124,7 @@ try {
     check(`${label}: Heads up shows the TTC alert and the weather, and nothing for closures on a transit trip`, /Heads up/i.test(dt) && /Line 1: trains move slower/i.test(dt) && /Snow from 1 pm/i.test(dt) && !/closed near/i.test(dt));
     check(`${label}: Check now and Last checked are there, and the by-itself sentence says what the page does`, /Check now/i.test(dt) && /Last checked \d{1,2}(:\d{2})? (am|pm)/i.test(dt) && /While this panel is open, it checks once in the hour before you leave\./i.test(dt));
     check(`${label}: no Parking near row`, !/parking near/i.test(dt));
-    await page.waitForFunction(() => document.querySelectorAll("#cmMap .leaflet-interactive").length >= 1, null, { timeout: 15000 }).catch(() => {});
-    check(`${label}: the small map draws the route line`, await page.evaluate(() => document.querySelectorAll("#cmMap path.leaflet-interactive, #cmMap .leaflet-overlay-pane path").length) >= 1);
+    check(`${label}: with directions loaded the weather is for the Leave by hour`, /When you leave, \d{1,2}(:\d{2})? (am|pm)\./.test(flat(await text(page, "#cmWx"))), flat(await text(page, "#cmWx")));
     if (process.env.SHOTS) await page.screenshot({ path: path.join(process.env.SHOTS, `commute-${label}-directions.png`) });
     await page.evaluate(async (b) => fetch(b + "/__dev/directions?next=1"), BASE);
     const callsBefore = await page.evaluate(async (b) => (await (await fetch(b + "/__dev/directions")).json()).calls.length, BASE);
@@ -166,7 +167,7 @@ try {
 
     // d21 (Junyan, 2026-11-24): no Open map button, no full screen map, and nothing can open one
     check(`${label}: the panel has no Open map button and no full screen map layer`, !/Open map/.test(await panelText(page)) && await page.locator('#cmBox [data-cm="map"]').count() === 0 && await page.locator(".cmbig").count() === 0);
-    check(`${label}: Open in Google Maps and the small map are still there`, await page.locator('#cmBox a:has-text("Open in Google Maps")').count() === 1 && await page.locator("#cmMap").count() === 1);
+    check(`${label}: Open in Google Maps and the weather box are still there`, await page.locator('#cmBox a:has-text("Open in Google Maps")').count() === 1 && await page.locator("#cmWx").count() === 1);
 
     // Add a note
     await page.click('#cmBox [data-cm="note"]'); await sleep(200);
@@ -191,15 +192,9 @@ try {
     const sized = await page.evaluate(() => { const i = document.querySelector(".cmmodal img"); return i.complete && i.naturalWidth; });
     check(`${label}: See the photo shows the saved picture`, sized === 1600, String(sized));
     await page.click('.cmmodal [data-cm="closemodal"]'); await sleep(150);
-    // the camera pin on the map shows the photo
-    await page.waitForFunction(() => document.querySelectorAll("#cmMap .cmpin.photo").length === 1, null, { timeout: 8000 }).catch(() => {});
-    check(`${label}: the map has a 📷 pin for the photo`, await page.evaluate(() => document.querySelectorAll("#cmMap .cmpin.photo").length) === 1);
     await page.evaluate(() => document.querySelector("#cmBox").scrollIntoView()); await sleep(200);
     if (process.env.SHOTS) await page.screenshot({ path: path.join(process.env.SHOTS, `commute-${label}-panel.png`), fullPage: false });
-    await page.click("#cmMap .cmpin.photo"); await page.waitForSelector(".cmmodal img", { timeout: 5000 });
-    check(`${label}: tapping the photo pin shows the photo`, await page.evaluate(() => document.querySelectorAll(".cmmodal img").length) === 1);
-    await page.keyboard.press("Escape"); await sleep(200);
-    check(`${label}: Escape closes the photo`, !(await shown(page, ".cmmodal")));
+    check(`${label}: no camera pin is left (the map is gone); the photo opens from its note`, await page.locator(".cmpin").count() === 0);
 
     // a later block before the same-titled event fills itself and shows what he saved last time
     check(`${label}: the later Commute block opens`, await open("Commute"));
@@ -215,33 +210,13 @@ try {
     pt = await panelText(page);
     check(`${label}: the next event's address is used for the To`, /To Studio on-site · 527 527 Bloor St W, Toronto/i.test(pt) && !/Where are you going\?/i.test(pt), pt.slice(0, 200));
     check(`${label}: Bus to studio is Transit`, (await chip("transit").getAttribute("aria-pressed")) === "true");
-    // the same block tapped again within a moment: no page error from a map that was already removed, and one small map only
-    await page.waitForFunction(() => document.querySelectorAll("#cmMap .cmpin").length >= 1, null, { timeout: 8000 }).catch(() => {});
-    // the test browser's pinned clock keeps errors thrown inside a timer away from "pageerror", so the map's resize also records what it throws
-    await page.evaluate(() => { window.__mapThrown = []; const o = L.Map.prototype.invalidateSize; L.Map.prototype.invalidateSize = function () { try { return o.apply(this, arguments); } catch (e) { window.__mapThrown.push(e.message); throw e; } }; });
-    const thrown = () => page.evaluate(() => window.__mapThrown.slice());
-    // the timing a repaint makes: the panel draws again just after the map was built, so its 60 ms resize timer meets a removed map
-    const errsT = errors.length;
-    await page.evaluate(async () => { const b = document.querySelector("#cmMap"); await cmMapShow(b, "small"); cmDrop("small"); b.style.height = (b.offsetHeight + 40) + "px"; });   // the box changes size, as it does when the panel draws again
-    await sleep(300);
-    await page.evaluate(() => { document.querySelector("#cmMap").style.height = ""; });
-    check(`${label}: a map removed right after it was built throws no page error from its delayed resize`, errors.length === errsT && (await thrown()).length === 0, errors.slice(errsT).concat(await thrown()).join(" | "));
-    // two overlapping draws of the same small map: the older one gives way, one map is built
-    const errsO = errors.length;
-    const built = await page.evaluate(async () => {
-      const L = await mapLib(); let n = 0; const orig = L.map; L.map = function () { n++; return orig.apply(this, arguments); };
-      const box = document.querySelector("#cmMap"); cmDrop("small");
-      await Promise.all([cmMapShow(box, "small"), cmMapShow(box, "small")]);
-      L.map = orig; return n;
-    });
-    await sleep(300);
-    check(`${label}: two overlapping draws of the small map build one map and throw nothing`, built === 1 && errors.length === errsO && (await thrown()).length === 0 && await page.evaluate(() => document.querySelectorAll("#cmBox .leaflet-container").length) === 1, `built ${built} ${errors.slice(errsO).join(" | ")}`);
-    const errsBefore = errors.length, thrownBefore = (await page.evaluate(() => window.__mapThrown.length));
+    // the same block tapped again within a moment: no page error, and one weather box only
+    await page.waitForSelector("#cmWx .big", { timeout: 8000 }).catch(() => {});
+    const errsBefore = errors.length;
     for (let i = 0; i < 3; i++) { await page.evaluate(() => [...document.querySelectorAll(".ev")].find((e) => /Bus to studio/.test(e.innerText))?.click()); await sleep(20); }
     await sleep(1000);
-    check(`${label}: tapping the same Commute block again three times quickly throws no page error`, errors.length === errsBefore && (await thrown()).length === thrownBefore, errors.slice(errsBefore).concat((await thrown()).slice(thrownBefore)).join(" | "));
-    const maps = await page.evaluate(() => [document.querySelectorAll("#cmBox .leaflet-container").length, document.querySelectorAll("#cmBox .leaflet-map-pane").length, document.querySelectorAll("#cmMap .cmpin").length]);
-    check(`${label}: and exactly one small map is in the panel, with its pins`, maps[0] === 1 && maps[1] === 1 && maps[2] >= 1, JSON.stringify(maps));
+    check(`${label}: tapping the same Commute block again three times quickly throws no page error`, errors.length === errsBefore, errors.slice(errsBefore).join(" | "));
+    check(`${label}: and exactly one weather box is in the panel`, await page.locator("#cmBox #cmWx").count() === 1);
     check(`${label}: Subway to class opens`, await open("Subway to class"));
     await page.waitForFunction(() => /\bTo\b/.test(document.querySelector("#cmBox")?.innerText || ""), null, { timeout: 5000 }).catch(() => {});
     check(`${label}: the block's own location is used for the To`, /To 1 Yonge St, Toronto/i.test(await panelText(page)));
@@ -263,7 +238,7 @@ try {
     const ctx2 = await browser.newContext({ ...opts, timezoneId: "America/Toronto" });
     const page2 = await ctx2.newPage(); await page2.clock.install({ time: new Date(NOW) });
     await page2.route("https://nominatim.openstreetmap.org/**", (route) => route.fulfill({ status: 200, contentType: "application/json", headers: { "access-control-allow-origin": "*" }, body: "[]" }));
-    await page2.route("https://tile.openstreetmap.org/**", (route) => route.fulfill({ status: 200, contentType: "image/png", body: PNG }));
+    stubOpenMeteo(page2);
     await page2.addInitScript(() => { localStorage.setItem("quest-key", "test"); });
     await page2.goto(URL_); await page2.waitForSelector(".ev", { state: "attached" }); await sleep(500);
     for (let i = 0; i < 6; i++) {

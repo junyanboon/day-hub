@@ -124,7 +124,7 @@ test("a way he picked by hand still wins: the quicker row only offers a switch, 
   assert.equal(K.quickerThan({ transit: { minutes: 34 }, drive: { minutes: 32 } }, "transit"), null, "2 minutes is not worth a row");
   assert.equal(K.quickerThan({ transit: { tooFar: true }, drive: { minutes: 5 } }, "transit"), null);
   const src = fs.readFileSync(new URL("../calendar.html", import.meta.url), "utf8");
-  const fn = src.slice(src.indexOf("function cmPaint()"), src.indexOf("function cmDrop("));
+  const fn = src.slice(src.indexOf("function cmPaint()"), src.indexOf("const CMW ="));
   assert.match(fn, /const mode = C\.modeOf\(ev\)/, "the way drawn is the one saved on the block");
   assert.doesNotMatch(src.slice(src.indexOf("/* commute:start */"), src.indexOf("/* commute:end */")), /patchEvent\(ev, \{ mode: best/, "the page never changes the way by itself");
 });
@@ -194,7 +194,7 @@ test("d21: the Commute panel has no Open map button and nothing on the page can 
   assert.doesNotMatch(src, /Open map/);
   assert.doesNotMatch(src, /data-cm="(map|gps|fit|close)"/);
   assert.match(src, /Open in Google Maps/, "the Google Maps link stays");
-  assert.match(src, /id="cmMap"/, "the small map stays");
+  assert.doesNotMatch(src, /id="cmMap"/, "the small map is gone (d31 B: the weather box took its place)");
   for (const w of [/cmbig/i, /cmbar/i, /cmOpenBig/, /cmGps/, /cmBigMap/, /Show where I am/, /Whole trip/, /Open map/, /createElement\("div"\);\s*o\.className/]) assert.doesNotMatch(html, w, String(w));
   assert.doesNotMatch(html, /d\.cm === "(map|gps|fit|close)"/, "no action is left to open one");
   const core = readFileSync(new URL("../calendar-core.js", import.meta.url), "utf8");
@@ -234,11 +234,11 @@ test("d6: in the computer panel and the phone sheet the Commute box comes right 
   assert.doesNotMatch(pSheet, /cmWhen/, "no date and time line above the box (Junyan, 2026-11-24)");
   assert.ok(sbox < at(pSheet, 'id="pDel"'));
 });
-test("d6: inside the box the order is Going by, From, To or the ask, Open in Google Maps, the small map, then photos and notes; Home is asked last (slice 2 puts Leave by after Going by, and The way there, Heads up and Check now after To)", async () => {
+test("d6: inside the box the order is Going by, From, To or the ask, Open in Google Maps, the weather box (d31 B, where the small map was), then photos and notes; Home is asked last (slice 2 puts Leave by after Going by, and The way there, Heads up and Check now after To)", async () => {
   const { readFileSync } = await import("node:fs");
   const html = readFileSync(new URL("../calendar.html", import.meta.url), "utf8");
-  const src = html.slice(html.indexOf("function cmPaint()"), html.indexOf("function cmDrop("));
-  const order = ['Going by', 'dp.leave', 'cmRow("from"', 'cmRow("to"', 'dp.way + dp.heads + dp.check', 'if (!inPlace) h += cmEditBox', 'id="cmLinks"', 'id="cmMap"', 'Photos and notes', 'Add your home address'];
+  const src = html.slice(html.indexOf("function cmPaint()"), html.indexOf("const CMW ="));
+  const order = ['Going by', 'dp.leave', 'cmRow("from"', 'cmRow("to"', 'dp.way + dp.heads + dp.check', 'if (!inPlace) h += cmEditBox', 'id="cmLinks"', 'cmWxBox(ev)', 'Photos and notes', 'Add your home address'];
   let last = -1;
   for (const w of order) { const i = src.indexOf(w); assert.ok(i > last, w + " out of order"); last = i; }
 });
@@ -350,10 +350,10 @@ test("the page: a Commute block shows no date and time line, other blocks keep t
   assert.match(fn, /starts in/); assert.match(fn, /Repeats/);
   assert.match(h.slice(h.indexOf("function pSheet(ev)")), /\$\{cm\}/, "the sheet still draws the Commute part");
 });
-test("the page: both map tile layers ask for the site's origin as Referer", () => {
+test("the page: the Travel map's tile layer (the only one left, d31 B) asks for the site's origin as Referer", () => {
   const h = html2(), n = (h.match(/L\.tileLayer\(/g) || []).length;
-  assert.equal(n, 2);
-  assert.equal((h.match(/L\.tileLayer\("https:\/\/tile\.openstreetmap\.org\/\{z\}\/\{x\}\/\{y\}\.png", \{[^}]*referrerPolicy: "strict-origin-when-cross-origin"/g) || []).length, 2);
+  assert.equal(n, 1);
+  assert.equal((h.match(/L\.tileLayer\("https:\/\/tile\.openstreetmap\.org\/\{z\}\/\{x\}\/\{y\}\.png", \{[^}]*referrerPolicy: "strict-origin-when-cross-origin"/g) || []).length, 1);
 });
 
 /* ---- d24 to d27 (Junyan, 2026-11-24, "Yes to all four"): tap the line, a places list, Open in Organic Maps ---- */
