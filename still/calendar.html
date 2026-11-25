@@ -14,7 +14,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>Calendar</title>
 <script src="calendar-core.js?v=34"></script>
-<script src="calendar-commute.js?v=3"></script>
+<script src="calendar-commute.js?v=4"></script>
 <script src="cards-vault.js?v=2"></script><script src="cards.js?v=7"></script>
 <script src="quest-trips.js?v=20261121a" data-helpers></script>
 <script>
@@ -376,6 +376,12 @@ button.cmr{border:1px solid var(--line);background:var(--raise);border-radius:10
 .chip{border:1px solid var(--line);background:none;border-radius:999px;padding:4px 10px;color:var(--soft)}
 .chip[aria-pressed=true]{background:color-mix(in srgb,var(--c,var(--neutral)) 22%,var(--bar));border-color:var(--c,var(--ink));color:var(--ink);font-weight:600}
 .chip:disabled{opacity:.5;cursor:default}
+.cmsvh{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:6px}
+.cmedit{background:none;border:0;color:var(--accent-ink);font:inherit;font-weight:600;padding:0 8px;min-height:32px;min-width:44px;cursor:pointer}
+.chips.rm{gap:10px}
+.chip.rm{display:inline-flex;align-items:center;gap:6px;padding:0 3px 0 10px}
+.chip.off{opacity:.45}
+.cmx{background:var(--raise2);border:0;border-radius:50%;color:var(--ink);font:inherit;font-size:18px;line-height:1;min-width:32px;min-height:32px;padding:0;margin:2px 0 2px 4px;cursor:pointer}
 .lenrow{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.lenrow b{min-width:60px;text-align:center}
 .lenrow button{min-height:44px;min-width:44px;font-size:20px;line-height:1}.lenrow button:disabled{opacity:.4;cursor:default}
 .typeline{color:var(--soft)}.typeline[hidden],#typeChips[hidden]{display:none}
@@ -1020,7 +1026,7 @@ if (TOUCH) for (const g of ["gesturestart", "gesturechange"]) document.addEventL
    which shows this build, the phone's answers and a log of every day change with its cause. Until then CalHook.on is
    null and diag() does nothing. BUILD names this copy of the page, so a screenshot proves which copy ran: change it on
    every change to this page or calendar-readout.js (the date plus a letter). */
-const BUILD = "2026-11-25a commute weather box and location box";
+const BUILD = "2026-11-25b remove a kept place";
 const CalHook = window.CalHook = { BUILD, on: null };
 const diag = (kind, msg) => { if (CalHook.on) CalHook.on(kind, msg); };
 /* The iPhone home screen app's fit (2026-11-12): html.hs in a home screen app on touch, html.hsfill and --hsgap when
@@ -2746,7 +2752,7 @@ const CMS = makePlaceList({ id: "cmSug", rowAttr: 'data-cm="sug"', ready: () => 
   nearOf: (side) => { const ev = S.ev, other = ev && (side === "from" ? cmTarget(ev) : cmFrom(ev)); return other && (other.lat != null && other.lng != null ? other : cmSpot(other)); } });
 /** The Location row of the phone sheet: a point is known only from Home's saved coordinates (nobody is asked just for the bias). */
 const LOC = makePlaceList({ id: "locSug", rowAttr: 'data-loc="sug"', nearOf: () => { const h = cmHome(); return h && h.lat != null && h.lng != null ? h : null; } });
-const CM = { dir: {}, places: null, loading: false, notes: null, edit: "", editFrom: false, key: "", run: 0, routes: {}, loaded: {}, up: false };
+const CM = { dir: {}, places: null, loading: false, notes: null, edit: "", editFrom: false, rm: false, key: "", run: 0, routes: {}, loaded: {}, up: false };
 const cmGet = (k) => { try { const v = JSON.parse(store.get(k) || "{}"); return v && typeof v === "object" ? v : {}; } catch { return {}; } };
 const cmSet = (k, key, val) => { const o = cmGet(k); if (val) o[key] = val; else delete o[key]; store.set(k, JSON.stringify(o)); };
 const cmHome = () => (CM.places || []).find((p) => p.category === "home" || /^home$/i.test(p.name || "")) || null;
@@ -2931,7 +2937,7 @@ function commuteBox(ev) { return ev.k === "commute" && !ev.isNew && !ev.ghost &&
 /** The panel just drew: load his saved places and this place's notes once, then fill the box. */
 async function cmAfter(ev) {
   const key = keyOf(ev), run = ++CM.run;
-  if (CM.key !== key) { CM.key = key; CM.edit = ""; CM.editFrom = false; CM.notes = null; cmSugClose(); }
+  if (CM.key !== key) { CM.key = key; CM.edit = ""; CM.editFrom = false; CM.rm = false; CM.notes = null; cmSugClose(); }
   cmPaint();
   const same = () => CM.run === run && S.ev && keyOf(S.ev) === key && $("#cmBox");
   if (CM.places === null) {
@@ -2959,17 +2965,24 @@ function cmRow(side, o, can) {
   return can ? `<button type="button" class="cmr" data-cm="row${side}" aria-label="${from ? "Change where you start" : "Change where you are going"}" aria-describedby="cmV${side}"><span class="lbl">${from ? "From" : "To"}</span>${v}</button>`
     : `<div class="cmr"><span class="lbl">${from ? "From" : "To"}</span>${v}</div>`;
 }
+/** One chip of Saved places. The remove mode (d34): a kept place gets an x; no chip picks while it is on, so a missed x never changes From or To. */
+function cmChipHtml(p, side, rmOn, dis) {
+  if (!rmOn) return `<button type="button" class="chip" data-cm="pick${side}" data-id="${esc(p.id)}" ${dis}>${esc(p.name)}</button>`;
+  if (!CalCommute.removableChip(p)) return `<span class="chip off">${esc(p.name)}</span>`;
+  return `<span class="chip rm" data-rmid="${esc(p.id)}"><span>${esc(p.name)}</span><button type="button" class="cmx" data-cm="rmplace" data-id="${esc(p.id)}" aria-label="Remove ${esc(p.name)} from Saved places">×</button></span>`;
+}
 /** The typing box one row turns into (d24, d25): the box, the places list, Saved places (Home first), Cancel. */
 function cmEditBox(ev, side, t) {
   const to = side === "to", home = cmHome(), first = to && CalCommute.needsAsk(t), dis = cmCanEdit(ev) ? "" : "disabled";
   const chips = CalCommute.savedChips(CM.places, home);   // Home first, then places kept from here, then the Trips places
   const id = to ? "cmTo" : "cmFromIn";
+  const can = !dis, rmOn = can && CM.rm && CalCommute.anyRemovable(chips);
   return `<div class="cmask" id="${to ? "cmAsk" : "cmFromAsk"}">` +
     (first ? `<b>Where are you going?</b><div class="meta">Type an address or a place name.</div>` : `<label class="lbl" for="${id}" style="margin:0">${to ? "To" : "From"}</label>`) +
     `<input id="${id}" placeholder="Address or place name" ${first ? 'aria-label="Where are you going"' : ""} autocomplete="off" enterkeyhint="go" aria-controls="cmSug" ${dis}>` +
     `<div class="cmsug" id="cmSug" aria-live="polite">${cmSugHtml()}</div>` +
     `<label class="cmrem"><input type="checkbox" role="switch" id="cmKeep" ${dis}> <span>Keep in Saved places</span></label>` +
-    (chips.length ? `<p class="lbl" style="margin:6px 0 0">Saved places</p><div class="chips">${chips.map((p) => `<button type="button" class="chip" data-cm="pick${side}" data-id="${esc(p.id)}" ${dis}>${esc(p.name)}</button>`).join("")}</div>` : "") +
+    (chips.length ? `<div class="cmsvh"><p class="lbl" style="margin:0">Saved places</p>${can && CalCommute.anyRemovable(chips) ? `<button type="button" class="cmedit" data-cm="rmmode" aria-pressed="${CM.rm}">${CM.rm ? "Done" : "Edit"}</button>` : ""}</div><div class="chips${rmOn ? " rm" : ""}">${chips.map((p) => cmChipHtml(p, side, rmOn, dis)).join("")}</div>` : "") +
     (to && t.nextTitle ? `<label class="cmrem"><input type="checkbox" role="switch" id="cmRem" ${dis}> <span>Remember for every ${esc(t.nextTitle)}</span></label>` : "") +
     (first ? "" : `<div class="r"><button type="button" class="btn" data-cm="${to ? "cancel" : "cancelfrom"}">Cancel</button></div>`) + `</div>`;
 }
@@ -3008,6 +3021,7 @@ function cmPaint() {
   const fo = document.activeElement;
   if (fo && (fo.id === "cmTo" || fo.id === "cmFromIn") && box.contains(fo)) { CM.dirty = true; return; }   // never rebuild a box while he types in it: on an iPhone that closes the keyboard (any tap or Enter lets go of the box first)
   const mode = C.modeOf(ev), t = cmTarget(ev), from = cmFrom(ev), can = cmCanEdit(ev), ask = !CM.editFrom && (CalCommute.needsAsk(t) || CM.edit === keyOf(ev));
+  if (!ask && !CM.editFrom) CM.rm = false;   // no box open: no remove mode
   const asking = ask, home = cmHome(), inPlace = ask && !CalCommute.needsAsk(t);   // an ask for a To that is set replaces the To row; the first ask sits under the rows
   const keep = cmKeepTyped(box);
   const dis = can ? "" : "disabled";
@@ -3213,6 +3227,22 @@ async function cmPickSuggestion(ev, pid) {
   if (side === "to") await cmSetTarget(ev, o, keepRem); else await cmSetFrom(ev, o);
   if (keepPlace) await cmKeepPlace(o);
 }
+/** The x on a kept place (d34): send the existing removal, take the chip off, leave the box open. Only a place kept from this box can go.
+    A block's From or To (and any Remember rule) holds its own copy of name and address, so nothing on a block changes. */
+async function cmRemovePlace(id) {
+  const p = (CM.places || []).find((x) => x.id === id);
+  if (!p || !CalCommute.removableChip(p) || CM.rmBusy) return;
+  CM.rmBusy = true;
+  try {
+    await send("/quest/places", "POST", C.placeRemove(p));
+    CM.places = (CM.places || []).filter((x) => x.id !== id);
+    const gone = document.querySelector('[data-rmid="' + CSS.escape(id) + '"]'), hadFocus = !!gone && gone.contains(document.activeElement);
+    if (gone) gone.remove();   // at once, even when a typing box holds focus and the box repaint waits
+    toast("Removed from Saved places"); cmPaint();
+    if (hadFocus && !document.activeElement.closest?.("input")) { const b = $('[data-cm="rmmode"]'); if (b) b.focus(); }
+  } catch (e) { toast("Not removed. Try again in a moment.", { bad: true }); }
+  finally { CM.rmBusy = false; }
+}
 /** A row of the Location list was tapped: ask the server for that place and put "Name, full address" into the Location row. It is saved
     with the event the way a typed Location is (the Save button). If the lookup fails, the row's own name and small line go in. */
 async function locPick(pid) {
@@ -3232,15 +3262,17 @@ async function cmAct(t) {
   else if (d.cm === "shotsave") cmSave(t.closest(".cmmodal"));
   if (!ev || ev.k !== "commute") return;
   if (d.cm === "mode") { const r = await patchEvent(ev, { mode: d.v }, "Change the way of going for"); if (r) { const e2 = findByKey(key); if (e2) panel("event", e2); } }
-  else if (d.cm === "rowto") { CM.editFrom = false; CM.edit = key; cmSugOpen("to"); cmPaint(); const i = $("#cmTo"); if (i) i.focus(); }
-  else if (d.cm === "cancel") { CM.edit = ""; cmSugClose(); cmPaint(); }
-  else if (d.cm === "rowfrom") { CM.edit = ""; CM.editFrom = true; cmSugOpen("from"); cmPaint(); const i = $("#cmFromIn"); if (i) i.focus(); }
-  else if (d.cm === "cancelfrom") { CM.editFrom = false; cmSugClose(); cmPaint(); }
+  else if (d.cm === "rowto") { CM.rm = false; CM.editFrom = false; CM.edit = key; cmSugOpen("to"); cmPaint(); const i = $("#cmTo"); if (i) i.focus(); }
+  else if (d.cm === "cancel") { CM.rm = false; CM.edit = ""; cmSugClose(); cmPaint(); }
+  else if (d.cm === "rowfrom") { CM.rm = false; CM.edit = ""; CM.editFrom = true; cmSugOpen("from"); cmPaint(); const i = $("#cmFromIn"); if (i) i.focus(); }
+  else if (d.cm === "cancelfrom") { CM.rm = false; CM.editFrom = false; cmSugClose(); cmPaint(); }
   else if (d.cm === "pickfrom") {
     const p = (CM.places || []).find((x) => x.id === d.id); if (!p) return;
     if (p === cmHome()) await cmFromHome(ev); else await cmSetFrom(ev, { name: p.name, address: p.address || p.name, lat: p.lat, lng: p.lng, id: p.id });
   }
   else if (d.cm === "pickto") { const p = (CM.places || []).find((x) => x.id === d.id); if (p) { const rem = $("#cmRem"); cmSugClose(); cmSetTarget(ev, { name: p.name, address: p.address || p.name, lat: p.lat, lng: p.lng, id: p.id }, rem && rem.checked); } }
+  else if (d.cm === "rmmode") { CM.rm = !CM.rm; cmPaint(); const b = $('[data-cm="rmmode"]'); if (b) b.focus(); }
+  else if (d.cm === "rmplace") await cmRemovePlace(d.id);
   else if (d.cm === "sug") await cmPickSuggestion(ev, d.pid);
   else if (d.cm === "home") {
     const v = ($("#cmHomeIn").value || "").trim(); if (!v) return;

@@ -225,6 +225,11 @@
     const rest = [...all.filter((p) => p.category === "saved"), ...all.filter((p) => p.category !== "saved").slice(0, 12)];
     return [...(home ? [{ id: home.id, name: "Home" }] : []), ...rest];
   }
+  /** Whether the x may show on a chip (d34, Junyan, 2026-11-25): only a place kept from the From and To box (category "saved") with an id to send.
+      Home never; a Trips place never (it belongs to a trip and is removed in the Travel tab); a remembered-for place is not a chip. */
+  const removableChip = (p) => !!p && p.category === "saved" && !!p.id;
+  /** The Edit link shows only when at least one chip of the list can be removed. */
+  const anyRemovable = (chips) => Array.isArray(chips) && chips.some(removableChip);
   /** How a place reads on a From or To row: the name over its address (Home alone, a typed place once). */
   function rowText(o) {
     if (!o) return { main: "", sub: "" };
@@ -314,5 +319,5 @@
   /** An answer kept in memory is fresh for 30 minutes; a failed ask is remembered for 2 so a repaint does not ask again at once. */
   const wxFresh = (e, now) => !!e && now - e.at < (e.fail ? 2 : 30) * 60000;
 
-  root.CalCommute = { arriveTarget, leaveBy, arriveLine, bestWay, quickerThan, alertsFor, groupAlerts, leaveShift, autoCheckDue, decodePolyline, WAY, CHIP, mapsLink, organicMapsLink, placesAskable, readSuggestions, readPlace, locationText, keepPlace, alreadyKept, savedChips, rowText, weatherUrl, weatherPlace, weatherKey, weatherWords, pickHour, weatherWindow, outsideMinutes, weatherTip, weatherCard, wxFresh, WX_TEXT, titleKey, rememberPlace, nextEvent, target, needsAsk, samePlace, previousPlace, fromFor, stepDur, placeKey, fitSize, TRAVELMODE };
+  root.CalCommute = { arriveTarget, leaveBy, arriveLine, bestWay, quickerThan, alertsFor, groupAlerts, leaveShift, autoCheckDue, decodePolyline, WAY, CHIP, mapsLink, organicMapsLink, placesAskable, readSuggestions, readPlace, locationText, keepPlace, alreadyKept, savedChips, removableChip, anyRemovable, rowText, weatherUrl, weatherPlace, weatherKey, weatherWords, pickHour, weatherWindow, outsideMinutes, weatherTip, weatherCard, wxFresh, WX_TEXT, titleKey, rememberPlace, nextEvent, target, needsAsk, samePlace, previousPlace, fromFor, stepDur, placeKey, fitSize, TRAVELMODE };
 })(typeof window !== "undefined" ? window : globalThis);
