@@ -34,11 +34,35 @@
   function locationKey(t) {
     return clean(String(t == null ? "" : t).toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, " "));
   }
+  /** Can this Location text be remembered? Its key is not empty (a text of only emoji or punctuation has none) and "loc:" + key fits the 120
+      characters the server keeps of a place's list (still-api cuts it there; a longer key would be stored cut short and never found). */
+  const LOC_LIST_MAX = 120;
+  const canRememberLocation = (t) => { const k = locationKey(t); return !!k && ("loc:" + k).length <= LOC_LIST_MAX; };
   /** The place saved by "Remember <Location text> as this place" (same category as rememberPlace, key "loc:"; still-api stores both as free text). */
   function rememberLocation({ text, address, lat, lng }) {
-    const key = locationKey(text); if (!key || !clean(address)) return null;
+    if (!canRememberLocation(text) || !clean(address)) return null;
     return { name: clean(text).slice(0, 200), address: clean(address), lat: lat == null ? null : lat, lng: lng == null ? null : lng,
-      category: "commute-for", list: "loc:" + key, notes: "Where the Commute block goes when an event's Location is this text", savedBy: "Calendar" };
+      category: "commute-for", list: "loc:" + locationKey(text), notes: "Where the Commute block goes when an event's Location is this text", savedBy: "Calendar" };
+  }
+  /** The remembered "loc:" row for a Location text (whole text, same key), else null. Only these rows get a Forget link. */
+  function locationMemory(remembered, text) {
+    const k = locationKey(text);
+    return k && Array.isArray(remembered) ? remembered.find((p) => p && p.category === "commute-for" && p.list === "loc:" + k && clean(p.address)) || null : null;
+  }
+  /** The line beside the Forget link in the To box. */
+  const forgetLine = (row, text) => `"${clean(text)}" goes to ${clean(row && row.address)}`;
+  /** The one message after the Remember switches. t and l are the results of the title save and the Location save: undefined when that
+      switch was off, { ok: true } or { ok: false, error }. One switch keeps its own words; two give one message true for both. */
+  function rememberToast({ title, text, t, l }) {
+    const T = clean(title), L = '"' + clean(text) + '"';
+    if (t && l) {
+      if (t.ok && l.ok) return { text: `Remembered for every ${T} and ${L}`, bad: false };
+      if (t.ok) return { text: `Remembered for every ${T}. Not remembered ${L}: ${l.error}`, bad: true };
+      if (l.ok) return { text: `Remembered ${L}. Not remembered for every ${T}: ${t.error}`, bad: true };
+      return { text: `Not remembered for every ${T} or ${L}: ${t.error === l.error ? t.error : t.error + " and " + l.error}`, bad: true };
+    }
+    const one = t || l; if (!one) return null;
+    return one.ok ? { text: t ? "Remembered for every " + T : "Remembered " + L, bad: false } : { text: "Not remembered: " + one.error, bad: true };
   }
 
   /** The next timed event on the block's day that begins when the block ends or later (not all-day, not a suggestion,
@@ -61,7 +85,7 @@
     const locOf = clean(ev.location) || (next ? clean(next.location) : "");   // the Location text a To would come from, kept even when a typed place wins (the page offers to remember it)
     const out = (source, o) => ({ source, address: clean(o.address), lat: o.lat == null ? null : o.lat, lng: o.lng == null ? null : o.lng, id: o.id || "", nextTitle, name: clean(o.name), locText: locOf });
     /** A remembered "loc:" row for this Location text (whole text, same key), else null. */
-    const forText = (text) => { const k = locationKey(text); return k ? remembered.find((p) => p && p.category === "commute-for" && p.list === "loc:" + k && clean(p.address)) || null : null; };
+    const forText = (text) => locationMemory(remembered, text);
     if (typed && clean(typed.address)) return out("typed", typed);
     if (clean(ev.location)) { const m = forText(ev.location); return m ? out("location", { ...m, name: clean(ev.location) }) : out("block", { address: ev.location }); }
     if (next && clean(next.location)) { const m = forText(next.location); return m ? out("location", { ...m, name: clean(next.location) }) : out("next", { address: next.location, name: next.title }); }
@@ -375,5 +399,5 @@
     return e || "No directions for this way.";
   }
 
-  root.CalCommute = { checkedLine, onRoute, alertLine, noRouteText, blockEnded, missingHour, RAIN_CODES: RAIN, SNOW_CODES: SNOW, arriveTarget, leaveBy, arriveLine, bestWay, quickerThan, alertsFor, groupAlerts, leaveShift, autoCheckDue, decodePolyline, WAY, CHIP, mapsLink, organicMapsLink, placesAskable, readSuggestions, readPlace, locationText, keepPlace, alreadyKept, savedChips, removableChip, anyRemovable, rowText, weatherUrl, weatherPlace, weatherKey, weatherWords, pickHour, weatherWindow, outsideMinutes, weatherTip, weatherCard, wxFresh, WX_TEXT, titleKey, rememberPlace, locationKey, rememberLocation, nextEvent, target, needsAsk, samePlace, previousPlace, fromFor, stepDur, placeKey, fitSize, TRAVELMODE };
+  root.CalCommute = { checkedLine, onRoute, alertLine, noRouteText, blockEnded, missingHour, RAIN_CODES: RAIN, SNOW_CODES: SNOW, arriveTarget, leaveBy, arriveLine, bestWay, quickerThan, alertsFor, groupAlerts, leaveShift, autoCheckDue, decodePolyline, WAY, CHIP, mapsLink, organicMapsLink, placesAskable, readSuggestions, readPlace, locationText, keepPlace, alreadyKept, savedChips, removableChip, anyRemovable, rowText, weatherUrl, weatherPlace, weatherKey, weatherWords, pickHour, weatherWindow, outsideMinutes, weatherTip, weatherCard, wxFresh, WX_TEXT, titleKey, rememberPlace, locationKey, canRememberLocation, rememberLocation, locationMemory, forgetLine, rememberToast, nextEvent, target, needsAsk, samePlace, previousPlace, fromFor, stepDur, placeKey, fitSize, TRAVELMODE };
 })(typeof window !== "undefined" ? window : globalThis);

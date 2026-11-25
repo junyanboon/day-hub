@@ -78,7 +78,83 @@ test("page: the To box has a second switch, read wherever the other switches are
   assert.match(html, /Remember "\$\{esc\(t\.locText\)\}" as this place/);
   assert.match(html, /CalCommute\.rememberLocation\(/);
   assert.match(html, /#cmRemLoc/);
-  assert.match(html, /const BUILD = "2026-11-25d remember a location text";/);
-  assert.match(html, /calendar-commute\.js\?v=6/);
-  assert.match(html, /Remembered "\$\{/);
+  assert.match(html, /const BUILD = "2026-11-25e forget a location text";/);
+  assert.match(html, /calendar-commute\.js\?v=7/);
+  assert.match(html, /CalCommute\.rememberToast\(/);
+});
+
+/* ---- 2026-11-25e: d43 (a text that cannot be remembered gets no switch) and d42 (Forget) ---- */
+const keyOfLen = (n) => "a".repeat(n);   // locationKey("aaa...") is the same string, so "loc:" + key is n + 4 characters
+
+test("canRememberLocation: key not empty and \"loc:\" + key at most 120 characters (the server cuts list at 120)", () => {
+  assert.equal(K.canRememberLocation(keyOfLen(116)), true, "116 + 4 = 120 fits");
+  assert.equal(K.canRememberLocation(keyOfLen(117)), false, "117 + 4 = 121 is cut by the server");
+  assert.equal(K.canRememberLocation("Studio 509A"), true, "a normal room name");
+  assert.equal(K.canRememberLocation("😀🎉"), false, "emoji only: empty key");
+  assert.equal(K.canRememberLocation("!!! ... ???"), false, "punctuation only: empty key");
+  assert.equal(K.canRememberLocation(""), false);
+  assert.equal(K.canRememberLocation(null), false);
+  assert.equal(K.canRememberLocation("  " + keyOfLen(116) + "  "), true, "spaces around do not count");
+  assert.equal(K.canRememberLocation(("ab " + "c").repeat(20)), true, "a long text whose key is short enough");
+});
+test("rememberLocation returns null when the text cannot be remembered, and a row when it can", () => {
+  assert.equal(K.rememberLocation({ text: keyOfLen(117), address: "x" }), null);
+  assert.equal(K.rememberLocation({ text: "😀", address: "x" }), null);
+  const r = K.rememberLocation({ text: keyOfLen(116), address: "x" });
+  assert.equal(r.list.length, 120);
+  assert.equal(r.list, "loc:" + keyOfLen(116));
+});
+test("a row saved for a 116 character key is found by the exact lookup (list is not cut)", () => {
+  const long = keyOfLen(116), row = { ...K.rememberLocation({ text: long, address: "1 Long St", lat: 1, lng: 2 }), id: "p9" };
+  const t = K.target({ ev: block, events: [block, next("X", long)], tz: TZ, remembered: [row] });
+  assert.deepEqual([t.source, t.address], ["location", "1 Long St"]);
+});
+
+test("locationMemory: the remembered loc: row for a Location text, else null", () => {
+  const row = { ...mem[0], id: "p1" };
+  assert.equal(K.locationMemory([row], " studio  509a. "), row);
+  assert.equal(K.locationMemory([row], "Studio 5"), null);
+  assert.equal(K.locationMemory([row], ""), null);
+  assert.equal(K.locationMemory([], "Studio 509A"), null);
+  assert.equal(K.locationMemory(null, "Studio 509A"), null);
+  assert.equal(K.locationMemory([{ ...row, category: "trip" }], "Studio 509A"), null, "only commute-for rows");
+  assert.equal(K.locationMemory([{ ...row, list: "for:studio 509a" }], "Studio 509A"), null, "a title row is never a loc: row");
+  assert.equal(K.locationMemory([{ ...row, address: " " }], "Studio 509A"), null);
+});
+test("forgetLine: the words beside the Forget link", () => {
+  assert.equal(K.forgetLine({ ...mem[0], id: "p1" }, "Studio 509A"), '"Studio 509A" goes to 509 Bloor St W, Toronto');
+});
+
+test("rememberToast: one switch keeps today's words; two switches give one true message", () => {
+  const ok = { ok: true }, no = (error) => ({ ok: false, error });
+  assert.deepEqual(K.rememberToast({ title: "DM Class", text: "Studio 509A", t: ok }), { text: "Remembered for every DM Class", bad: false });
+  assert.deepEqual(K.rememberToast({ title: "DM Class", text: "Studio 509A", l: ok }), { text: 'Remembered "Studio 509A"', bad: false });
+  assert.deepEqual(K.rememberToast({ title: "DM Class", text: "Studio 509A", t: no("boom") }), { text: "Not remembered: boom", bad: true });
+  assert.deepEqual(K.rememberToast({ title: "DM Class", text: "Studio 509A", l: no("boom") }), { text: "Not remembered: boom", bad: true });
+  assert.deepEqual(K.rememberToast({ title: "DM Class", text: "Studio 509A", t: ok, l: ok }), { text: 'Remembered for every DM Class and "Studio 509A"', bad: false });
+  assert.deepEqual(K.rememberToast({ title: "DM Class", text: "Studio 509A", t: ok, l: no("boom") }), { text: 'Remembered for every DM Class. Not remembered "Studio 509A": boom', bad: true });
+  assert.deepEqual(K.rememberToast({ title: "DM Class", text: "Studio 509A", t: no("boom"), l: ok }), { text: 'Remembered "Studio 509A". Not remembered for every DM Class: boom', bad: true });
+  assert.deepEqual(K.rememberToast({ title: "DM Class", text: "Studio 509A", t: no("boom"), l: no("boom") }), { text: 'Not remembered for every DM Class or "Studio 509A": boom', bad: true });
+  assert.deepEqual(K.rememberToast({ title: "DM Class", text: "Studio 509A", t: no("a"), l: no("b") }), { text: 'Not remembered for every DM Class or "Studio 509A": a and b', bad: true });
+  assert.equal(K.rememberToast({ title: "DM Class", text: "Studio 509A" }), null, "nothing was asked: no message");
+});
+
+test("target after a forget: the row is gone, so the Location text goes as written; a typed place is untouched", () => {
+  const evs = [block, next("X", "Studio 509A")];
+  assert.equal(K.target({ ev: block, events: evs, tz: TZ, remembered: mem }).source, "location");
+  const gone = K.target({ ev: block, events: evs, tz: TZ, remembered: [] });
+  assert.deepEqual([gone.source, gone.address], ["next", "Studio 509A"]);
+  const typed = K.target({ ev: block, events: evs, tz: TZ, remembered: [], typed: { address: "10 Typed Rd", lat: 1, lng: 2 } });
+  assert.deepEqual([typed.source, typed.address], ["typed", "10 Typed Rd"]);
+});
+
+test("page: d43 switch rule, combined message, d42 Forget wiring", () => {
+  assert.match(html, /CalCommute\.canRememberLocation\(t\.locText\)/);
+  assert.match(html, /CalCommute\.rememberToast\(/);
+  assert.match(html, /data-cm="forgetloc"/);
+  assert.match(html, /CalCommute\.locationMemory\(/);
+  assert.match(html, /op: "del"/);
+  assert.match(html, /Forgot "\$\{/);
+  assert.match(html, /Not forgotten\. Try again in a moment\./);
+  assert.doesNotMatch(html, /\(to && t\.locText \? `<label class="cmrem"><input type="checkbox" role="switch" id="cmRemLoc"/, "the switch is no longer drawn for any non-empty text");
 });
