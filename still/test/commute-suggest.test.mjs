@@ -234,7 +234,7 @@ test("the To line shows the place's name over its address when one was picked, f
 
 test("page: the second switch, the load of places, the suggestion draw, the gym wording and the stamps", () => {
   const html = fs.readFileSync(fileURLToPath(new URL("../calendar.html", import.meta.url)), "utf8");
-  assert.match(html, /const BUILD = "2026-11-25g suggested commute blocks";/);
+  assert.match(html, /const BUILD = "2026-11-25h suggested commute blocks";/);
   assert.match(html, /calendar-commute\.js\?v=9/);
   assert.match(html, /calendar-core\.js\?v=34"/, "the core is unchanged");
   assert.match(html, /id="cmSuggSw"/);
@@ -249,4 +249,10 @@ test("page: the second switch, the load of places, the suggestion draw, the gym 
   assert.match(draw, /homeCal\(\)/, "Accept goes to the calendar new events go to");
   const settings = html.slice(html.indexOf('id="routineSw"'), html.indexOf('id="railSw"'));
   assert.ok(settings.indexOf('id="cmSuggSw"') > settings.indexOf('id="routineSw"'), "below the existing switch");
+});
+
+test("opening the Commute panel reads the places again, since first paint already read them (a place taught elsewhere shows)", () => {
+  const html = fs.readFileSync(fileURLToPath(new URL("../calendar.html", import.meta.url)), "utf8");
+  const after = html.slice(html.indexOf("async function cmAfter(ev)"), html.indexOf("async function cmLoadNotes(ev)"));
+  assert.match(after, /else \{[^}]*CM\.places = \(await api\("\/quest\/places"\)\)/, "the already-loaded branch re-reads /quest/places");
 });

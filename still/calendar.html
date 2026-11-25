@@ -1029,7 +1029,7 @@ if (TOUCH) for (const g of ["gesturestart", "gesturechange"]) document.addEventL
    which shows this build, the phone's answers and a log of every day change with its cause. Until then CalHook.on is
    null and diag() does nothing. BUILD names this copy of the page, so a screenshot proves which copy ran: change it on
    every change to this page or calendar-readout.js (the date plus a letter). */
-const BUILD = "2026-11-25g suggested commute blocks";
+const BUILD = "2026-11-25h suggested commute blocks";
 const CalHook = window.CalHook = { BUILD, on: null };
 const diag = (kind, msg) => { if (CalHook.on) CalHook.on(kind, msg); };
 /* The iPhone home screen app's fit (2026-11-12): html.hs in a home screen app on touch, html.hsfill and --hsgap when
@@ -3020,6 +3020,9 @@ async function cmAfter(ev) {
   const same = () => CM.run === run && S.ev && keyOf(S.ev) === key && $("#cmBox");
   if (CM.places === null) {
     try { CM.places = (await api("/quest/places")).places || []; } catch (e) { CM.places = []; }
+    if (!same()) return; cmPaint();
+  } else {   // already read at first paint (d48): read again as the panel opens so a place taught on another device shows; a failed read keeps what is held
+    try { CM.places = (await api("/quest/places")).places || CM.places; } catch (e) { /* keep the places held */ }
     if (!same()) return; cmPaint();
   }
   await cmLoadRoute(ev); if (!same()) return; cmPaint();
