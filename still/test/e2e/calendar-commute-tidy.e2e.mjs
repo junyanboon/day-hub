@@ -69,8 +69,8 @@ try {
       const tops = []; for (const sel of order) tops.push((await box(sel))?.top ?? null);
       check(`${label}: the order is Going by, Leave by, From, To, weather, Heads up, The way there, map buttons, photos`, tops.every((v, i) => v != null && (i === 0 || v > tops[i - 1])), JSON.stringify(tops));
       check(`${label}: the blue banner and the big Check now button are gone`, await page.locator(".cmchk").count() === 0 && !/Checked just now|Check now|Last checked/i.test(t) && await page.locator('#cmBox button.btn[data-cm="check"]').count() === 0, t.slice(0, 200));
-      check(`${label}: Leave by shows the big time and the Arrive line, and under it one quiet line "Checked <time> · Check again"`,
-        /Leave by \d{1,2}(:\d{2})? (am|pm) Arrive .*Checked \d{1,2}(:\d{2})? (am|pm) · Check again/i.test(flat(await page.evaluate(() => document.querySelector("#cmBox .cmleave").innerText))), flat(await page.evaluate(() => document.querySelector("#cmBox .cmleave").innerText)));
+      check(`${label}: Leave by and Arrive share one row, and under the trip bar one quiet line "Spare time before ... · Checked <time> · Check again"`,
+        /Leave by \d{1,2}(:\d{2})? (am|pm) \S+ \d+ min Arrive \d{1,2}(:\d{2})? (am|pm) \d+ min Spare time before .* at \d.* · Checked \d{1,2}(:\d{2})? (am|pm) · Check again/i.test(flat(await page.evaluate(() => document.querySelector("#cmBox .cmleave").innerText))), flat(await page.evaluate(() => document.querySelector("#cmBox .cmleave").innerText)));
       check(`${label}: the quiet line is small, and Check again is a link-style button inside it`, await page.evaluate(() => { const l = document.querySelector("#cmBox .cmchecked"), b = l.querySelector("button.cmlink"); return parseFloat(getComputedStyle(l).fontSize) <= 13 && !!b && getComputedStyle(b).textDecorationLine.includes("underline"); }));
       check(`${label}: the sentence about checking once in the hour before leaving is not text, only the button's tooltip`, !/While this panel is open/.test(t) && /once in the hour before you leave/.test(await page.getAttribute('#cmBox [data-cm="check"]', "title")));
 

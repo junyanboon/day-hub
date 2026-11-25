@@ -1,9 +1,9 @@
 // d45 and d46 (Junyan, 2026-11-25: "45 yes I want to be able to see it still", "46 yes remove it", "47 yes").
 // Clicks every state in the test browser, on a computer and on a phone, against the faked dev routes (calendar-dev.mjs):
 //  - a panel open while the Commute block runs, the clock then moves past the block's end, and Transit, Drive, Walk are tapped: Leave by, the way
-//    fold (still open), its steps, Heads up and the chip minutes stay, "This block is over." shows with "Checked TIME" and no Check again, no row
+//    fold (still open), its steps, Heads up and the chip minutes stay, "Checked TIME" shows with no Check again, no "This block is over." line, no early chips, no row
 //    says another way is quicker, and no request goes to the server;
-//  - a fresh open of an ended block shows the answer kept in this browser (no request); with none kept only the quiet line shows, with From, To,
+//  - a fresh open of an ended block shows the answer kept in this browser (no request); with none kept nothing shows in the Leave by area, with From, To,
 //    the map buttons and Photos and notes as before, and still no request;
 //  - a re-check that comes back not ok (a Check again, and a chip tap after a minute) keeps the good directions and puts the server's message under
 //    Leave by; a failed load does the same with Try again; a changed To never shows the old trip's answer;
@@ -80,7 +80,7 @@ try {
     await tap(page, '#cmBox [data-cm="mode"][data-v="drive"]'); await sleep(700);
     t = await box(page);
     check(`${label}: after the end, one tap on Drive keeps Leave by, the way fold, the steps and Heads up`, /leave by/i.test(t) && /The way there · 27 min/.test(t) && /The way there · 27 min · /.test(t) && /Heads up · 1/.test(t), t.slice(0, 300));
-    check(`${label}: it says "This block is over." once, with "Checked TIME" and no Check again`, (t.match(/This block is over\./g) || []).length === 1 && /Checked \d{1,2}(:\d{2})? (am|pm)/.test(t) && !/Check again|Checking/.test(t) && await count(page, '#cmBox [data-cm="check"]') === 0, t.slice(0, 300));
+    check(`${label}: no "This block is over." line; "Checked TIME", no Check again and no early chips`, !/This block is over/.test(t) && !/Be there early/i.test(t) && await count(page, '#cmBox [data-cm="early"]') === 0 && /Checked \d{1,2}(:\d{2})? (am|pm)/.test(t) && !/Check again|Checking/.test(t) && await count(page, '#cmBox [data-cm="check"]') === 0, t.slice(0, 300));
     check(`${label}: the chips still show every way's minutes`, (await chipTexts(page)).filter((x) => /\d+ min/.test(x)).length >= 2, JSON.stringify(await chipTexts(page)));
     check(`${label}: no row says another way is quicker right now`, !/quicker right now/.test(t) && await count(page, ".cmquick") === 0);
     await tap(page, '#cmBox [data-cm="mode"][data-v="transit"]'); await sleep(700);
@@ -88,7 +88,7 @@ try {
     check(`${label}: back on Transit the Transit directions are the same as before the end`, flat(await page.locator("#cmBox .cmleave .big").innerText()) === leaveBefore && /Walk to Dev Station North/.test(t) && /Heads up · 2/.test(t), `${leaveBefore} / ${t.slice(0, 200)}`);
     check(`${label}: the fold he opened is still open`, await page.getAttribute('#cmBox [data-cm="fold"][data-v="way"]', "aria-expanded") === "true" && await page.locator("#cmBox .cmsteps").first().isVisible());
     await tap(page, '#cmBox [data-cm="mode"][data-v="commute"]'); await sleep(500); t = await box(page);
-    check(`${label}: Walk still switches to the kept Walk answer (too far to walk) and the over line stays`, /This block is over\./.test(t) && /Too far to walk \(9 km\)\./.test(t) && !/Check again/.test(t), t.slice(0, 200));
+    check(`${label}: Walk still switches to the kept Walk answer (too far to walk) and no over line is drawn`, !/This block is over/.test(t) && /Too far to walk \(9 km\)\./.test(t) && !/Check again/.test(t), t.slice(0, 200));
     await tap(page, '#cmBox [data-cm="mode"][data-v="transit"]'); await sleep(500);
     check(`${label}: no request went to the server after the block ended (chip taps, the page's own check)`, reqs.n === nBefore, `${nBefore} before, ${reqs.n} after`);
     await page.clock.fastForward(5 * 60 * 1000); await sleep(300);
@@ -102,14 +102,14 @@ try {
     ({ page, reqs } = await newPage(ctx, OVER));
     check(`${label}: the ended block opens fresh`, await openEv(page, "Transit")); await sleep(500);
     t = await box(page);
-    check(`${label}: fresh open: the kept answer shows (Leave by, Arrive, chip minutes), with the over line and Checked TIME`, /leave by/i.test(t) && /Arrive /.test(t) && /This block is over\./.test(t) && /Checked [^·]*?(am|pm)/.test(t) && !/Check again/.test(t) && (await chipTexts(page)).some((x) => /Transit 34 min/.test(x)), t.slice(0, 300));
+    check(`${label}: fresh open: the kept answer shows (Leave by, Arrive, chip minutes), with Checked TIME and no over line`, /leave by/i.test(t) && /Arrive /i.test(t) && !/This block is over/.test(t) && /Checked [^·]*?(am|pm)/.test(t) && !/Check again/.test(t) && (await chipTexts(page)).some((x) => /Transit 34 min/.test(x)), t.slice(0, 300));
     check(`${label}: its time is the time of the answer he last saw (${checkedBefore})`, t.includes(checkedBefore), t.slice(0, 200));
     check(`${label}: the folds start as always (way closed, Heads up open) and nothing was requested`, await page.getAttribute('#cmBox [data-cm="fold"][data-v="way"]', "aria-expanded") === "false" && await page.getAttribute('#cmBox [data-cm="fold"][data-v="heads"]', "aria-expanded") === "true" && reqs.n === 0, `requests ${reqs.n}`);
     check(`${label}: From, To, the map buttons and Photos and notes are there`, await count(page, '#cmBox [data-cm="rowfrom"]') === 1 && await count(page, '#cmBox [data-cm="rowto"]') === 1 && await count(page, "#cmBox #cmLinks a") >= 1 && /photos and notes/i.test(t));
     // a changed To is another trip: the old trip's answer never shows
     await tap(page, '#cmBox [data-cm="rowto"]'); await page.fill("#cmTo", "Queen and Spadina, Toronto"); await page.press("#cmTo", "Enter"); await sleep(900);
     t = await box(page);
-    check(`${label}: a changed To (another trip) shows no kept directions, only the over line, and sends nothing`, !/leave by/i.test(t) && /This block is over\./.test(t) && reqs.n === 0, t.slice(0, 260));
+    check(`${label}: a changed To (another trip) shows no kept directions, nothing in the Leave by area, and sends nothing`, !/leave by/i.test(t) && !/This block is over/.test(t) && await count(page, "#cmBox .cmleave") === 0 && reqs.n === 0, t.slice(0, 260));
     await page.close();
     await ctx.close();
 
@@ -118,7 +118,7 @@ try {
     ({ page, reqs } = await newPage(ctx2, OVER));
     check(`${label}: the ended block opens in a browser that never saw its directions`, await openEv(page, "Transit")); await sleep(600);
     t = await box(page);
-    check(`${label}: only the quiet line: "This block is over.", no Leave by, no way fold, no minutes on the chips`, /This block is over\./.test(t) && !/leave by|the way there|heads up|check again/i.test(t) && !(await chipTexts(page)).some((x) => /\d+ min/.test(x)) && reqs.n === 0, t.slice(0, 260));
+    check(`${label}: nothing in the Leave by area (no over line), no way fold, no minutes on the chips`, !/This block is over/.test(t) && await count(page, "#cmBox .cmleave") === 0 && !/leave by|the way there|heads up|check again/i.test(t) && !(await chipTexts(page)).some((x) => /\d+ min/.test(x)) && reqs.n === 0, t.slice(0, 260));
     check(`${label}: and From, To, the map buttons and Photos and notes are still there`, await count(page, '#cmBox [data-cm="rowfrom"]') === 1 && await count(page, '#cmBox [data-cm="rowto"]') === 1 && await count(page, "#cmBox #cmLinks a") >= 1 && /photos and notes/i.test(t));
     await page.close(); await ctx2.close();
 

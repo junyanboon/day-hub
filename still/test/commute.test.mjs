@@ -103,13 +103,31 @@ test("leave-by per mode: walk and drive count back from arrive-by, transit keeps
   assert.equal(K.leaveBy({ mode: "walk", tooFar: true, km: 9 }, t.at), null);
   assert.equal(K.leaveBy(null, t.at), null);
 });
-test("the Arrive line: the real spare minutes before the next event, or when the block ends", () => {
+test("the trip view: arrive time, the real spare minutes before the next plan, late wording, or when the block ends", () => {
   const t = tgt();
-  assert.equal(K.arriveLine({ minutes: 27 }, t, hmT), "Arrive 1:10 pm, 5 min before Zouk Training");
-  assert.equal(K.arriveLine({ minutes: 34, arriveAt: at("2026-11-24T18:09:00Z") }, t, hmT), "Arrive 1:09 pm, 6 min before Zouk Training", "transit arrives when Google says");
-  assert.equal(K.arriveLine({ minutes: 34, arriveAt: at("2026-11-24T18:20:00Z") }, t, hmT), "Arrive 1:20 pm, 5 min after Zouk Training starts");
-  assert.equal(K.arriveLine({ minutes: 27 }, K.arriveTarget(block, [block], TZ), hmT), "Arrive 1:10 pm, when the block ends");
-  assert.equal(K.arriveLine({ tooFar: true }, t, hmT), "");
+  assert.deepEqual(K.tripView({ minutes: 27 }, t, hmT), { arrive: "1:10 pm", minutes: 27, spare: 5, late: false, nextTitle: "Zouk Training", nextAt: "1:15 pm", lead: "Spare time before Zouk Training at 1:15 pm" });
+  const tr = K.tripView({ minutes: 34, arriveAt: at("2026-11-24T18:09:00Z") }, t, hmT);
+  assert.equal(tr.arrive, "1:09 pm", "transit arrives when Google says"); assert.equal(tr.spare, 6);
+  const late = K.tripView({ minutes: 34, arriveAt: at("2026-11-24T18:20:00Z") }, t, hmT);
+  assert.deepEqual([late.arrive, late.spare, late.late, late.lead], ["1:20 pm", -5, true, "5 min after Zouk Training starts"]);
+  const none = K.tripView({ minutes: 27 }, K.arriveTarget(block, [block], TZ), hmT);
+  assert.deepEqual([none.arrive, none.spare, none.nextTitle, none.lead], ["1:10 pm", null, "", "Arrives when the block ends"]);
+  assert.equal(K.tripView({ tooFar: true }, t, hmT), null);
+});
+test("Be there early by: the arrive-by time is 5, 10, 15 or 20 minutes before the next plan (5 when unset), and the block's end with no next plan", () => {
+  const nextAt = at("2026-11-24T18:15:00Z");
+  assert.deepEqual(K.EARLY_CHOICES, [5, 10, 15, 20]);
+  for (const n of [5, 10, 15, 20]) {
+    const x = K.arriveTarget(block, [block, next], TZ, n);
+    assert.equal(x.at, next.s - n * 60000, n + " min before the plan"); assert.equal(x.buffer, n); assert.equal(x.nextTitle, "Zouk Training");
+    assert.equal(K.tripView({ minutes: 27 }, x, hmT).spare, n, "walk or drive arrive at the target: the spare time is the pick");
+  }
+  assert.equal(K.arriveTarget(block, [block, next], TZ).at, next.s - 5 * 60000, "left out: 5, as before");
+  for (const bad of [undefined, null, "", "x", 0, 7, 25, NaN]) assert.equal(K.arriveTarget(block, [block, next], TZ, bad).buffer, 5, String(bad) + " is 5");
+  assert.equal(K.earlyMin("15"), 15, "a stored string counts"); assert.equal(K.earlyMin(null), 5);
+  const none = K.arriveTarget(block, [block], TZ, 20);
+  assert.deepEqual([none.at, none.buffer, none.nextTitle], [block.e, 0, ""], "no next plan: arrive when the block ends, whatever the pick");
+  assert.equal(K.leaveBy({ minutes: 27 }, K.arriveTarget(block, [block, next], TZ, 15).at), nextAt - 15 * 60000 - 27 * 60000, "walk or drive leave earlier by the pick");
 });
 test("best way: the quickest is marked, a walk that is too far never is, and nothing is marked without minutes", () => {
   assert.equal(K.bestWay({ walk: { minutes: 50 }, transit: { minutes: 34 }, drive: { minutes: 27 } }), "drive");
