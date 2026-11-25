@@ -28,9 +28,10 @@ test("planGym stops at the switch before anything is read or written", () => {
 });
 
 test("every automatic call goes through planGym (no other gym write path)", () => {
-  // the only gym placement is the POST inside planGym; the calls are page load, after a move and the Plan screen
+  // the only gym placement is the POST inside planGym; the calls are page load, after a move, the Plan screen and
+  // turning the switch on (that one only runs once he has switched it on)
   const calls = html.match(/planGym\((true|false)?\)/g) || [];
-  assert.equal(calls.length, 3, calls.join(" "));
+  assert.equal(calls.length, 4, calls.join(" "));
   const i = html.indexOf("async function planGym(force){"), end = html.indexOf("const gymLine", i);
   assert.ok(html.slice(i, end).includes("Placed by Day Quest"));
   assert.equal(html.split("Placed by Day Quest: this week's training").length - 1, 1);
