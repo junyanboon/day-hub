@@ -71,6 +71,15 @@ function dirAnswer(b, later) {
 }
 let routesDown = false;   // GET /__dev/routes?down=1 makes the route calls fail, to check the browser-copy fallback
 const uploads = [];   // reservation files the trip page sent (the e2e reads the request log, this keeps the server honest)
+let placesMode = "ok"; const placesCalls = [], placeCalls = [];
+const GPLACES = [
+  { id: "gp-smh", name: "St. Michael's Hospital", sub: "Bond Street, Toronto, ON", address: "30 Bond St, Toronto, ON M5B 1W8", lat: 43.6533, lng: -79.3772 },
+  { id: "gp-slm", name: "St. Lawrence Market", sub: "93 Front St E, Toronto, ON", address: "93 Front St E, Toronto, ON M5E 1C3", lat: 43.6487, lng: -79.3715 },
+  { id: "gp-sta", name: "St. Andrew Station", sub: "King St W, Toronto, ON", address: "King St W & University Ave, Toronto, ON", lat: 43.6477, lng: -79.3848 },
+  { id: "gp-stj", name: "St. James Cathedral", sub: "106 King St E, Toronto, ON", address: "106 King St E, Toronto, ON M5C 1G6", lat: 43.6502, lng: -79.3732 },
+  { id: "gp-stp", name: "St. Patrick Station", sub: "Dundas St W, Toronto, ON", address: "Dundas St W & University Ave, Toronto, ON", lat: 43.6546, lng: -79.3886 },
+  { id: "gp-stx", name: "St. Extra Place", sub: "Sixth row, Toronto, ON", address: "6 Extra St, Toronto, ON", lat: 43.7, lng: -79.4 },
+];
 const FOUND = { "schwartz's deli": { lat: 45.5163, lng: -73.5776 }, "jean-talon market": { lat: 45.5364, lng: -73.6148 } };
 
 const send = (res, code, body) => { res.writeHead(code, { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "*", "Access-Control-Allow-Methods": "*" }); res.end(JSON.stringify(body)); };
@@ -111,6 +120,23 @@ http.createServer(async (req, res) => {
     if (dirState === "no-key") return send(res, 200, { state: "no-key", message: "Directions need the Google key" });
     if (dirState === "stopped") return send(res, 200, { state: "stopped", message: "Directions are off for the rest of this month. They come back on the 1st." });
     const later = dirNext && b.fresh === true; return send(res, 200, dirAnswer(b, later));
+  }
+  /* d25: /quest/commute/places and /quest/commute/place, faked in the contract's shape (the real routes are in still-api, deployed
+     separately). GET /__dev/places?mode=ok|no-key|stopped|error|404 sets the answer; ?reset=1 clears the call log. A q holding "slow"
+     answers 900 ms late, to prove a late answer for changed text is ignored. */
+  if (u.pathname === "/__dev/places") { if (u.searchParams.get("mode")) placesMode = u.searchParams.get("mode"); if (u.searchParams.get("reset")) { placesCalls.length = 0; placeCalls.length = 0; placesMode = "ok"; } return send(res, 200, { placesMode, placesCalls, placeCalls }); }
+  if (u.pathname === "/quest/commute/places" || u.pathname === "/quest/commute/place") {
+    if (req.headers["x-quest-key"] !== "test") return send(res, 401, { error: "wrong pairing code (the dev server's code is: test)" });
+    const b = await readBody(req), one = u.pathname.endsWith("/place");
+    (one ? placeCalls : placesCalls).push(b);
+    if (placesMode === "404") return send(res, 404, { error: "not found" });
+    if (placesMode !== "ok") return send(res, 200, { state: placesMode, message: "dev: " + placesMode });
+    if (one) { const pl = GPLACES.find((x) => x.id === b.id); return send(res, 200, pl ? { state: "ok", place: pl } : { state: "error", message: "no such place" }); }
+    const q = String(b.q || "").toLowerCase();
+    if (q.length < 3) return send(res, 200, { state: "ok", suggestions: [] });
+    const hits = q.includes("slow") ? [{ id: "gp-slow", name: "Slow answer", sub: "Late, Toronto" }] : GPLACES.filter((x) => x.name.toLowerCase().includes(q) || q.includes("st")).map(({ id, name, sub }) => ({ id, name, sub })).slice(0, 5);
+    if (q.includes("slow")) await new Promise((r) => setTimeout(r, 900));
+    return send(res, 200, { state: "ok", suggestions: hits });
   }
   if (u.pathname.startsWith("/quest/commute/")) {
     if (req.headers["x-quest-key"] !== "test") return send(res, 401, { error: "wrong pairing code (the dev server's code is: test)" });

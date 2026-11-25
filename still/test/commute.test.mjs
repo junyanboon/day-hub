@@ -238,7 +238,7 @@ test("d6: inside the box the order is Going by, From, To or the ask, Open in Goo
   const { readFileSync } = await import("node:fs");
   const html = readFileSync(new URL("../calendar.html", import.meta.url), "utf8");
   const src = html.slice(html.indexOf("function cmPaint()"), html.indexOf("function cmDrop("));
-  const order = ['Going by', 'dp.leave', '<span class="lbl">From</span>', '<span class="lbl">To</span>', 'dp.way + dp.heads + dp.check', 'Where are you going?', 'Open in Google Maps', 'id="cmMap"', 'Photos and notes', 'Add your home address'];
+  const order = ['Going by', 'dp.leave', 'cmRow("from"', 'cmRow("to"', 'dp.way + dp.heads + dp.check', 'if (!inPlace) h += cmEditBox', 'id="cmLinks"', 'id="cmMap"', 'Photos and notes', 'Add your home address'];
   let last = -1;
   for (const w of order) { const i = src.indexOf(w); assert.ok(i > last, w + " out of order"); last = i; }
 });
@@ -354,4 +354,97 @@ test("the page: both map tile layers ask for the site's origin as Referer", () =
   const h = html2(), n = (h.match(/L\.tileLayer\(/g) || []).length;
   assert.equal(n, 2);
   assert.equal((h.match(/L\.tileLayer\("https:\/\/tile\.openstreetmap\.org\/\{z\}\/\{x\}\/\{y\}\.png", \{[^}]*referrerPolicy: "strict-origin-when-cross-origin"/g) || []).length, 2);
+});
+
+/* ---- d24 to d27 (Junyan, 2026-11-24, "Yes to all four"): tap the line, a places list, Open in Organic Maps ---- */
+const OMGLAD = { name: "Gladstone Hotel", address: "1214 Queen St W, Toronto", lat: 43.6429, lng: -79.4259 };
+const OMHOME = { name: "Home", address: "10 Bay St, Toronto", lat: 43.6407, lng: -79.3763 };
+test("d26: Organic Maps link with both ends: the trip from From to To in the picked way (omaps.app/route, documented at omaps.app/api)", () => {
+  assert.equal(K.organicMapsLink({ from: OMHOME, to: OMGLAD, mode: "commute" }),
+    "https://omaps.app/route?sll=43.6407,-79.3763&saddr=Home&dll=43.6429,-79.4259&daddr=Gladstone%20Hotel&type=pedestrian");
+  assert.match(K.organicMapsLink({ from: OMHOME, to: OMGLAD, mode: "transit" }), /&type=transit$/);
+  assert.match(K.organicMapsLink({ from: OMHOME, to: OMGLAD, mode: "drive" }), /&type=vehicle$/);
+  assert.match(K.organicMapsLink({ from: OMHOME, to: OMGLAD, mode: "nonsense" }), /&type=pedestrian$/, "an unknown way walks, as the Google link does");
+});
+test("d26: Organic Maps link names a place by its name, else its address, and escapes it", () => {
+  const l = K.organicMapsLink({ from: { address: "1 A&B St #2", lat: 1, lng: 2 }, to: { name: "", address: "Café 5/6", lat: 3, lng: 4 }, mode: "drive" });
+  assert.match(l, /saddr=1%20A%26B%20St%20%232&/); assert.match(l, /daddr=Caf%C3%A9%205%2F6&/);
+});
+test("d26: Organic Maps link with only the To spot: just that point on the map", () => {
+  const noFrom = { name: "", address: "Somewhere", lat: null, lng: null };
+  assert.equal(K.organicMapsLink({ from: noFrom, to: OMGLAD, mode: "commute" }), "https://omaps.app/map?v=1&ll=43.6429,-79.4259&n=Gladstone%20Hotel");
+  assert.equal(K.organicMapsLink({ from: null, to: OMGLAD, mode: "transit" }), "https://omaps.app/map?v=1&ll=43.6429,-79.4259&n=Gladstone%20Hotel");
+  assert.equal(K.organicMapsLink({ from: { ...OMHOME, lat: 43.6, lng: null }, to: OMGLAD, mode: "drive" }).startsWith("https://omaps.app/map?"), true, "half a coordinate counts as none");
+});
+test("d26: no Organic Maps link when the To has no coordinates", () => {
+  assert.equal(K.organicMapsLink({ from: OMHOME, to: { name: "X", address: "X", lat: null, lng: null }, mode: "commute" }), "");
+  assert.equal(K.organicMapsLink({ from: OMHOME, to: null, mode: "commute" }), "");
+  assert.equal(K.organicMapsLink({ from: OMHOME, to: { address: "X", lat: "abc", lng: 1 }, mode: "commute" }), "");
+});
+test("d25: the places list asks only from 3 characters on", () => {
+  assert.equal(K.placesAskable("ab"), false); assert.equal(K.placesAskable("  ab  "), false);
+  assert.equal(K.placesAskable("abc"), true); assert.equal(K.placesAskable(" abc "), true); assert.equal(K.placesAskable(null), false);
+});
+test("d25: a places answer gives up to 5 rows, and only an ok answer gives any; stopped is flagged, the rest show nothing", () => {
+  const s = (n) => Array.from({ length: n }, (_, i) => ({ id: "p" + i, name: "Place " + i, sub: "Toronto" }));
+  assert.deepEqual(K.readSuggestions({ state: "ok", suggestions: s(7) }).items.map((x) => x.id), ["p0", "p1", "p2", "p3", "p4"]);
+  assert.deepEqual(K.readSuggestions({ state: "ok", suggestions: [{ id: "a", name: "A" }, { id: "", name: "no id" }, { name: "none" }, { id: "b", name: "  " }] }).items, [{ id: "a", name: "A", sub: "" }]);
+  for (const st of ["no-key", "error"]) assert.deepEqual(K.readSuggestions({ state: st, message: "m" }), { items: [], stopped: false });
+  assert.deepEqual(K.readSuggestions({ state: "stopped", message: "m" }), { items: [], stopped: true });
+  for (const bad of [null, undefined, {}, "x", { state: "ok" }]) assert.deepEqual(K.readSuggestions(bad), { items: [], stopped: false });
+});
+test("d25: a place answer gives name, address, lat and lng, or nothing", () => {
+  assert.deepEqual(K.readPlace({ state: "ok", place: { id: "x", name: "St. Michael's Hospital", address: "30 Bond St, Toronto, ON", lat: 43.65, lng: -79.377 } }),
+    { name: "St. Michael's Hospital", address: "30 Bond St, Toronto, ON", lat: 43.65, lng: -79.377 });
+  assert.equal(K.readPlace({ state: "ok", place: { name: "No coords", address: "A" } }), null, "a place with no coordinates is not a pick");
+  assert.equal(K.readPlace({ state: "stopped", message: "m" }), null);
+  assert.equal(K.readPlace({ state: "ok", place: { id: "x", name: "", address: "", lat: 1, lng: 2 } }), null);
+  assert.equal(K.readPlace(null), null);
+});
+test("d24: how a place reads on a row: the name over its address, Home alone, a typed place once", () => {
+  assert.deepEqual(K.rowText({ name: "St. Michael's Hospital", address: "Bond Street, Toronto, ON" }), { main: "St. Michael's Hospital", sub: "Bond Street, Toronto, ON" });
+  assert.deepEqual(K.rowText({ name: "Home", address: "10 Bay St" }), { main: "Home", sub: "" });
+  assert.deepEqual(K.rowText({ name: "55 Offline Ave", address: "55 Offline Ave" }), { main: "55 Offline Ave", sub: "" });
+  assert.deepEqual(K.rowText({ name: "", address: "1 Yonge St" }), { main: "1 Yonge St", sub: "" });
+  assert.deepEqual(K.rowText(null), { main: "", sub: "" });
+});
+
+test("d24: no Change button on From or To; each line is one real button with its screen reader words; a read-only calendar gets no button", async () => {
+  const { readFileSync } = await import("node:fs");
+  const html = readFileSync(new URL("../calendar.html", import.meta.url), "utf8");
+  const src = html.slice(html.indexOf("/* commute:start */"), html.indexOf("/* commute:end */"));
+  assert.doesNotMatch(src, /data-cm="editfrom"/); assert.doesNotMatch(src, /data-cm="edit"/); assert.doesNotMatch(src, />Change</);
+  assert.doesNotMatch(src, /Use this/, "Go or Enter on the keyboard does what Use this did");
+  assert.match(src, /Change where you start/); assert.match(src, /Change where you are going/);
+  const row = src.slice(src.indexOf("function cmRow("), src.indexOf("function cmEditBox("));
+  assert.match(row, /return can \? `<button type="button" class="cmr"/, "a real button when he can edit");
+  assert.match(row, /: `<div class="cmr">/, "a plain line when the calendar is read-only");
+  assert.match(html, /button\.cmr\{[^}]*padding/, "styled as a button");
+  assert.match(html, /\.cmr\{[^}]*min-height:44px/, "44px or taller");
+});
+test("d24: the open box has the label, the typing box with enterkeyhint go, the list, Saved places and Cancel, in that order", async () => {
+  const { readFileSync } = await import("node:fs");
+  const html = readFileSync(new URL("../calendar.html", import.meta.url), "utf8");
+  const fn = html.slice(html.indexOf("function cmEditBox("), html.indexOf("function cmKeepTyped("));
+  assert.match(fn, /enterkeyhint="go"/);
+  let last = -1;
+  for (const w of ['<label class="lbl"', '<input id=', 'id="cmSug"', 'Saved places', 'Remember for every', '>Cancel<']) { const i = fn.indexOf(w); assert.ok(i > last, w + " out of order"); last = i; }
+  assert.match(fn, /\.\.\.\(home \? \[\{ id: home\.id, name: "Home" \}\] : \[\]\), \.\.\.saved/, "Home first when a home is saved");
+});
+test("d25: the page asks places after 300 ms and 3 characters, shows no error for 404, and says one soft line for stopped", async () => {
+  const { readFileSync } = await import("node:fs");
+  const html = readFileSync(new URL("../calendar.html", import.meta.url), "utf8");
+  const src = html.slice(html.indexOf("/* commute:start */"), html.indexOf("/* commute:end */"));
+  assert.match(src, /setTimeout\(\(\) => cmAskPlaces\(side, q\), 300\)/);
+  assert.match(src, /\/quest\/commute\/places/); assert.match(src, /\/quest\/commute\/place"/);
+  assert.match(src, /Place suggestions are off for the rest of the month\. Type the full address\./);
+  const ask = src.slice(src.indexOf("async function cmAskPlaces("), src.indexOf("/** A pin already known"));
+  assert.match(ask, /catch \(e\) \{[^}]*\}/, "a failed request is swallowed");
+  assert.doesNotMatch(ask, /toast\(/, "and never shown");
+  assert.match(ask, /CMS\.q !== q/, "a slow answer for changed text is dropped");
+});
+test("d26: the page links Open in Organic Maps next to Open in Google Maps from the pure function", async () => {
+  const { readFileSync } = await import("node:fs");
+  const html = readFileSync(new URL("../calendar.html", import.meta.url), "utf8");
+  assert.match(html, /Open in Organic Maps/); assert.match(html, /CalCommute\.organicMapsLink\(/);
 });
