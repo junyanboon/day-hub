@@ -2982,7 +2982,7 @@ function cmEditBox(ev, side, t) {
     `<input id="${id}" placeholder="Address or place name" ${first ? 'aria-label="Where are you going"' : ""} autocomplete="off" enterkeyhint="go" aria-controls="cmSug" ${dis}>` +
     `<div class="cmsug" id="cmSug" aria-live="polite">${cmSugHtml()}</div>` +
     `<label class="cmrem"><input type="checkbox" role="switch" id="cmKeep" ${dis}> <span>Keep in Saved places</span></label>` +
-    (chips.length ? `<div class="cmsvh"><p class="lbl" style="margin:0">Saved places</p>${can && CalCommute.anyRemovable(chips) ? `<button type="button" class="cmedit" data-cm="rmmode" aria-pressed="${CM.rm}">${CM.rm ? "Done" : "Edit"}</button>` : ""}</div><div class="chips${rmOn ? " rm" : ""}">${chips.map((p) => cmChipHtml(p, side, rmOn, dis)).join("")}</div>` : "") +
+    (chips.length ? `<div class="cmsvh"><p class="lbl" style="margin:0">Saved places</p>${can && CalCommute.anyRemovable(chips) ? `<button type="button" class="cmedit" data-cm="rmmode">${CM.rm ? "Done" : "Edit"}</button>` : ""}</div><div class="chips${rmOn ? " rm" : ""}">${chips.map((p) => cmChipHtml(p, side, rmOn, dis)).join("")}</div>` : "") +
     (to && t.nextTitle ? `<label class="cmrem"><input type="checkbox" role="switch" id="cmRem" ${dis}> <span>Remember for every ${esc(t.nextTitle)}</span></label>` : "") +
     (first ? "" : `<div class="r"><button type="button" class="btn" data-cm="${to ? "cancel" : "cancelfrom"}">Cancel</button></div>`) + `</div>`;
 }
@@ -3233,15 +3233,15 @@ async function cmRemovePlace(id) {
   const p = (CM.places || []).find((x) => x.id === id);
   if (!p || !CalCommute.removableChip(p) || CM.rmBusy) return;
   CM.rmBusy = true;
-  try {
-    await send("/quest/places", "POST", C.placeRemove(p));
-    CM.places = (CM.places || []).filter((x) => x.id !== id);
-    const gone = document.querySelector('[data-rmid="' + CSS.escape(id) + '"]'), hadFocus = !!gone && gone.contains(document.activeElement);
-    if (gone) gone.remove();   // at once, even when a typing box holds focus and the box repaint waits
-    toast("Removed from Saved places"); cmPaint();
-    if (hadFocus && !document.activeElement.closest?.("input")) { const b = $('[data-cm="rmmode"]'); if (b) b.focus(); }
-  } catch (e) { toast("Not removed. Try again in a moment.", { bad: true }); }
-  finally { CM.rmBusy = false; }
+  try { await send("/quest/places", "POST", C.placeRemove(p)); }
+  catch (e) { CM.rmBusy = false; toast("Not removed. Try again in a moment.", { bad: true }); return; }
+  CM.rmBusy = false;
+  CM.places = (CM.places || []).filter((x) => x.id !== id);
+  if (!CalCommute.anyRemovable(CalCommute.savedChips(CM.places, cmHome()))) CM.rm = false;   // nothing left to remove: the Edit link goes
+  const gone = document.querySelector('[data-rmid="' + CSS.escape(id) + '"]'), hadFocus = !!gone && gone.contains(document.activeElement);
+  if (gone) gone.remove();   // at once, even when a typing box holds focus and the box repaint waits
+  toast("Removed from Saved places"); cmPaint();
+  if (hadFocus) { const b = $('[data-cm="rmmode"]') || $("#cmTo, #cmFromIn"); if (b) b.focus(); }   // never leave focus on a chip that is gone
 }
 /** A row of the Location list was tapped: ask the server for that place and put "Name, full address" into the Location row. It is saved
     with the event the way a typed Location is (the Save button). If the lookup fails, the row's own name and small line go in. */
