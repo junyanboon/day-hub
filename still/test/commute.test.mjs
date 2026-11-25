@@ -215,7 +215,7 @@ test("d6: in the computer panel and the phone sheet the Commute box comes right 
   const sbox = at(pSheet, "${cm}");
   assert.ok(at(pSheet, 'id="pTitle"') < sbox, "after the title");
   assert.ok(sbox < at(pSheet, '<div class="rows">'), "before Day, Starts, Ends, Location, Notes, Type, Calendar");
-  assert.ok(at(pSheet, 'id="cmWhen"') < sbox && at(pSheet, 'id="cmWhen"') > at(pSheet, 'id="pTitle"'), "the time line sits between the title and the box");
+  assert.doesNotMatch(pSheet, /cmWhen/, "no date and time line above the box (Junyan, 2026-11-24)");
   assert.ok(sbox < at(pSheet, 'id="pDel"'));
 });
 test("d6: inside the box the order is Going by, From, To or the ask, Open in Google Maps, the small map, then photos and notes; Home is asked last (slice 2 puts Leave by after Going by, and The way there, Heads up and Check now after To)", async () => {
@@ -244,3 +244,98 @@ test("d9: the page saves, reads and clears a block's To and From on the server, 
   assert.equal(keyHint(html), true);
 });
 const keyHint = (html) => /const keyOf = \(e\) => \(e\.ghost \? "g\|" : "e\|"\) \+ e\.calId \+ "\|" \+ e\.id;/.test(html);   // the block's key is the same on every device: calendar id and event id
+
+/* ---- Junyan, 2026-11-24 (feedback; d17 A, d18 yes, d19 yes): From is where the day left off, To falls back to Home,
+   Length is one minus / plus line, Block type is one small line, no date line on a Commute block, tiles carry a Referer ---- */
+const HOME = { name: "Home", address: "1 Made Up Rd, Toronto", lat: 43.7, lng: -79.4, id: "pl-home" };
+const html2 = () => fs.readFileSync(new URL("../calendar.html", import.meta.url), "utf8");
+const day = (h, m = 0) => new Date(globalThis.CalCore.instant("2026-11-26", h * 60 + m, TZ)).toISOString();   // a Toronto wall time on a fixed day
+const tgtOf = (events, over = {}) => (x) => K.target({ ev: x, events, tz: TZ, remembered: [], ...over });
+
+test("From: the place of the block before it that day; a Commute block gives its To, any other block its location", () => {
+  const yoga = ev("y", "Yoga", day(8), day(9), { location: "9 Yoga Ln" });
+  const cm1 = ev("c1", "Commute", day(9), day(9, 30));
+  const lunch = ev("l", "Lunch", day(12), day(13), { location: "7 Lunch St" });
+  const cm2 = ev("c2", "Commute", day(14), day(14, 30));
+  const events = [yoga, cm1, lunch, cm2];
+  const p = K.previousPlace({ ev: cm2, events, tz: TZ, targetOf: tgtOf(events) });
+  assert.deepEqual([p.address, p.title], ["7 Lunch St", "Lunch"], "the nearest earlier block that has a place");
+  const events2 = [yoga, ev("l2", "Lunch", day(12), day(13)), cm2];
+  assert.equal(K.previousPlace({ ev: cm2, events: events2, tz: TZ, targetOf: tgtOf(events2) }).address, "9 Yoga Ln", "walks back past a block with no place");
+  const trip = { ...cm1, location: "5 Trip Ave" };
+  const events3 = [trip, ev("l3", "Lunch", day(12), day(13)), cm2];
+  assert.equal(K.previousPlace({ ev: cm2, events: events3, tz: TZ, targetOf: tgtOf(events3) }).address, "5 Trip Ave", "a Commute block before it gives its To");
+  const events4 = [ev("c0", "Commute", day(8), day(8, 30)), cm2];
+  assert.equal(K.previousPlace({ ev: cm2, events: events4, tz: TZ, targetOf: tgtOf(events4) }), null, "a Commute block with no To gives nothing");
+});
+test("From: all-day, suggested, later, other-day and the block itself never count", () => {
+  const cm = ev("c", "Commute", day(14), day(14, 30));
+  const events = [cm,
+    { ...ev("ad", "Rent", day(0), day(23)), allDay: true, location: "1 AllDay St" },
+    ev("g", "Idea", day(10), day(11), { location: "2 Ghost St", ghost: true }),
+    ev("later", "Dinner", day(18), day(19), { location: "3 Later St" }),
+    ev("yday", "Gym", "2026-11-25T15:00:00Z", "2026-11-25T16:00:00Z", { location: "4 Yesterday St" })];
+  assert.equal(K.previousPlace({ ev: cm, events, tz: TZ, targetOf: tgtOf(events) }), null);
+});
+test("From order: the one he picked, then the block before, then Home, else nothing (Where you are)", () => {
+  const cm = ev("c", "Commute", day(14), day(14, 30));
+  const prev = ev("p", "Class", day(12), day(13), { location: "8 Class Rd" });
+  const mk = (o) => K.fromFor({ ev: cm, events: [prev, cm], tz: TZ, targetOf: tgtOf([prev, cm]), ...o });
+  const picked = { name: "", address: "6 Picked Pl" };
+  assert.equal(mk({ picked, home: HOME }).address, "6 Picked Pl");
+  assert.equal(mk({ home: HOME }).address, "8 Class Rd");
+  const first = K.fromFor({ ev: cm, events: [cm], tz: TZ, targetOf: tgtOf([cm]), home: HOME });
+  assert.deepEqual([first.name, first.address], ["Home", HOME.address], "the first trip of the day starts at Home");
+  assert.equal(K.fromFor({ ev: cm, events: [cm], tz: TZ, targetOf: tgtOf([cm]), home: null }), null, "no Home saved: Where you are");
+});
+test("To: when nothing says where, it is Home, shown as Home; a trip from Home to Home keeps the ask", () => {
+  const cm = ev("c", "Commute", day(14), day(14, 30));
+  const elsewhere = { name: "", address: "8 Class Rd" };
+  const t = K.target({ ev: cm, events: [cm], tz: TZ, remembered: [], home: HOME, from: elsewhere });
+  assert.deepEqual([t.source, t.name, t.address, K.needsAsk(t)], ["home", "Home", HOME.address, false]);
+  const same = K.target({ ev: cm, events: [cm], tz: TZ, remembered: [], home: HOME, from: { ...HOME } });
+  assert.deepEqual([same.source, K.needsAsk(same)], ["none", true], "Home to Home is never offered");
+  const typedHome = K.target({ ev: cm, events: [cm], tz: TZ, remembered: [], home: HOME, from: { name: "", address: " 1 made up rd, toronto " } });
+  assert.equal(K.needsAsk(typedHome), true, "the same address typed another way is still Home");
+  assert.equal(K.needsAsk(K.target({ ev: cm, events: [cm], tz: TZ, remembered: [], home: null, from: elsewhere })), true, "no Home saved: asks as before");
+  assert.equal(K.target({ ev: { ...cm, location: "388 Carlaw Ave" }, events: [cm], tz: TZ, remembered: [], home: HOME, from: elsewhere }).source, "block", "an obvious end still wins over Home");
+});
+test("Length: minus and plus move the end by 15 minutes, never under 15", () => {
+  assert.equal(K.stepDur(45, 1), 60); assert.equal(K.stepDur(45, -1), 30);
+  assert.equal(K.stepDur(15, -1), 15); assert.equal(K.stepDur(20, -1), 15); assert.equal(K.stepDur(50, 1), 65);
+});
+test("the page: Length is one minus / plus line with the end time, disabled where the chips were", () => {
+  const h = html2(), i = h.indexOf("function pEvent(ev)"), fn = h.slice(i, h.indexOf("function pSheet(ev)"));
+  assert.doesNotMatch(fn, /durs\.map/, "no row of length chips");
+  assert.match(fn, /aria-label="15 minutes shorter"/); assert.match(fn, /aria-label="15 minutes longer"/);
+  assert.match(fn, /data-lenstep="-1"/); assert.match(fn, /data-lenstep="1"/);
+  assert.match(fn, /ends \$\{esc\(endsText\(/, "beside the length: ends 12:45 pm");
+  assert.match(h, /\.lenrow button\{[^}]*min-height:44px/, "44px tall for touch");
+  assert.match(h, /d\.lenstep/, "the buttons are wired");
+  assert.match(h, /S\.form\.dur = CalCommute\.stepDur\(S\.form\.dur, \+d\.lenstep\)/, "it saves the way the chips did: S.form.dur");
+  assert.match(h, /\$\("#pBody \.lenrow|\.lenrow \[data-lenval\]|data-lenval/, "the length and the end time repaint as he taps");
+  const row = fn.slice(fn.indexOf("lenrow"), fn.indexOf("lenrow") + 700);
+  assert.match(row, /\$\{dis\}/, "read-only: disabled");
+});
+test("the page: Block type is one small line on an existing block, the chips come with change; a new block keeps all chips", () => {
+  const h = html2(), fn = h.slice(h.indexOf("function pEvent(ev)"), h.indexOf("function pSheet(ev)"));
+  assert.match(fn, /isNew \?/, "the new block form branches");
+  assert.match(fn, /data-typechange/); assert.match(fn, /change<\/button>/);
+  assert.match(fn, /KNAME\[S\.form\.kind \|\| guess\]/, "the chosen kind, or the guess when none is chosen");
+  assert.match(fn, / · /);
+  assert.match(h, /"typechange" in d/, "change shows the chip row in place");
+  assert.equal((fn.match(/Guess: /g) || []).length, 1, "one chip row, built once and shown by change or for a new block");
+});
+test("the page: a Commute block shows no date and time line, other blocks keep theirs", () => {
+  const h = html2();
+  assert.doesNotMatch(h, /id="cmWhen"/);
+  const fn = h.slice(h.indexOf("function pEvent(ev)"), h.indexOf("function pSheet(ev)"));
+  assert.match(fn, /ev\.k === "commute" \? "" : esc\(whenText\(ev\)\)/, "desktop panel drops only the date text for Commute");
+  assert.match(fn, /starts in/); assert.match(fn, /Repeats/);
+  assert.match(h.slice(h.indexOf("function pSheet(ev)")), /\$\{cm\}/, "the sheet still draws the Commute part");
+});
+test("the page: both map tile layers ask for the site's origin as Referer", () => {
+  const h = html2(), n = (h.match(/L\.tileLayer\(/g) || []).length;
+  assert.equal(n, 2);
+  assert.equal((h.match(/L\.tileLayer\("https:\/\/tile\.openstreetmap\.org\/\{z\}\/\{x\}\/\{y\}\.png", \{[^}]*referrerPolicy: "strict-origin-when-cross-origin"/g) || []).length, 2);
+});

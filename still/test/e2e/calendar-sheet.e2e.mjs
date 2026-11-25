@@ -56,13 +56,16 @@ try {
   /* ---- desktop first, before any save changes the fake data: the panel's HTML for an event equals origin/main's ---- */
   {
     const a = await open(desk, BASE), m = await open(desk, MAIN);
-    const html = async (page, title, d) => { await openEv(page, title, d); return page.evaluate(() => document.querySelector("#pbody").innerHTML); };
+    /* Junyan, 2026-11-24 (d17 A, d18 yes): the desktop panel's Length row and Block type row are redesigned on purpose, so the compare leaves out
+       everything from the first of them to the Calendar field; the rest of the panel must still equal origin/main's. */
+    const norm = (h) => h.replace(/<div class="field"(?: id="typeBox")?>(?:<p class="lbl" style="margin:0">(?:Length|Block type)<\/p>|<div class="typeline")[\s\S]*?(?=<div class="field"><label class="lbl" style="margin:0" for="pCal">)/, "");
+    const html = async (page, title, d) => { await openEv(page, title, d); return norm(await page.evaluate(() => document.querySelector("#pbody").innerHTML)); };
     for (const [title, d] of [["Work block", 2], ["Caney away", 3], ["Dinner", 2], ["Stay at FICTION", 3], ["Pack for FICTION stay", 2], ["Packing & Errands", 2]]) {
       const [x, y] = [await html(a.page, title, d), await html(m.page, title, d)];
-      check(`1280px: "${title}" panel HTML equals origin/main's`, x === y && x.length > 200, x === y ? `${x.length} chars` : "differs");
+      check(`1280px: "${title}" panel HTML equals origin/main's (apart from Length and Block type)`, x === y && x.length > 200, x === y ? `${x.length} chars` : "differs");
     }
     const draft = (page) => page.evaluate(() => { const s = C.instant(C.addDays(today(), 2), 180, S.tz); panel("event", { isNew: true, id: "draft", calId: "joint", title: "", s, e: s + 3600000, start: new Date(s).toISOString(), end: new Date(s + 3600000).toISOString(), k: "other" }); return document.querySelector("#pbody").innerHTML; });
-    check("1280px: a new event's panel HTML equals origin/main's", await draft(a.page) === await draft(m.page));
+    check("1280px: a new event's panel HTML equals origin/main's (apart from Length and Block type)", norm(await draft(a.page)) === norm(await draft(m.page)));
     check("no page errors (desktop)", !a.errors.length && !m.errors.length, [...a.errors, ...m.errors].join("; "));
     await a.ctx.close(); await m.ctx.close();
   }
@@ -75,7 +78,7 @@ try {
     const head = await page.evaluate(() => [document.querySelector("#pGrab")?.getAttribute("aria-label"), document.querySelector(".shead b")?.textContent, document.querySelector("#pSave")?.textContent, document.querySelector("#pDel")?.textContent]);
     check("the dash (Close), Event, Save at the top and Delete event at the bottom", head.join("|") === "Close|Event|Save|Delete event", head.join("|"));
     check("the tabs (Now, Settings, Shortcuts) are hidden under the sheet", await page.evaluate(() => getComputedStyle(document.querySelector(".ptabs")).display === "none"));
-    check("no Length chips on the phone", await page.evaluate(() => !document.querySelector("[data-dur]")));
+    check("no Length chips on the phone", await page.evaluate(() => !document.querySelector("[data-dur],[data-lenstep]")));
     const [s0, st] = [await rowText(page, "start"), await rowText(page, "end")];
     check("Starts and Ends read 9:30 AM and 11:00 AM", s0 === "9:30 AM" && st === "11:00 AM", `${s0} / ${st}`);
     check("Day reads like Fri, Nov 13", /^(Mon|Tue|Wed|Thu|Fri|Sat|Sun), (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) \d{1,2}$/.test(await rowText(page, "day")), await rowText(page, "day"));

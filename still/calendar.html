@@ -377,6 +377,10 @@ div.month{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));grid-templa
 .chip{border:1px solid var(--line);background:none;border-radius:999px;padding:4px 10px;color:var(--soft)}
 .chip[aria-pressed=true]{background:color-mix(in srgb,var(--c,var(--neutral)) 22%,var(--bar));border-color:var(--c,var(--ink));color:var(--ink);font-weight:600}
 .chip:disabled{opacity:.5;cursor:default}
+.lenrow{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.lenrow b{min-width:60px;text-align:center}
+.lenrow button{min-height:44px;min-width:44px;font-size:20px;line-height:1}.lenrow button:disabled{opacity:.4;cursor:default}
+.typeline{color:var(--soft)}.typeline[hidden],#typeChips[hidden]{display:none}
+.linkbtn{border:0;background:none;padding:6px 2px;color:var(--ink);text-decoration:underline;font:inherit;cursor:pointer}.linkbtn:disabled{opacity:.5;cursor:default;text-decoration:none}
 .keys-list{display:grid;grid-template-columns:1fr auto;gap:9px 10px;align-items:center;color:var(--soft)}
 .sw{display:flex;justify-content:space-between;gap:10px;align-items:center;color:var(--soft)}
 .sw input{width:16px;height:16px;accent-color:var(--accent);flex:none}.sw select{width:150px}
@@ -1747,23 +1751,29 @@ function pNow() {
     <div><p class="lbl">Rest of today</p>${rest.map((e) => rowHTML(e)).join("") || '<span class="meta">Clear. Nothing left on the calendar today.</span>'}</div>
     ${sug.length ? `<div><p class="lbl">Suggestions (${sug.length})</p>${sug.map((g) => `<div class="sugg"><b>${esc(g.title)}</b><span class="meta">${esc(whenText(g))} · from ${esc(g.by)}</span>${g.why ? `<span class="meta">${esc(g.why)}</span>` : ""}<div class="r"><button class="btn pri" data-acc="${esc(g.id)}">Accept</button><button class="btn" data-skip="${esc(g.id)}">Skip</button><button class="btn" data-go="${esc(g.id)}">Show</button></div></div>`).join("")}</div>` : ""}`;
 }
+/** "12:45 pm": when a block of dur minutes starting like ev ends, on the calendar's clock. */
+const endsText = (ev, dur) => C.hm(C.wall(ev.s + dur * 60000, S.tz).min);
 function pEvent(ev) {
   if (sheetOn()) return pSheet(ev);
   if (S.form && S.form.sheet) S.form = null;
   const isNew = !!ev.isNew, cal = calOf(ev.calId), canEdit = ev.ghost || isNew || cal.writable;
   const len = ev.allDay ? 0 : Math.round((ev.e - ev.s) / 60000);
-  const durs = [...new Set([15, 30, 45, 60, 90, 120, 180, len])].filter(Boolean).sort((a, b) => a - b);
   const guess = C.kindOf({ title: ev.title, calName: cal.name });
   const writable = S.cals.filter((c) => c.writable || c.id === ev.calId), dis = canEdit ? "" : "disabled";
   if (!S.form) S.form = { dur: len, kind: ev.kind || "" };
   const mins = ev.allDay ? 0 : (ev.s - Date.now()) / 60000;
+  /* A Commute block shows no date and time line (Junyan, 2026-11-24): it keeps "starts in", the second zone, Repeats and the place. */
+  const whenTxt = ev.k === "commute" ? "" : esc(whenText(ev)), soon = mins > 0 && mins < 1440 ? `${whenTxt ? " · " : ""}starts in ${untilText(mins)}` : "";
+  const lines = [whenTxt + soon, two() && !ev.allDay ? `${esc(zoneName(S.tz2))}: ${C.hm(C.wall(ev.s, S.tz2).min)} to ${C.hm(C.wall(ev.e, S.tz2).min)}` : "", ev.recurringEventId ? "Repeats" : "", ev.location ? esc(ev.location) : ""].filter(Boolean).join("<br>");
+  const typeChips = `<div class="chips" id="typeChips" ${isNew ? "" : "hidden"}><button class="chip k-${guess}" data-kind="" aria-pressed="${!S.form.kind}" ${dis}>Guess: ${esc(KNAME[guess])}</button>${C.KINDS.map(([k, n]) => `<button class="chip k-${k}" data-kind="${k}" aria-pressed="${S.form.kind === k}" ${dis}>${KICON[k] ? KICON[k] + " " : ""}${n}</button>`).join("")}</div>`;
   return `<div class="r"><button class="btn" data-p="now">&#8249; Now</button><span class="spacer"></span><span class="meta">${esc(cal.name)}</span></div>
     ${ev.ghost ? `<div class="meta">Suggested by ${esc(ev.by)}${ev.why ? ": " + esc(ev.why) : ""}</div>` : ""}
     <div class="field"><input class="tinput" id="pTitle" value="${esc(ev.title)}" placeholder="Title" aria-label="Title" ${dis}>
-      <div style="color:var(--soft)">${esc(whenText(ev))}${mins > 0 && mins < 1440 ? ` · starts in ${untilText(mins)}` : ""}${two() && !ev.allDay ? `<br>${esc(zoneName(S.tz2))}: ${C.hm(C.wall(ev.s, S.tz2).min)} to ${C.hm(C.wall(ev.e, S.tz2).min)}` : ""}${ev.recurringEventId ? "<br>Repeats" : ""}${ev.location ? "<br>" + esc(ev.location) : ""}</div></div>
+      <div style="color:var(--soft)">${lines}</div></div>
     ${commuteBox(ev)}
-    ${ev.allDay || ev.ghost ? "" : `<div class="field"><p class="lbl" style="margin:0">Length</p><div class="chips">${durs.map((m) => `<button class="chip" data-dur="${m}" aria-pressed="${m === S.form.dur}" ${dis}>${C.dur(m)}</button>`).join("")}</div></div>`}
-    ${ev.ghost ? "" : `<div class="field"><p class="lbl" style="margin:0">Block type</p><div class="chips"><button class="chip k-${guess}" data-kind="" aria-pressed="${!S.form.kind}" ${dis}>Guess: ${esc(KNAME[guess])}</button>${C.KINDS.map(([k, n]) => `<button class="chip k-${k}" data-kind="${k}" aria-pressed="${S.form.kind === k}" ${dis}>${KICON[k] ? KICON[k] + " " : ""}${n}</button>`).join("")}</div></div>`}
+    ${ev.allDay || ev.ghost ? "" : `<div class="field"><p class="lbl" style="margin:0">Length</p><div class="lenrow"><button class="btn" data-lenstep="-1" aria-label="15 minutes shorter" ${dis || S.form.dur <= 15 ? "disabled" : ""}>&minus;</button><b data-lenval>${C.dur(S.form.dur)}</b><button class="btn" data-lenstep="1" aria-label="15 minutes longer" ${dis}>+</button><span class="meta" data-lenends>ends ${esc(endsText(ev, S.form.dur))}</span></div></div>`}
+    ${ev.ghost ? "" : isNew ? `<div class="field"><p class="lbl" style="margin:0">Block type</p>${typeChips}</div>`
+      : `<div class="field" id="typeBox"><div class="typeline" id="typeLine"><span id="typeName">${esc(KNAME[S.form.kind || guess])}</span> · <button class="linkbtn" data-typechange ${dis}>change</button></div>${typeChips}</div>`}
     <div class="field"><label class="lbl" style="margin:0" for="pCal">Calendar</label><select id="pCal" ${dis}>${writable.map((c) => `<option value="${esc(c.id)}" ${c.id === ev.calId ? "selected" : ""}>${esc(c.name)}</option>`).join("")}</select></div>
     ${canEdit ? "" : `<div class="meta">${esc(cal.name)} is read-only here.</div>`}
     <div class="r">${ev.ghost ? `<button class="btn" id="pSkip">Skip</button><span class="spacer"></span><button class="btn pri" id="pAcc">Accept</button>`
@@ -1789,7 +1799,7 @@ function pSheet(ev) {
     <div class="shead"><span></span><b>Event</b>${canEdit && !ev.ghost ? '<button class="btn pri" id="pSave">Save</button>' : "<span></span>"}</div>
     ${ev.ghost ? `<div class="meta">Suggested by ${esc(ev.by)}${ev.why ? ": " + esc(ev.why) : ""}</div>` : ""}
     <input class="tinput" id="pTitle" value="${esc(f.title)}" placeholder="Title" aria-label="Title" autocomplete="off" ${canEdit ? "" : "disabled"}>
-    ${cm ? `<div class="meta" id="cmWhen">${esc(whenText(ev))}</div>${cm}` : ""}
+    ${cm}
     <div class="rows">
       ${row("Day", pick("date", "day", "Day"))}
       ${row("Starts", pick("time", "start", "Starts"), `data-timed ${f.allDay ? "hidden" : ""}`)}
@@ -2172,7 +2182,7 @@ async function tripPins(m) {
   m = tripModel();   // the map library may have taken seconds to arrive: draw what is true now
   if (!TM.map || TM.map.getContainer() !== box) {
     TM.map = L.map(box, { zoomControl: true, attributionControl: true });
-    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "© OpenStreetMap contributors" }).addTo(TM.map);
+    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "© OpenStreetMap contributors", referrerPolicy: "strict-origin-when-cross-origin" }).addTo(TM.map);
     TM.map.setView([20, 0], 2);
     TM.layer = L.layerGroup().addTo(TM.map); TM.fitted = false; TM.fitN = 0; TM.moved = false;
     TM.map.on("dragstart", () => { TM.moved = true; });
@@ -2705,10 +2715,13 @@ const cmDay = (ev) => C.wall(ev.s, S.tz).day;
 const cmRoute = (ev) => CM.routes[keyOf(ev)] || null;
 const cmTyped = (ev) => (cmRoute(ev) && cmRoute(ev).to) || cmGet(CMK.to)[keyOf(ev)] || null;
 const cmFromPicked = (ev) => (cmRoute(ev) && cmRoute(ev).from) || cmGet(CMK.from)[keyOf(ev)] || null;
-const cmTarget = (ev) => CalCommute.target({ ev, events: eventsFor(cmDay(ev), cmDay(ev)), tz: S.tz, remembered: CM.places || [], typed: cmTyped(ev) });
+/* Junyan, 2026-11-24 ("Starting point is always home. If there is no ending point that is obvious then it's home."):
+   From is the one he picked for the block, else where the block before it that day ended, else Home. To is the usual order,
+   and when none of it says where, Home (but never a Home to Home trip: then it still asks). */
+const cmTarget = (ev) => CalCommute.target({ ev, events: eventsFor(cmDay(ev), cmDay(ev)), tz: S.tz, remembered: CM.places || [], typed: cmTyped(ev), home: cmHome(), from: cmFrom(ev) });
+const cmTargetOf = (x) => CalCommute.target({ ev: x, events: eventsFor(cmDay(x), cmDay(x)), tz: S.tz, remembered: CM.places || [], typed: cmTyped(x), home: cmHome(), from: cmFrom(x) });
 function cmFrom(ev) {
-  const f = cmFromPicked(ev); if (f) return f;
-  const h = cmHome(); return h ? { name: "Home", address: h.address || "", lat: h.lat, lng: h.lng, id: h.id } : null;
+  return CalCommute.fromFor({ ev, events: eventsFor(cmDay(ev), cmDay(ev)), tz: S.tz, targetOf: cmTargetOf, picked: cmFromPicked(ev), home: cmHome() });
 }
 const cmPlaceBody = (o) => ({ name: o.name || "", address: o.address || "", lat: o.lat == null ? null : o.lat, lng: o.lng == null ? null : o.lng, id: o.id || "" });
 /** Save one end of a block's route on the server (side "to" or "from"; o null clears it). false when the server cannot be reached. */
@@ -2911,7 +2924,7 @@ function cmPaint() {
   h += `<div class="cmroute"><div class="cmr"><span class="lbl">From</span><span class="v">${from ? esc(from.name === "Home" ? "Home" : nm(from)) : "Where you are"}</span>` +
     `${can ? `<button class="btn" data-cm="editfrom">Change</button>` : ""}</div>`;
   if (CM.editFrom) h += `<div class="cmask"><input id="cmFromIn" placeholder="Address or place name" aria-label="From" autocomplete="off" enterkeyhint="go"><div class="r"><button class="btn pri" data-cm="gofrom">Use this</button>${cmFromPicked(ev) ? '<button class="btn" data-cm="homeagain">Back to Home</button>' : ""}<button class="btn" data-cm="cancelfrom">Cancel</button></div></div>`;
-  h += `<div class="cmr"><span class="lbl">To</span><span class="v">${asking || !t.address ? "Not set yet" : esc(nm(t))}</span>${!asking && can ? `<button class="btn" data-cm="edit">Change</button>` : ""}</div></div>`;
+  h += `<div class="cmr"><span class="lbl">To</span><span class="v">${asking || !t.address ? "Not set yet" : esc(t.source === "home" ? "Home" : nm(t))}</span>${!asking && can ? `<button class="btn" data-cm="edit">Change</button>` : ""}</div></div>`;
   if (!asking) h += dp.way + dp.heads + dp.check;
   if (asking) {
     const saved = CM.places.filter((p) => p.category !== "commute-for" && p.category !== "home" && (p.address || p.lat != null));
@@ -2957,7 +2970,7 @@ async function cmMapShow(box, which) {
   const dd = cmDirOf(ev), way = cmWay(dd, C.modeOf(ev)), line = cmUsable(way) && way.polyline ? CalCommute.decodePolyline(way.polyline) : [];
   cmDrop(which);
   const map = CM[which] = L.map(box, { zoomControl: which === "big", attributionControl: true, dragging: which === "big" || !L.Browser.mobile, scrollWheelZoom: which === "big" });
-  L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "© OpenStreetMap contributors" }).addTo(map);
+  L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "© OpenStreetMap contributors", referrerPolicy: "strict-origin-when-cross-origin" }).addTo(map);
   map._pins = pins; map._line = line;
   if (line.length > 1) L.polyline(line, { color: getComputedStyle(document.documentElement).getPropertyValue("--k-commute").trim() || "#2a7", weight: 5, opacity: 0.85, interactive: false }).addTo(map);   // the way there, between the From and To pins
   for (const p of pins) {
@@ -3111,7 +3124,7 @@ function commuteWire() {
 /* commute:end */
 function setup() {
   document.addEventListener("click", function clickRouter(e) {
-    const t = e.target.closest("[data-railtog],[data-pkday],[data-page],[data-n],[data-p],[data-key],[data-staff],[data-bday],[data-allday],[data-open],[data-acc],[data-skip],[data-go],[data-dur],[data-kind],[data-sheet],[data-triptab],button[data-look],#pSave,#pDel,#pAcc,#pSkip,#pGrab,#pairBtn,[data-end],[data-pkrm],#pkAdd,#soBtn,#soAll,#pwBtn,#pwGo");
+    const t = e.target.closest("[data-railtog],[data-pkday],[data-page],[data-n],[data-p],[data-key],[data-staff],[data-bday],[data-allday],[data-open],[data-acc],[data-skip],[data-go],[data-lenstep],[data-typechange],[data-kind],[data-sheet],[data-triptab],button[data-look],#pSave,#pDel,#pAcc,#pSkip,#pGrab,#pairBtn,[data-end],[data-pkrm],#pkAdd,#soBtn,#soAll,#pwBtn,#pwGo");
     if (!t || t.closest(".ev")) return;
     const d = t.dataset;
     if (t.matches("button[data-look]")) setLook(d.look);
@@ -3132,8 +3145,17 @@ function setup() {
       if (d.acc) acceptSugg(g); else if (d.skip) skipSugg(g);
       else { document.body.classList.remove("popen"); if (S.n === "m") S.n = 3; goTo(g.allDay ? g.start : C.wall(g.s, S.tz).day); }
     }
-    else if (d.dur) { S.form.dur = +d.dur; $$("[data-dur]").forEach((c) => c.setAttribute("aria-pressed", String(c === t))); }
-    else if ("kind" in d) { S.form.kind = d.kind; $$("[data-kind]").forEach((c) => c.setAttribute("aria-pressed", String(c === t))); if (S.form.sheet) { $('[data-v="types"]').hidden = true; sheetPaint(); } }
+    else if (d.lenstep) {
+      S.form.dur = CalCommute.stepDur(S.form.dur, +d.lenstep);
+      $("[data-lenval]").textContent = C.dur(S.form.dur); $("[data-lenends]").textContent = "ends " + endsText(S.ev, S.form.dur);
+      $('[data-lenstep="-1"]').disabled = S.form.dur <= 15;   // a read-only block never gets here: both buttons are disabled
+    }
+    else if ("typechange" in d) { $("#typeLine").hidden = true; $("#typeChips").hidden = false; }
+    else if ("kind" in d) {
+      S.form.kind = d.kind; $$("[data-kind]").forEach((c) => c.setAttribute("aria-pressed", String(c === t)));
+      if (S.form.sheet) { $('[data-v="types"]').hidden = true; sheetPaint(); }
+      else if ($("#typeLine")) { $("#typeName").textContent = KNAME[d.kind || C.kindOf({ title: S.ev.title, calName: calOf(S.ev.calId).name })]; $("#typeChips").hidden = true; $("#typeLine").hidden = false; }
+    }
     else if (d.sheet === "type") { const c = $('[data-v="types"]'); c.hidden = !c.hidden; }
     else if (t.id === "pGrab") closeSheet();
     else if (t.id === "pSave") saveEvent();

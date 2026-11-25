@@ -80,7 +80,7 @@ try {
     const lay = await page.evaluate((isPhone) => {
       const top = (sel) => { const el = document.querySelector(sel); return el ? el.getBoundingClientRect() : null; };
       const box = top("#cmBox"), going = top('#cmBox [data-cm="mode"]'), ask = top("#cmAsk"), title = top("#pTitle");
-      const firstLen = document.querySelector("[data-dur]"), firstRow = document.querySelector(".srow"), cal = top("#pCal");
+      const firstLen = document.querySelector("[data-lenstep]"), firstRow = document.querySelector(".srow"), cal = top("#pCal");
       return { vh: innerHeight, title: title && [title.top, title.bottom], box: box && [box.top, box.bottom], going: going && going.bottom, ask: ask && ask.bottom,
         lenTop: firstLen ? firstLen.getBoundingClientRect().top : null, rowTop: firstRow ? firstRow.getBoundingClientRect().top : null, calTop: cal && cal.top, sheet: !!document.querySelector(".sheet") };
     }, phone);
