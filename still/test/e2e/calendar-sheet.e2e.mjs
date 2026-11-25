@@ -59,7 +59,8 @@ try {
     /* Junyan, 2026-11-24 (d17 A, d18 yes): the desktop panel's Length row and Block type row are redesigned on purpose, so the compare leaves out
        everything from the first of them to the Calendar field; the rest of the panel must still equal origin/main's. */
     /* Junyan, 2026-11-25 (d33 yes): the desktop panel also gets its own Location box, so that field (label to list box) is left out too. */
-    const noLoc = (h) => h.replace(/<div class="field"><label class="lbl" style="margin:0" for="pLoc">[\s\S]*?id="locSug"[^>]*><\/div><\/div>/, "").replace(/>\s+</g, "><");
+    /* Junyan, 2026-11-25 (d46 yes): the Open in Google link is gone from the panel on purpose, so origin/main's copy is compared without it. */
+    const noLoc = (h) => h.replace(/<div class="field"><label class="lbl" style="margin:0" for="pLoc">[\s\S]*?id="locSug"[^>]*><\/div><\/div>/, "").replace(/<a class="meta" href="[^"]*" target="_blank" rel="noopener">Open in Google<\/a>/, "").replace(/>\s+</g, "><");
     const norm = (h) => noLoc(h).replace(/<div class="field"(?: id="typeBox")?>(?:<p class="lbl" style="margin:0">(?:Length|Block type)<\/p>|<div class="typeline")[\s\S]*?(?=<div class="field"><label class="lbl" style="margin:0" for="pCal">)/, "");
     const html = async (page, title, d) => { await openEv(page, title, d); return norm(await page.evaluate(() => document.querySelector("#pbody").innerHTML)); };
     for (const [title, d] of [["Work block", 2], ["Caney away", 3], ["Dinner", 2], ["Stay at FICTION", 3], ["Pack for FICTION stay", 2], ["Packing & Errands", 2]]) {
