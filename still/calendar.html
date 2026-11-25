@@ -2945,7 +2945,7 @@ function cmRestoreTyped(box, k) {
 }
 /** The places list (d25): up to 5 rows, the name over the small line, with a pin; or one soft line when the month's budget is spent. */
 function cmSugHtml() {
-  let h = CMS.items.map((x, i) => `<button type="button" data-cm="sug" data-i="${i}"><span aria-hidden="true">📍</span><span>${esc(x.name)}${x.sub ? `<small>${esc(x.sub)}</small>` : ""}</span></button>`).join("");
+  let h = CMS.items.map((x) => `<button type="button" data-cm="sug" data-pid="${esc(x.id)}"><span aria-hidden="true">📍</span><span>${esc(x.name)}${x.sub ? `<small>${esc(x.sub)}</small>` : ""}</span></button>`).join("");
   if (CMS.stopped) h += `<div class="meta cmstop" role="status">Place suggestions are off for the rest of the month. Type the full address.</div>`;
   return h;
 }
@@ -2990,6 +2990,8 @@ function cmLinksHtml(ev) {
 }
 function cmPaint() {
   const box = $("#cmBox"), ev = S.ev; if (!box || !ev) return;
+  const fo = document.activeElement;
+  if (fo && (fo.id === "cmTo" || fo.id === "cmFromIn") && box.contains(fo)) { CM.dirty = true; return; }   // never rebuild a box while he types in it: on an iPhone that closes the keyboard (any tap or Enter lets go of the box first)
   cmDrop("small");
   const mode = C.modeOf(ev), t = cmTarget(ev), from = cmFrom(ev), can = cmCanEdit(ev), ask = !CM.editFrom && (CalCommute.needsAsk(t) || CM.edit === keyOf(ev));
   const asking = ask, home = cmHome(), inPlace = ask && !CalCommute.needsAsk(t);   // an ask for a To that is set replaces the To row; the first ask sits under the rows
@@ -3138,13 +3140,14 @@ async function cmFromHome(ev) {
 /** Go or Enter with no row picked: the typed text is used as it is (a lookup for the pin, as before). */
 async function cmGo(ev, side) {
   const i = $(side === "to" ? "#cmTo" : "#cmFromIn"); const v = i ? (i.value || "").trim() : ""; if (!v) { if (i) i.focus(); return; }
-  const rem = $("#cmRem"), keepRem = !!(rem && rem.checked); cmSugClose();
-  const o = await cmFound(v);
+  if (CM.going) return; CM.going = true;   // Enter twice while the lookup runs saves once
+  const rem = $("#cmRem"), keepRem = !!(rem && rem.checked); cmSugClose(); i.blur();
+  let o; try { o = await cmFound(v); } finally { CM.going = false; }
   if (side === "to") cmSetTarget(ev, o, keepRem); else cmSetFrom(ev, o);
 }
 /** A row of the places list was tapped: ask the server for that place and save it (name, address, lat, lng) as this end. */
-async function cmPickSuggestion(ev, i) {
-  const x = CMS.items[i], side = CMS.side; if (!x || !side || CMS.busy) return;
+async function cmPickSuggestion(ev, pid) {
+  const x = CMS.items.find((y) => y.id === pid), side = CMS.side;   // by id: a list redrawn under his finger never picks another row if (!x || !side || CMS.busy) return;
   CMS.busy = true; const session = CMS.session, rem = $("#cmRem"), keepRem = !!(rem && rem.checked);
   let o = null; try { o = CalCommute.readPlace(await send("/quest/commute/place", "POST", { id: x.id, session })); } catch (e) { /* falls back to the words on the row */ }
   if (CMS.side !== side || CMS.session !== session) return;   // the box was closed or reopened while we waited
@@ -3154,6 +3157,7 @@ async function cmPickSuggestion(ev, i) {
 }
 async function cmAct(t) {
   const ev = S.ev, d = t.dataset, key = ev && keyOf(ev);
+  const fo = document.activeElement; if (fo && (fo.id === "cmTo" || fo.id === "cmFromIn")) { fo.blur(); if (CM.dirty) { CM.dirty = false; cmPaint(); } }
   if (d.cm === "closemodal") document.querySelectorAll(".cmmodal").forEach((x) => x.remove());
   else if (d.cm === "see") { const n = [...((CM.notes && CM.notes.block) || []), ...((CM.notes && CM.notes.place) || [])].find((x) => x.id === d.id); if (n) cmSeePhotos([n]); }
   else if (d.cm === "shotsave") cmSave(t.closest(".cmmodal"));
@@ -3168,7 +3172,7 @@ async function cmAct(t) {
     if (p === cmHome()) await cmFromHome(ev); else await cmSetFrom(ev, { name: p.name, address: p.address || p.name, lat: p.lat, lng: p.lng, id: p.id });
   }
   else if (d.cm === "pickto") { const p = (CM.places || []).find((x) => x.id === d.id); if (p) { const rem = $("#cmRem"); cmSugClose(); cmSetTarget(ev, { name: p.name, address: p.address || p.name, lat: p.lat, lng: p.lng, id: p.id }, rem && rem.checked); } }
-  else if (d.cm === "sug") await cmPickSuggestion(ev, +d.i);
+  else if (d.cm === "sug") await cmPickSuggestion(ev, d.pid);
   else if (d.cm === "home") {
     const v = ($("#cmHomeIn").value || "").trim(); if (!v) return;
     try { const o = await cmFound(v), r = await send("/quest/places", "POST", { op: "put", place: { name: "Home", address: v, lat: o.lat, lng: o.lng, category: "home", list: "home", savedBy: "Calendar" } });

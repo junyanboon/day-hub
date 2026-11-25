@@ -89,7 +89,7 @@ try {
     check(`${label}: typing on asks again with the same session`, c.placesCalls.length === 2 && c.placesCalls[1].session === session && c.placesCalls[1].q === "St.x", JSON.stringify(c.placesCalls.map((x) => [x.q, x.session === session])));
     await page.fill("#cmTo", "St."); await sleep(700);
     // a pick saves name, address and coordinates
-    await page.click('#cmSug [data-cm="sug"][data-i="0"]'); await sleep(900);
+    await page.click('#cmSug [data-cm="sug"][data-pid="gp-smh"]'); await sleep(900);
     c = await calls(page);
     check(`${label}: tapping a row asks /place with its id and the same session`, c.placeCalls.length === 1 && c.placeCalls[0].id === "gp-smh" && c.placeCalls[0].session === session, JSON.stringify(c.placeCalls));
     pt = await panelText(page);
@@ -177,7 +177,7 @@ try {
     // d26: only To has coordinates; and none
     await page.click('#cmBox [data-cm="rowfrom"]'); await page.fill("#cmFromIn", "nowhere land"); await page.press("#cmFromIn", "Enter"); await sleep(900);
     await page.click('#cmBox [data-cm="rowto"]'); await page.click('#cmSug [data-cm="sug"]').catch(() => {});
-    await page.fill("#cmTo", "St."); await sleep(700); await page.click('#cmSug [data-cm="sug"][data-i="1"]'); await sleep(900);
+    await page.fill("#cmTo", "St."); await sleep(700); await page.click('#cmSug [data-cm="sug"][data-pid="gp-slm"]'); await sleep(900);
     const om2 = await page.getAttribute('#cmBox a:has-text("Open in Organic Maps")', "href").catch(() => null);
     check(`${label}: with no coordinates for From, Open in Organic Maps shows just the To spot`, om2 === "https://omaps.app/map?v=1&ll=43.6487,-79.3715&n=St.%20Lawrence%20Market", String(om2));
     await page.click('#cmBox [data-cm="rowto"]'); await page.fill("#cmTo", "nowhere land"); await page.press("#cmTo", "Enter"); await sleep(900);
