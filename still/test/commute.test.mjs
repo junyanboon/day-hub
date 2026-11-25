@@ -114,7 +114,7 @@ test("the Arrive line: the real spare minutes before the next event, or when the
 test("best way: the quickest is marked, a walk that is too far never is, and nothing is marked without minutes", () => {
   assert.equal(K.bestWay({ walk: { minutes: 50 }, transit: { minutes: 34 }, drive: { minutes: 27 } }), "drive");
   assert.equal(K.bestWay({ walk: { tooFar: true, km: 9 }, transit: { minutes: 34 }, drive: { minutes: 40 } }), "transit");
-  assert.equal(K.bestWay({ walk: { minutes: 20 }, transit: { minutes: 20 } }), "commute", "a tie goes to walking: the walk is the chip named Commute");
+  assert.equal(K.bestWay({ walk: { minutes: 20 }, transit: { minutes: 20 } }), "commute", "a tie goes to walking: the walk is the chip named Walk");
   assert.equal(K.bestWay({}), ""); assert.equal(K.bestWay(null), "");
 });
 test("a way he picked by hand still wins: the quicker row only offers a switch, and only for 3 minutes or more", () => {
@@ -184,10 +184,26 @@ test("the page: the box sits in both panels, only for a Commute block, and draws
   assert.match(src, /accept="image\/\*"/);
   assert.match(src, /From last time you went here/);
   assert.match(src, /The place too/);
-  assert.match(src, /Show where I am/);
-  assert.match(src, /Whole trip/);
-  assert.match(src, /Open map/);
-  assert.doesNotMatch(src.replace(/navigator\.geolocation\.getCurrentPosition/, ""), /getCurrentPosition|watchPosition/, "location is asked only from the Show where I am press");
+  assert.doesNotMatch(src, /getCurrentPosition|watchPosition|geolocation/, "the page never asks for his location");
+});
+/* d21, d23 (Junyan, 2026-11-24: "21 remove it", "23 yes"): no full screen map, and the walking chip reads Walk */
+test("d21: the Commute panel has no Open map button and nothing on the page can make a full screen map layer", async () => {
+  const { readFileSync } = await import("node:fs");
+  const html = readFileSync(new URL("../calendar.html", import.meta.url), "utf8");
+  const src = html.slice(html.indexOf("/* commute:start */"), html.indexOf("/* commute:end */"));
+  assert.doesNotMatch(src, /Open map/);
+  assert.doesNotMatch(src, /data-cm="(map|gps|fit|close)"/);
+  assert.match(src, /Open in Google Maps/, "the Google Maps link stays");
+  assert.match(src, /id="cmMap"/, "the small map stays");
+  for (const w of [/cmbig/i, /cmbar/i, /cmOpenBig/, /cmGps/, /cmBigMap/, /Show where I am/, /Whole trip/, /Open map/, /createElement\("div"\);\s*o\.className/]) assert.doesNotMatch(html, w, String(w));
+  assert.doesNotMatch(html, /d\.cm === "(map|gps|fit|close)"/, "no action is left to open one");
+  const core = readFileSync(new URL("../calendar-core.js", import.meta.url), "utf8");
+  assert.doesNotMatch(core, /cmbig/i);
+});
+test("d23: the three Going by chips read Walk, Transit and Drive, and the block type is still Commute", async () => {
+  const C = globalThis.CalCore;
+  assert.deepEqual(C.MODES.map((m) => m[2]), ["Walk", "Transit", "Drive"]);
+  assert.deepEqual(C.KINDS.find(([k]) => k === "commute"), ["commute", "Commute"]);
 });
 test("the card shows the mode's emoji, and Commute has no page of its own", async () => {
   const { readFileSync } = await import("node:fs");

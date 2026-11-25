@@ -359,9 +359,9 @@ div.month{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));grid-templa
 .cmroute{display:flex;flex-direction:column;gap:6px}.cmr{display:flex;align-items:center;gap:8px}.cmr .lbl{margin:0;width:42px}.cmr .v{flex:1;min-width:0;overflow-wrap:anywhere}
 .cmask{display:flex;flex-direction:column;gap:6px}.cmask input[type=text],.cmask input:not([type]),.cmask textarea,.cmmodal textarea{width:100%;background:var(--raise);border:1px solid var(--line);border-radius:10px;padding:8px 10px}
 .cmrem{display:flex;align-items:center;gap:8px}
-.cmmap{height:170px;border-radius:10px;overflow:hidden;border:1px solid var(--line);position:relative;z-index:0}.cmmap.big{height:auto;flex:1;border-radius:0;border:0}
+.cmmap{height:170px;border-radius:10px;overflow:hidden;border:1px solid var(--line);position:relative;z-index:0}
 .cmpin{min-width:34px;height:34px;border-radius:17px;padding:0 6px;display:flex;align-items:center;justify-content:center;font:700 11px system-ui,sans-serif;background:var(--bar);color:var(--ink);border:2px solid var(--k-commute);box-shadow:0 1px 4px var(--line)}
-.cmpin.to{border-width:4px}.cmpin.me{border-style:dashed}
+.cmpin.to{border-width:4px}
 .cmnote{display:flex;align-items:center;gap:8px;flex-wrap:wrap;border-top:1px solid var(--line);padding-top:6px}.cmnote span{flex:1;min-width:0;overflow-wrap:anywhere}
 .cmbox .chip .cmm{opacity:.85;font-variant-numeric:tabular-nums}.cmbest{display:inline-block;margin-left:4px;padding:1px 6px;border-radius:8px;font-size:10px;font-weight:700;background:var(--k-commute);color:var(--bg)}
 .cmchk{display:flex;flex-direction:column;gap:2px;border-left:4px solid var(--k-commute);padding:6px 10px;background:var(--raise);border-radius:8px}.cmchk small{color:var(--soft)}
@@ -369,8 +369,6 @@ div.month{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));grid-templa
 .cmsteps{list-style:none;margin:6px 0 0;padding:0;display:flex;flex-direction:column;gap:6px}.cmsteps li{display:flex;gap:8px;align-items:flex-start}.cmsteps li>div{flex:1;min-width:0;overflow-wrap:anywhere}.cmsteps b{display:block;font-weight:600}.cmsteps small,.cmalert small{display:block;color:var(--soft);font-size:12px}.cmsteps .sm{white-space:nowrap;color:var(--soft);font-size:12px}.cmsteps .si,.cmalert .si{width:22px;text-align:center}
 .cmalert{display:flex;gap:8px;align-items:flex-start;padding:6px 8px;border:1px solid var(--line);border-radius:10px;background:var(--raise)}.cmalert>div{flex:1;min-width:0;overflow-wrap:anywhere}.cmalert.gone{opacity:.6}.cmalert.gone b{text-decoration:line-through}.cmgrp{margin:6px 0 0}
 .cmquick{display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap;border:1px solid var(--k-commute);border-radius:10px;padding:6px 8px}.cmquick small{display:block;color:var(--soft);font-size:12px}.cmlast{margin-top:-4px}
-.cmbig{position:fixed;top:12px;left:12px;right:12px;height:calc(100% - 24px);z-index:60;display:flex;flex-direction:column;background:var(--bg);border:1px solid var(--line);border-radius:14px;overflow:hidden}
-.cmbar{display:flex;align-items:center;gap:8px;padding:8px 10px;border-bottom:1px solid var(--line);flex-wrap:wrap}
 .cmmodal{position:fixed;top:0;left:0;right:0;height:100%;z-index:70;display:flex;align-items:center;justify-content:center;padding:16px;background:color-mix(in srgb,var(--bg) 70%,transparent)}
 .cmcard{width:min(520px,100%);max-height:100%;overflow:auto;display:flex;flex-direction:column;gap:10px;background:var(--bar);border:1px solid var(--line);border-radius:14px;padding:12px}
 .cmcard .r{display:flex;align-items:center;gap:8px}.cmcard img{max-width:100%;border-radius:10px}.cmfig{margin:0;display:flex;flex-direction:column;gap:6px}
@@ -966,7 +964,7 @@ html.hsfill .x-toast{bottom:calc(22px + env(safe-area-inset-bottom,0px) - var(--
   .page.cards input,.page.cards select,.page.cards textarea{font-size:16px}
   .x-toast{white-space:normal;border-radius:18px}
 }
-@media (max-width:760px){.cmbig{top:0;left:0;right:0;height:100%;border-radius:0;border:0}.cmmap{height:150px}}
+@media (max-width:760px){.cmmap{height:150px}}
 </style></head>
 <body>
 <div class="app">
@@ -2703,7 +2701,7 @@ function wirePair() {
    by step, Heads up and Check now, all from the server's directions answer (below). */
 /* commute:start */
 const CMK = { to: "cal-commute-to", from: "cal-commute-from", spots: "cal-commute-spots" };
-const CM = { dir: {}, places: null, loading: false, notes: null, edit: "", editFrom: false, key: "", big: null, small: null, seq: {}, run: 0, routes: {}, loaded: {}, up: false };
+const CM = { dir: {}, places: null, loading: false, notes: null, edit: "", editFrom: false, key: "", small: null, seq: {}, run: 0, routes: {}, loaded: {}, up: false };
 const cmGet = (k) => { try { const v = JSON.parse(store.get(k) || "{}"); return v && typeof v === "object" ? v : {}; } catch { return {}; } };
 const cmSet = (k, key, val) => { const o = cmGet(k); if (val) o[key] = val; else delete o[key]; store.set(k, JSON.stringify(o)); };
 const cmHome = () => (CM.places || []).find((p) => p.category === "home" || /^home$/i.test(p.name || "")) || null;
@@ -2935,7 +2933,7 @@ function cmPaint() {
       <div class="r"><button class="btn pri" data-cm="go" ${dis}>Use this</button>${CalCommute.needsAsk(t) ? "" : '<button class="btn" data-cm="cancel">Cancel</button>'}</div></div>`;
   } else if (t.address) {
     const link = CalCommute.mapsLink({ from: from && from.address, to: t.address, mode });
-    h += `<div class="r"><a class="btn" href="${esc(link)}" target="_blank" rel="noopener">Open in Google Maps</a><button class="btn" data-cm="map">Open map</button></div>
+    h += `<div class="r"><a class="btn" href="${esc(link)}" target="_blank" rel="noopener">Open in Google Maps</a></div>
       <div class="cmmap" id="cmMap" role="region" aria-label="Map"></div>`;
   }
   if (!asking && t.address) {
@@ -2969,7 +2967,7 @@ async function cmMapShow(box, which) {
   if (!pins.length) { box.innerHTML = '<div class="meta" style="padding:14px">No pin yet. The address was not found on the map, and Open in Google Maps still works.</div>'; return; }
   const dd = cmDirOf(ev), way = cmWay(dd, C.modeOf(ev)), line = cmUsable(way) && way.polyline ? CalCommute.decodePolyline(way.polyline) : [];
   cmDrop(which);
-  const map = CM[which] = L.map(box, { zoomControl: which === "big", attributionControl: true, dragging: which === "big" || !L.Browser.mobile, scrollWheelZoom: which === "big" });
+  const map = CM[which] = L.map(box, { zoomControl: false, attributionControl: true, dragging: !L.Browser.mobile, scrollWheelZoom: false });
   L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "© OpenStreetMap contributors", referrerPolicy: "strict-origin-when-cross-origin" }).addTo(map);
   map._pins = pins; map._line = line;
   if (line.length > 1) L.polyline(line, { color: getComputedStyle(document.documentElement).getPropertyValue("--k-commute").trim() || "#2a7", weight: 5, opacity: 0.85, interactive: false }).addTo(map);   // the way there, between the From and To pins
@@ -2986,23 +2984,7 @@ function cmFit(map) {
   const pts = [...ps.map((p) => [p.lat, p.lng]), ...(map._line || [])];
   if (pts.length === 1) map.setView(pts[0], 15); else map.fitBounds(pts, { padding: [36, 36], maxZoom: 15 });
 }
-function cmClose() { cmDrop("big"); document.querySelectorAll(".cmbig,.cmmodal").forEach((x) => x.remove()); }
-function cmOpenBig() {
-  const ev = S.ev; if (!ev) return; cmClose();
-  const o = document.createElement("div"); o.className = "cmbig"; o.setAttribute("role", "dialog"); o.setAttribute("aria-label", "Map");
-  o.innerHTML = `<div class="cmbar"><b>${esc(ev.title)}</b><span class="spacer"></span><button class="btn" data-cm="gps">Show where I am</button><button class="btn" data-cm="fit">Whole trip</button><button class="btn pri" data-cm="close">Close</button></div><div class="cmmap big" id="cmBigMap"></div>`;
-  document.body.appendChild(o); cmMapShow($("#cmBigMap"), "big");
-}
-function cmGps() {
-  const map = CM.big; if (!map) return;
-  if (!navigator.geolocation) { toast("This browser cannot find where you are", { bad: true }); return; }
-  navigator.geolocation.getCurrentPosition((p) => {
-    const L = window.L, ll = [p.coords.latitude, p.coords.longitude];
-    if (map._me) map._me.remove();
-    map._me = L.marker(ll, { icon: L.divIcon({ className: "", html: '<div class="cmpin me">You</div>', iconSize: [34, 34], iconAnchor: [17, 17] }), title: "You are here", alt: "You are here" }).addTo(map);
-    map.setView(ll, Math.max(map.getZoom(), 15));
-  }, () => toast("Could not find where you are. Allow location for this page and try again.", { bad: true }), { enableHighAccuracy: true, timeout: 10000 });
-}
+function cmClose() { document.querySelectorAll(".cmmodal").forEach((x) => x.remove()); }
 function cmModal(inner) {
   document.querySelectorAll(".cmmodal").forEach((x) => x.remove());
   const m = document.createElement("div"); m.className = "cmmodal"; m.setAttribute("role", "dialog");
@@ -3065,10 +3047,7 @@ async function cmFound(text) {
 }
 async function cmAct(t) {
   const ev = S.ev, d = t.dataset, key = ev && keyOf(ev);
-  if (d.cm === "close") cmClose();
-  else if (d.cm === "closemodal") document.querySelectorAll(".cmmodal").forEach((x) => x.remove());
-  else if (d.cm === "gps") cmGps();
-  else if (d.cm === "fit") cmFit(CM.big);
+  if (d.cm === "closemodal") document.querySelectorAll(".cmmodal").forEach((x) => x.remove());
   else if (d.cm === "see") { const n = [...((CM.notes && CM.notes.block) || []), ...((CM.notes && CM.notes.place) || [])].find((x) => x.id === d.id); if (n) cmSeePhotos([n]); }
   else if (d.cm === "shotsave") cmSave(t.closest(".cmmodal"));
   if (!ev || ev.k !== "commute") return;
@@ -3093,7 +3072,6 @@ async function cmAct(t) {
   }
   else if (d.cm === "go") { const v = ($("#cmTo").value || "").trim(); if (!v) { $("#cmTo").focus(); return; } const rem = $("#cmRem"); cmSetTarget(ev, await cmFound(v), rem && rem.checked); }
   else if (d.cm === "pick") { const p = (CM.places || []).find((x) => x.id === d.id); if (p) { const rem = $("#cmRem"); cmSetTarget(ev, { name: p.name, address: p.address || p.name, lat: p.lat, lng: p.lng, id: p.id }, rem && rem.checked); } }
-  else if (d.cm === "map") cmOpenBig();
   else if (d.cm === "check") cmDirections(ev, { fresh: true });
   else if (d.cm === "switch") { const r = await patchEvent(ev, { mode: d.v }, "Change the way of going for"); if (r) { const e2 = findByKey(key); if (e2) panel("event", e2); } }
   else if (d.cm === "note") cmCompose(ev, null);
@@ -3110,7 +3088,7 @@ function commuteWire() {
   setInterval(cmAutoTick, 60000);
   document.addEventListener("click", (e) => { const t = e.target.closest("[data-cm]"); if (t) cmAct(t); });
   document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape" && document.querySelector(".cmbig,.cmmodal")) { cmClose(); return; }
+    if (e.key === "Escape" && document.querySelector(".cmmodal")) { cmClose(); return; }
     if (e.key !== "Enter") return;
     const id = e.target.id, go = { cmTo: "go", cmFromIn: "gofrom", cmHomeIn: "home" }[id];
     if (go) { e.preventDefault(); const b = $(`[data-cm="${go}"]`); if (b) b.click(); }

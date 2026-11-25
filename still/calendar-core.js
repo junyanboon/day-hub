@@ -101,7 +101,7 @@
   }
   /* A Commute block's "Going by": walking or whatever is best (🚶), transit (🚇) or driving (🚗). Guessed from the title,
      the earlier word wins; a mode picked by hand is kept on the event (extendedProperties.private.mode) and beats the guess. */
-  const MODES = [["commute", "🚶", "Commute"], ["transit", "🚇", "Transit"], ["drive", "🚗", "Drive"]];
+  const MODES = [["commute", "🚶", "Walk"], ["transit", "🚇", "Transit"], ["drive", "🚗", "Drive"]];
   const MODE_RX = [["transit", /\b(transit|subway|ttc|streetcar|bus)\b/i], ["drive", /\b(drive|driving|car)\b/i]];
   function modeOf(ev) {
     if (ev.mode && MODES.some(([m]) => m === ev.mode)) return ev.mode;
