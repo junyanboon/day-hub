@@ -2719,7 +2719,7 @@ const cmFromPicked = (ev) => (cmRoute(ev) && cmRoute(ev).from) || cmGet(CMK.from
    From is the one he picked for the block, else where the block before it that day ended, else Home. To is the usual order,
    and when none of it says where, Home (but never a Home to Home trip: then it still asks). */
 const cmTarget = (ev) => CalCommute.target({ ev, events: eventsFor(cmDay(ev), cmDay(ev)), tz: S.tz, remembered: CM.places || [], typed: cmTyped(ev), home: cmHome(), from: cmFrom(ev) });
-const cmTargetOf = (x) => CalCommute.target({ ev: x, events: eventsFor(cmDay(x), cmDay(x)), tz: S.tz, remembered: CM.places || [], typed: cmTyped(x), home: cmHome(), from: cmFrom(x) });
+const cmTargetOf = cmTarget;   // the From rule asks the same question of the blocks before this one
 function cmFrom(ev) {
   return CalCommute.fromFor({ ev, events: eventsFor(cmDay(ev), cmDay(ev)), tz: S.tz, targetOf: cmTargetOf, picked: cmFromPicked(ev), home: cmHome() });
 }
