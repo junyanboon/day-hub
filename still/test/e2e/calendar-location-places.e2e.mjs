@@ -1,7 +1,7 @@
 // The Location row's places list and "Keep in Saved places" (Junyan, 2026-11-24, d28 to d30: "yes to all thre").
 // Clicks every control this change adds in the test browser against the faked dev routes (calendar-dev.mjs). The Location row is drawn only
-// by the phone's event sheet (760px wide or less); the computer panel shows the location as text, so at 1280px the checks are that it
-// has no Location box and the Commute box and its new switch work. The clock is fixed, so no test reads the real one.
+// by the phone's event sheet (760px wide or less); the computer panel got its own Location box in d33 (still/test/e2e/calendar-desk-location.e2e.mjs
+// tests it), so at 1280px the checks here are that the Commute box and its new switch work. The clock is fixed, so no test reads the real one.
 // Not part of `node --test`: it needs playwright-core.
 //   PW_DIR=<folder with node_modules/playwright-core> node still/test/e2e/calendar-location-places.e2e.mjs
 //   BROWSER=webkit (and PW_DIR with playwright) runs it in WebKit at iPhone size when that build is installed.
@@ -13,6 +13,7 @@ import { fileURLToPath } from "node:url";
 const require = createRequire(path.join(process.env.PW_DIR || process.cwd(), "x.js"));
 const pw = require(process.env.BROWSER === "webkit" ? "playwright" : "playwright-core");
 import { launchTestBrowser } from "../helpers/test-browser.mjs";
+import { stubOpenMeteo } from "../helpers/open-meteo-stub.mjs";
 const here = path.dirname(fileURLToPath(import.meta.url));
 const PORT = +(process.env.PORT || 8861), BASE = `http://localhost:${PORT}`;
 const URL_ = `${BASE}/still/calendar.html?api=${encodeURIComponent(BASE)}`;
@@ -21,7 +22,6 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const flat = (s) => String(s || "").replace(/\s+/g, " ").trim();
 const results = [];
 const check = (name, ok, detail = "") => { results.push({ name, ok }); console.log(`${ok ? "PASS" : "FAIL"}  ${name}${detail ? "  (" + detail + ")" : ""}`); };
-const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64");
 
 const browser = process.env.BROWSER === "webkit" ? await pw.webkit.launch() : await launchTestBrowser(pw.chromium);
 const shown = (page, sel) => page.evaluate((s) => { const el = document.querySelector(s); return !!el && el.getClientRects().length > 0; }, sel);
@@ -49,7 +49,7 @@ try {
     const at = /queen/i.test(q) ? { lat: "43.6529", lon: "-79.3849" } : /nowhere/i.test(q) ? null : { lat: "43.6495", lon: "-79.4290" };
     route.fulfill({ status: 200, contentType: "application/json", headers: { "access-control-allow-origin": "*" }, body: JSON.stringify(at ? [at] : []) });
   });
-  await page.route("https://tile.openstreetmap.org/**", (route) => route.fulfill({ status: 200, contentType: "image/png", body: PNG }));
+  stubOpenMeteo(page);
   await page.addInitScript(() => { localStorage.setItem("quest-key", "test"); });
   await page.goto(URL_); await page.waitForSelector(".ev", { state: "attached" }); await sleep(500);
   const openEv = async (title, d) => {
@@ -207,7 +207,7 @@ try {
   check("phone: no page errors", errors.length === 0, errors.join(" | "));
   await ctx.close(); server.kill();
 
-  /* ============ computer: no Location box; the switch and the chips work ============ */
+  /* ============ computer: the switch and the chips work ============ */
   if (process.env.BROWSER !== "webkit") {
     const server2 = spawn(process.execPath, [path.join(here, "calendar-dev.mjs"), String(PORT + 1)], { stdio: ["ignore", "pipe", "inherit"], env: { ...process.env, DEV_NOW: NOW, TZ: "America/Toronto" } });
     await new Promise((ok) => server2.stdout.once("data", ok));
@@ -216,12 +216,12 @@ try {
     const p2 = await ctx2.newPage(); await p2.clock.install({ time: new Date(NOW) });
     const errs = []; p2.on("pageerror", (e) => errs.push(e.message));
     await p2.route("https://nominatim.openstreetmap.org/**", (route) => route.fulfill({ status: 200, contentType: "application/json", headers: { "access-control-allow-origin": "*" }, body: JSON.stringify([{ lat: "43.6529", lon: "-79.3849" }]) }));
-    await p2.route("https://tile.openstreetmap.org/**", (route) => route.fulfill({ status: 200, contentType: "image/png", body: PNG }));
+    stubOpenMeteo(p2);
     await p2.addInitScript(() => { localStorage.setItem("quest-key", "test"); });
     await p2.goto(`${B2}/still/calendar.html?api=${encodeURIComponent(B2)}`); await p2.waitForSelector(".ev", { state: "attached" }); await sleep(500);
     await p2.evaluate(() => { const k = C.addDays(today(), 1); const ev = eventsFor(k, k).find((e) => e.title === "Transit"); panel("event", ev); });
     await sleep(900); await p2.waitForFunction(() => !/Looking up/.test(document.querySelector("#cmBox")?.innerText || "x"), null, { timeout: 5000 }).catch(() => {});
-    check("computer: the panel has no Location box (it shows the place as text), so no Location list", await p2.locator('[data-f="location"]').count() === 0 && await p2.locator("#locSug").count() === 0);
+    check("computer: the panel has the Location box (d33) with its list element, and the phone's row is not there", await p2.locator("#pLoc").count() === 1 && await p2.locator("#locSug").count() === 1 && await p2.locator('[data-f="location"]').count() === 0);
     await p2.fill("#cmHomeIn", "100 Queen St W, Toronto"); await p2.click('[data-cm="home"]'); await sleep(800);
     await p2.fill("#cmTo", "St."); await sleep(900);
     check("computer: the Commute box list still works", (await p2.locator('#cmSug [data-cm="sug"]').count()) === 5);

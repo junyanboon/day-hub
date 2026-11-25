@@ -14,6 +14,7 @@ import { fileURLToPath } from "node:url";
 const require = createRequire(path.join(process.env.PW_DIR || process.cwd(), "x.js"));
 const { chromium } = require("playwright-core");
 import { launchTestBrowser } from "../helpers/test-browser.mjs";
+import { stubOpenMeteo } from "../helpers/open-meteo-stub.mjs";
 const here = path.dirname(fileURLToPath(import.meta.url));
 const PORT = +(process.env.PORT || 8827), BASE = `http://localhost:${PORT}`;
 const URL_ = `${BASE}/still/calendar.html?api=${encodeURIComponent(BASE)}`;
@@ -45,7 +46,8 @@ try {
       const at = /queen/i.test(q) ? { lat: "43.6529", lon: "-79.3849" } : { lat: "43.6495", lon: "-79.4290" };
       route.fulfill({ status: 200, contentType: "application/json", headers: { "access-control-allow-origin": "*" }, body: JSON.stringify([at]) });
     });
-    const tiles = [];   // the Referer each tile request carried
+    const wx = stubOpenMeteo(page);
+    const tiles = [];   // any map tile asked for (none now: the Commute panel draws no map)
     await page.route("https://tile.openstreetmap.org/**", (route) => { tiles.push(route.request().headers()["referer"] || ""); route.fulfill({ status: 200, contentType: "image/png", body: PNG }); });
     await page.addInitScript(() => { localStorage.setItem("quest-key", "test"); });
     await page.goto(URL_); await page.waitForSelector(".ev", { state: "attached" }); await sleep(500);
@@ -112,19 +114,13 @@ try {
     check(`${label}: Home saved: the first trip of the day starts at Home`, /From Home/i.test(pt));
     check(`${label}: ...and From and To are not both Home: To still asks`, /Where are you going\?/.test(pt) && !/To Home/i.test(pt), pt.slice(0, 220));
 
-    // Subway to class: first of its day: From Home, To is its own address; small map and tile Referer
+    // Subway to class: first of its day: From Home, To is its own address; the weather box (d31 B) in place of the small map
     check(`${label}: Subway to class opens`, await open("Subway to class"));
     pt = await panelText(page);
     check(`${label}: Subway to class: From Home, To 1 Yonge St`, /From Home/i.test(pt) && /To 1 Yonge St/i.test(pt), pt.slice(0, 220));
-    await page.waitForFunction(() => document.querySelectorAll("#cmMap .leaflet-tile").length >= 1, null, { timeout: 20000 }).catch(() => {});
-    await sleep(800);
-    const tile = await page.evaluate(() => { const t = document.querySelector("#cmMap img.leaflet-tile"); return t ? { policy: t.getAttribute("referrerpolicy"), n: document.querySelectorAll("#cmMap img.leaflet-tile").length } : null; });
-    check(`${label}: the small map's tile images carry referrerpolicy=strict-origin-when-cross-origin`, !!tile && tile.policy === "strict-origin-when-cross-origin", JSON.stringify(tile));
-    check(`${label}: every tile request carried the site's origin as Referer`, tiles.length > 0 && tiles.every((r) => r === BASE + "/"), JSON.stringify([...new Set(tiles)]));
-    // control: a plain image on the same page, with no policy of its own, sends nothing: the header is in force
-    const ctrl = []; await page.route("https://tile.openstreetmap.org/control/**", (route) => { ctrl.push(route.request().headers()["referer"] || ""); route.fulfill({ status: 200, contentType: "image/png", body: PNG }); });
-    await page.evaluate(() => new Promise((ok) => { const i = new Image(); i.onload = i.onerror = ok; i.src = "https://tile.openstreetmap.org/control/1/1/1.png"; }));
-    check(`${label}: control: an image with no policy of its own sends no Referer under this header`, ctrl.length === 1 && ctrl[0] === "", JSON.stringify(ctrl));
+    await page.waitForSelector("#cmWx .big", { timeout: 8000 }).catch(() => {});
+    const text = (sel) => page.evaluate((x) => document.querySelector(x)?.innerText || "", sel);
+    check(`${label}: the weather box (d31 B) shows where the small map was, from Home's point, and no map tile is asked for`, /\d+° · /.test(flat(await text("#cmWx"))) && tiles.length === 0 && wx.urls.length >= 1 && /latitude=43\.65&longitude=-79\.38&/.test(wx.urls[0]), JSON.stringify({ tiles: tiles.length, urls: wx.urls }));
     // Commute 9:15 follows Subway to class: From is where that trip ended, To is Home (nothing else says where)
     check(`${label}: the Commute block after it opens`, await open("Commute"));
     pt = await panelText(page);
