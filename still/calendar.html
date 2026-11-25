@@ -14,7 +14,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>Calendar</title>
 <script src="calendar-core.js?v=34"></script>
-<script src="calendar-commute.js?v=10"></script>
+<script src="calendar-commute.js?v=11"></script>
 <script src="cards-vault.js?v=2"></script><script src="cards.js?v=7"></script>
 <script src="quest-trips.js?v=20261121a" data-helpers></script>
 <script>
@@ -368,7 +368,10 @@ button.cmr{border:1px solid var(--line);background:var(--raise);border-radius:10
 .cmchecked{font-size:12px;color:var(--soft);margin-top:2px}.cmlink{border:0;background:none;color:inherit;font:inherit;text-decoration:underline;padding:8px 2px;margin:-8px 0;cursor:pointer}.cmlink:disabled{opacity:.6;text-decoration:none;cursor:default}
 .cmfold{display:flex;flex-direction:column;gap:6px}.cmfh,.cmatog{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;text-align:left;color:inherit;font:inherit}.cmfh{min-height:44px;border:1px solid var(--line);background:var(--raise);border-radius:10px;padding:6px 10px}.cmfh:hover{background:var(--raise2)}.cmfh .t{font-weight:600}
 .cmatog{border:0;background:none;padding:0;min-height:32px}.cmatog>span:first-child{flex:1;min-width:0}.cmchev{flex:none;color:var(--soft);transition:transform .15s}.cmchev::before{content:"\25B8"}[aria-expanded="true"]>.cmchev{transform:rotate(90deg)}.cmadet{font-size:12px;color:var(--soft);margin-top:2px;overflow-wrap:anywhere}.cmalert .cmatog b{display:block}.cmalert .cmatog small{display:block}
-.cmleave{display:flex;flex-direction:column;gap:2px}.cmleave .lbl{margin:0}.cmleave .big{font-size:28px;font-weight:700;line-height:1.1;display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}.cmshift{font-size:13px;font-weight:600;color:var(--soft)}
+.cmleave{display:flex;flex-direction:column;gap:6px}.cmleave .lbl{margin:0}.cmleave .big,.cmleave .ar{font-size:20px;font-weight:700;line-height:1.1;display:flex;align-items:baseline;gap:4px;flex-wrap:wrap}.cmshift{font-size:13px;font-weight:600;color:var(--soft)}
+.cmtrip{display:flex;align-items:center;gap:8px}.cmt{display:flex;flex-direction:column;gap:2px;flex:none}.cmt.r{align-items:flex-end;text-align:right}.cmmid{flex:1;min-width:0;display:flex;align-items:center;gap:6px;color:var(--soft);font-size:12px;white-space:nowrap}.cmmid i{flex:1;min-width:6px;height:1px;background:var(--line)}
+.cmtb{display:flex;height:22px;border-radius:6px;overflow:hidden;background:var(--raise)}.cmtb i{display:flex;align-items:center;justify-content:center;font-style:normal;min-width:6px}.cmtb .tr{background:var(--raise2)}.cmtb .sp{min-width:46px;padding:0 6px;background:color-mix(in srgb,var(--emerald) 55%,var(--bar));color:var(--ink);font-size:11px;font-weight:700;white-space:nowrap;margin-left:2px}.cmlate{color:var(--red)}
+.cmearly{display:flex;flex-direction:column;gap:6px;border-top:1px solid var(--line);padding-top:8px;margin-top:2px}
 .cmsteps{list-style:none;margin:6px 0 0;padding:0;display:flex;flex-direction:column;gap:6px}.cmsteps li{display:flex;gap:8px;align-items:flex-start}.cmsteps li>div{flex:1;min-width:0;overflow-wrap:anywhere}.cmsteps b{display:block;font-weight:600}.cmsteps small,.cmalert small{display:block;color:var(--soft);font-size:12px}.cmsteps .sm{white-space:nowrap;color:var(--soft);font-size:12px}.cmsteps .si,.cmalert .si{width:22px;text-align:center}
 .cmalert{display:flex;gap:8px;align-items:flex-start;padding:6px 8px;border:1px solid var(--line);border-radius:10px;background:var(--raise)}.cmalert>div{flex:1;min-width:0;overflow-wrap:anywhere}.cmalert.gone{opacity:.6}.cmalert.gone b{text-decoration:line-through}.cmgrp{margin:6px 0 0}
 .cmquick{display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap;border:1px solid var(--k-commute);border-radius:10px;padding:6px 8px}.cmquick small{display:block;color:var(--soft);font-size:12px}
@@ -1029,7 +1032,7 @@ if (TOUCH) for (const g of ["gesturestart", "gesturechange"]) document.addEventL
    which shows this build, the phone's answers and a log of every day change with its cause. Until then CalHook.on is
    null and diag() does nothing. BUILD names this copy of the page, so a screenshot proves which copy ran: change it on
    every change to this page or calendar-readout.js (the date plus a letter). */
-const BUILD = "2026-11-25k commute directions after reload";
+const BUILD = "2026-11-25l commute trip bar";
 const CalHook = window.CalHook = { BUILD, on: null };
 const diag = (kind, msg) => { if (CalHook.on) CalHook.on(kind, msg); };
 /* The iPhone home screen app's fit (2026-11-12): html.hs in a home screen app on touch, html.hsfill and --hsgap when
@@ -1101,7 +1104,7 @@ const zoneName = (tz) => (ZONES.find((x) => x[0] === tz) || [0, tz])[1];
 const CACHE_KEY = "cal-app-cache-v1";
 const S = { tz: store.get("cal-tz") || DEVICE_TZ, tz2: store.get("cal-tz2") || "", n: store.get("cal-n") || "3",
   cur: null, win0: null, mini: null, miniLock: false, cals: [], hidden: new Set(JSON.parse(store.get("cal-hidden") || "[]")),
-  months: {}, sugg: [], loading: new Set(), tab: "now", ev: null, form: null, page: "cal", rail: store.get("cal-rail") !== "0", routine: store.get("cal-routine") !== "0", cmSuggest: store.get("cal-commute-suggest") !== "0", autoG: [], top: null,
+  months: {}, sugg: [], loading: new Set(), tab: "now", ev: null, form: null, page: "cal", rail: store.get("cal-rail") !== "0", routine: store.get("cal-routine") !== "0", cmSuggest: store.get("cal-commute-suggest") !== "0", cmEarly: CalCommute.earlyMin(store.get("cal-commute-early")), autoG: [], top: null,
   look: C.lookId(store.get("cal-look")),
   h: C.startHour({ getItem: store.get }, TOUCH) };   // the hour height in px: 56 on a desktop; a phone's own pinched height (slice 01)
 S.n = S.n === "m" ? "m" : +S.n || 3;
@@ -2850,16 +2853,16 @@ const cmSig = (from, t, arrive) => [from.address, t.address, Math.floor(arrive.a
 function cmDirInput(ev) {
   const t = cmTarget(ev), from = cmFrom(ev);
   if (CalCommute.needsAsk(t) || !t.address || !from || !from.address || !Number.isFinite(ev.e) || CalCommute.blockEnded(ev.e, Date.now())) return null;
-  const arrive = CalCommute.arriveTarget(ev, eventsFor(cmDay(ev), cmDay(ev)), S.tz);
+  const arrive = CalCommute.arriveTarget(ev, eventsFor(cmDay(ev), cmDay(ev)), S.tz, S.cmEarly);
   if (!(arrive.at > Date.now() - 3600000) || arrive.at > Date.now() + 14 * 86400000) return null;
   return { t, from, arrive, sig: cmSig(from, t, arrive) };
 }
 /** (d45) The trip of a block that is over, for finding the answer kept for it: the same sig as cmDirInput made while it ran, with no clock window
     and never a request. null: the block is not over, or it has no To or From address. */
-function cmEndedInput(ev) {
+function cmEndedInput(ev, early = S.cmEarly) {
   const t = cmTarget(ev), from = cmFrom(ev);
   if (!Number.isFinite(ev.e) || !CalCommute.blockEnded(ev.e, Date.now()) || CalCommute.needsAsk(t) || !t.address || !from || !from.address) return null;
-  const arrive = CalCommute.arriveTarget(ev, eventsFor(cmDay(ev), cmDay(ev)), S.tz);
+  const arrive = CalCommute.arriveTarget(ev, eventsFor(cmDay(ev), cmDay(ev)), S.tz, early);
   return { t, from, arrive, sig: cmSig(from, t, arrive) };
 }
 /** A check that failed with nothing good held for this trip: hold the answer this browser kept for it (same sig), so the panel draws it (got = now keeps the 60 second guard: a repaint does not ask again) and says why under it. No request. */
@@ -2888,6 +2891,7 @@ async function cmDirections(ev, { fresh = false, auto = false } = {}) {
     if (restored || !CalCommute.replacesHeld({ held: d.res, heldSig: d.sig, sig: inp.sig, res })) { d.note = CalCommute.notOkText(res); d.checked = wasChecked; }   // d45: a not-ok re-check never throws away the good directions he has
     else {
       d.prev = res.state === "ok" && before && before.state === "ok" ? before : null;
+      if (d.sig !== inp.sig) d.checked = null;   // the old trip's Checked time is not this answer's
       d.res = res; d.got = Date.now(); d.sig = inp.sig;
       if (fresh && res.state === "ok") {
         d.checked = { auto, at: d.got };
@@ -2958,14 +2962,26 @@ function cmHeadsUp(d, mode, way) {
 }
 /** The one quiet line under Leave by: when it was checked and a link-style "Check again" (it replaces the blue banner, the big button and the second line).
     A failed re-check shows its error right under it. */
-function cmChecked(d, checkedAt, note) {
+function cmChecked(d, checkedAt, note, lead) {
   const line = CalCommute.checkedLine({ at: checkedAt, auto: !!(d.checked && d.checked.auto), fmt: cmFmt });
   const btn = `<button type="button" class="cmlink" data-cm="check" ${d.loading ? "disabled" : ""}${note ? ` title="${esc(note)}"` : ""}>${d.loading ? "Checking…" : d.error ? "Try again" : "Check again"}</button>`;
   const msg = d.error || d.note;   // d45: a failed load or a not-ok re-check leaves the good directions on screen and says why right here
-  return `<div class="cmchecked">${line ? esc(line) + " · " : ""}${btn}</div>${msg && !d.loading ? `<div class="meta" role="alert">${esc(msg)}</div>` : ""}`;
+  return `<div class="cmchecked">${lead ? lead + " · " : ""}${line ? esc(line) + " · " : ""}${btn}</div>${msg && !d.loading ? `<div class="meta" role="alert">${esc(msg)}</div>` : ""}`;
 }
-/** (d45) The Leave by area's quiet lines for a block that is over: when the answer was checked (no Check again) and that the block is over. */
-const cmOver = (v) => (v.checked ? `<div class="cmchecked">${esc(v.checked)}</div>` : "") + `<div class="cmchecked" id="cmOver">${esc(v.over)}</div>`;
+/** (d45) The Leave by area's quiet line for a block that is over: what the trip was and when the answer was checked, with no Check again. */
+const cmOver = (v, lead) => lead || v.checked ? `<div class="cmchecked">${[lead || "", esc(v.checked)].filter(Boolean).join(" · ")}</div>` : "";
+/** The first words of the quiet line (what the spare time is before which plan, already escaped); in the warning colour when he arrives late. */
+const cmLead = (v) => (v.late ? `<span class="cmlate">${esc(v.lead)}</span>` : esc(v.lead));
+/** (d60, d61) "Be there early by": a thin divider, the label and four chips; the pick is kept on this device for every trip. Only a trip with a next plan has it. */
+const cmEarlyChips = (inp) => !inp.arrive.nextTitle ? "" : `<div class="cmearly"><p class="lbl" style="margin:0">Be there early by</p><div class="chips">${CalCommute.EARLY_CHOICES.map((n) => `<button type="button" class="chip k-commute" data-cm="early" data-v="${n}" aria-pressed="${n === S.cmEarly}">${n} min</button>`).join("")}</div></div>`;
+/** (d60) One row: Leave by on the left, Arrive on the right, the way's icon and minutes between them on a thin line; under it the trip bar (the travel
+    minutes, then the spare minutes in green) and the quiet line. */
+function cmTrip(mode, v, leave, shift, quiet) {
+  const ic = (C.MODES.find((m) => m[0] === mode) || [])[1] || "";
+  const bar = `<div class="cmtb" role="img" aria-label="${esc(v.minutes + " min of travel" + (v.spare != null && v.spare >= 0 ? ", " + v.spare + " min to spare" : ""))}"><i class="tr" style="flex:${v.minutes} 1 0"></i>${v.spare != null && v.spare >= 0 ? `<i class="sp" style="flex:${v.spare} 1 0">${v.spare} min</i>` : ""}</div>`;
+  return `<div class="cmtrip"><div class="cmt"><span class="lbl">Leave by</span><div class="big">${esc(cmFmt(leave))}${shift ? `<span class="cmshift">${esc(shift)}</span>` : ""}</div></div>` +
+    `<div class="cmmid"><i></i><span>${ic} ${v.minutes} min</span><i></i></div><div class="cmt r"><span class="lbl">Arrive</span><div class="ar">${esc(v.arrive)}</div></div></div>${bar}${quiet}`;
+}
 /** The words for a way with no directions (d37): Too far to walk, the monthly stop, or no route (naming the To when the page's own lookup found no spot for it). */
 function cmWayError(ev, d, mode) {
   const K = CalCommute, way = cmWay(d, mode), err = (d.res.errors || {})[K.WAY[mode]], t = cmTarget(ev);
@@ -2978,18 +2994,22 @@ function cmDirParts(ev, mode, inp) {
   const d = cmDirOf(ev), K = CalCommute, out = { leave: "", way: "", heads: "", quick: "", ways: null };
   if (!inp) return cmEndedParts(ev, mode, out);
   if (!d || (!d.res && !d.loading && !d.error)) return out;
-  if (d.res && d.sig !== inp.sig && d.loading) { out.way = `<div class="meta" role="status">Getting directions…</div>`; return out; }   // never show the answer for an earlier From or To
+  const chips = () => { const c = cmEarlyChips(inp); return c ? `<div class="cmleave">${c}</div>` : ""; };   // the early chips stay on screen while a new pick loads or fails, so he can tap back
+  // never show the answer for an earlier From or To
+  if (d.res && d.sig !== inp.sig && d.loading) { out.way = `<div class="meta" role="status">Getting directions…</div>`; out.leave = chips(); return out; }
   if (d.loading && !d.res) { out.way = `<div class="meta" role="status">Getting directions…</div>`; return out; }
-  if (!d.res || d.sig !== inp.sig) { if (d.error) out.way = `<div class="meta">${esc(d.error)}</div><div class="r"><button class="btn" data-cm="check">Try again</button></div>`; return out; }
-  if (d.res.state !== "ok") { out.way = `<div class="meta" role="status">${esc(K.notOkText(d.res))}</div>`; return out; }
+  if (!d.res || d.sig !== inp.sig) { if (d.error) out.way = `<div class="meta">${esc(d.error)}</div><div class="r"><button class="btn" data-cm="check">Try again</button></div>`; out.leave = chips(); return out; }
+  if (d.res.state !== "ok") { out.way = `<div class="meta" role="status">${esc(K.notOkText(d.res))}</div>`; out.leave = chips(); return out; }
   return cmOkParts(ev, mode, inp, d, null, out);
 }
-/** (d45) A block that is over: no request, ever. It draws the last good answer for this same trip (memory, else this browser) with the quiet
-    "This block is over." line and no Check again; with none kept, only that line. */
+/** (d45) A block that is over: no request, ever. It draws the last good answer for this same trip (memory, else this browser), the Checked time and no
+    Check again; with none kept, nothing (d60: the "block is over" line is gone). */
 function cmEndedParts(ev, mode, out) {
-  const e = cmEndedInput(ev), K = CalCommute; if (!e) return out;
-  const key = keyOf(ev), kept = K.keptAnswer({ mem: CM.dir[key], stored: cmLast()[key], sig: e.sig }), v = K.endedView({ kept, fmt: cmFmt });
-  if (v.show === "none") { out.leave = `<div class="cmleave">${cmOver(v)}</div>`; return out; }
+  const K = CalCommute, key = keyOf(ev); let e = cmEndedInput(ev), kept = null; if (!e) return out;
+  // the answer was kept under the pick he had while the block ran: look under the current pick first, then the others
+  for (const n of [S.cmEarly, ...K.EARLY_CHOICES]) { const c = cmEndedInput(ev, n); kept = K.keptAnswer({ mem: CM.dir[key], stored: cmLast()[key], sig: c.sig }); if (kept) { e = c; break; } }
+  const v = K.endedView({ kept, fmt: cmFmt });
+  if (v.show === "none") return out;   // d60: no kept answer, nothing in the Leave by area
   return cmOkParts(ev, mode, e, { res: kept.res, sig: kept.sig, checked: null, prev: null, loading: false, error: "", note: "", autoDone: true }, v, out);
 }
 /** The drawn parts of an ok answer. over: the ended view when the block is over (no Check again, no quicker row). */
@@ -3000,7 +3020,8 @@ function cmOkParts(ev, mode, inp, d, over, out) {
     const arriveAt = inp.arrive.at, leave = K.leaveBy(way, arriveAt), prevWay = d.checked && d.prev && d.prev.ways ? d.prev.ways[K.WAY[mode]] : null;
     const shift = prevWay && cmUsable(prevWay) ? K.leaveShift(K.leaveBy(prevWay, arriveAt), leave) : "";
     const auto = !d.autoDone && Number.isFinite(leave) && leave > Date.now();
-    out.leave = `<div class="cmleave"><span class="lbl">Leave by</span><div class="big">${esc(cmFmt(leave))}${shift ? `<span class="cmshift">${esc(shift)}</span>` : ""}</div><div class="meta">${esc(K.arriveLine(way, inp.arrive, cmFmt))}</div>${over ? cmOver(over) : cmChecked(d, checkedAt, auto ? CM_AUTO_NOTE : "")}</div>`;
+    const v = K.tripView(way, inp.arrive, cmFmt), lead = cmLead(v);
+    out.leave = `<div class="cmleave">${cmTrip(mode, v, leave, shift, over ? cmOver(over, lead) : cmChecked(d, checkedAt, auto ? CM_AUTO_NOTE : "", lead))}${over ? "" : cmEarlyChips(inp)}</div>`;
     out.way = cmFold("cmWay", `The way there · ${way.minutes} min${mode === "drive" && way.km ? " · " + way.km + " km" : ""}`, CM_FOLD.way, cmSteps(way, mode));
     out.heads = cmHeadsUp(d, mode, way);
     const q = d.checked && !over ? K.quickerThan(ways, mode) : null;
@@ -3132,7 +3153,7 @@ function cmPaint() {
   if (!asking && t.address) {
     const mine = (CM.notes && CM.notes.block) || [], past = ((CM.notes && CM.notes.place) || []).filter((n) => n.block !== keyOf(ev));
     h += `<div class="field"><p class="lbl" style="margin:0">Photos and notes</p><div class="r">${can ? '<label class="btn cmfile">Add a photo<input type="file" id="cmFile" accept="image/*" capture="environment" hidden></label>' : ""}<button class="btn" data-cm="note" ${dis}>Add a note</button></div>
-      ${mine.length ? mine.map(cmNoteRow).join("") : '<div class="meta">Nothing saved with this block yet.</div>'}</div>
+      ${mine.map(cmNoteRow).join("")}</div>
       ${past.length ? `<div class="field"><p class="lbl" style="margin:0">From last time you went here</p>${past.map(cmNoteRow).join("")}</div>` : ""}`;
   }
   /* the Home prompt sits last, so Going by and the To line (or the ask) stay at the top of a phone sheet */
@@ -3402,6 +3423,10 @@ async function cmAct(t) {
     try { const o = await cmFound(v), r = await send("/quest/places", "POST", { op: "put", place: { name: "Home", address: v, lat: o.lat, lng: o.lng, category: "home", list: "home", savedBy: "Calendar" } });
       CM.places = (CM.places || []).filter((p) => p.id !== r.place.id).concat(r.place); toast("Home saved"); cmPaint(); cmDirections(ev); }
     catch (e) { toast("Not saved: " + e.message, { bad: true }); }
+  }
+  else if (d.cm === "early") {   // d61: one pick for every trip on this device; the trip is asked again with the new arrive-by time (the same check path as any changed trip)
+    const n = CalCommute.earlyMin(d.v); if (n === S.cmEarly) return;
+    S.cmEarly = n; store.set("cal-commute-early", String(n)); cmPaint(); cmDirections(ev);
   }
   else if (d.cm === "check") cmDirections(ev, { fresh: true });
   else if (d.cm === "fold" || d.cm === "alert") cmToggle(t);

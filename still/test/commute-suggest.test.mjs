@@ -234,8 +234,8 @@ test("the To line shows the place's name over its address when one was picked, f
 
 test("page: the second switch, the load of places, the suggestion draw, the gym wording and the stamps", () => {
   const html = fs.readFileSync(fileURLToPath(new URL("../calendar.html", import.meta.url)), "utf8");
-  assert.match(html, /const BUILD = "2026-11-25k commute directions after reload";/);
-  assert.match(html, /calendar-commute\.js\?v=10/);
+  assert.match(html, /const BUILD = "2026-11-25l commute trip bar";/);
+  assert.match(html, /calendar-commute\.js\?v=11/);
   assert.match(html, /calendar-core\.js\?v=34"/, "the core is unchanged");
   assert.match(html, /id="cmSuggSw"/);
   assert.match(html, /Suggest a Commute block before plans away from home/);

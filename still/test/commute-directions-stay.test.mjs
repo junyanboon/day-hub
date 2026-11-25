@@ -26,11 +26,11 @@ test("keptAnswer: another trip, a not-ok answer or no signature is never returne
   assert.equal(K.keptAnswer({ mem: { res: a, sig: "" }, stored: null, sig: "" }), null);
   assert.equal(K.keptAnswer({ mem: undefined, stored: undefined, sig: SIG }), null);
 });
-test("endedView: a kept answer shows with 'Checked TIME' and no Check again; none shows only the quiet line", () => {
+test("endedView: a kept answer shows with 'Checked TIME' and no Check again; none shows nothing (no 'This block is over.' line)", () => {
   const v = K.endedView({ kept: { res: ok(Date.parse("2026-11-25T17:20:00Z")) }, fmt });
-  assert.deepEqual(v, { show: "answer", over: "This block is over.", checked: "Checked 17:20" });
+  assert.deepEqual(v, { show: "answer", checked: "Checked 17:20" });
   const none = K.endedView({ kept: null, fmt });
-  assert.deepEqual(none, { show: "none", over: "This block is over.", checked: "" });
+  assert.deepEqual(none, { show: "none", checked: "" });
   assert.equal(K.endedView({ kept: { res: { state: "ok" } }, fmt }).checked, "", "an answer with no time says no time");
 });
 test("replacesHeld: a not-ok answer never replaces an ok one for the same trip; everything else replaces", () => {
@@ -57,11 +57,15 @@ const html = fs.readFileSync(new URL("../calendar.html", import.meta.url), "utf8
 const box = html.slice(html.indexOf("/* commute:start */"), html.indexOf("/* commute:end */"));
 test("the page: an ended block draws from the rule, sends no request, and the old trip is never shown", () => {
   const ended = box.slice(box.indexOf("function cmEndedParts("), box.indexOf("/** The drawn parts of an ok answer"));
-  assert.match(ended, /K\.keptAnswer\(\{ mem: CM\.dir\[key\], stored: cmLast\(\)\[key\], sig: e\.sig \}\)/);
+  assert.match(ended, /K\.keptAnswer\(\{ mem: CM\.dir\[key\], stored: cmLast\(\)\[key\], sig: c\.sig \}\)/);
+  assert.match(ended, /\[S\.cmEarly, \.\.\.K\.EARLY_CHOICES\]/, "the kept answer is found under whichever pick it was made with");
   assert.match(ended, /K\.endedView\(/);
+  assert.doesNotMatch(html, /This block is over|OVER_TEXT|id="cmOver"/, "the line is gone everywhere it was drawn");
+  assert.match(ended, /if \(v\.show === "none"\) return out;/, "no kept answer: the Leave by area shows nothing");
   assert.doesNotMatch(ended, /send\(|cmDirections\(/, "no request from an ended block");
   assert.match(box, /function cmDirInput\(ev\) \{[^}]*CalCommute\.blockEnded\(ev\.e, Date\.now\(\)\)\) return null;/, "the page's own check and every request still stop at the end");
   assert.match(box, /if \(!d\.res \|\| d\.sig !== inp\.sig\) \{ if \(d\.error\)/, "a changed From or To never shows the old trip's answer");
+  assert.match(box, /Try again<\/button><\/div>`; out\.leave = chips\(\); return out;/, "a failed ask after a new pick keeps the chips so he can tap back");
   assert.match(box, /CalCommute\.replacesHeld\(\{ held: d\.res, heldSig: d\.sig, sig: inp\.sig, res \}\)/);
 });
 test("d46: the Open in Google link is gone from the computer panel and the phone sheet (Open in Google Maps stays)", () => {
@@ -90,6 +94,6 @@ test("the page: a failed first check (not ok or no answer) restores from this br
   assert.doesNotMatch(fn, /send\(|cmDirections\(/);
 });
 test("the build stamp and the script number name this copy", () => {
-  assert.match(html, /const BUILD = "2026-11-25k commute directions after reload";/);
-  assert.match(html, /calendar-commute\.js\?v=10/);
+  assert.match(html, /const BUILD = "2026-11-25l commute trip bar";/);
+  assert.match(html, /calendar-commute\.js\?v=11/);
 });

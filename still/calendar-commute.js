@@ -203,14 +203,18 @@
   }
 
   /* ---------- slice 2 ---------- */
-  const BUFFER_MIN = 5, MIN = 60000;
+  const MIN = 60000;
+  /** (d60, d61) "Be there early by": how many minutes before the next plan he wants to arrive. One pick for every trip on this device; 5 is the old fixed rule. */
+  const EARLY_CHOICES = [5, 10, 15, 20], EARLY_DEFAULT = 5;
+  /** The stored or tapped value as a choice: anything that is not one of the four is 5. */
+  function earlyMin(v) { const n = Number(v); return EARLY_CHOICES.includes(n) ? n : EARLY_DEFAULT; }
   /** The chip names a way as C.MODES does (commute is the walk); the server names it walk. */
   const WAY = { commute: "walk", transit: "transit", drive: "drive" };
   const CHIP = { walk: "commute", transit: "transit", drive: "drive" };
-  /** When he has to be there: 5 minutes before the next event that day, else the end of the block. */
-  function arriveTarget(ev, events, tz) {
-    const next = nextEvent(ev, events || [], tz);
-    return next ? { at: next.s - BUFFER_MIN * MIN, nextTitle: next.title, buffer: BUFFER_MIN } : { at: ev.e, nextTitle: "", buffer: 0 };
+  /** When he has to be there: `early` minutes (5, 10, 15 or 20; 5 when left out) before the next event that day, else the end of the block. */
+  function arriveTarget(ev, events, tz, early) {
+    const next = nextEvent(ev, events || [], tz), b = earlyMin(early);
+    return next ? { at: next.s - b * MIN, nextTitle: next.title, buffer: b } : { at: ev.e, nextTitle: "", buffer: 0 };
   }
   const usable = (w) => !!w && !w.tooFar && Number.isFinite(w.minutes);
   /** When to leave: the server's own time for a transit trip (it is a real departure), else the arrive-by time minus the minutes. */
@@ -219,13 +223,17 @@
     if (Number.isFinite(way.leaveAt)) return way.leaveAt;
     return Math.floor(arriveAt / MIN) * MIN - way.minutes * MIN;
   }
-  /** "Arrive 1:09 pm, 6 min before Zouk Training" (the minutes are what is really left between arriving and the next start). */
-  function arriveLine(way, target, fmt) {
-    if (!usable(way)) return "";
-    const arrive = Number.isFinite(way.arriveAt) ? way.arriveAt : target.at;
-    if (!target.nextTitle) return `Arrive ${fmt(arrive)}, when the block ends`;
-    const spare = Math.round((target.at + target.buffer * MIN - arrive) / MIN);
-    return spare >= 0 ? `Arrive ${fmt(arrive)}, ${spare} min before ${target.nextTitle}` : `Arrive ${fmt(arrive)}, ${-spare} min after ${target.nextTitle} starts`;
+  /** What the trip row, the bar and the quiet line say (null when the way has no minutes): the arrive time, the travel minutes, the minutes
+      really left between arriving and the next plan starting (`spare`, below zero when late; null with no next plan), the next plan's
+      start time, and `lead`, the words that start the quiet line. */
+  function tripView(way, target, fmt) {
+    if (!usable(way)) return null;
+    const arriveAt = Number.isFinite(way.arriveAt) ? way.arriveAt : target.at, arrive = fmt(arriveAt), minutes = way.minutes;
+    if (!target.nextTitle) return { arrive, minutes, spare: null, late: false, nextTitle: "", nextAt: "", lead: "Arrives when the block ends" };
+    const startAt = target.at + target.buffer * MIN, spare = Math.round((startAt - arriveAt) / MIN), nextAt = fmt(startAt);
+    return spare >= 0
+      ? { arrive, minutes, spare, late: false, nextTitle: target.nextTitle, nextAt, lead: `Spare time before ${target.nextTitle} at ${nextAt}` }
+      : { arrive, minutes, spare, late: true, nextTitle: target.nextTitle, nextAt, lead: `${-spare} min after ${target.nextTitle} starts` };
   }
   /** The chip of the quickest way (ties go to walking, then transit), or "" when no way has minutes. */
   function bestWay(ways) {
@@ -470,17 +478,16 @@
 
   /* (d45, Junyan, 2026-11-25: "45 yes I want to be able to see it still") The directions he was using stay on screen once the block is
      over, and a re-check that comes back not ok never replaces a good answer for the same trip. Pure rules; the page only draws them. */
-  const OVER_TEXT = "This block is over.";
   /** The ok answer the page holds for this same trip (same From, To and arrive time = same sig): the one in memory, else the one kept in
       this browser. {res, sig} or null. An answer that is not ok, or for another trip, is never returned. */
   function keptAnswer({ mem, stored, sig }) {
     const ok = (x) => !!sig && !!x && !!x.res && x.res.state === "ok" && x.sig === sig;
     return ok(mem) ? { res: mem.res, sig } : ok(stored) ? { res: stored.res, sig } : null;
   }
-  /** What a block that is over shows: show "answer" with the kept directions, or "none" (only the quiet line). It never offers a Check again. */
+  /** What a block that is over shows: show "answer" with the kept directions and "Checked TIME", or "none" (nothing at all). It never offers a Check again. */
   function endedView({ kept, fmt }) {
     const at = kept && kept.res ? kept.res.checkedAt : NaN, t = Number.isFinite(at) ? clean(fmt(at)) : "";
-    return { show: kept ? "answer" : "none", over: OVER_TEXT, checked: kept && t ? "Checked " + t : "" };
+    return { show: kept ? "answer" : "none", checked: kept && t ? "Checked " + t : "" };
   }
   /** Does a new answer replace the one held? Always, unless it is not ok and the held one is ok for the same trip (then the good one stays). */
   const replacesHeld = ({ held, heldSig, sig, res }) => !!res && (res.state === "ok" || !(held && held.state === "ok" && !!sig && heldSig === sig));
@@ -494,5 +501,5 @@
   /** The words for an answer that is not ok (the server's own message when it sent one). */
   const notOkText = (res) => (res && res.state === "no-key" ? "Directions need the Google key" : (res && res.message) || "Directions are not available.");
 
-  root.CalCommute = { OVER_TEXT, keptAnswer, endedView, replacesHeld, restoredAfterFail, notOkText, checkedLine, onRoute, alertLine, noRouteText, blockEnded, missingHour, RAIN_CODES: RAIN, SNOW_CODES: SNOW, arriveTarget, leaveBy, arriveLine, bestWay, quickerThan, alertsFor, groupAlerts, leaveShift, autoCheckDue, decodePolyline, WAY, CHIP, mapsLink, organicMapsLink, placesAskable, readSuggestions, readPlace, locationText, keepPlace, alreadyKept, savedChips, removableChip, anyRemovable, rowText, weatherUrl, weatherPlace, weatherKey, weatherWords, pickHour, weatherWindow, outsideMinutes, weatherTip, weatherCard, wxFresh, WX_TEXT, titleKey, rememberPlace, isGym, rememberName, titleMemory, placeNameOf, isWebLink, eventPlace, commuteSuggestions, locationKey, canRememberLocation, rememberLocation, locationMemory, forgetLine, rememberToast, nextEvent, target, needsAsk, samePlace, previousPlace, fromFor, stepDur, placeKey, fitSize, TRAVELMODE };
+  root.CalCommute = { keptAnswer, endedView, replacesHeld, restoredAfterFail, notOkText, checkedLine, onRoute, alertLine, noRouteText, blockEnded, missingHour, RAIN_CODES: RAIN, SNOW_CODES: SNOW, arriveTarget, leaveBy, tripView, EARLY_CHOICES, earlyMin, bestWay, quickerThan, alertsFor, groupAlerts, leaveShift, autoCheckDue, decodePolyline, WAY, CHIP, mapsLink, organicMapsLink, placesAskable, readSuggestions, readPlace, locationText, keepPlace, alreadyKept, savedChips, removableChip, anyRemovable, rowText, weatherUrl, weatherPlace, weatherKey, weatherWords, pickHour, weatherWindow, outsideMinutes, weatherTip, weatherCard, wxFresh, WX_TEXT, titleKey, rememberPlace, isGym, rememberName, titleMemory, placeNameOf, isWebLink, eventPlace, commuteSuggestions, locationKey, canRememberLocation, rememberLocation, locationMemory, forgetLine, rememberToast, nextEvent, target, needsAsk, samePlace, previousPlace, fromFor, stepDur, placeKey, fitSize, TRAVELMODE };
 })(typeof window !== "undefined" ? window : globalThis);
