@@ -36,9 +36,15 @@
     return events.filter((x) => x.id !== ev.id && !x.allDay && !x.ghost && x.k !== "commute" && x.s >= ev.e && C().wall(x.s, tz).day === day)
       .sort((a, b) => a.s - b.s)[0] || null;
   }
+  /** The same place: the same address by its words, else the same saved place id. */
+  function samePlace(a, b) {
+    const x = placeKey(a), y = placeKey(b);
+    return !!x && !!y && x === y;
+  }
   /** Where the block goes. A place he picked or typed for this block wins; then the block's own location, the next event's
-      location, and the place saved for that event's title. source "none" means ask. */
-  function target({ ev, events, tz, remembered = [], typed = null }) {
+      location, and the place saved for that event's title. With none of those, Home (shown as Home), unless the trip would
+      start at Home too: then source "none" means ask. With no Home saved, "none" as before. */
+  function target({ ev, events, tz, remembered = [], typed = null, home = null, from = null }) {
     const next = nextEvent(ev, events || [], tz), nextTitle = next ? next.title : "";
     const out = (source, o) => ({ source, address: clean(o.address), lat: o.lat == null ? null : o.lat, lng: o.lng == null ? null : o.lng, id: o.id || "", nextTitle, name: clean(o.name) });
     if (typed && clean(typed.address)) return out("typed", typed);
@@ -47,9 +53,35 @@
     const key = next ? titleKey(next.title) : "";
     const mem = key && remembered.find((p) => p.category === "commute-for" && p.list === "for:" + key);
     if (mem) return out("remembered", { ...mem, name: "" });   // its saved name is the event title, not a place name
+    if (home && (clean(home.address) || home.id) && !samePlace(from, home)) return out("home", { ...home, name: "Home" });
     return out("none", {});
   }
   const needsAsk = (t) => !t || t.source === "none";
+
+  /** Where the trip starts when he did not pick it: the place of the block before it that day. Walk back through that day's
+      earlier timed events (not all-day, not a suggestion), take the first with a place: a Commute block gives its To
+      (targetOf), any other block its location. null when nothing before it has one. */
+  function previousPlace({ ev, events, tz, targetOf }) {
+    const day = C().wall(ev.s, tz).day;
+    const before = (events || []).filter((x) => x.id !== ev.id && !x.allDay && !x.ghost && x.s < ev.s && C().wall(x.s, tz).day === day)
+      .sort((a, b) => b.s - a.s || b.e - a.e);
+    for (const x of before) {
+      if (x.k === "commute") {
+        const t = targetOf ? targetOf(x) : null;
+        if (t && !needsAsk(t) && clean(t.address)) return { name: clean(t.name), address: clean(t.address), lat: t.lat == null ? null : t.lat, lng: t.lng == null ? null : t.lng, id: t.id || "", title: x.title };
+      } else if (clean(x.location)) return { name: "", address: clean(x.location), lat: null, lng: null, id: "", title: x.title };
+    }
+    return null;
+  }
+  /** The From of a block: the one he picked for it, else where the block before it ended, else Home, else null ("Where you are"). */
+  function fromFor({ ev, events, tz, targetOf, picked = null, home = null }) {
+    if (picked) return picked;
+    const prev = previousPlace({ ev, events, tz, targetOf });
+    if (prev) return prev;
+    return home && (clean(home.address) || home.id) ? { name: "Home", address: home.address || "", lat: home.lat == null ? null : home.lat, lng: home.lng == null ? null : home.lng, id: home.id || "" } : null;
+  }
+  /** Length: one tap of minus or plus moves the end by 15 minutes, never under 15. */
+  const stepDur = (min, dir) => Math.max(15, Math.round(min) + (dir < 0 ? -15 : 15));
 
   /** The key a photo note is kept under: an address by its words (so a saved place and the same address typed by hand are one place), else a saved place by its id. */
   function placeKey(p) {
@@ -130,5 +162,5 @@
     return out;
   }
 
-  root.CalCommute = { arriveTarget, leaveBy, arriveLine, bestWay, quickerThan, alertsFor, groupAlerts, leaveShift, autoCheckDue, decodePolyline, WAY, CHIP, mapsLink, titleKey, rememberPlace, nextEvent, target, needsAsk, placeKey, fitSize, TRAVELMODE };
+  root.CalCommute = { arriveTarget, leaveBy, arriveLine, bestWay, quickerThan, alertsFor, groupAlerts, leaveShift, autoCheckDue, decodePolyline, WAY, CHIP, mapsLink, titleKey, rememberPlace, nextEvent, target, needsAsk, samePlace, previousPlace, fromFor, stepDur, placeKey, fitSize, TRAVELMODE };
 })(typeof window !== "undefined" ? window : globalThis);

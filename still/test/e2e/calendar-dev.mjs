@@ -174,6 +174,6 @@ http.createServer(async (req, res) => {
   }
   const file = path.join(ROOT, decodeURIComponent(u.pathname));
   if (!file.startsWith(ROOT) || !fs.existsSync(file) || fs.statSync(file).isDirectory()) { res.writeHead(404); return res.end("not found"); }
-  res.writeHead(200, { "Content-Type": TYPES[path.extname(file)] || "application/octet-stream", "Cache-Control": "no-store" });
+  res.writeHead(200, { "Content-Type": TYPES[path.extname(file)] || "application/octet-stream", "Cache-Control": "no-store", "Referrer-Policy": "same-origin" });   // the live site sends this header (still-api src/site.mjs): a tile request then carries no Referer unless the tile layer asks for one
   fs.createReadStream(file).pipe(res);
 }).listen(PORT, () => console.log(`calendar dev server on http://localhost:${PORT}/still/calendar.html?api=http://localhost:${PORT}  (pairing code: test)`));
