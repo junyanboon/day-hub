@@ -72,7 +72,7 @@ try {
     await page.waitForFunction(() => /\d+° · /.test(document.querySelector("#cmWx")?.innerText || ""), null, { timeout: 6000 });
     check(`${label}: when the weather arrives, focus and the typed text are still in the From box`, await page.evaluate(() => document.activeElement?.id === "cmFromIn" && document.activeElement.value === "Que"));
     check(`${label}: the box has the icon, the big line, the small line and one tip`, await page.evaluate(() => {
-      const w = document.querySelector("#cmWx"); return !!w && !!w.querySelector(".wxi")?.textContent.trim() && /^3° · light rain$/.test(w.querySelector(".big").textContent) && /^When you leave, \d{1,2}(:\d{2})? (am|pm)\. Feels like 0°\.$/.test(w.querySelector(".meta").textContent) && w.querySelectorAll(".wxtip").length === 1 && /^Bring an umbrella\./.test(w.querySelector(".wxtip").textContent); }), await wxText(page));
+      const w = document.querySelector("#cmWx"); return !!w && !!w.querySelector(".wxi")?.textContent.trim() && /^3° · light rain$/.test(w.querySelector(".big").textContent) && /^feels like 0° when you leave$/.test(w.querySelector(".meta").textContent) && w.querySelectorAll(".wxtip").length === 1 && /^Bring an umbrella\./.test(w.querySelector(".wxtip").textContent); }), await wxText(page));
     check(`${label}: asked once, with only the rounded From point, the fields, the time zone and the day count`, wx.urls.length === 1 && wx.urls[0] === "https://api.open-meteo.com/v1/forecast?latitude=43.65&longitude=-79.38&hourly=temperature_2m,apparent_temperature,precipitation_probability,weather_code&timezone=America%2FToronto&timeformat=unixtime&forecast_days=16", JSON.stringify(wx.urls));
     await page.press("#cmFromIn", "Escape"); await page.click('#cmBox [data-cm="cancelfrom"]'); await sleep(300);
 
@@ -111,7 +111,7 @@ try {
     check(`${label}: Subway to class opens (the weather call will fail)`, await openEv("Subway to class", 2));
     await page.waitForFunction(() => /not available/.test(document.querySelector("#cmWx")?.innerText || ""), null, { timeout: 6000 }).catch(() => {});
     check(`${label}: a failed call says "Weather is not available right now."`, await wxText(page) === "Weather is not available right now.", await wxText(page));
-    check(`${label}: and the rest of the panel is fine (the way chips, Heads up, Check now)`, await page.locator('#cmBox [data-cm="mode"]').count() === 3 && /Check now/.test(await page.innerText("#cmBox")));
+    check(`${label}: and the rest of the panel is fine (the way chips, Heads up, Check again)`, await page.locator('#cmBox [data-cm="mode"]').count() === 3 && /Check again/.test(await page.innerText("#cmBox")));
     const askedBefore = wx.urls.length;
     await page.evaluate(() => cmPaint()); await sleep(500);
     check(`${label}: a failure is remembered for a moment, so a repaint does not ask again at once`, wx.urls.length === askedBefore, `${askedBefore} -> ${wx.urls.length}`);

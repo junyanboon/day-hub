@@ -65,8 +65,10 @@ function dirAnswer(b, later) {
     { kind: "walk", text: "Walk to Dev Studio", minutes: 4, meters: 300 }] };
   const drive = { mode: "drive", minutes: dm, km: 8.1, leaveAt: null, arriveAt: null, polyline: line, steps: [], trafficMinutes: later ? 0 : 5, roads: [{ road: "Dev Avenue", km: 3.2, minutes: 10 }, { road: "Test Street", km: 2.2, minutes: 7 }, { road: "Sample Road", km: 2.7, minutes: 8 }] };
   const walk = { mode: "walk", tooFar: true, km: 9 };
-  const alerts = [{ id: "ttc:t1", kind: "ttc", mode: "transit", title: "Line 1: trains move slower than usual", detail: "Reduced speed zone, Dev Station North to Dev Junction." }, { id: "wx:snow", kind: "weather", mode: "any", title: "Snow from 1 pm, 2°C", detail: "Roads and sidewalks may be slippery." }];
-  const alerts2 = [{ id: "ttc:t3", kind: "ttc", mode: "transit", title: "Line 2: delays of about 5 minutes", detail: "" }, { id: "wx:snow", kind: "weather", mode: "any", title: "Snow from 1 pm, 2°C", detail: "Roads and sidewalks may be slippery." }, { id: "road:c1", kind: "closure", mode: "drive", title: "Dev Avenue closed near Test Street", detail: "Watermain repair." }];
+  const alerts = [{ id: "ttc:t1", kind: "ttc", mode: "transit", title: "Line 1: trains move slower than usual", detail: "Reduced speed zone, Dev Station North to Dev Junction. Trains run every 8 minutes instead of every 4 while crews repair the track near the junction." }, { id: "wx:snow", kind: "weather", mode: "any", title: "Snow from 1 pm, 2°C", detail: "Roads and sidewalks may be slippery." }];
+  const alerts2 = [{ id: "ttc:t3", kind: "ttc", mode: "transit", title: "Line 2: delays of about 5 minutes", detail: "" }, { id: "wx:snow", kind: "weather", mode: "any", title: "Snow from 1 pm, 2°C", detail: "Roads and sidewalks may be slippery." }, { id: "road:c1", kind: "closure", mode: "drive", title: "Dev Avenue closed near Test Street", detail: "Watermain repair." },
+    { id: "road:c2", kind: "closure", mode: "drive", title: "Test Street is closed between Dev Avenue and Sample Road", detail: "Until Nov 27. Water main repair with a full closure; expect detours around the block." },
+    { id: "road:c3", kind: "closure", mode: "drive", title: "Elsewhere Road is closed between North Gate and South Gate", detail: "Until Dec 2. Bridge work with a full closure and long detours around the area." }];
   return { state: "ok", checkedAt: new Date(process.env.DEV_NOW || Date.now()).getTime() + (later ? 3 * 60000 : 0), ways: { walk, transit, drive }, errors: {}, alerts: later ? alerts2 : alerts, sourcesDown: b.fresh && later ? ["roads"] : [], cached: {} };
 }
 let routesDown = false;   // GET /__dev/routes?down=1 makes the route calls fail, to check the browser-copy fallback
@@ -119,7 +121,10 @@ http.createServer(async (req, res) => {
     const b = await readBody(req); dirCalls.push({ fresh: b.fresh === true, arriveBy: b.arriveBy, from: b.from && b.from.address, to: b.to && b.to.address });
     if (dirState === "no-key") return send(res, 200, { state: "no-key", message: "Directions need the Google key" });
     if (dirState === "stopped") return send(res, 200, { state: "stopped", message: "Directions are off for the rest of this month. They come back on the 1st." });
-    const later = dirNext && b.fresh === true; return send(res, 200, dirAnswer(b, later));
+    const later = dirNext && b.fresh === true, a = dirAnswer(b, later);
+    if (dirState === "quiet") { a.alerts = []; a.sourcesDown = []; }   // GET /__dev/directions?state=quiet: a trip with no alerts at all
+    if (dirState === "noroute") { a.ways = {}; a.errors = { walk: "Google found no route.", transit: "Google found no route.", drive: "Google found no route." }; }   // ?state=noroute: Google finds no route for any way
+    return send(res, 200, a);
   }
   /* d25: /quest/commute/places and /quest/commute/place, faked in the contract's shape (the real routes are in still-api, deployed
      separately). GET /__dev/places?mode=ok|no-key|stopped|error|404 sets the answer; ?reset=1 clears the call log. A q holding "slow"

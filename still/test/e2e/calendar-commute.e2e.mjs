@@ -89,7 +89,7 @@ try {
     if (process.env.SHOTS) await page.screenshot({ path: path.join(process.env.SHOTS, `commute-${label}-first-open.png`) });
     check(`${label}: no Google Maps link, no weather box, no photo buttons before there is an address`, !(await shown(page, "#cmBox a")) && !(await shown(page, "#cmWx")) && !(await shown(page, "#cmFile")) && !/Add a photo/.test(pt));
     check(`${label}: the ask offers Remember for every Work block`, /Remember for every Work block/.test(pt));
-    check(`${label}: no route steps, times, alerts or Check now are drawn`, !/leave by|heads up|check now|get directions|\d+ min walk|closure|weather/i.test(pt), pt);
+    check(`${label}: no route steps, times, alerts or Check now are drawn`, !/leave by|heads up|check again|checked|get directions|\d+ min walk|closure|weather/i.test(pt), pt);
     if (process.env.SHOTS) await page.screenshot({ path: path.join(process.env.SHOTS, `commute-${label}-ask.png`) });
 
     // Home
@@ -110,7 +110,7 @@ try {
     // d31 B: the weather box where the small map was. It shows the From place's weather and asks Open-Meteo with only the rounded From point.
     await page.waitForSelector("#cmWx .big", { timeout: 8000 }).catch(() => {});
     const wxt = flat(await text(page, "#cmWx"));
-    check(`${label}: the weather box shows a temperature and words (stubbed Open-Meteo)`, /^\S* ?3° · light rain/.test(wxt) && /Feels like 0°/.test(wxt) && /Bring an umbrella\./.test(wxt), wxt);
+    check(`${label}: the weather box shows a temperature and words (stubbed Open-Meteo)`, /^\S* ?3° · light rain/.test(wxt) && /feels like 0° when/.test(wxt) && /Bring an umbrella\./.test(wxt), wxt);
     check(`${label}: it asked once, and sent only the rounded From point, the fields and the time zone`, wx.urls.length === 1 && (() => { const u = new URL(wx.urls[0]); return u.searchParams.get("latitude") === "43.65" && u.searchParams.get("longitude") === "-79.38" && u.searchParams.get("timezone") === "America/Toronto" && [...u.searchParams.keys()].sort().join() === "forecast_days,hourly,latitude,longitude,timeformat,timezone"; })(), JSON.stringify(wx.urls));
     check(`${label}: no map is drawn in the panel (no Leaflet, no #cmMap)`, await page.locator("#cmMap, #cmBox .leaflet-container").count() === 0);
 
@@ -120,19 +120,22 @@ try {
     const dirChips = await page.evaluate(() => [...document.querySelectorAll('#cmBox [data-cm="mode"]')].map((b) => b.textContent.replace(/\s+/g, " ").trim()));
     check(`${label}: Going by shows each way's minutes and marks the quickest "best way"`, /Walk$/.test(dirChips[0]) && /Transit 34 min$/.test(dirChips[1]) && /Drive 27 min best way$/.test(dirChips[2]), JSON.stringify(dirChips));
     check(`${label}: Leave by comes from the directions, with the Arrive line (no next event: when the block ends)`, /Leave by \d{1,2}(:\d{2})? (am|pm)/i.test(dt) && /Arrive \d{1,2}(:\d{2})? (am|pm), (when the block ends|\d+ min before)/i.test(dt), dt.slice(0, 400));
+    check(`${label}: The way there starts closed: a button with aria-expanded=false, and no steps showing`, await page.getAttribute('#cmBox [data-cm="fold"][data-v="way"]', "aria-expanded") === "false" && !(await shown(page, "#cmBox .cmsteps")) && !/Walk to Dev Station North/.test(dt), dt.slice(0, 300));
+    await page.click('#cmBox [data-cm="fold"][data-v="way"]'); dt = await panelText(page);
     check(`${label}: The way there lists the walk legs, each line with its direction, stops and minutes`, /The way there · 34 min/i.test(dt) && /Walk to Dev Station North/i.test(dt) && /Line 1 Dev Line toward Union/i.test(dt) && /5 stops/i.test(dt) && /Line 2 Test Line toward Kipling/i.test(dt) && /3 min wait before it/i.test(dt) && /Walk to Dev Studio/i.test(dt), dt);
-    check(`${label}: Heads up shows the TTC alert and the weather, and nothing for closures on a transit trip`, /Heads up/i.test(dt) && /Line 1: trains move slower/i.test(dt) && /Snow from 1 pm/i.test(dt) && !/closed near/i.test(dt));
-    check(`${label}: Check now and Last checked are there, and the by-itself sentence says what the page does`, /Check now/i.test(dt) && /Last checked \d{1,2}(:\d{2})? (am|pm)/i.test(dt) && /While this panel is open, it checks once in the hour before you leave\./i.test(dt));
+    check(`${label}: Heads up shows the TTC alert and the weather, and nothing for closures on a transit trip`, /Heads up · 2/i.test(dt) && /Line 1: trains move slower/i.test(dt) && /Snow from 1 pm/i.test(dt) && !/closed near/i.test(dt));
+    check(`${label}: one quiet line "Checked time · Check again"; the by-itself sentence is only its tooltip, not text`, /Checked \d{1,2}(:\d{2})? (am|pm) · Check again/i.test(dt) && !/Check now|Last checked|Checked just now/i.test(dt) && !/While this panel is open/i.test(dt) && /While this panel is open, it checks once in the hour before you leave\./.test(await page.getAttribute('#cmBox [data-cm="check"]', "title")), dt);
     check(`${label}: no Parking near row`, !/parking near/i.test(dt));
-    check(`${label}: with directions loaded the weather is for the Leave by hour`, /When you leave, \d{1,2}(:\d{2})? (am|pm)\./.test(flat(await text(page, "#cmWx"))), flat(await text(page, "#cmWx")));
+    check(`${label}: with directions loaded the weather is for the Leave by hour`, /when you leave/.test(flat(await text(page, "#cmWx"))), flat(await text(page, "#cmWx")));
     if (process.env.SHOTS) await page.screenshot({ path: path.join(process.env.SHOTS, `commute-${label}-directions.png`) });
     await page.evaluate(async (b) => fetch(b + "/__dev/directions?next=1"), BASE);
     const callsBefore = await page.evaluate(async (b) => (await (await fetch(b + "/__dev/directions")).json()).calls.length, BASE);
     await page.click('#cmBox [data-cm="check"]'); await sleep(900);
     dt = await panelText(page);
     const callsAfter = await page.evaluate(async (b) => (await (await fetch(b + "/__dev/directions")).json()).calls, BASE);
-    check(`${label}: Check now asks the server again and tells it to skip its saved answer`, callsAfter.length === callsBefore + 1 && callsAfter[callsAfter.length - 1].fresh === true, JSON.stringify(callsAfter.slice(-2)));
-    check(`${label}: Check now says "Checked just now" with the real time and what moved`, /Checked just now, \d{1,2}(:\d{2})? (am|pm)/i.test(dt) && /6 min earlier/i.test(dt), dt.slice(0, 300));
+    check(`${label}: Check again asks the server again and tells it to skip its saved answer`, callsAfter.length === callsBefore + 1 && callsAfter[callsAfter.length - 1].fresh === true, JSON.stringify(callsAfter.slice(-2)));
+    check(`${label}: after Check again the line reads Checked with the real time, there is no banner, and the leave-by shows what moved`, /Checked \d{1,2}(:\d{2})? (am|pm) · Check again/i.test(dt) && !/Checked just now/i.test(dt) && await page.locator(".cmchk").count() === 0 && /6 min earlier/i.test(dt), dt.slice(0, 300));
+    check(`${label}: a fold he opened stays open through the repaint (the way there)`, await page.getAttribute('#cmBox [data-cm="fold"][data-v="way"]', "aria-expanded") === "true" && await shown(page, "#cmBox .cmsteps"));
     check(`${label}: alerts are grouped New since, Still on and Cleared`, /New since \d{1,2}(:\d{2})? (am|pm)/i.test(dt) && /Line 2: delays of about 5 minutes/i.test(dt) && /Still on/i.test(dt) && /Cleared/i.test(dt) && /Line 1: trains move slower/i.test(dt), dt);
     check(`${label}: a source that could not be reached is named`, /Could not reach/i.test(dt) ? false : true);
     check(`${label}: "Drive is quicker right now" with a Switch to Drive button`, /Drive is quicker right now/i.test(dt) && await shown(page, '#cmBox [data-cm="switch"]'), dt);

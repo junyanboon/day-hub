@@ -173,7 +173,7 @@ test("the page: the box sits in both panels, only for a Commute block, and draws
   assert.match(html, /function commuteBox\(ev\) \{ return ev\.k === "commute" && !ev\.isNew && !ev\.ghost/);
   const src = html.slice(html.indexOf("/* commute:start */"), html.indexOf("/* commute:end */"));
   assert.ok(src.length > 3000);
-  for (const w of [/leave by/i, /heads up/i, /check now/i, /the way there/i, /best way/i]) assert.match(src, w, String(w));
+  for (const w of [/leave by/i, /heads up/i, /check again/i, /the way there/i, /best way/i]) assert.match(src, w, String(w));
   assert.doesNotMatch(src, /routes\.googleapis|GOOGLE_ROUTES|api[_-]?key/i, "the key is never on the page");
   assert.doesNotMatch(src, /parking near/i, "no Parking near row: it has no source");
   assert.match(src, /Directions need the Google key/);
@@ -234,11 +234,11 @@ test("d6: in the computer panel and the phone sheet the Commute box comes right 
   assert.doesNotMatch(pSheet, /cmWhen/, "no date and time line above the box (Junyan, 2026-11-24)");
   assert.ok(sbox < at(pSheet, 'id="pDel"'));
 });
-test("d6: inside the box the order is Going by, From, To or the ask, Open in Google Maps, the weather box (d31 B, where the small map was), then photos and notes; Home is asked last (slice 2 puts Leave by after Going by, and The way there, Heads up and Check now after To)", async () => {
+test("d6: inside the box the order is Going by, From, To or the ask, Open in Google Maps, the weather box (d31 B, where the small map was), then photos and notes; Home is asked last (d40: Leave by with the quiet checked line after Going by; then From and To, the weather, Heads up, The way there and the map buttons)", async () => {
   const { readFileSync } = await import("node:fs");
   const html = readFileSync(new URL("../calendar.html", import.meta.url), "utf8");
   const src = html.slice(html.indexOf("function cmPaint()"), html.indexOf("const CMW ="));
-  const order = ['Going by', 'dp.leave', 'cmRow("from"', 'cmRow("to"', 'dp.way + dp.heads + dp.check', 'if (!inPlace) h += cmEditBox', 'id="cmLinks"', 'cmWxBox(ev)', 'Photos and notes', 'Add your home address'];
+  const order = ['Going by', 'dp.leave', 'cmRow("from"', 'cmRow("to"', 'cmWxBox(ev)', 'dp.heads + dp.quick + dp.way', 'id="cmLinks"', 'else if (!inPlace) h += cmEditBox', 'Photos and notes', 'Add your home address'];
   let last = -1;
   for (const w of order) { const i = src.indexOf(w); assert.ok(i > last, w + " out of order"); last = i; }
 });
