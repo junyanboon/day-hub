@@ -20,7 +20,7 @@ const TODAY = "2026-11-23";   // a Monday; the clock is pinned, so the test neve
 let api;
 const reset = state => { api = { ops:{}, posts:[], state:state || { xp:0, day:null } }; };
 const iso = (ymd, hm) => `${ymd}T${hm}:00-05:00`;   // November in Toronto is EST: test data only
-const planFor = ymd => ({ generated:new Date().toISOString(), label:ymd, tz:TZ, where:{ place:"Toronto", tz:TZ, from:"test" },
+const planFor = ymd => ({ generated:`${TODAY}T10:00:00-05:00`, label:ymd, tz:TZ, where:{ place:"Toronto", tz:TZ, from:"test" },
   blocks:[
     { s:iso(ymd, "09:00"), e:iso(ymd, "10:00"), t:`Pages ${ymd.slice(5)}`, type:"task", cal:"Junyan" },
     { s:iso(ymd, "12:00"), e:iso(ymd, "13:00"), t:"Lunch", type:"task", cal:"Junyan" },
@@ -94,7 +94,7 @@ const S = {
         && (await page.locator("#gymAuto").getAttribute("role")) === "switch");
     } finally { await browser.close(); }
   },
-  async "turning it on plans as before, and the choice is saved to his state"(){
+  async "turning it on saves the choice and the next open plans as before"(){
     reset();
     const { browser, page } = await fresh();
     try {
@@ -104,11 +104,13 @@ const S = {
       check("settings open", !!(await openSettings(page)));
       await page.locator("#gymAuto").click();
       check("the switch reads on", (await page.locator("#gymAuto").getAttribute("aria-checked")) === "true");
-      const wrote = await waitFor(async () => { await page.clock.runFor(2000); return events().length > 0; }, 20000);
-      check("gym sessions are written to the calendar (positive control)", !!wrote, `${events().length} writes`);
-      check("every write is a Gym block", events().every(e => /^Gym/.test(e.body.title)), events().map(e => e.body.title).join(", "));
       const saved = await waitFor(async () => { await page.clock.runFor(2000); return api.posts.some(p => p.path === "/quest/state" && p.body.gymAuto === true); }, 15000);
       check("gymAuto: true reaches his saved state (follows him across devices)", !!saved);
+      check("flipping the switch itself writes nothing to the calendar", events().length === 0);
+      await page.reload(); await loaded(page);
+      const wrote = await waitFor(async () => { await page.clock.runFor(2000); return events().length > 0; }, 25000);
+      check("on: the next open plans gym sessions as before (positive control)", !!wrote, `${events().length} writes`);
+      check("every write is a Gym block", events().every(e => /^Gym/.test(e.body.title)), events().map(e => e.body.title).join(", "));
     } finally { await browser.close(); }
   },
   async "another device that turned it on: this one plans on load; turning it off flips the switch and the saved state"(){

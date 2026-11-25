@@ -5127,7 +5127,6 @@
       G.gymAuto = on; saveG();
       $("gymAuto").setAttribute("aria-checked", String(on));
       $("gymAuto").classList.toggle("primary", on); $("gymState").textContent = on ? "On" : "Off";
-      if (on) planGym(true).catch(e => console.warn("gym", e));
     };
     $("gymAuto").classList.toggle("primary", gymOn);
     $("pSave").onclick = async () => {

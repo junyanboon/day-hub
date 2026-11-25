@@ -28,10 +28,9 @@ test("planGym stops at the switch before anything is read or written", () => {
 });
 
 test("every automatic call goes through planGym (no other gym write path)", () => {
-  // the only gym placement is the POST inside planGym; the calls are page load, after a move, the Plan screen and
-  // turning the switch on (that one only runs once he has switched it on)
+  // the only gym placement is the POST inside planGym; the calls are page load, after a move, and the Plan screen
   const calls = html.match(/planGym\((true|false)?\)/g) || [];
-  assert.equal(calls.length, 4, calls.join(" "));
+  assert.equal(calls.length, 3, calls.join(" "));
   const i = html.indexOf("async function planGym(force){"), end = html.indexOf("const gymLine", i);
   assert.ok(html.slice(i, end).includes("Placed by Day Quest"));
   assert.equal(html.split("Placed by Day Quest: this week's training").length - 1, 1);
@@ -51,8 +50,8 @@ test("turning it on or off is saved to his state (it follows him across devices)
   assert.match(seg, /saveG\(\)/);
 });
 
-test("turning it on plans at once, turning it off places nothing and removes nothing", () => {
+test("the switch only saves the choice: it places nothing and removes nothing", () => {
   const i = html.indexOf("function openSettings(){"), seg = html.slice(i, html.indexOf('$("gear").onclick', i));
-  assert.match(seg, /planGym\(true\)/);
+  assert.ok(!/planGym/.test(seg), "settings must not run the planner");
   assert.ok(!/cal\/event|DELETE|method:\s*"DELETE"/.test(seg), "settings must not touch calendar events");
 });
