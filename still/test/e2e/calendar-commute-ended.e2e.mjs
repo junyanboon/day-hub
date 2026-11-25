@@ -154,6 +154,37 @@ try {
     check(`${label}: no page errors (not-ok and failed re-checks)`, !errors.length, errors.join("; "));
     await page.close(); await ctx3.close();
 
+    // ---- a reload whose first check fails: the directions this browser last had stay (Junyan, 2026-11-25, 53)
+    const ctx5 = await browser.newContext({ ...opts, timezoneId: "America/Toronto" });
+    ({ page, reqs } = await newPage(ctx5, RUNNING));
+    await dev("reset=1");
+    await openEv(page, "Transit"); await waitDirs(page);
+    const leave5 = flat(await page.locator("#cmBox .cmleave .big").innerText());
+    const cheq5 = (flat(await page.locator("#cmBox .cmchecked").first().innerText()).match(/Checked [^·]*?(?= ·)/) || [""])[0];
+    await page.route("**/quest/commute/directions", (route) => route.abort());
+    await page.reload(); await page.waitForSelector(".ev", { state: "attached" }); await sleep(500);
+    await openEv(page, "Transit"); await sleep(600);
+    t = await box(page);
+    check(`${label}: reload with the directions call failing: the last directions show with Checked TIME, Try again and the failure words`, flat(await page.locator("#cmBox .cmleave .big").innerText()) === leave5 && t.includes(cheq5) && /Try again/.test(t) && t.includes(LOST), t.slice(0, 300));
+    await page.unroute("**/quest/commute/directions");
+    await page.reload(); await page.waitForSelector(".ev", { state: "attached" }); await sleep(500);
+    await dev("state=stopped");
+    await openEv(page, "Transit"); await sleep(700);
+    t = await box(page);
+    check(`${label}: reload with the server saying no: the last directions show, with the server's words and Check again`, flat(await page.locator("#cmBox .cmleave .big").innerText()) === leave5 && t.includes(OFF) && /Check again/.test(t), t.slice(0, 300));
+    await page.close();
+    // another trip stored: never shown, the error stays
+    await page.context().clearCookies();
+    ({ page, reqs } = await newPage(ctx5, RUNNING));
+    await page.evaluate(() => { const all = JSON.parse(localStorage.getItem("cal-commute-last") || "{}"); for (const k of Object.keys(all)) all[k].sig = "another|trip|1"; localStorage.setItem("cal-commute-last", JSON.stringify(all)); });
+    await page.reload(); await page.waitForSelector(".ev", { state: "attached" }); await sleep(500);
+    await openEv(page, "Transit"); await sleep(700);
+    t = await box(page);
+    check(`${label}: a kept answer for another trip is never shown (the server's words only)`, !/leave by/i.test(t) && t.includes(OFF), t.slice(0, 300));
+    await dev("reset=1");
+    check(`${label}: no page errors (reload with a failed first check)`, !errors.length, errors.join("; "));
+    await page.close(); await ctx5.close();
+
     // ---- d46: the Open in Google link is gone (the events have an htmlLink)
     const ctx4 = await browser.newContext({ ...opts, timezoneId: "America/Toronto" });
     ({ page } = await newPage(ctx4, RUNNING));

@@ -79,5 +79,5 @@ test("touch size: the x and the Edit link are at least 32 px, the x set apart fr
   assert.match(html, /\.chips\.rm\{[^}]*gap:10px/);
 });
 test("the BUILD stamp names this change", () => {
-  assert.match(html, /const BUILD = "2026-11-25j suggested commute blocks";/);
+  assert.match(html, /const BUILD = "2026-11-25k commute directions after reload";/);
 });

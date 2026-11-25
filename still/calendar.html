@@ -14,7 +14,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>Calendar</title>
 <script src="calendar-core.js?v=34"></script>
-<script src="calendar-commute.js?v=9"></script>
+<script src="calendar-commute.js?v=10"></script>
 <script src="cards-vault.js?v=2"></script><script src="cards.js?v=7"></script>
 <script src="quest-trips.js?v=20261121a" data-helpers></script>
 <script>
@@ -1029,7 +1029,7 @@ if (TOUCH) for (const g of ["gesturestart", "gesturechange"]) document.addEventL
    which shows this build, the phone's answers and a log of every day change with its cause. Until then CalHook.on is
    null and diag() does nothing. BUILD names this copy of the page, so a screenshot proves which copy ran: change it on
    every change to this page or calendar-readout.js (the date plus a letter). */
-const BUILD = "2026-11-25j suggested commute blocks";
+const BUILD = "2026-11-25k commute directions after reload";
 const CalHook = window.CalHook = { BUILD, on: null };
 const diag = (kind, msg) => { if (CalHook.on) CalHook.on(kind, msg); };
 /* The iPhone home screen app's fit (2026-11-12): html.hs in a home screen app on touch, html.hsfill and --hsgap when
@@ -2862,6 +2862,13 @@ function cmEndedInput(ev) {
   const arrive = CalCommute.arriveTarget(ev, eventsFor(cmDay(ev), cmDay(ev)), S.tz);
   return { t, from, arrive, sig: cmSig(from, t, arrive) };
 }
+/** A check that failed with nothing good held for this trip: hold the answer this browser kept for it (same sig), so the panel draws it (got = now keeps the 60 second guard: a repaint does not ask again) and says why under it. No request. */
+function cmRestored(d, stored, inp) {
+  const k = CalCommute.restoredAfterFail({ held: d.res, heldSig: d.sig, stored, sig: inp.sig });
+  if (!k) return null;
+  d.res = k.res; d.sig = inp.sig; d.got = Date.now(); d.prev = null;
+  return k;
+}
 const cmDirOf = (ev) => CM.dir[keyOf(ev)] || null;
 /** Ask the server. fresh skips its saved answer (Check again); auto marks the page's own once-only check. */
 async function cmDirections(ev, { fresh = false, auto = false } = {}) {
@@ -2877,7 +2884,8 @@ async function cmDirections(ev, { fresh = false, auto = false } = {}) {
   try {
     const res = await send("/quest/commute/directions", "POST", { from: cmEnd(inp.from), to: cmEnd(inp.t), arriveBy: new Date(inp.arrive.at).toISOString(), fresh });
     if (d.seq !== seq) return;   // a newer request replaced this one
-    if (!CalCommute.replacesHeld({ held: d.res, heldSig: d.sig, sig: inp.sig, res })) { d.note = CalCommute.notOkText(res); d.checked = wasChecked; }   // d45: a not-ok re-check never throws away the good directions he has
+    const restored = res && res.state !== "ok" ? cmRestored(d, stored, inp) : null;
+    if (restored || !CalCommute.replacesHeld({ held: d.res, heldSig: d.sig, sig: inp.sig, res })) { d.note = CalCommute.notOkText(res); d.checked = wasChecked; }   // d45: a not-ok re-check never throws away the good directions he has
     else {
       d.prev = res.state === "ok" && before && before.state === "ok" ? before : null;
       d.res = res; d.got = Date.now(); d.sig = inp.sig;
@@ -2888,7 +2896,7 @@ async function cmDirections(ev, { fresh = false, auto = false } = {}) {
       }
       if (res.state === "ok") cmRemember(key, res, inp.sig);
     }
-  } catch (e) { if (d.seq !== seq) return; d.error = "Directions could not be loaded. Check your connection and try again."; if (fresh) d.checked = wasChecked; }
+  } catch (e) { if (d.seq !== seq) return; d.error = "Directions could not be loaded. Check your connection and try again."; if (fresh) d.checked = wasChecked; cmRestored(d, stored, inp); }
   d.loading = false;
   if (S.ev && keyOf(S.ev) === key) cmPaint();
 }
