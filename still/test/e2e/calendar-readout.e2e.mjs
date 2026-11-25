@@ -83,9 +83,16 @@ try {
   text = await box();
   check("a swipe logs its lock decision", !!text && /LOCK [^\n]*x/.test(text), (text || "").split("\n").slice(-12).join(" / "));
   check("a swipe's day change names the swipe end", !!text && /DAY [^\n]*swipeEnd/.test(text), (text || "").split("\n").find((l) => l.includes("DAY")) || "");
+  /* The view opens scrolled to the current time of day, so late in the day it is already at the bottom and a finger
+     moving up has nowhere to scroll (the page then correctly logs no SC line). Park it at the top first, wait for the
+     log to settle, and judge only the lines this drag added, so the test does not depend on the clock. */
+  const logLines = () => page.evaluate(() => document.querySelector("#readoutLog").innerText.split("\n"));
+  await page.evaluate(() => { document.getElementById("view").scrollTop = 0; });
+  await sleep(500);
+  const before = new Set(await logLines());
   await drag(200, 440, 202, 140);
-  text = await box();
-  check("an up/down drag logs a y lock and scroll lines", !!text && /LOCK [^\n]*y/.test(text) && /SC /.test(text));
+  const added = (await logLines()).filter((l) => !before.has(l));
+  check("an up/down drag logs a y lock and scroll lines", added.some((l) => /LOCK [^\n]*y/.test(l)) && added.some((l) => /SC /.test(l)), added.join(" / "));
 
   /* ---- Pause freezes the log; five taps close it ---- */
   await tapEl("#readoutPause");
