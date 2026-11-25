@@ -125,13 +125,6 @@ try {
     const ctrl = []; await page.route("https://tile.openstreetmap.org/control/**", (route) => { ctrl.push(route.request().headers()["referer"] || ""); route.fulfill({ status: 200, contentType: "image/png", body: PNG }); });
     await page.evaluate(() => new Promise((ok) => { const i = new Image(); i.onload = i.onerror = ok; i.src = "https://tile.openstreetmap.org/control/1/1/1.png"; }));
     check(`${label}: control: an image with no policy of its own sends no Referer under this header`, ctrl.length === 1 && ctrl[0] === "", JSON.stringify(ctrl));
-    // the big trip map
-    await page.click('#cmBox [data-cm="map"]').catch(() => {});
-    await page.waitForFunction(() => document.querySelectorAll(".cmbig img.leaflet-tile").length >= 1, null, { timeout: 8000 }).catch(() => {});
-    const big = await page.evaluate(() => { const t = [...document.querySelectorAll(".cmbig img.leaflet-tile")]; return t.length ? t[0].getAttribute("referrerpolicy") : "no big map tiles"; });
-    check(`${label}: the trip map's tiles carry the same policy`, big === "strict-origin-when-cross-origin", String(big));
-    if (await page.locator('.cmbig [data-cm="close"]').count()) await page.click('.cmbig [data-cm="close"]');
-
     // Commute 9:15 follows Subway to class: From is where that trip ended, To is Home (nothing else says where)
     check(`${label}: the Commute block after it opens`, await open("Commute"));
     pt = await panelText(page);

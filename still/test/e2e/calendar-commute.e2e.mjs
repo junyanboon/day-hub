@@ -1,12 +1,12 @@
 // Commute blocks, slice 1 (Junyan, 2026-11-24: "1 yes, 2 A, 3 yes, 4 A"). Clicks every control of the Commute panel in
 // the test browser, on a computer and on a phone: Going by, Home, the ask, Remember for every ..., Open in Google Maps,
-// the small map, Open map (Show where I am, Whole trip, Close), Add a photo (shrunk to 1600px), Add a note, See the
+// the small map, Add a photo (shrunk to 1600px), Add a note, See the
 // photo, and "From last time you went here" on a later block to the same place.
 // The clock is fixed (Nov 24 2026, 10:00 in Toronto) for the page and for the dev server, so no test reads the real clock.
 // The map lookup (OpenStreetMap search) and the map tiles are answered here; Leaflet itself loads from the internet.
 // Not part of `node --test`: it needs playwright-core and the test browser.
 //   PW_DIR=<folder with node_modules/playwright-core> node still/test/e2e/calendar-commute.e2e.mjs
-//   SHOTS=<folder> also saves a computer and a phone screenshot of the panel and the open map.
+//   SHOTS=<folder> also saves a computer and a phone screenshot of the panel.
 import { spawn } from "node:child_process";
 import path from "node:path";
 import { createRequire } from "node:module";
@@ -74,7 +74,7 @@ try {
     await page.waitForFunction(() => !/Looking up/.test(document.querySelector("#cmBox")?.innerText || ""), null, { timeout: 5000 });
     let pt = await panelText(page);
     const chips = await page.evaluate(() => [...document.querySelectorAll('#cmBox [data-cm="mode"]')].map((b) => b.textContent + ":" + b.getAttribute("aria-pressed")));
-    check(`${label}: Going by has three chips, Transit pressed (guessed from the title)`, JSON.stringify(chips) === '["🚶 Commute:false","🚇 Transit:true","🚗 Drive:false"]', JSON.stringify(chips));
+    check(`${label}: Going by has three chips (Walk, Transit, Drive), Transit pressed (guessed from the title)`, JSON.stringify(chips) === '["🚶 Walk:false","🚇 Transit:true","🚗 Drive:false"]', JSON.stringify(chips));
     check(`${label}: no address anywhere, so the panel asks "Where are you going?"`, /Where are you going\?/i.test(pt) && /Not set yet/.test(pt));
     // d6 (Junyan, 2026-11-24, "6 yes"): the Commute part comes first, right under the title and time
     const lay = await page.evaluate((isPhone) => {
@@ -116,7 +116,7 @@ try {
     await page.waitForSelector("#cmBox .cmleave", { timeout: 8000 }).catch(() => {});
     let dt = await panelText(page);
     const dirChips = await page.evaluate(() => [...document.querySelectorAll('#cmBox [data-cm="mode"]')].map((b) => b.textContent.replace(/\s+/g, " ").trim()));
-    check(`${label}: Going by shows each way's minutes and marks the quickest "best way"`, /Commute$/.test(dirChips[0]) && /Transit 34 min$/.test(dirChips[1]) && /Drive 27 min best way$/.test(dirChips[2]), JSON.stringify(dirChips));
+    check(`${label}: Going by shows each way's minutes and marks the quickest "best way"`, /Walk$/.test(dirChips[0]) && /Transit 34 min$/.test(dirChips[1]) && /Drive 27 min best way$/.test(dirChips[2]), JSON.stringify(dirChips));
     check(`${label}: Leave by comes from the directions, with the Arrive line (no next event: when the block ends)`, /Leave by \d{1,2}(:\d{2})? (am|pm)/i.test(dt) && /Arrive \d{1,2}(:\d{2})? (am|pm), (when the block ends|\d+ min before)/i.test(dt), dt.slice(0, 400));
     check(`${label}: The way there lists the walk legs, each line with its direction, stops and minutes`, /The way there · 34 min/i.test(dt) && /Walk to Dev Station North/i.test(dt) && /Line 1 Dev Line toward Union/i.test(dt) && /5 stops/i.test(dt) && /Line 2 Test Line toward Kipling/i.test(dt) && /3 min wait before it/i.test(dt) && /Walk to Dev Studio/i.test(dt), dt);
     check(`${label}: Heads up shows the TTC alert and the weather, and nothing for closures on a transit trip`, /Heads up/i.test(dt) && /Line 1: trains move slower/i.test(dt) && /Snow from 1 pm/i.test(dt) && !/closed near/i.test(dt));
@@ -152,7 +152,7 @@ try {
     check(`${label}: the server holds mode drive on the event`, stored === "drive", String(stored));
     await chip("commute").click(); await sleep(700);
     href = await page.getAttribute('#cmBox a:has-text("Open in Google Maps")', "href");
-    check(`${label}: Commute is the walking link`, /travelmode=walking$/.test(href), href);
+    check(`${label}: Walk is the walking link`, /travelmode=walking$/.test(href), href);
 
     // Change To: the ask comes back with a Cancel
     await page.click('#cmBox [data-cm="edit"]'); await sleep(200);
@@ -164,22 +164,9 @@ try {
     await page.click('#cmBox [data-cm="edit"]'); await sleep(200);
     await page.fill("#cmTo", "Gladstone Hotel, Toronto"); await page.click('#cmAsk [data-cm="go"]'); await sleep(900);
 
-    // the big map
-    await page.click('#cmBox [data-cm="map"]'); await sleep(400);
-    await page.waitForFunction(() => document.querySelectorAll("#cmBigMap .cmpin").length >= 2, null, { timeout: 15000 }).catch(() => {});
-    const box = await page.evaluate(() => { const r = document.querySelector(".cmbig").getBoundingClientRect(); return { w: r.width, h: r.height, x: r.left }; });
-    check(`${label}: Open map fills ${phone ? "the screen" : "the calendar area"}`, phone ? box.w >= 389 && box.h >= 843 : box.w > 1000 && box.h > 700, JSON.stringify(box));
-    check(`${label}: the big map has Show where I am, Whole trip and Close`, ["gps", "fit", "close"].every((a) => true) && (await page.locator('.cmbig [data-cm]').allTextContents()).join("|") === "Show where I am|Whole trip|Close");
-    const geoBefore = await page.evaluate(() => document.querySelectorAll(".cmpin.me").length);
-    await page.click('.cmbig [data-cm="gps"]'); await sleep(900);
-    check(`${label}: Show where I am puts a You pin only after the press`, geoBefore === 0 && await page.evaluate(() => document.querySelectorAll(".cmpin.me").length) === 1);
-    await page.evaluate(() => { document.querySelector("#cmBigMap").scrollIntoView(); });
-    const z0 = await page.evaluate(() => window.L && [...document.querySelectorAll(".leaflet-container")].length);
-    await page.click('.cmbig [data-cm="fit"]'); await sleep(500);
-    check(`${label}: Whole trip refits the map`, z0 >= 1);
-    if (process.env.SHOTS) await page.screenshot({ path: path.join(process.env.SHOTS, `commute-${label}-map.png`) });
-    await page.click('.cmbig [data-cm="close"]'); await sleep(200);
-    check(`${label}: Close leaves the panel`, !(await shown(page, ".cmbig")) && await shown(page, "#cmBox"));
+    // d21 (Junyan, 2026-11-24): no Open map button, no full screen map, and nothing can open one
+    check(`${label}: the panel has no Open map button and no full screen map layer`, !/Open map/.test(await panelText(page)) && await page.locator('#cmBox [data-cm="map"]').count() === 0 && await page.locator(".cmbig").count() === 0);
+    check(`${label}: Open in Google Maps and the small map are still there`, await page.locator('#cmBox a:has-text("Open in Google Maps")').count() === 1 && await page.locator("#cmMap").count() === 1);
 
     // Add a note
     await page.click('#cmBox [data-cm="note"]'); await sleep(200);
@@ -209,11 +196,10 @@ try {
     check(`${label}: the map has a 📷 pin for the photo`, await page.evaluate(() => document.querySelectorAll("#cmMap .cmpin.photo").length) === 1);
     await page.evaluate(() => document.querySelector("#cmBox").scrollIntoView()); await sleep(200);
     if (process.env.SHOTS) await page.screenshot({ path: path.join(process.env.SHOTS, `commute-${label}-panel.png`), fullPage: false });
-    await page.click('#cmBox [data-cm="map"]'); await page.waitForSelector("#cmBigMap .cmpin.photo", { timeout: 15000 });
-    await page.click("#cmBigMap .cmpin.photo"); await page.waitForSelector(".cmmodal img", { timeout: 5000 });
+    await page.click("#cmMap .cmpin.photo"); await page.waitForSelector(".cmmodal img", { timeout: 5000 });
     check(`${label}: tapping the photo pin shows the photo`, await page.evaluate(() => document.querySelectorAll(".cmmodal img").length) === 1);
     await page.keyboard.press("Escape"); await sleep(200);
-    check(`${label}: Escape closes the map and the photo`, !(await shown(page, ".cmbig")) && !(await shown(page, ".cmmodal")));
+    check(`${label}: Escape closes the photo`, !(await shown(page, ".cmmodal")));
 
     // a later block before the same-titled event fills itself and shows what he saved last time
     check(`${label}: the later Commute block opens`, await open("Commute"));

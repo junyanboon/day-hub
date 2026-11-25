@@ -175,5 +175,5 @@ test("the mode (its emoji) is guessed from the title, and a hand-picked mode bea
   assert.equal(m("Commute", "drive"), "drive");
   assert.equal(m("Drive", "rocket"), "drive", "an unknown mode is ignored");
   assert.equal(m("Drive to the subway"), "drive", "the first word wins");
-  assert.deepEqual(C.MODES.map((x) => [x[0], x[1], x[2]]), [["commute", "🚶", "Commute"], ["transit", "🚇", "Transit"], ["drive", "🚗", "Drive"]]);
+  assert.deepEqual(C.MODES.map((x) => [x[0], x[1], x[2]]), [["commute", "🚶", "Walk"], ["transit", "🚇", "Transit"], ["drive", "🚗", "Drive"]]);
 });
