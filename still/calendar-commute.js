@@ -194,6 +194,37 @@
     if (!p || !hasXY(p) || !(clean(p.name) || clean(p.address))) return null;
     return { name: clean(p.name), address: clean(p.address), lat: p.lat, lng: p.lng };
   }
+  /** What a picked place puts into an event's Location: "Name, full address", or just the address when it already starts with the
+      name, or the name alone with no address. With the answer failed, the row's own words go in as {name, address: sub}. */
+  function locationText(o) {
+    if (!o) return "";
+    const name = clean(o.name), addr = clean(o.address);
+    if (!addr) return name;
+    if (!name || addr.toLowerCase() === name.toLowerCase() || addr.toLowerCase().startsWith(name.toLowerCase())) return addr;
+    return name + ", " + addr;
+  }
+  const keyText = (s) => clean(s).toLowerCase().replace(/\s+/g, "");
+  /** The place to save for "Keep in Saved places" (still-api cleanPlace's shape, a category of its own so Trips never lists it),
+      or null: it needs coordinates and something to call it. */
+  function keepPlace(o) {
+    if (!o) return null;
+    const name = clean(o.name) || clean(o.address);
+    if (!name || !hasXY(o)) return null;
+    return { name: name.slice(0, 200), address: clean(o.address).slice(0, 300), lat: o.lat, lng: o.lng, category: "saved", savedBy: "Calendar", list: "", notes: "Kept from the Commute box" };
+  }
+  /** Already among the saved places: the same name and address, ignoring case and spaces. */
+  function alreadyKept(places, o) {
+    if (!o || !Array.isArray(places)) return false;
+    const n = keyText(o.name || o.address), a = keyText(o.address);
+    return places.some((p) => p && keyText(p.name) === n && keyText(p.address) === a);
+  }
+  /** The Saved places chips of a From or To box: Home first, then the places kept from here, then the Trips places as before
+      (12 saved places at most). Remembered-for places, the Home card itself and places with no address and no pin stay out. */
+  function savedChips(places, home) {
+    const all = (Array.isArray(places) ? places : []).filter((p) => p && p.category !== "commute-for" && p.category !== "home" && p !== home && (p.address || p.lat != null));
+    const rest = [...all.filter((p) => p.category === "saved"), ...all.filter((p) => p.category !== "saved")].slice(0, 12);
+    return [...(home ? [{ id: home.id, name: "Home" }] : []), ...rest];
+  }
   /** How a place reads on a From or To row: the name over its address (Home alone, a typed place once). */
   function rowText(o) {
     if (!o) return { main: "", sub: "" };
@@ -203,5 +234,5 @@
     return { main: name || addr, sub: "" };
   }
 
-  root.CalCommute = { arriveTarget, leaveBy, arriveLine, bestWay, quickerThan, alertsFor, groupAlerts, leaveShift, autoCheckDue, decodePolyline, WAY, CHIP, mapsLink, organicMapsLink, placesAskable, readSuggestions, readPlace, rowText, titleKey, rememberPlace, nextEvent, target, needsAsk, samePlace, previousPlace, fromFor, stepDur, placeKey, fitSize, TRAVELMODE };
+  root.CalCommute = { arriveTarget, leaveBy, arriveLine, bestWay, quickerThan, alertsFor, groupAlerts, leaveShift, autoCheckDue, decodePolyline, WAY, CHIP, mapsLink, organicMapsLink, placesAskable, readSuggestions, readPlace, locationText, keepPlace, alreadyKept, savedChips, rowText, titleKey, rememberPlace, nextEvent, target, needsAsk, samePlace, previousPlace, fromFor, stepDur, placeKey, fitSize, TRAVELMODE };
 })(typeof window !== "undefined" ? window : globalThis);
