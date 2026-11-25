@@ -71,6 +71,6 @@ test("d46: the Open in Google link is gone from the computer panel and the phone
   assert.match(html, /<button class="btn del" id="pDel">Delete<\/button>'\}<span class="spacer"><\/span>\$\{canEdit \? '<button class="btn pri" id="pSave">Save<\/button>'/, "the foot is Delete, then the spacer, then Save");
 });
 test("the build stamp and the script number name this copy", () => {
-  assert.match(html, /const BUILD = "2026-11-25f directions stay after a block";/);
-  assert.match(html, /calendar-commute\.js\?v=8/);
+  assert.match(html, /const BUILD = "2026-11-25g suggested commute blocks";/);
+  assert.match(html, /calendar-commute\.js\?v=9/);
 });

@@ -14,7 +14,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>Calendar</title>
 <script src="calendar-core.js?v=34"></script>
-<script src="calendar-commute.js?v=8"></script>
+<script src="calendar-commute.js?v=9"></script>
 <script src="cards-vault.js?v=2"></script><script src="cards.js?v=7"></script>
 <script src="quest-trips.js?v=20261121a" data-helpers></script>
 <script>
@@ -1029,7 +1029,7 @@ if (TOUCH) for (const g of ["gesturestart", "gesturechange"]) document.addEventL
    which shows this build, the phone's answers and a log of every day change with its cause. Until then CalHook.on is
    null and diag() does nothing. BUILD names this copy of the page, so a screenshot proves which copy ran: change it on
    every change to this page or calendar-readout.js (the date plus a letter). */
-const BUILD = "2026-11-25f directions stay after a block";
+const BUILD = "2026-11-25g suggested commute blocks";
 const CalHook = window.CalHook = { BUILD, on: null };
 const diag = (kind, msg) => { if (CalHook.on) CalHook.on(kind, msg); };
 /* The iPhone home screen app's fit (2026-11-12): html.hs in a home screen app on touch, html.hsfill and --hsgap when
@@ -1101,7 +1101,7 @@ const zoneName = (tz) => (ZONES.find((x) => x[0] === tz) || [0, tz])[1];
 const CACHE_KEY = "cal-app-cache-v1";
 const S = { tz: store.get("cal-tz") || DEVICE_TZ, tz2: store.get("cal-tz2") || "", n: store.get("cal-n") || "3",
   cur: null, win0: null, mini: null, miniLock: false, cals: [], hidden: new Set(JSON.parse(store.get("cal-hidden") || "[]")),
-  months: {}, sugg: [], loading: new Set(), tab: "now", ev: null, form: null, page: "cal", rail: store.get("cal-rail") !== "0", routine: store.get("cal-routine") !== "0", autoG: [], top: null,
+  months: {}, sugg: [], loading: new Set(), tab: "now", ev: null, form: null, page: "cal", rail: store.get("cal-rail") !== "0", routine: store.get("cal-routine") !== "0", cmSuggest: store.get("cal-commute-suggest") !== "0", autoG: [], top: null,
   look: C.lookId(store.get("cal-look")),
   h: C.startHour({ getItem: store.get }, TOUCH) };   // the hour height in px: 56 on a desktop; a phone's own pinched height (slice 01)
 S.n = S.n === "m" ? "m" : +S.n || 3;
@@ -1200,17 +1200,26 @@ const RSKIP = "cal-routine-skip";
 const ownCal = () => S.cals.find((c) => c.writable && c.name === "Junyan") || homeCal();
 function routineSkips() { try { return JSON.parse(store.get(RSKIP) || "{}"); } catch { return {}; } }
 function autoGhosts(days, evs) {
-  const cal = S.routine && authed() && ownCal(); if (!cal) return [];
+  if (!authed()) return [];
+  const cal = S.routine && ownCal(), cmCal = S.cmSuggest && homeCal(); if (!cal && !cmCal) return [];
   const t = today(), now = Date.now(), skip = routineSkips(), out = [];
   // his own time: timed plans on calendars he can write, not studio shifts (they are other people's)
   const mine = evs.filter((e) => !e.allDay && !e.ghost && calOf(e.calId).writable && !/staff/i.test(calOf(e.calId).name));
   for (const d of days) {
     if (d < t) continue;
     const a = C.instant(d, 0, S.tz), z = C.instant(C.addDays(d, 2), 0, S.tz);   // that day and the next morning only
-    for (const b of C.routineBlocks(d, mine.filter((e) => e.e > a && e.s < z), S.tz, d === t ? now : 0)) {
+    for (const b of cal ? C.routineBlocks(d, mine.filter((e) => e.e > a && e.s < z), S.tz, d === t ? now : 0) : []) {
       const id = `auto:${b.key}:${d}`;
       if (skip[id] || b.e <= now) continue;
       out.push({ id, auto: true, ghost: true, status: "open", allDay: false, calId: cal.id, title: b.title, kind: b.kind, k: b.kind,
+        s: b.s, e: b.e, start: new Date(b.s).toISOString(), end: new Date(b.e).toISOString(), by: "the calendar", why: b.why });
+    }
+    /* A Commute block before each plan away from Home (Junyan, 2026-11-25, d48): worked out here from the Location text and the places he
+       taught, so drawing one asks Google for nothing; Accept writes it to the calendar new events go to, and only opening it asks for directions. */
+    for (const b of cmCal ? CalCommute.commuteSuggestions({ day: d, events: mine, remembered: CM.places || [], home: cmHome(), tz: S.tz, now }) : []) {
+      const id = `auto:${b.key}:${d}`;
+      if (skip[id] || b.e <= now) continue;
+      out.push({ id, auto: true, ghost: true, status: "open", allDay: false, calId: cmCal.id, title: b.title, kind: b.kind, k: b.kind,
         s: b.s, e: b.e, start: new Date(b.s).toISOString(), end: new Date(b.e).toISOString(), by: "the calendar", why: b.why });
     }
   }
@@ -1249,11 +1258,18 @@ async function refresh(force) {
   if (!got) return;   // nothing new came in: the caller already drew this, so a second full redraw only slowed each key (2026-11-21)
   saveCache(); render();
 }
+/** His saved and remembered places, read once so the Commute suggestions know them at first paint (d48). Quiet: when the server cannot be
+    reached CM.places stays null (the Commute panel asks again when it opens) and only the suggestions that need a place by name are missing. */
+async function cmLoadPlaces() {
+  if (CM.places !== null) return;
+  try { const d = await api("/quest/places"); if (CM.places === null) CM.places = d.places || []; } catch (e) { /* no places: no name-based suggestions, no message */ }
+}
 async function loadSide() {
   if (!authed()) return;
   await Promise.all([
     api("/planner/calendars").then((d) => { S.cals = d.calendars || []; }).catch((e) => toast("Calendars: " + e.message, { bad: true })),
     api("/planner/suggestions").then((d) => { S.sugg = d.suggestions || []; }).catch(() => {}),
+    cmLoadPlaces(),
   ]);
   saveCache(); render();
 }
@@ -1916,7 +1932,7 @@ function pSet() {
   const swatch = (l) => { const a = l.day || l, b = l.night || l;
     return `--lk-bg:${a.bg};--lk-bar:${a.theme};--lk-bg2:${b.bg};--lk-bar2:${b.theme};--lk-acc:${a.accent};--lk-1:${a.gels[0]};--lk-2:${a.gels[1]};--lk-3:${a.gels[2]}`; };
   return `<div class="field"><p class="lbl" style="margin:0">Look</p><div class="looks" role="group" aria-label="Look">${C.LOOKS.map((l) => `<button class="look" data-look="${l.id}" aria-pressed="${l.id === S.look}" style="${swatch(l)}"><span class="lk-chip ${l.day ? "split" : ""}" aria-hidden="true"><i></i><i></i><i></i></span><span class="lk-nm">${esc(l.name)}</span></button>`).join("")}</div><div class="meta">Tap one to try it on the whole calendar. This device remembers it. Studio is light by day and dark after sunset.</div></div>
-    <div class="field"><p class="lbl" style="margin:0">Daily blocks</p><label class="sw" for="routineSw">Suggest Domestic, Wind Down, Sleep and Morning Routine<input type="checkbox" id="routineSw" ${S.routine ? "checked" : ""}></label></div>
+    <div class="field"><p class="lbl" style="margin:0">Daily blocks</p><label class="sw" for="routineSw">Suggest Domestic, Wind Down, Sleep and Morning Routine<input type="checkbox" id="routineSw" ${S.routine ? "checked" : ""}></label><label class="sw" for="cmSuggSw">Suggest a Commute block before plans away from home<input type="checkbox" id="cmSuggSw" ${S.cmSuggest ? "checked" : ""}></label></div>
     <div class="field"><p class="lbl" style="margin:0">Studio shifts</p><label class="sw" for="railSw">Show in a slim rail, not as full blocks<input type="checkbox" id="railSw" ${S.rail ? "checked" : ""}></label></div>
     <div class="field"><p class="lbl" style="margin:0">Time zones</p><label class="sw" for="tz1">Main<select id="tz1">${opts(S.tz)}</select></label><label class="sw" for="tz2">Second<select id="tz2">${opts(S.tz2, true)}</select></label></div>
     <div class="field"><p class="lbl" style="margin:0">Block types</p>${C.KINDS.map(([k, n]) => `<div class="r k-${k}" style="color:var(--soft)"><i style="width:12px;height:12px;border-radius:4px;background:var(--c)"></i>${KICON[k] ? KICON[k] + " " : ""}${n}</div>`).join("")}<div class="meta">Guessed from the title. Change one on its event and it sticks.</div></div>
@@ -3046,7 +3062,7 @@ function cmEditBox(ev, side, t) {
     `<div class="cmsug" id="cmSug" aria-live="polite">${cmSugHtml()}</div>` +
     `<label class="cmrem"><input type="checkbox" role="switch" id="cmKeep" ${dis}> <span>Keep in Saved places</span></label>` +
     (chips.length ? `<div class="cmsvh"><p class="lbl" style="margin:0">Saved places</p>${can && CalCommute.anyRemovable(chips) ? `<button type="button" class="cmedit" data-cm="rmmode">${CM.rm ? "Done" : "Edit"}</button>` : ""}</div><div class="chips${rmOn ? " rm" : ""}">${chips.map((p) => cmChipHtml(p, side, rmOn, dis)).join("")}</div>` : "") +
-    (to && t.nextTitle ? `<label class="cmrem"><input type="checkbox" role="switch" id="cmRem" ${dis}> <span>Remember for every ${esc(t.nextTitle)}</span></label>` : "") +
+    (to && t.nextTitle ? `<label class="cmrem"><input type="checkbox" role="switch" id="cmRem" ${dis}> <span>Remember for every ${esc(CalCommute.rememberName(t.nextTitle))}</span></label>` : "") +
     (to && t.locText && CalCommute.canRememberLocation(t.locText) ? `<label class="cmrem"><input type="checkbox" role="switch" id="cmRemLoc" ${dis}> <span>Remember "${esc(t.locText)}" as this place</span></label>` : "") +
     (to && t.locText && locMem ? `<div class="cmfg" id="cmForgetLoc"><span>${esc(CalCommute.forgetLine(locMem, t.locText))}</span><button type="button" class="cmedit" data-cm="forgetloc" data-id="${esc(locMem.id)}" ${dis}>Forget</button></div>` : "") +
     (first ? "" : `<div class="r"><button type="button" class="btn" data-cm="${to ? "cancel" : "cancelfrom"}">Cancel</button></div>`) + `</div>`;
@@ -3235,6 +3251,7 @@ async function cmPutRemembered(place) {
     const row = { ...place }, old = (CM.places || []).find((p) => p.category === "commute-for" && p.list === row.list); if (old) row.id = old.id;
     const d = await send("/quest/places", "POST", { op: "put", place: row });
     CM.places = (CM.places || []).filter((p) => p.id !== d.place.id).concat(d.place);
+    render();   // a place just taught can make a Commute suggestion appear
     return { ok: true };
   } catch (e) { return { ok: false, error: e.message }; }
 }
@@ -3256,7 +3273,7 @@ async function cmSetTarget(ev, o, remember, rememberLoc) {
   CM.edit = "";
   const t = (remember || rememberLoc) ? cmTarget(ev) : null, res = {};   // both saves run, then one message that is true for both (d43)
   if (remember) {
-    const rp = CalCommute.rememberPlace({ title: t.nextTitle || ev.title, address: o.address, lat: o.lat, lng: o.lng });
+    const rp = CalCommute.rememberPlace({ title: t.nextTitle || ev.title, address: o.address, lat: o.lat, lng: o.lng, placeName: o.name });
     if (rp) res.t = await cmPutRemembered(rp);
     else if (rememberLoc) res.t = { ok: false, error: "that title cannot be kept" };   // two switches on: say so rather than leave it out of the one message
   }
@@ -3264,7 +3281,7 @@ async function cmSetTarget(ev, o, remember, rememberLoc) {
     const rl = CalCommute.rememberLocation({ text: t.locText, address: o.address, lat: o.lat, lng: o.lng });
     res.l = rl ? await cmPutRemembered(rl) : { ok: false, error: "nothing to keep for that text" };
   }
-  const m = res.t || res.l ? CalCommute.rememberToast({ title: t.nextTitle || ev.title, text: t.locText, t: res.t, l: res.l }) : null;
+  const m = res.t || res.l ? CalCommute.rememberToast({ title: CalCommute.rememberName(t.nextTitle || ev.title), text: t.locText, t: res.t, l: res.l }) : null;
   if (m) toast(m.text, { bad: m.bad });
   cmPaint(); cmDirections(ev); await cmLoadNotes(ev); cmPaint();
 }
@@ -3472,6 +3489,7 @@ function setup() {
     const t = e.target;
     if (t.id === "railSw") { S.rail = t.checked; store.set("cal-rail", S.rail ? "1" : "0"); render(); }
     else if (t.id === "routineSw") { S.routine = t.checked; store.set("cal-routine", S.routine ? "1" : "0"); render(); }
+    else if (t.id === "cmSuggSw") { S.cmSuggest = t.checked; store.set("cal-commute-suggest", S.cmSuggest ? "1" : "0"); render(); }
     else if (t.id === "tz1") { S.tz = t.value; store.set("cal-tz", S.tz); S.months = {}; showLook(); render(); refresh(true); }
     else if (t.id === "tz2") { S.tz2 = t.value; store.set("cal-tz2", S.tz2); render(); }
     else if (t.closest(".sheet") && (t.dataset.f || t.id === "pCal")) { if (t.id === "pCal") { S.form.calId = t.value; sheetPaint(); } else sheetInput(t); }

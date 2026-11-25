@@ -62,5 +62,5 @@ test("d36: the block-over check is one rule, and the weather card reads the miss
   assert.match(box, /K\.WX_TEXT\[K\.missingHour\(entry\.res, plan\.at\)\]/);
 });
 test("the page loads the new commute script (a new ?v= so a phone does not keep the old one)", () => {
-  assert.match(html, /calendar-commute\.js\?v=8/);
+  assert.match(html, /calendar-commute\.js\?v=9/);
 });

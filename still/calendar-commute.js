@@ -22,11 +22,29 @@
   function titleKey(t) {
     return clean(String(t || "").toLowerCase().replace(/[^\p{L}\p{N}\s']/gu, " ").replace(/\b\d+\b/g, " "));
   }
-  /** The place saved by "Remember for every <title>" (still-api /quest/places, own category so Trips never lists it). */
-  function rememberPlace({ title, address, lat, lng }) {
-    const key = titleKey(title); if (!key || !clean(address)) return null;
-    return { name: clean(title).slice(0, 200), address: clean(address), lat: lat == null ? null : lat, lng: lng == null ? null : lng,
-      category: "commute-for", list: "for:" + key, notes: "Where the Commute block before this event goes", savedBy: "Calendar" };
+  /** (d48, 2026-11-25) Gym sessions share one place: any title with the whole word "gym" (any case) is looked up under "for:gym" when its own
+      name has no row. Taught once ("Remember for every gym session"), it serves every "Gym · NAME" and any new name. */
+  const isGym = (t) => /\bgym\b/i.test(String(t == null ? "" : t));
+  const GYM_LIST = "for:gym";
+  /** What the Remember switch calls the thing it remembers for: the title, or "gym session" for a gym. */
+  const rememberName = (t) => (isGym(t) ? "gym session" : clean(t));
+  /** The row remembered for an event's name: its exact "for:" + titleKey row first, then for a gym the shared "for:gym" row. A row with no address is no place. */
+  function titleMemory(remembered, title) {
+    const rows = Array.isArray(remembered) ? remembered.filter((p) => p && p.category === "commute-for" && clean(p.address)) : [];
+    const key = titleKey(title), exact = key ? rows.find((p) => p.list === "for:" + key) : null;
+    return exact || (isGym(title) ? rows.find((p) => p.list === GYM_LIST) || null : null);
+  }
+  /** The place name kept with a remembered row, in its notes (the server stores name, address, notes, url and list; the name column holds the
+      event's title). "Place: NAME" gives NAME; a row from before this change has none. */
+  const PLACE_LINE = /^Place: (.+)$/m;
+  const placeNameOf = (row) => { const m = PLACE_LINE.exec(String((row && row.notes) || "")); return m ? clean(m[1]) : ""; };
+  /** The place saved by "Remember for every <title>" (still-api /quest/places, own category so Trips never lists it). A gym title saves under
+      "for:gym". placeName is the name of the place he picked (a club from the list), kept in notes so the To line can show it. */
+  function rememberPlace({ title, address, lat, lng, placeName }) {
+    const gym = isGym(title), key = gym ? "gym" : titleKey(title); if (!key || !clean(address)) return null;
+    const pn = clean(placeName), showName = pn && pn.toLowerCase() !== clean(address).toLowerCase() ? pn : "";
+    return { name: gym ? "Gym session" : clean(title).slice(0, 200), address: clean(address), lat: lat == null ? null : lat, lng: lng == null ? null : lng,
+      category: "commute-for", list: "for:" + key, notes: (gym ? "Where the Commute block before a gym session goes" : "Where the Commute block before this event goes") + (showName ? "\nPlace: " + showName.slice(0, 300) : ""), savedBy: "Calendar" };
   }
 
   /** "Studio 509A" → "studio 509a": what "Remember this place" for a Location text matches on. Whole text only; numbers are kept
@@ -83,15 +101,15 @@
   function target({ ev, events, tz, remembered = [], typed = null, home = null, from = null }) {
     const next = nextEvent(ev, events || [], tz), nextTitle = next ? next.title : "";
     const locOf = clean(ev.location) || (next ? clean(next.location) : "");   // the Location text a To would come from, kept even when a typed place wins (the page offers to remember it)
+    const own = isWebLink(ev.location) ? "" : clean(ev.location), nextLoc = next && !isWebLink(next.location) ? clean(next.location) : "";   // a web link or video call link is not a place (d48)
     const out = (source, o) => ({ source, address: clean(o.address), lat: o.lat == null ? null : o.lat, lng: o.lng == null ? null : o.lng, id: o.id || "", nextTitle, name: clean(o.name), locText: locOf });
     /** A remembered "loc:" row for this Location text (whole text, same key), else null. */
     const forText = (text) => locationMemory(remembered, text);
     if (typed && clean(typed.address)) return out("typed", typed);
-    if (clean(ev.location)) { const m = forText(ev.location); return m ? out("location", { ...m, name: clean(ev.location) }) : out("block", { address: ev.location }); }
-    if (next && clean(next.location)) { const m = forText(next.location); return m ? out("location", { ...m, name: clean(next.location) }) : out("next", { address: next.location, name: next.title }); }
-    const key = next ? titleKey(next.title) : "";
-    const mem = key && remembered.find((p) => p.category === "commute-for" && p.list === "for:" + key);
-    if (mem) return out("remembered", { ...mem, name: "" });   // its saved name is the event title, not a place name
+    if (own) { const m = forText(ev.location); return m ? out("location", { ...m, name: clean(ev.location) }) : out("block", { address: ev.location }); }
+    if (nextLoc) { const m = forText(next.location); return m ? out("location", { ...m, name: clean(next.location) }) : out("next", { address: next.location, name: next.title }); }
+    const mem = next ? titleMemory(remembered, next.title) : null;
+    if (mem) return out("remembered", { ...mem, name: placeNameOf(mem) });   // its saved name is the event title; the place's own name, when one was picked, is in its notes
     if (home && (clean(home.address) || home.id) && !samePlace(from, home)) return out("home", { ...home, name: "Home" });
     return out("none", {});
   }
@@ -131,6 +149,56 @@
   function fitSize(w, h, max) {
     const k = Math.min(1, max / Math.max(w, h));
     return { w: Math.round(w * k), h: Math.round(h * k) };
+  }
+
+  /* ---------- d48 (Junyan, 2026-11-25: "48 yes suggest commute blocks", "49yes"): suggested Commute blocks ----------
+     A dashed Suggested Commute before each of his timed events that has a place away from Home: 30 minutes, ending when the event starts.
+     Pure rules; the page (calendar.html autoGhosts) draws them with Accept and Skip and asks Google for nothing until a block is accepted. */
+  const SUGG_MIN = 30, SUGG_FLOOR = 15;
+  /** A web link or a video call link (Zoom, Meet, Teams, Webex...): not a place you can walk to. */
+  const isWebLink = (t) => /^\s*(https?:\/\/|www\.)|\b(zoom\.us|meet\.google\.com|teams\.microsoft\.com|teams\.live\.com|webex\.com|whereby\.com|gotomeet\.me|skype\.com)\b/i.test(String(t == null ? "" : t));
+  /** Where one event is: its Location text (as a remembered "loc:" place when one is, else as written), else the place remembered for its name.
+      null when it has neither (an empty Location, or a web link with nothing remembered for the name). */
+  function eventPlace(x, remembered) {
+    const loc = clean(x && x.location);
+    if (loc && !isWebLink(loc)) { const m = locationMemory(remembered, loc); return m ? { address: clean(m.address), id: m.id || "", text: loc } : { address: loc, id: "", text: loc }; }
+    const mem = titleMemory(remembered, x && x.title);
+    return mem ? { address: clean(mem.address), id: mem.id || "", text: "" } : null;
+  }
+  /** Is this place Home? Same address as Home by its words, or the Location text "Home". With no Home saved nothing is Home. */
+  function isHome(place, home) {
+    if (!place || !home || !(clean(home.address) || home.id)) return false;
+    return samePlace(place, home) || (!!place.text && place.text.toLowerCase() === "home");
+  }
+  /** One short key per event, safe for the page's ^auto:(\w+):(.+)$ id pattern: "cm" and two 32 bit hashes of calendar and event id. */
+  function suggestionKey(x) {
+    const s = String(x.calId) + "|" + String(x.id);
+    let a = 0x811c9dc5, b = 5381;
+    for (let i = 0; i < s.length; i++) { a = Math.imul(a ^ s.charCodeAt(i), 16777619) >>> 0; b = (Math.imul(b, 33) + s.charCodeAt(i)) >>> 0; }
+    return "cm" + a.toString(36) + b.toString(36);
+  }
+  /** The Commute suggestions for one day. events: his own timed events (the page already left out other people's calendars), each with
+      title, location, s, e (ms), allDay, ghost, k. remembered: the places rows. home: his Home place or null. now: ms. Returns
+      [{key, kind: "commute", title: "Commute", s, e, why, forId}], earliest first. */
+  function commuteSuggestions({ day, events, remembered = [], home = null, tz, now = 0 }) {
+    const M = 60000, timed = (events || []).filter((x) => x && !x.allDay && !x.ghost && Number.isFinite(x.s) && Number.isFinite(x.e));
+    const onDay = timed.filter((x) => C().wall(x.s, tz).day === day).sort((a, b) => a.s - b.s || a.e - b.e);
+    const out = [];
+    for (const ev of onDay) {
+      if (ev.k === "commute" || ev.s <= now) continue;   // not for a Commute block itself, nor an event that has started
+      const place = eventPlace(ev, remembered);
+      if (!place || isHome(place, home)) continue;
+      const before = onDay.filter((x) => x !== ev && x.s < ev.s), last = before[before.length - 1] || null;
+      const winStart = ev.s - SUGG_MIN * M;
+      if (last && last.k === "commute") continue;   // the last block before it is a Commute already
+      if (before.some((x) => x.k === "commute" && x.e > winStart)) continue;   // a Commute runs into the 30 minutes before it
+      const prevPlace = last ? eventPlace(last, remembered) : null;
+      if (prevPlace && samePlace(prevPlace, place)) continue;   // already there
+      const ends = before.map((x) => x.e).filter((e) => e > winStart && e <= ev.s);
+      const s = Math.min(ends.length ? Math.max(...ends) : winStart, ev.s - SUGG_FLOOR * M);
+      out.push({ key: suggestionKey(ev), kind: "commute", title: "Commute", s, e: ev.s, why: "To " + clean(ev.title), forId: ev.id });
+    }
+    return out;
   }
 
   /* ---------- slice 2 ---------- */
@@ -418,5 +486,5 @@
   /** The words for an answer that is not ok (the server's own message when it sent one). */
   const notOkText = (res) => (res && res.state === "no-key" ? "Directions need the Google key" : (res && res.message) || "Directions are not available.");
 
-  root.CalCommute = { OVER_TEXT, keptAnswer, endedView, replacesHeld, notOkText, checkedLine, onRoute, alertLine, noRouteText, blockEnded, missingHour, RAIN_CODES: RAIN, SNOW_CODES: SNOW, arriveTarget, leaveBy, arriveLine, bestWay, quickerThan, alertsFor, groupAlerts, leaveShift, autoCheckDue, decodePolyline, WAY, CHIP, mapsLink, organicMapsLink, placesAskable, readSuggestions, readPlace, locationText, keepPlace, alreadyKept, savedChips, removableChip, anyRemovable, rowText, weatherUrl, weatherPlace, weatherKey, weatherWords, pickHour, weatherWindow, outsideMinutes, weatherTip, weatherCard, wxFresh, WX_TEXT, titleKey, rememberPlace, locationKey, canRememberLocation, rememberLocation, locationMemory, forgetLine, rememberToast, nextEvent, target, needsAsk, samePlace, previousPlace, fromFor, stepDur, placeKey, fitSize, TRAVELMODE };
+  root.CalCommute = { OVER_TEXT, keptAnswer, endedView, replacesHeld, notOkText, checkedLine, onRoute, alertLine, noRouteText, blockEnded, missingHour, RAIN_CODES: RAIN, SNOW_CODES: SNOW, arriveTarget, leaveBy, arriveLine, bestWay, quickerThan, alertsFor, groupAlerts, leaveShift, autoCheckDue, decodePolyline, WAY, CHIP, mapsLink, organicMapsLink, placesAskable, readSuggestions, readPlace, locationText, keepPlace, alreadyKept, savedChips, removableChip, anyRemovable, rowText, weatherUrl, weatherPlace, weatherKey, weatherWords, pickHour, weatherWindow, outsideMinutes, weatherTip, weatherCard, wxFresh, WX_TEXT, titleKey, rememberPlace, isGym, rememberName, titleMemory, placeNameOf, isWebLink, eventPlace, commuteSuggestions, locationKey, canRememberLocation, rememberLocation, locationMemory, forgetLine, rememberToast, nextEvent, target, needsAsk, samePlace, previousPlace, fromFor, stepDur, placeKey, fitSize, TRAVELMODE };
 })(typeof window !== "undefined" ? window : globalThis);
