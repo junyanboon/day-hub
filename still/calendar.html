@@ -2829,7 +2829,7 @@ const cmEnd = (o) => ({ name: o.name || "", address: o.address || "", lat: o.lat
 /** The inputs a directions answer needs, or null: no To, no From address, a block that has ended, or a day too far off. */
 function cmDirInput(ev) {
   const t = cmTarget(ev), from = cmFrom(ev);
-  if (CalCommute.needsAsk(t) || !t.address || !from || !from.address || CalCommute.blockEnded(ev.e, Date.now())) return null;
+  if (CalCommute.needsAsk(t) || !t.address || !from || !from.address || !Number.isFinite(ev.e) || CalCommute.blockEnded(ev.e, Date.now())) return null;
   const arrive = CalCommute.arriveTarget(ev, eventsFor(cmDay(ev), cmDay(ev)), S.tz);
   if (!(arrive.at > Date.now() - 3600000) || arrive.at > Date.now() + 14 * 86400000) return null;
   return { t, from, arrive, sig: [from.address, t.address, Math.floor(arrive.at / 60000)].join("|") };

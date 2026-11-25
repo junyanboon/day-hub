@@ -261,8 +261,8 @@
     return "https://api.open-meteo.com/v1/forecast?latitude=" + p.lat + "&longitude=" + p.lng + "&hourly=" + WX_FIELDS +
       "&timezone=" + encodeURIComponent(tz) + "&timeformat=unixtime&forecast_days=" + WX_DAYS;
   }
-  /** WMO weather code (open-meteo.com/en/docs) to an icon and plain words. An unknown code keeps a plain icon and no words. */
-  /* The third entry marks the codes that mean rain or snow; the two lists below are read from it, not repeated. */
+  /** WMO weather code (open-meteo.com/en/docs) to an icon and plain words. An unknown code keeps a plain icon and no words.
+      The optional third entry marks the codes that mean rain or snow; the two lists below are read from it, not repeated. */
   const WX_CODES = {
     0: ["☀️", "clear"], 1: ["🌤️", "mostly clear"], 2: ["⛅", "partly cloudy"], 3: ["☁️", "overcast"], 45: ["🌫️", "fog"], 48: ["🌫️", "fog"],
     51: ["🌦️", "light drizzle", "rain"], 53: ["🌦️", "drizzle", "rain"], 55: ["🌦️", "heavy drizzle", "rain"], 56: ["🌧️", "freezing drizzle", "rain"], 57: ["🌧️", "freezing drizzle", "rain"],
