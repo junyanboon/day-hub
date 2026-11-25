@@ -114,7 +114,7 @@ test("the panel: the Open packing list button is drawn only on a computer, and P
 });
 
 test("the BUILD label names this copy", () => {
-  assert.match(html, /const BUILD = "2026-11-25a commute weather box and location box";/, "top strip colour matches the header (build d, on top of the layout D dash header)");
+  assert.match(html, /const BUILD = "2026-11-25b remove a kept place";/, "top strip colour matches the header (build d, on top of the layout D dash header)");
   assert.match(html, /calendar-core\.js\?v=34"/, "a new stamp for the changed core (slice 05)");
 });
 
