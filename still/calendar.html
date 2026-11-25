@@ -14,7 +14,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>Calendar</title>
 <script src="calendar-core.js?v=34"></script>
-<script src="calendar-commute.js?v=5"></script>
+<script src="calendar-commute.js?v=6"></script>
 <script src="cards-vault.js?v=2"></script><script src="cards.js?v=7"></script>
 <script src="quest-trips.js?v=20261121a" data-helpers></script>
 <script>
@@ -1028,7 +1028,7 @@ if (TOUCH) for (const g of ["gesturestart", "gesturechange"]) document.addEventL
    which shows this build, the phone's answers and a log of every day change with its cause. Until then CalHook.on is
    null and diag() does nothing. BUILD names this copy of the page, so a screenshot proves which copy ran: change it on
    every change to this page or calendar-readout.js (the date plus a letter). */
-const BUILD = "2026-11-25c tidy commute panel";
+const BUILD = "2026-11-25d remember a location text";
 const CalHook = window.CalHook = { BUILD, on: null };
 const diag = (kind, msg) => { if (CalHook.on) CalHook.on(kind, msg); };
 /* The iPhone home screen app's fit (2026-11-12): html.hs in a home screen app on touch, html.hsfill and --hsgap when
@@ -3017,13 +3017,14 @@ function cmEditBox(ev, side, t) {
     `<label class="cmrem"><input type="checkbox" role="switch" id="cmKeep" ${dis}> <span>Keep in Saved places</span></label>` +
     (chips.length ? `<div class="cmsvh"><p class="lbl" style="margin:0">Saved places</p>${can && CalCommute.anyRemovable(chips) ? `<button type="button" class="cmedit" data-cm="rmmode">${CM.rm ? "Done" : "Edit"}</button>` : ""}</div><div class="chips${rmOn ? " rm" : ""}">${chips.map((p) => cmChipHtml(p, side, rmOn, dis)).join("")}</div>` : "") +
     (to && t.nextTitle ? `<label class="cmrem"><input type="checkbox" role="switch" id="cmRem" ${dis}> <span>Remember for every ${esc(t.nextTitle)}</span></label>` : "") +
+    (to && t.locText ? `<label class="cmrem"><input type="checkbox" role="switch" id="cmRemLoc" ${dis}> <span>Remember "${esc(t.locText)}" as this place</span></label>` : "") +
     (first ? "" : `<div class="r"><button type="button" class="btn" data-cm="${to ? "cancel" : "cancelfrom"}">Cancel</button></div>`) + `</div>`;
 }
 /** A repaint (directions arriving, a place list) must not wipe what he is typing: keep the text, the cursor and the Remember switch. */
 function cmKeepTyped(box) {
   const i = box.querySelector("#cmTo, #cmFromIn"); if (!i) return null;
-  const r = box.querySelector("#cmRem"), k = box.querySelector("#cmKeep");
-  return { id: i.id, v: i.value, focus: document.activeElement === i, at: i.selectionStart, rem: r ? r.checked : null, keep: k ? k.checked : null };
+  const r = box.querySelector("#cmRem"), k = box.querySelector("#cmKeep"), rl = box.querySelector("#cmRemLoc");
+  return { id: i.id, v: i.value, focus: document.activeElement === i, at: i.selectionStart, rem: r ? r.checked : null, keep: k ? k.checked : null, remLoc: rl ? rl.checked : null };
 }
 function cmRestoreTyped(box, k) {
   if (!k) return;
@@ -3031,6 +3032,7 @@ function cmRestoreTyped(box, k) {
   i.value = k.v; if (k.focus) { i.focus(); try { i.setSelectionRange(k.at, k.at); } catch (e) {} }
   const r = box.querySelector("#cmRem"); if (r && k.rem != null) r.checked = k.rem;
   const kp = box.querySelector("#cmKeep"); if (kp && k.keep != null) kp.checked = k.keep;
+  const rl = box.querySelector("#cmRemLoc"); if (rl && k.remLoc != null) rl.checked = k.remLoc;
 }
 const cmSugHtml = () => CMS.html(), cmSugDraw = () => CMS.draw(), cmSugOpen = (side) => CMS.open(side), cmSugClose = () => CMS.close();
 const cmSugType = (side, text) => CMS.type(side, text);
@@ -3196,7 +3198,7 @@ async function cmSave(m) {
     m.remove(); toast("Saved"); await cmLoadNotes(ev); if (S.ev && keyOf(S.ev) === keyOf(ev)) cmPaint();
   } catch (e) { sv.disabled = false; toast("Not saved: " + e.message, { bad: true }); }
 }
-async function cmSetTarget(ev, o, remember) {
+async function cmSetTarget(ev, o, remember, rememberLoc) {
   if (!(await cmSaveRoute(ev, "to", o))) { cmSet(CMK.to, keyOf(ev), { ...o, pending: true }); toast("Saved on this device only. The server could not be reached; it goes up next time.", { bad: true }); }
   CM.edit = "";
   if (remember) {
@@ -3205,6 +3207,14 @@ async function cmSetTarget(ev, o, remember) {
       const old = (CM.places || []).find((p) => p.category === "commute-for" && p.list === rp.list); if (old) rp.id = old.id;
       const d = await send("/quest/places", "POST", { op: "put", place: rp });
       CM.places = (CM.places || []).filter((p) => p.id !== d.place.id).concat(d.place); toast("Remembered for every " + (t.nextTitle || ev.title));
+    } catch (e) { toast("Not remembered: " + e.message, { bad: true }); }
+  }
+  if (rememberLoc) {
+    const t = cmTarget(ev), rl = CalCommute.rememberLocation({ text: t.locText, address: o.address, lat: o.lat, lng: o.lng });
+    if (rl) try {
+      const old = (CM.places || []).find((p) => p.category === "commute-for" && p.list === rl.list); if (old) rl.id = old.id;
+      const d = await send("/quest/places", "POST", { op: "put", place: rl });
+      CM.places = (CM.places || []).filter((p) => p.id !== d.place.id).concat(d.place); toast(`Remembered "${t.locText}"`);
     } catch (e) { toast("Not remembered: " + e.message, { bad: true }); }
   }
   cmPaint(); cmDirections(ev); await cmLoadNotes(ev); cmPaint();
@@ -3232,9 +3242,9 @@ async function cmFromHome(ev) {
 async function cmGo(ev, side) {
   const i = $(side === "to" ? "#cmTo" : "#cmFromIn"); const v = i ? (i.value || "").trim() : ""; if (!v) { if (i) i.focus(); return; }
   if (CM.going) return; CM.going = true;   // Enter twice while the lookup runs saves once
-  const rem = $("#cmRem"), keepRem = !!(rem && rem.checked), kp = $("#cmKeep"), keepPlace = !!(kp && kp.checked); cmSugClose(); i.blur();
+  const rem = $("#cmRem"), keepRem = !!(rem && rem.checked), rl = $("#cmRemLoc"), keepLoc = !!(rl && rl.checked), kp = $("#cmKeep"), keepPlace = !!(kp && kp.checked); cmSugClose(); i.blur();
   let o; try { o = await cmFound(v); } finally { CM.going = false; }
-  if (side === "to") await cmSetTarget(ev, o, keepRem); else await cmSetFrom(ev, o);
+  if (side === "to") await cmSetTarget(ev, o, keepRem, keepLoc); else await cmSetFrom(ev, o);
   if (keepPlace) await cmKeepPlace(o);
 }
 /** "Keep in Saved places" was on: save the picked or found place on the server and add it to the chips (no second copy; a place with no
@@ -3252,12 +3262,12 @@ async function cmKeepPlace(o) {
 async function cmPickSuggestion(ev, pid) {
   const x = CMS.items.find((y) => y.id === pid), side = CMS.side;   // by id: a list redrawn under his finger never picks another row
   if (!x || !side || CMS.busy) return;
-  CMS.busy = true; const session = CMS.session, rem = $("#cmRem"), keepRem = !!(rem && rem.checked), kp = $("#cmKeep"), keepPlace = !!(kp && kp.checked);
+  CMS.busy = true; const session = CMS.session, rem = $("#cmRem"), keepRem = !!(rem && rem.checked), rl = $("#cmRemLoc"), keepLoc = !!(rl && rl.checked), kp = $("#cmKeep"), keepPlace = !!(kp && kp.checked);
   let o = null; try { o = CalCommute.readPlace(await send("/quest/commute/place", "POST", { id: x.id, session })); } catch (e) { /* falls back to the words on the row */ }
   if (CMS.side !== side || CMS.session !== session) return;   // the box was closed or reopened while we waited
   if (!o) o = await cmFound([x.name, x.sub].filter(Boolean).join(", "));
   cmSugClose();
-  if (side === "to") await cmSetTarget(ev, o, keepRem); else await cmSetFrom(ev, o);
+  if (side === "to") await cmSetTarget(ev, o, keepRem, keepLoc); else await cmSetFrom(ev, o);
   if (keepPlace) await cmKeepPlace(o);
 }
 /** The x on a kept place (d34): send the existing removal, take the chip off, leave the box open. Only a place kept from this box can go.
@@ -3303,7 +3313,7 @@ async function cmAct(t) {
     const p = (CM.places || []).find((x) => x.id === d.id); if (!p) return;
     if (p === cmHome()) await cmFromHome(ev); else await cmSetFrom(ev, { name: p.name, address: p.address || p.name, lat: p.lat, lng: p.lng, id: p.id });
   }
-  else if (d.cm === "pickto") { const p = (CM.places || []).find((x) => x.id === d.id); if (p) { const rem = $("#cmRem"); cmSugClose(); cmSetTarget(ev, { name: p.name, address: p.address || p.name, lat: p.lat, lng: p.lng, id: p.id }, rem && rem.checked); } }
+  else if (d.cm === "pickto") { const p = (CM.places || []).find((x) => x.id === d.id); if (p) { const rem = $("#cmRem"), rl = $("#cmRemLoc"); cmSugClose(); cmSetTarget(ev, { name: p.name, address: p.address || p.name, lat: p.lat, lng: p.lng, id: p.id }, rem && rem.checked, rl && rl.checked); } }
   else if (d.cm === "rmmode") { CM.rm = !CM.rm; cmPaint(); const b = $('[data-cm="rmmode"]'); if (b) b.focus(); }
   else if (d.cm === "rmplace") await cmRemovePlace(d.id);
   else if (d.cm === "sug") await cmPickSuggestion(ev, d.pid);
