@@ -1168,7 +1168,7 @@
 <script src="quest-water.js?v=20261024p1"></script>
 <script src="quest-gut.js?v=20261024g3"></script>
 <script src="quest-library.js?v=20261022b1"></script>
-<script src="quest-gym.js?v=20261019x"></script>
+<script src="quest-gym.js?v=20261125a"></script>
 <script src="quest-gymcoach.js?v=20261109f"></script>
 <script src="quest-morning.js?v=20261030c"></script>
 <script src="quest-buckets.js?v=20261030c"></script>
@@ -5106,7 +5106,7 @@
   }
 
   function openSettings(){
-    const paired = !!questKey(), pushed = !!store.get("quest-push");
+    const paired = !!questKey(), pushed = !!store.get("quest-push"), gymOn = QG().autoOn(G);
     openSheet(`<h3>Settings</h3>
       <p>${paired ? `Paired. Your prana saves to the server${syncErr ? ` <span style="color:var(--warn)">(last sync failed: ${esc(syncErr)})</span>` : ""}, and calendar changes are on.`
         : "Pair this device to save your prana, change the calendar and get phone pings."}</p>
@@ -5118,8 +5118,17 @@
         : standalone() ? "Pings arrive even when Quest is closed." : "On iPhone, pings need Quest on your Home Screen: Share, then Add to Home Screen, then open it from the icon."}</p>
       <div class="actions"><button class="btn primary" id="pushOn">${pushed ? "Re-connect pings" : "Turn on pings"}</button>
         ${pushed ? `<button class="btn" id="pushTest">Send a test</button>` : ""}</div>
+      <div class="actions"><button class="btn" id="gymAuto" role="switch" aria-checked="${gymOn}"><span>Plan my gym sessions</span> <b id="gymState">${gymOn ? "On" : "Off"}</b></button></div>
       <div class="actions"><button class="btn ghost" id="sClose">Close</button></div>`);
     $("sClose").onclick = closeSheet;
+    // follows him to every device (G.gymAuto is saved with his state); off leaves the gym blocks already on his calendar alone
+    $("gymAuto").onclick = () => {
+      const on = !QG().autoOn(G);
+      G.gymAuto = on; saveG();
+      $("gymAuto").setAttribute("aria-checked", String(on));
+      $("gymAuto").classList.toggle("primary", on); $("gymState").textContent = on ? "On" : "Off";
+    };
+    $("gymAuto").classList.toggle("primary", gymOn);
     $("pSave").onclick = async () => {
       const v = $("pCode").value.trim();
       if (!v || v.startsWith("•")) { $("pCode").focus(); return; }
@@ -5294,6 +5303,9 @@
   }
   async function planGym(force){
     if (!QG() || !PLAN || !lastPull || gymBusy) return;
+    // the "Plan my gym sessions" switch in Settings (2026-11-25): off, nothing is read, placed or written. Gym blocks already on
+    // the calendar stay. The calls are page load, after a move and opening the Plan screen: none of them is a gym button.
+    if (!QG().autoOn(G)) return;
     const stamp = store.get(GYM_AT) || "", [day, at] = stamp.split("|");
     // between runs the last plan's counts come back from this device's saved copy, so the line shows at once
     if (!GYMWK && day === gameYmd()) try { const w = JSON.parse(store.get(GYM_WK) || "null"); if (w && w.length) GYMWK = { weeks:w, at:+at || 0 }; } catch {}

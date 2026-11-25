@@ -211,5 +211,8 @@
     return `${day} · ${t}`.replace(/[\u202f\u00a0]/g, " ");
   }
 
-  root.QuestGym = { sessionOf, isGymTitle, dayInfo, weekMode, planWeek, moveOptions, label, at, localYmd, mondayOf, addDays, NAMES, GRAPE };
+  // the "Plan my gym sessions" switch (Junyan, 2026-11-25: "the gym auto-populates right now and I want that turned off"):
+  // off unless his saved state says exactly gymAuto: true, so no existing copy plans by itself after this ships
+  const autoOn = g => !!g && g.gymAuto === true;
+  root.QuestGym = { autoOn, sessionOf, isGymTitle, dayInfo, weekMode, planWeek, moveOptions, label, at, localYmd, mondayOf, addDays, NAMES, GRAPE };
 })(typeof window !== "undefined" ? window : globalThis);
