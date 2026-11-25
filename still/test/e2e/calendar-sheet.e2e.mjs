@@ -156,8 +156,8 @@ try {
     check("reopened, location and notes show again", back[0] === "527 Bloor St W" && back[1] === "Bring the keys\nand the mop", JSON.stringify(back));
     /* notes with Google formatting are read-only */
     await page.evaluate(() => { const ev = S.ev; ev.description = 'See <a href="https://x.ca">the plan</a><br>Fish &amp; chips'; panel("event", ev); });
-    const rich = await page.evaluate(() => [!!document.querySelector(".sheet textarea"), document.querySelector(".sheet .snotes")?.textContent, !!document.querySelector('.sheet a[href*="calendar.google"]')]);
-    check("notes with Google formatting show as text, not a box, with Open in Google", !rich[0] && rich[1] === "See the plan\nFish & chips" && rich[2], JSON.stringify(rich));
+    const rich = await page.evaluate(() => [!!document.querySelector(".sheet textarea"), document.querySelector(".sheet .snotes")?.textContent, !!document.querySelector('.sheet a[href*="calendar.google"]'), /Open in Google/.test(document.querySelector(".sheet")?.textContent || "")]);
+    check("notes with Google formatting show as text, not a box (and the Open in Google link is gone, d46)", !rich[0] && rich[1] === "See the plan\nFish & chips" && !rich[2] && !rich[3], JSON.stringify(rich));
     await tap(page, "#pSave"); await sleep(400);
     check("Save with formatted notes sends no description", !("description" in (last(sent) || {})) || last(sent) === b);
     check("no page errors (location and notes)", !errors.length, errors.join("; "));

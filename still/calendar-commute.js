@@ -399,5 +399,24 @@
     return e || "No directions for this way.";
   }
 
-  root.CalCommute = { checkedLine, onRoute, alertLine, noRouteText, blockEnded, missingHour, RAIN_CODES: RAIN, SNOW_CODES: SNOW, arriveTarget, leaveBy, arriveLine, bestWay, quickerThan, alertsFor, groupAlerts, leaveShift, autoCheckDue, decodePolyline, WAY, CHIP, mapsLink, organicMapsLink, placesAskable, readSuggestions, readPlace, locationText, keepPlace, alreadyKept, savedChips, removableChip, anyRemovable, rowText, weatherUrl, weatherPlace, weatherKey, weatherWords, pickHour, weatherWindow, outsideMinutes, weatherTip, weatherCard, wxFresh, WX_TEXT, titleKey, rememberPlace, locationKey, canRememberLocation, rememberLocation, locationMemory, forgetLine, rememberToast, nextEvent, target, needsAsk, samePlace, previousPlace, fromFor, stepDur, placeKey, fitSize, TRAVELMODE };
+  /* (d45, Junyan, 2026-11-25: "45 yes I want to be able to see it still") The directions he was using stay on screen once the block is
+     over, and a re-check that comes back not ok never replaces a good answer for the same trip. Pure rules; the page only draws them. */
+  const OVER_TEXT = "This block is over.";
+  /** The ok answer the page holds for this same trip (same From, To and arrive time = same sig): the one in memory, else the one kept in
+      this browser. {res, sig, from} or null. An answer that is not ok, or for another trip, is never returned. */
+  function keptAnswer({ mem, stored, sig }) {
+    const ok = (x) => !!sig && !!x && !!x.res && x.res.state === "ok" && x.sig === sig;
+    return ok(mem) ? { res: mem.res, sig, from: "memory" } : ok(stored) ? { res: stored.res, sig, from: "browser" } : null;
+  }
+  /** What a block that is over shows: show "answer" with the kept directions, or "none" (only the quiet line). Never a Check again. */
+  function endedView({ kept, fmt }) {
+    const at = kept && kept.res ? kept.res.checkedAt : NaN, t = Number.isFinite(at) ? clean(fmt(at)) : "";
+    return { show: kept ? "answer" : "none", over: OVER_TEXT, checked: kept && t ? "Checked " + t : "", check: false };
+  }
+  /** Does a new answer replace the one held? Always, unless it is not ok and the held one is ok for the same trip (then the good one stays). */
+  const replacesHeld = ({ held, heldSig, sig, res }) => !!res && (res.state === "ok" || !(held && held.state === "ok" && !!sig && heldSig === sig));
+  /** The words for an answer that is not ok (the server's own message when it sent one). */
+  const notOkText = (res) => (res && res.state === "no-key" ? "Directions need the Google key" : (res && res.message) || "Directions are not available.");
+
+  root.CalCommute = { OVER_TEXT, keptAnswer, endedView, replacesHeld, notOkText, checkedLine, onRoute, alertLine, noRouteText, blockEnded, missingHour, RAIN_CODES: RAIN, SNOW_CODES: SNOW, arriveTarget, leaveBy, arriveLine, bestWay, quickerThan, alertsFor, groupAlerts, leaveShift, autoCheckDue, decodePolyline, WAY, CHIP, mapsLink, organicMapsLink, placesAskable, readSuggestions, readPlace, locationText, keepPlace, alreadyKept, savedChips, removableChip, anyRemovable, rowText, weatherUrl, weatherPlace, weatherKey, weatherWords, pickHour, weatherWindow, outsideMinutes, weatherTip, weatherCard, wxFresh, WX_TEXT, titleKey, rememberPlace, locationKey, canRememberLocation, rememberLocation, locationMemory, forgetLine, rememberToast, nextEvent, target, needsAsk, samePlace, previousPlace, fromFor, stepDur, placeKey, fitSize, TRAVELMODE };
 })(typeof window !== "undefined" ? window : globalThis);
