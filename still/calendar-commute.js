@@ -484,8 +484,15 @@
   }
   /** Does a new answer replace the one held? Always, unless it is not ok and the held one is ok for the same trip (then the good one stays). */
   const replacesHeld = ({ held, heldSig, sig, res }) => !!res && (res.state === "ok" || !(held && held.state === "ok" && !!sig && heldSig === sig));
+  /** (Junyan, 2026-11-25, 53) After a reload the page holds nothing, so a first check that fails (not ok, or no answer at all) falls back to the good
+      answer this browser kept for the same trip. {res, sig} or null: null when the page already holds an ok answer for this trip (it keeps that one),
+      when nothing is kept, or when what is kept is for another trip or not ok. */
+  function restoredAfterFail({ held, heldSig, stored, sig }) {
+    if (held && held.state === "ok" && !!sig && heldSig === sig) return null;
+    return keptAnswer({ mem: null, stored, sig });
+  }
   /** The words for an answer that is not ok (the server's own message when it sent one). */
   const notOkText = (res) => (res && res.state === "no-key" ? "Directions need the Google key" : (res && res.message) || "Directions are not available.");
 
-  root.CalCommute = { OVER_TEXT, keptAnswer, endedView, replacesHeld, notOkText, checkedLine, onRoute, alertLine, noRouteText, blockEnded, missingHour, RAIN_CODES: RAIN, SNOW_CODES: SNOW, arriveTarget, leaveBy, arriveLine, bestWay, quickerThan, alertsFor, groupAlerts, leaveShift, autoCheckDue, decodePolyline, WAY, CHIP, mapsLink, organicMapsLink, placesAskable, readSuggestions, readPlace, locationText, keepPlace, alreadyKept, savedChips, removableChip, anyRemovable, rowText, weatherUrl, weatherPlace, weatherKey, weatherWords, pickHour, weatherWindow, outsideMinutes, weatherTip, weatherCard, wxFresh, WX_TEXT, titleKey, rememberPlace, isGym, rememberName, titleMemory, placeNameOf, isWebLink, eventPlace, commuteSuggestions, locationKey, canRememberLocation, rememberLocation, locationMemory, forgetLine, rememberToast, nextEvent, target, needsAsk, samePlace, previousPlace, fromFor, stepDur, placeKey, fitSize, TRAVELMODE };
+  root.CalCommute = { OVER_TEXT, keptAnswer, endedView, replacesHeld, restoredAfterFail, notOkText, checkedLine, onRoute, alertLine, noRouteText, blockEnded, missingHour, RAIN_CODES: RAIN, SNOW_CODES: SNOW, arriveTarget, leaveBy, arriveLine, bestWay, quickerThan, alertsFor, groupAlerts, leaveShift, autoCheckDue, decodePolyline, WAY, CHIP, mapsLink, organicMapsLink, placesAskable, readSuggestions, readPlace, locationText, keepPlace, alreadyKept, savedChips, removableChip, anyRemovable, rowText, weatherUrl, weatherPlace, weatherKey, weatherWords, pickHour, weatherWindow, outsideMinutes, weatherTip, weatherCard, wxFresh, WX_TEXT, titleKey, rememberPlace, isGym, rememberName, titleMemory, placeNameOf, isWebLink, eventPlace, commuteSuggestions, locationKey, canRememberLocation, rememberLocation, locationMemory, forgetLine, rememberToast, nextEvent, target, needsAsk, samePlace, previousPlace, fromFor, stepDur, placeKey, fitSize, TRAVELMODE };
 })(typeof window !== "undefined" ? window : globalThis);

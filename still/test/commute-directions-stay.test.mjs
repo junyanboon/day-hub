@@ -70,7 +70,26 @@ test("d46: the Open in Google link is gone from the computer panel and the phone
   assert.match(html, /Open in Google Maps/);
   assert.match(html, /<button class="btn del" id="pDel">Delete<\/button>'\}<span class="spacer"><\/span>\$\{canEdit \? '<button class="btn pri" id="pSave">Save<\/button>'/, "the foot is Delete, then the spacer, then Save");
 });
+test("restoredAfterFail: a failed first check falls back to the good answer kept in this browser for the same trip", () => {
+  const good = ok(3), stored = { at: 5, res: good, sig: SIG };
+  assert.equal(K.restoredAfterFail({ held: null, heldSig: "", stored, sig: SIG }).res, good, "nothing held after a reload: the stored one");
+  assert.equal(K.restoredAfterFail({ held: { state: "stopped" }, heldSig: SIG, stored, sig: SIG }).res, good, "a not-ok one held does not hide the stored ok one");
+});
+test("restoredAfterFail: a different trip, nothing stored or a not-ok stored answer gives null (today's error stays)", () => {
+  const good = ok(3);
+  assert.equal(K.restoredAfterFail({ held: null, heldSig: "", stored: { res: good, sig: "other" }, sig: SIG }), null, "he changed the place or the way");
+  assert.equal(K.restoredAfterFail({ held: null, heldSig: "", stored: undefined, sig: SIG }), null, "nothing stored");
+  assert.equal(K.restoredAfterFail({ held: null, heldSig: "", stored: { res: { state: "stopped" }, sig: SIG }, sig: SIG }), null);
+  assert.equal(K.restoredAfterFail({ held: ok(9), heldSig: SIG, stored: { res: good, sig: SIG }, sig: SIG }), null, "an ok answer already held for this trip stays as it is");
+});
+test("the page: a failed first check (not ok or no answer) restores from this browser, asks for nothing extra", () => {
+  assert.match(box, /function cmRestored\(d, stored, inp\) \{[^}]*CalCommute\.restoredAfterFail\(\{ held: d\.res, heldSig: d\.sig, stored, sig: inp\.sig \}\)/);
+  assert.match(box, /res && res\.state !== "ok" \? cmRestored\(d, stored, inp\) : null/);
+  assert.match(box, /d\.error = "Directions could not be loaded[^}]*cmRestored\(d, stored, inp\); \}/);
+  const fn = box.slice(box.indexOf("function cmRestored("), box.indexOf("const cmDirOf"));
+  assert.doesNotMatch(fn, /send\(|cmDirections\(/);
+});
 test("the build stamp and the script number name this copy", () => {
-  assert.match(html, /const BUILD = "2026-11-25j suggested commute blocks";/);
-  assert.match(html, /calendar-commute\.js\?v=9/);
+  assert.match(html, /const BUILD = "2026-11-25k commute directions after reload";/);
+  assert.match(html, /calendar-commute\.js\?v=10/);
 });
