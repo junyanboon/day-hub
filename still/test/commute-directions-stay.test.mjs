@@ -57,13 +57,15 @@ const html = fs.readFileSync(new URL("../calendar.html", import.meta.url), "utf8
 const box = html.slice(html.indexOf("/* commute:start */"), html.indexOf("/* commute:end */"));
 test("the page: an ended block draws from the rule, sends no request, and the old trip is never shown", () => {
   const ended = box.slice(box.indexOf("function cmEndedParts("), box.indexOf("/** The drawn parts of an ok answer"));
-  assert.match(ended, /K\.keptAnswer\(\{ mem: CM\.dir\[key\], stored: cmLast\(\)\[key\], sig: e\.sig \}\)/);
+  assert.match(ended, /K\.keptAnswer\(\{ mem: CM\.dir\[key\], stored: cmLast\(\)\[key\], sig: c\.sig \}\)/);
+  assert.match(ended, /\[S\.cmEarly, \.\.\.K\.EARLY_CHOICES\]/, "the kept answer is found under whichever pick it was made with");
   assert.match(ended, /K\.endedView\(/);
   assert.doesNotMatch(html, /This block is over|OVER_TEXT|id="cmOver"/, "the line is gone everywhere it was drawn");
   assert.match(ended, /if \(v\.show === "none"\) return out;/, "no kept answer: the Leave by area shows nothing");
   assert.doesNotMatch(ended, /send\(|cmDirections\(/, "no request from an ended block");
   assert.match(box, /function cmDirInput\(ev\) \{[^}]*CalCommute\.blockEnded\(ev\.e, Date\.now\(\)\)\) return null;/, "the page's own check and every request still stop at the end");
   assert.match(box, /if \(!d\.res \|\| d\.sig !== inp\.sig\) \{ if \(d\.error\)/, "a changed From or To never shows the old trip's answer");
+  assert.match(box, /Try again<\/button><\/div>`; out\.leave = chips\(\); return out;/, "a failed ask after a new pick keeps the chips so he can tap back");
   assert.match(box, /CalCommute\.replacesHeld\(\{ held: d\.res, heldSig: d\.sig, sig: inp\.sig, res \}\)/);
 });
 test("d46: the Open in Google link is gone from the computer panel and the phone sheet (Open in Google Maps stays)", () => {

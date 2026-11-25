@@ -22,7 +22,7 @@ test("one quiet line: Checked time, a link-style Check again that says Checkingâ
   assert.equal((box.match(/While this panel is open/g) || []).length, 1, "the sentence is not drawn as text anywhere");
 });
 test("the quiet line sits under the trip bar in the Leave by block, and also alone when a way has no directions", () => {
-  assert.match(box, /out\.leave = `<div class="cmleave">\$\{cmTrip\(mode, v, leave, shift, over \? cmOver\(over, lead\) : cmChecked\(d, checkedAt, auto \? CM_AUTO_NOTE : "", lead\)\)\}\$\{over \? "" : cmEarly\(inp\)\}<\/div>`/);
+  assert.match(box, /out\.leave = `<div class="cmleave">\$\{cmTrip\(mode, v, leave, shift, over \? cmOver\(over, lead\) : cmChecked\(d, checkedAt, auto \? CM_AUTO_NOTE : "", lead\)\)\}\$\{over \? "" : cmEarlyChips\(inp\)\}<\/div>`/);
   assert.match(box, /out\.leave = `<div class="cmleave">\$\{over \? cmOver\(over\) : cmChecked\(d, checkedAt, ""\)\}<\/div>`/);
   assert.match(box, /cmshift/, "the shift mark stays");
 });
@@ -33,7 +33,7 @@ test("trip bar page: Leave by and Arrive on one row with the way's icon and minu
   assert.match(trip, /class="tr" style="flex:\$\{v\.minutes\} 1 0"/); assert.match(trip, /class="sp" style="flex:\$\{v\.spare\} 1 0">\$\{v\.spare\} min</);
   assert.match(trip, /v\.spare != null && v\.spare >= 0 \? `<i class="sp"/, "no green segment with no next plan or when late");
   assert.match(box, /class="chip k-commute" data-cm="early" data-v="\$\{n\}" aria-pressed="\$\{n === S\.cmEarly\}">\$\{n\} min</);
-  assert.match(box, /Be there early by/); assert.match(box, /const cmEarly = \(inp\) => !inp\.arrive\.nextTitle \? ""/, "no chips with no next plan");
+  assert.match(box, /Be there early by/); assert.match(box, /const cmEarlyChips = \(inp\) => !inp\.arrive\.nextTitle \? ""/, "no chips with no next plan");
   assert.match(html, /\.cmtb\{display:flex;height:22px/, "the bar is 22px high"); assert.match(html, /\.cmtb \.sp\{min-width:/, "the green segment has a minimum width");
   assert.match(html, /\.cmtb \.sp\{[^}]*background:color-mix\(in srgb,var\(--emerald\) 55%,var\(--bar\)\)/, "green from the palette every look defines");
   assert.match(html, /\.cmlate\{color:var\(--red\)\}/);
@@ -42,7 +42,8 @@ test("trip bar page: Leave by and Arrive on one row with the way's icon and minu
 test("the early pick is one device setting read like the others, used by every arrive-by, and asks the directions again", () => {
   assert.match(html, /cmEarly: CalCommute\.earlyMin\(store\.get\("cal-commute-early"\)\)/);
   assert.equal((html.match(/CalCommute\.arriveTarget\(/g) || []).length, 2, "every reader of the arrive-by time");
-  assert.equal((html.match(/CalCommute\.arriveTarget\(ev, eventsFor\(cmDay\(ev\), cmDay\(ev\)\), S\.tz, S\.cmEarly\)/g) || []).length, 2, "both pass the pick");
+  assert.equal((html.match(/CalCommute\.arriveTarget\(ev, eventsFor\(cmDay\(ev\), cmDay\(ev\)\), S\.tz, S\.cmEarly\)/g) || []).length, 1, "the live trip passes the pick");
+  assert.match(html, /function cmEndedInput\(ev, early = S\.cmEarly\)/, "an ended trip can be read under any pick");
   assert.match(box, /d\.cm === "early"\) \{[\s\S]*?store\.set\("cal-commute-early", String\(n\)\); cmPaint\(\); cmDirections\(ev\);/, "the same check path, no second way of asking");
 });
 test("folds are real buttons with aria-expanded; the way there starts closed, Heads up starts open, alert rows start closed", () => {

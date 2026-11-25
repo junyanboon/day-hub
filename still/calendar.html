@@ -2859,10 +2859,10 @@ function cmDirInput(ev) {
 }
 /** (d45) The trip of a block that is over, for finding the answer kept for it: the same sig as cmDirInput made while it ran, with no clock window
     and never a request. null: the block is not over, or it has no To or From address. */
-function cmEndedInput(ev) {
+function cmEndedInput(ev, early = S.cmEarly) {
   const t = cmTarget(ev), from = cmFrom(ev);
   if (!Number.isFinite(ev.e) || !CalCommute.blockEnded(ev.e, Date.now()) || CalCommute.needsAsk(t) || !t.address || !from || !from.address) return null;
-  const arrive = CalCommute.arriveTarget(ev, eventsFor(cmDay(ev), cmDay(ev)), S.tz, S.cmEarly);
+  const arrive = CalCommute.arriveTarget(ev, eventsFor(cmDay(ev), cmDay(ev)), S.tz, early);
   return { t, from, arrive, sig: cmSig(from, t, arrive) };
 }
 /** A check that failed with nothing good held for this trip: hold the answer this browser kept for it (same sig), so the panel draws it (got = now keeps the 60 second guard: a repaint does not ask again) and says why under it. No request. */
@@ -2891,6 +2891,7 @@ async function cmDirections(ev, { fresh = false, auto = false } = {}) {
     if (restored || !CalCommute.replacesHeld({ held: d.res, heldSig: d.sig, sig: inp.sig, res })) { d.note = CalCommute.notOkText(res); d.checked = wasChecked; }   // d45: a not-ok re-check never throws away the good directions he has
     else {
       d.prev = res.state === "ok" && before && before.state === "ok" ? before : null;
+      if (d.sig !== inp.sig) d.checked = null;   // the old trip's Checked time is not this answer's
       d.res = res; d.got = Date.now(); d.sig = inp.sig;
       if (fresh && res.state === "ok") {
         d.checked = { auto, at: d.got };
@@ -2972,7 +2973,7 @@ const cmOver = (v, lead) => lead || v.checked ? `<div class="cmchecked">${[lead 
 /** The first words of the quiet line (what the spare time is before which plan, already escaped); in the warning colour when he arrives late. */
 const cmLead = (v) => (v.late ? `<span class="cmlate">${esc(v.lead)}</span>` : esc(v.lead));
 /** (d60, d61) "Be there early by": a thin divider, the label and four chips; the pick is kept on this device for every trip. Only a trip with a next plan has it. */
-const cmEarly = (inp) => !inp.arrive.nextTitle ? "" : `<div class="cmearly"><p class="lbl" style="margin:0">Be there early by</p><div class="chips">${CalCommute.EARLY_CHOICES.map((n) => `<button type="button" class="chip k-commute" data-cm="early" data-v="${n}" aria-pressed="${n === S.cmEarly}">${n} min</button>`).join("")}</div></div>`;
+const cmEarlyChips = (inp) => !inp.arrive.nextTitle ? "" : `<div class="cmearly"><p class="lbl" style="margin:0">Be there early by</p><div class="chips">${CalCommute.EARLY_CHOICES.map((n) => `<button type="button" class="chip k-commute" data-cm="early" data-v="${n}" aria-pressed="${n === S.cmEarly}">${n} min</button>`).join("")}</div></div>`;
 /** (d60) One row: Leave by on the left, Arrive on the right, the way's icon and minutes between them on a thin line; under it the trip bar (the travel
     minutes, then the spare minutes in green) and the quiet line. */
 function cmTrip(mode, v, leave, shift, quiet) {
@@ -2993,17 +2994,21 @@ function cmDirParts(ev, mode, inp) {
   const d = cmDirOf(ev), K = CalCommute, out = { leave: "", way: "", heads: "", quick: "", ways: null };
   if (!inp) return cmEndedParts(ev, mode, out);
   if (!d || (!d.res && !d.loading && !d.error)) return out;
-  if (d.res && d.sig !== inp.sig && d.loading) { out.way = `<div class="meta" role="status">Getting directions…</div>`; if (inp.arrive.nextTitle) out.leave = `<div class="cmleave">${cmEarly(inp)}</div>`; return out; }   // the early chips stay while the new pick is asked   // never show the answer for an earlier From or To
+  const chips = () => { const c = cmEarlyChips(inp); return c ? `<div class="cmleave">${c}</div>` : ""; };   // the early chips stay on screen while a new pick loads or fails, so he can tap back
+  // never show the answer for an earlier From or To
+  if (d.res && d.sig !== inp.sig && d.loading) { out.way = `<div class="meta" role="status">Getting directions…</div>`; out.leave = chips(); return out; }
   if (d.loading && !d.res) { out.way = `<div class="meta" role="status">Getting directions…</div>`; return out; }
-  if (!d.res || d.sig !== inp.sig) { if (d.error) out.way = `<div class="meta">${esc(d.error)}</div><div class="r"><button class="btn" data-cm="check">Try again</button></div>`; return out; }
-  if (d.res.state !== "ok") { out.way = `<div class="meta" role="status">${esc(K.notOkText(d.res))}</div>`; return out; }
+  if (!d.res || d.sig !== inp.sig) { if (d.error) out.way = `<div class="meta">${esc(d.error)}</div><div class="r"><button class="btn" data-cm="check">Try again</button></div>`; out.leave = chips(); return out; }
+  if (d.res.state !== "ok") { out.way = `<div class="meta" role="status">${esc(K.notOkText(d.res))}</div>`; out.leave = chips(); return out; }
   return cmOkParts(ev, mode, inp, d, null, out);
 }
 /** (d45) A block that is over: no request, ever. It draws the last good answer for this same trip (memory, else this browser), the Checked time and no
     Check again; with none kept, nothing (d60: the "block is over" line is gone). */
 function cmEndedParts(ev, mode, out) {
-  const e = cmEndedInput(ev), K = CalCommute; if (!e) return out;
-  const key = keyOf(ev), kept = K.keptAnswer({ mem: CM.dir[key], stored: cmLast()[key], sig: e.sig }), v = K.endedView({ kept, fmt: cmFmt });
+  const K = CalCommute, key = keyOf(ev); let e = cmEndedInput(ev), kept = null; if (!e) return out;
+  // the answer was kept under the pick he had while the block ran: look under the current pick first, then the others
+  for (const n of [S.cmEarly, ...K.EARLY_CHOICES]) { const c = cmEndedInput(ev, n); kept = K.keptAnswer({ mem: CM.dir[key], stored: cmLast()[key], sig: c.sig }); if (kept) { e = c; break; } }
+  const v = K.endedView({ kept, fmt: cmFmt });
   if (v.show === "none") return out;   // d60: no kept answer, nothing in the Leave by area
   return cmOkParts(ev, mode, e, { res: kept.res, sig: kept.sig, checked: null, prev: null, loading: false, error: "", note: "", autoDone: true }, v, out);
 }
@@ -3016,7 +3021,7 @@ function cmOkParts(ev, mode, inp, d, over, out) {
     const shift = prevWay && cmUsable(prevWay) ? K.leaveShift(K.leaveBy(prevWay, arriveAt), leave) : "";
     const auto = !d.autoDone && Number.isFinite(leave) && leave > Date.now();
     const v = K.tripView(way, inp.arrive, cmFmt), lead = cmLead(v);
-    out.leave = `<div class="cmleave">${cmTrip(mode, v, leave, shift, over ? cmOver(over, lead) : cmChecked(d, checkedAt, auto ? CM_AUTO_NOTE : "", lead))}${over ? "" : cmEarly(inp)}</div>`;
+    out.leave = `<div class="cmleave">${cmTrip(mode, v, leave, shift, over ? cmOver(over, lead) : cmChecked(d, checkedAt, auto ? CM_AUTO_NOTE : "", lead))}${over ? "" : cmEarlyChips(inp)}</div>`;
     out.way = cmFold("cmWay", `The way there · ${way.minutes} min${mode === "drive" && way.km ? " · " + way.km + " km" : ""}`, CM_FOLD.way, cmSteps(way, mode));
     out.heads = cmHeadsUp(d, mode, way);
     const q = d.checked && !over ? K.quickerThan(ways, mode) : null;
