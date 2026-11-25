@@ -92,7 +92,8 @@ try {
   const before = new Set(await logLines());
   await drag(200, 440, 202, 140);
   const added = (await logLines()).filter((l) => !before.has(l));
-  check("an up/down drag logs a y lock and scroll lines", added.some((l) => /LOCK [^\n]*y/.test(l)) && added.some((l) => /SC /.test(l)), added.join(" / "));
+  const top = await page.evaluate(() => document.getElementById("view").scrollTop);   // the drag really moved the view
+  check("an up/down drag logs a y lock and scroll lines", top > 0 && added.some((l) => /LOCK [^\n]*y/.test(l)) && added.some((l) => /SC /.test(l)), `top ${top}: ` + added.join(" / "));
 
   /* ---- Pause freezes the log; five taps close it ---- */
   await tapEl("#readoutPause");
