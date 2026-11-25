@@ -14,7 +14,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>Calendar</title>
 <script src="calendar-core.js?v=34"></script>
-<script src="calendar-commute.js?v=6"></script>
+<script src="calendar-commute.js?v=7"></script>
 <script src="cards-vault.js?v=2"></script><script src="cards.js?v=7"></script>
 <script src="quest-trips.js?v=20261121a" data-helpers></script>
 <script>
@@ -379,6 +379,7 @@ button.cmr{border:1px solid var(--line);background:var(--raise);border-radius:10
 .chip[aria-pressed=true]{background:color-mix(in srgb,var(--c,var(--neutral)) 22%,var(--bar));border-color:var(--c,var(--ink));color:var(--ink);font-weight:600}
 .chip:disabled{opacity:.5;cursor:default}
 .cmsvh{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:6px}
+.cmfg{display:flex;align-items:center;gap:8px}.cmfg span{flex:1;min-width:0;overflow-wrap:anywhere}.cmfg .cmedit{min-height:44px}
 .cmedit{background:none;border:0;color:var(--accent-ink);font:inherit;font-weight:600;padding:0 8px;min-height:32px;min-width:44px;cursor:pointer}
 .chips.rm{gap:10px}
 .chip.rm{display:inline-flex;align-items:center;gap:6px;padding:0 3px 0 10px}
@@ -1028,7 +1029,7 @@ if (TOUCH) for (const g of ["gesturestart", "gesturechange"]) document.addEventL
    which shows this build, the phone's answers and a log of every day change with its cause. Until then CalHook.on is
    null and diag() does nothing. BUILD names this copy of the page, so a screenshot proves which copy ran: change it on
    every change to this page or calendar-readout.js (the date plus a letter). */
-const BUILD = "2026-11-25d remember a location text";
+const BUILD = "2026-11-25e forget a location text";
 const CalHook = window.CalHook = { BUILD, on: null };
 const diag = (kind, msg) => { if (CalHook.on) CalHook.on(kind, msg); };
 /* The iPhone home screen app's fit (2026-11-12): html.hs in a home screen app on touch, html.hsfill and --hsgap when
@@ -3010,6 +3011,7 @@ function cmEditBox(ev, side, t) {
   const chips = CalCommute.savedChips(CM.places, home);   // Home first, then places kept from here, then the Trips places
   const id = to ? "cmTo" : "cmFromIn";
   const can = !dis, rmOn = can && CM.rm && CalCommute.anyRemovable(chips);
+  const locMem = to && t.locText ? CalCommute.locationMemory(CM.places, t.locText) : null;   // d42: a Location text already remembered gets a Forget link
   return `<div class="cmask" id="${to ? "cmAsk" : "cmFromAsk"}">` +
     (first ? `<b>Where are you going?</b><div class="meta">Type an address or a place name.</div>` : `<label class="lbl" for="${id}" style="margin:0">${to ? "To" : "From"}</label>`) +
     `<input id="${id}" placeholder="Address or place name" ${first ? 'aria-label="Where are you going"' : ""} autocomplete="off" enterkeyhint="go" aria-controls="cmSug" ${dis}>` +
@@ -3017,7 +3019,8 @@ function cmEditBox(ev, side, t) {
     `<label class="cmrem"><input type="checkbox" role="switch" id="cmKeep" ${dis}> <span>Keep in Saved places</span></label>` +
     (chips.length ? `<div class="cmsvh"><p class="lbl" style="margin:0">Saved places</p>${can && CalCommute.anyRemovable(chips) ? `<button type="button" class="cmedit" data-cm="rmmode">${CM.rm ? "Done" : "Edit"}</button>` : ""}</div><div class="chips${rmOn ? " rm" : ""}">${chips.map((p) => cmChipHtml(p, side, rmOn, dis)).join("")}</div>` : "") +
     (to && t.nextTitle ? `<label class="cmrem"><input type="checkbox" role="switch" id="cmRem" ${dis}> <span>Remember for every ${esc(t.nextTitle)}</span></label>` : "") +
-    (to && t.locText ? `<label class="cmrem"><input type="checkbox" role="switch" id="cmRemLoc" ${dis}> <span>Remember "${esc(t.locText)}" as this place</span></label>` : "") +
+    (to && t.locText && CalCommute.canRememberLocation(t.locText) ? `<label class="cmrem"><input type="checkbox" role="switch" id="cmRemLoc" ${dis}> <span>Remember "${esc(t.locText)}" as this place</span></label>` : "") +
+    (to && t.locText && locMem ? `<div class="cmfg" id="cmForgetLoc"><span>${esc(CalCommute.forgetLine(locMem, t.locText))}</span><button type="button" class="cmedit" data-cm="forgetloc" data-id="${esc(locMem.id)}" ${dis}>Forget</button></div>` : "") +
     (first ? "" : `<div class="r"><button type="button" class="btn" data-cm="${to ? "cancel" : "cancelfrom"}">Cancel</button></div>`) + `</div>`;
 }
 /** A repaint (directions arriving, a place list) must not wipe what he is typing: keep the text, the cursor and the Remember switch. */
@@ -3198,25 +3201,43 @@ async function cmSave(m) {
     m.remove(); toast("Saved"); await cmLoadNotes(ev); if (S.ev && keyOf(S.ev) === keyOf(ev)) cmPaint();
   } catch (e) { sv.disabled = false; toast("Not saved: " + e.message, { bad: true }); }
 }
+/** Save one remembered row (a repeat replaces the row of the same list, never adds a second). Never throws: { ok: true } or { ok: false, error }. */
+async function cmPutRemembered(place) {
+  try {
+    const row = { ...place }, old = (CM.places || []).find((p) => p.category === "commute-for" && p.list === row.list); if (old) row.id = old.id;
+    const d = await send("/quest/places", "POST", { op: "put", place: row });
+    CM.places = (CM.places || []).filter((p) => p.id !== d.place.id).concat(d.place);
+    return { ok: true };
+  } catch (e) { return { ok: false, error: e.message }; }
+}
+/** Forget (d42): delete the remembered "loc:" row of the open block's Location text. The text goes back to being sent as written; a To he typed
+    or picked for a block is that block's own and is not touched. Only a loc: row can go here; the title memory has no Forget. */
+async function cmForgetLoc(ev, id) {
+  const p = (CM.places || []).find((x) => x.id === id);
+  if (!p || p.category !== "commute-for" || !String(p.list || "").startsWith("loc:") || CM.fgBusy) return;
+  CM.fgBusy = true; const text = cmTarget(ev).locText || p.name;
+  try { await send("/quest/places", "POST", { op: "del", id }); }
+  catch (e) { CM.fgBusy = false; toast("Not forgotten. Try again in a moment.", { bad: true }); return; }
+  CM.fgBusy = false;
+  CM.places = (CM.places || []).filter((x) => x.id !== id);
+  toast(`Forgot "${text}".`); cmPaint(); cmDirections(ev);
+  const nf = $("#cmRemLoc") || $("#cmTo"); if (nf && !nf.disabled) nf.focus();   // the Forget button is gone: keep the place in the box for keyboard and screen reader users
+}
 async function cmSetTarget(ev, o, remember, rememberLoc) {
   if (!(await cmSaveRoute(ev, "to", o))) { cmSet(CMK.to, keyOf(ev), { ...o, pending: true }); toast("Saved on this device only. The server could not be reached; it goes up next time.", { bad: true }); }
   CM.edit = "";
+  const t = (remember || rememberLoc) ? cmTarget(ev) : null, res = {};   // both saves run, then one message that is true for both (d43)
   if (remember) {
-    const t = cmTarget(ev), rp = CalCommute.rememberPlace({ title: t.nextTitle || ev.title, address: o.address, lat: o.lat, lng: o.lng });
-    if (rp) try {
-      const old = (CM.places || []).find((p) => p.category === "commute-for" && p.list === rp.list); if (old) rp.id = old.id;
-      const d = await send("/quest/places", "POST", { op: "put", place: rp });
-      CM.places = (CM.places || []).filter((p) => p.id !== d.place.id).concat(d.place); toast("Remembered for every " + (t.nextTitle || ev.title));
-    } catch (e) { toast("Not remembered: " + e.message, { bad: true }); }
+    const rp = CalCommute.rememberPlace({ title: t.nextTitle || ev.title, address: o.address, lat: o.lat, lng: o.lng });
+    if (rp) res.t = await cmPutRemembered(rp);
+    else if (rememberLoc) res.t = { ok: false, error: "that title cannot be kept" };   // two switches on: say so rather than leave it out of the one message
   }
   if (rememberLoc) {
-    const t = cmTarget(ev), rl = CalCommute.rememberLocation({ text: t.locText, address: o.address, lat: o.lat, lng: o.lng });
-    if (rl) try {
-      const old = (CM.places || []).find((p) => p.category === "commute-for" && p.list === rl.list); if (old) rl.id = old.id;
-      const d = await send("/quest/places", "POST", { op: "put", place: rl });
-      CM.places = (CM.places || []).filter((p) => p.id !== d.place.id).concat(d.place); toast(`Remembered "${t.locText}"`);
-    } catch (e) { toast("Not remembered: " + e.message, { bad: true }); }
+    const rl = CalCommute.rememberLocation({ text: t.locText, address: o.address, lat: o.lat, lng: o.lng });
+    res.l = rl ? await cmPutRemembered(rl) : { ok: false, error: "nothing to keep for that text" };
   }
+  const m = res.t || res.l ? CalCommute.rememberToast({ title: t.nextTitle || ev.title, text: t.locText, t: res.t, l: res.l }) : null;
+  if (m) toast(m.text, { bad: m.bad });
   cmPaint(); cmDirections(ev); await cmLoadNotes(ev); cmPaint();
 }
 async function cmFound(text) {
@@ -3316,6 +3337,7 @@ async function cmAct(t) {
   else if (d.cm === "pickto") { const p = (CM.places || []).find((x) => x.id === d.id); if (p) { const rem = $("#cmRem"), rl = $("#cmRemLoc"); cmSugClose(); cmSetTarget(ev, { name: p.name, address: p.address || p.name, lat: p.lat, lng: p.lng, id: p.id }, rem && rem.checked, rl && rl.checked); } }
   else if (d.cm === "rmmode") { CM.rm = !CM.rm; cmPaint(); const b = $('[data-cm="rmmode"]'); if (b) b.focus(); }
   else if (d.cm === "rmplace") await cmRemovePlace(d.id);
+  else if (d.cm === "forgetloc") await cmForgetLoc(ev, d.id);
   else if (d.cm === "sug") await cmPickSuggestion(ev, d.pid);
   else if (d.cm === "home") {
     const v = ($("#cmHomeIn").value || "").trim(); if (!v) return;
