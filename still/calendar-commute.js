@@ -29,6 +29,18 @@
       category: "commute-for", list: "for:" + key, notes: "Where the Commute block before this event goes", savedBy: "Calendar" };
   }
 
+  /** "Studio 509A" → "studio 509a": what "Remember this place" for a Location text matches on. Whole text only; numbers are kept
+      (unlike titleKey), so "Studio 5" and "Studio 509A" are two texts. */
+  function locationKey(t) {
+    return clean(String(t == null ? "" : t).toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, " "));
+  }
+  /** The place saved by "Remember <Location text> as this place" (same category as rememberPlace, key "loc:"; still-api stores both as free text). */
+  function rememberLocation({ text, address, lat, lng }) {
+    const key = locationKey(text); if (!key || !clean(address)) return null;
+    return { name: clean(text).slice(0, 200), address: clean(address), lat: lat == null ? null : lat, lng: lng == null ? null : lng,
+      category: "commute-for", list: "loc:" + key, notes: "Where the Commute block goes when an event's Location is this text", savedBy: "Calendar" };
+  }
+
   /** The next timed event on the block's day that begins when the block ends or later (not all-day, not a suggestion,
       not another Commute block). */
   function nextEvent(ev, events, tz) {
@@ -46,10 +58,13 @@
       start at Home too: then source "none" means ask. With no Home saved, "none" as before. */
   function target({ ev, events, tz, remembered = [], typed = null, home = null, from = null }) {
     const next = nextEvent(ev, events || [], tz), nextTitle = next ? next.title : "";
-    const out = (source, o) => ({ source, address: clean(o.address), lat: o.lat == null ? null : o.lat, lng: o.lng == null ? null : o.lng, id: o.id || "", nextTitle, name: clean(o.name) });
+    const locOf = clean(ev.location) || (next ? clean(next.location) : "");   // the Location text a To would come from, kept even when a typed place wins (the page offers to remember it)
+    const out = (source, o) => ({ source, address: clean(o.address), lat: o.lat == null ? null : o.lat, lng: o.lng == null ? null : o.lng, id: o.id || "", nextTitle, name: clean(o.name), locText: locOf });
+    /** A remembered "loc:" row for this Location text (whole text, same key), else null. */
+    const forText = (text) => { const k = locationKey(text); return k ? remembered.find((p) => p && p.category === "commute-for" && p.list === "loc:" + k && clean(p.address)) || null : null; };
     if (typed && clean(typed.address)) return out("typed", typed);
-    if (clean(ev.location)) return out("block", { address: ev.location });
-    if (next && clean(next.location)) return out("next", { address: next.location, name: next.title });
+    if (clean(ev.location)) { const m = forText(ev.location); return m ? out("location", { ...m, name: clean(ev.location) }) : out("block", { address: ev.location }); }
+    if (next && clean(next.location)) { const m = forText(next.location); return m ? out("location", { ...m, name: clean(next.location) }) : out("next", { address: next.location, name: next.title }); }
     const key = next ? titleKey(next.title) : "";
     const mem = key && remembered.find((p) => p.category === "commute-for" && p.list === "for:" + key);
     if (mem) return out("remembered", { ...mem, name: "" });   // its saved name is the event title, not a place name
@@ -360,5 +375,5 @@
     return e || "No directions for this way.";
   }
 
-  root.CalCommute = { checkedLine, onRoute, alertLine, noRouteText, blockEnded, missingHour, RAIN_CODES: RAIN, SNOW_CODES: SNOW, arriveTarget, leaveBy, arriveLine, bestWay, quickerThan, alertsFor, groupAlerts, leaveShift, autoCheckDue, decodePolyline, WAY, CHIP, mapsLink, organicMapsLink, placesAskable, readSuggestions, readPlace, locationText, keepPlace, alreadyKept, savedChips, removableChip, anyRemovable, rowText, weatherUrl, weatherPlace, weatherKey, weatherWords, pickHour, weatherWindow, outsideMinutes, weatherTip, weatherCard, wxFresh, WX_TEXT, titleKey, rememberPlace, nextEvent, target, needsAsk, samePlace, previousPlace, fromFor, stepDur, placeKey, fitSize, TRAVELMODE };
+  root.CalCommute = { checkedLine, onRoute, alertLine, noRouteText, blockEnded, missingHour, RAIN_CODES: RAIN, SNOW_CODES: SNOW, arriveTarget, leaveBy, arriveLine, bestWay, quickerThan, alertsFor, groupAlerts, leaveShift, autoCheckDue, decodePolyline, WAY, CHIP, mapsLink, organicMapsLink, placesAskable, readSuggestions, readPlace, locationText, keepPlace, alreadyKept, savedChips, removableChip, anyRemovable, rowText, weatherUrl, weatherPlace, weatherKey, weatherWords, pickHour, weatherWindow, outsideMinutes, weatherTip, weatherCard, wxFresh, WX_TEXT, titleKey, rememberPlace, locationKey, rememberLocation, nextEvent, target, needsAsk, samePlace, previousPlace, fromFor, stepDur, placeKey, fitSize, TRAVELMODE };
 })(typeof window !== "undefined" ? window : globalThis);
