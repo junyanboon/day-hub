@@ -234,7 +234,7 @@ test("the To line shows the place's name over its address when one was picked, f
 
 test("page: the second switch, the load of places, the suggestion draw, the gym wording and the stamps", () => {
   const html = fs.readFileSync(fileURLToPath(new URL("../calendar.html", import.meta.url)), "utf8");
-  assert.match(html, /const BUILD = "2026-11-25i suggested commute blocks";/);
+  assert.match(html, /const BUILD = "2026-11-25j suggested commute blocks";/);
   assert.match(html, /calendar-commute\.js\?v=9/);
   assert.match(html, /calendar-core\.js\?v=34"/, "the core is unchanged");
   assert.match(html, /id="cmSuggSw"/);
@@ -262,6 +262,6 @@ test("no suggestion when an earlier plan still runs at the start (overlap), and 
   const longer = ev("p", "Workshop", "2026-11-26T13:00:00Z", "2026-11-26T16:00:00Z", { location: "5 Far Ave" });
   assert.equal(one([e, longer]).length, 0, "the workshop covers the start");
   const html = fs.readFileSync(fileURLToPath(new URL("../calendar.html", import.meta.url)), "utf8");
-  assert.match(html, /const cm0 = CM\.places !== null;/);
+  assert.match(html, /const cm0 = CM\.places !== null \|\| CM\.placesTried;/);
   assert.match(html, /cmCal = S\.cmSuggest && cm0 && homeCal\(\)/);
 });

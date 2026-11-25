@@ -1029,7 +1029,7 @@ if (TOUCH) for (const g of ["gesturestart", "gesturechange"]) document.addEventL
    which shows this build, the phone's answers and a log of every day change with its cause. Until then CalHook.on is
    null and diag() does nothing. BUILD names this copy of the page, so a screenshot proves which copy ran: change it on
    every change to this page or calendar-readout.js (the date plus a letter). */
-const BUILD = "2026-11-25i suggested commute blocks";
+const BUILD = "2026-11-25j suggested commute blocks";
 const CalHook = window.CalHook = { BUILD, on: null };
 const diag = (kind, msg) => { if (CalHook.on) CalHook.on(kind, msg); };
 /* The iPhone home screen app's fit (2026-11-12): html.hs in a home screen app on touch, html.hsfill and --hsgap when
@@ -1201,7 +1201,7 @@ const ownCal = () => S.cals.find((c) => c.writable && c.name === "Junyan") || ho
 function routineSkips() { try { return JSON.parse(store.get(RSKIP) || "{}"); } catch { return {}; } }
 function autoGhosts(days, evs) {
   if (!authed()) return [];
-  const cm0 = CM.places !== null;   // the Commute suggestions wait for his places (Home, taught places), so none flashes up and goes
+  const cm0 = CM.places !== null || CM.placesTried;   // the Commute suggestions wait for the places read to finish (found or failed), so none flashes up and goes
   const cal = S.routine && ownCal(), cmCal = S.cmSuggest && cm0 && homeCal(); if (!cal && !cmCal) return [];
   const t = today(), now = Date.now(), skip = routineSkips(), out = [];
   // his own time: timed plans on calendars he can write, not studio shifts (they are other people's)
@@ -1264,6 +1264,7 @@ async function refresh(force) {
 async function cmLoadPlaces() {
   if (CM.places !== null) return;
   try { const d = await api("/quest/places"); if (CM.places === null) CM.places = d.places || []; } catch (e) { /* no places: no name-based suggestions, no message */ }
+  CM.placesTried = true;
 }
 async function loadSide() {
   if (!authed()) return;
@@ -2772,7 +2773,7 @@ const CMS = makePlaceList({ id: "cmSug", rowAttr: 'data-cm="sug"', ready: () => 
   nearOf: (side) => { const ev = S.ev, other = ev && (side === "from" ? cmTarget(ev) : cmFrom(ev)); return other && (other.lat != null && other.lng != null ? other : cmSpot(other)); } });
 /** The Location row of the phone sheet: a point is known only from Home's saved coordinates (nobody is asked just for the bias). */
 const LOC = makePlaceList({ id: "locSug", rowAttr: 'data-loc="sug"', nearOf: () => { const h = cmHome(); return h && h.lat != null && h.lng != null ? h : null; } });
-const CM = { noPin: {}, dir: {}, places: null, loading: false, notes: null, edit: "", editFrom: false, rm: false, key: "", run: 0, routes: {}, loaded: {}, up: false };
+const CM = { noPin: {}, dir: {}, places: null, placesTried: false, loading: false, notes: null, edit: "", editFrom: false, rm: false, key: "", run: 0, routes: {}, loaded: {}, up: false };
 const cmGet = (k) => { try { const v = JSON.parse(store.get(k) || "{}"); return v && typeof v === "object" ? v : {}; } catch { return {}; } };
 const cmSet = (k, key, val) => { const o = cmGet(k); if (val) o[key] = val; else delete o[key]; store.set(k, JSON.stringify(o)); };
 const cmHome = () => (CM.places || []).find((p) => p.category === "home" || /^home$/i.test(p.name || "")) || null;
