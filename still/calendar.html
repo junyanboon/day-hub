@@ -13,8 +13,8 @@
 <meta name="apple-mobile-web-app-title" content="Calendar">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>Calendar</title>
-<script src="calendar-core.js?v=34"></script>
-<script src="calendar-commute.js?v=11"></script>
+<script src="calendar-core.js?v=35"></script>
+<script src="calendar-commute.js?v=12"></script>
 <script src="cards-vault.js?v=2"></script><script src="cards.js?v=7"></script>
 <script src="quest-trips.js?v=20261121a" data-helpers></script>
 <script>
@@ -1032,7 +1032,7 @@ if (TOUCH) for (const g of ["gesturestart", "gesturechange"]) document.addEventL
    which shows this build, the phone's answers and a log of every day change with its cause. Until then CalHook.on is
    null and diag() does nothing. BUILD names this copy of the page, so a screenshot proves which copy ran: change it on
    every change to this page or calendar-readout.js (the date plus a letter). */
-const BUILD = "2026-11-25l commute trip bar";
+const BUILD = "2026-11-25m trip home";
 const CalHook = window.CalHook = { BUILD, on: null };
 const diag = (kind, msg) => { if (CalHook.on) CalHook.on(kind, msg); };
 /* The iPhone home screen app's fit (2026-11-12): html.hs in a home screen app on touch, html.hsfill and --hsgap when
@@ -1197,7 +1197,7 @@ function ghosts() {
     .concat(S.autoG);
 }
 /* The day's own blocks (C.routineBlocks): Domestic, and Wind Down, Sleep and Morning Routine back to back, suggested on
-   today and later days from his free time. They are worked out here, not stored: Accept writes the event to his own
+   today and later days from his free time (today's Domestic and Commute suggestions stay after their time has passed, d68 and d70). They are worked out here, not stored: Accept writes the event to his own
    calendar, Skip is kept in this browser for that day (Junyan, 2026-11-21). Settings can turn them off. */
 const RSKIP = "cal-routine-skip";
 const ownCal = () => S.cals.find((c) => c.writable && c.name === "Junyan") || homeCal();
@@ -1212,9 +1212,9 @@ function autoGhosts(days, evs) {
   for (const d of days) {
     if (d < t) continue;
     const a = C.instant(d, 0, S.tz), z = C.instant(C.addDays(d, 2), 0, S.tz);   // that day and the next morning only
-    for (const b of cal ? C.routineBlocks(d, mine.filter((e) => e.e > a && e.s < z), S.tz, d === t ? now : 0) : []) {
+    for (const b of cal ? C.routineBlocks(d, mine.filter((e) => e.e > a && e.s < z), S.tz) : []) {
       const id = `auto:${b.key}:${d}`;
-      if (skip[id] || b.e <= now) continue;
+      if (skip[id] || (b.e <= now && b.key !== "domestic")) continue;   // Domestic stays after its time has passed, so it can be accepted late (d70)
       out.push({ id, auto: true, ghost: true, status: "open", allDay: false, calId: cal.id, title: b.title, kind: b.kind, k: b.kind,
         s: b.s, e: b.e, start: new Date(b.s).toISOString(), end: new Date(b.e).toISOString(), by: "the calendar", why: b.why });
     }
@@ -1222,7 +1222,7 @@ function autoGhosts(days, evs) {
        taught, so drawing one asks Google for nothing; Accept writes it to the calendar new events go to, and only opening it asks for directions. */
     for (const b of cmCal ? CalCommute.commuteSuggestions({ day: d, events: mine, remembered: CM.places || [], home: cmHome(), tz: S.tz, now }) : []) {
       const id = `auto:${b.key}:${d}`;
-      if (skip[id] || b.e <= now) continue;
+      if (skip[id]) continue;   // an earlier Commute suggestion stays until the day ends (d68; the rule already drops past days)
       out.push({ id, auto: true, ghost: true, status: "open", allDay: false, calId: cmCal.id, title: b.title, kind: b.kind, k: b.kind,
         s: b.s, e: b.e, start: new Date(b.s).toISOString(), end: new Date(b.e).toISOString(), by: "the calendar", why: b.why });
     }
@@ -2794,7 +2794,7 @@ const cmFromPicked = (ev) => (cmRoute(ev) && cmRoute(ev).from) || cmGet(CMK.from
 const cmTarget = (ev) => CalCommute.target({ ev, events: eventsFor(cmDay(ev), cmDay(ev)), tz: S.tz, remembered: CM.places || [], typed: cmTyped(ev), home: cmHome(), from: cmFrom(ev) });
 const cmTargetOf = cmTarget;   // the From rule asks the same question of the blocks before this one
 function cmFrom(ev) {
-  return CalCommute.fromFor({ ev, events: eventsFor(cmDay(ev), cmDay(ev)), tz: S.tz, targetOf: cmTargetOf, picked: cmFromPicked(ev), home: cmHome() });
+  return CalCommute.fromFor({ ev, events: eventsFor(cmDay(ev), cmDay(ev)), tz: S.tz, targetOf: cmTargetOf, picked: cmFromPicked(ev), home: cmHome(), remembered: CM.places || [] });
 }
 const cmPlaceBody = (o) => ({ name: o.name || "", address: o.address || "", lat: o.lat == null ? null : o.lat, lng: o.lng == null ? null : o.lng, id: o.id || "" });
 /** Save one end of a block's route on the server (side "to" or "from"; o null clears it). false when the server cannot be reached. */
@@ -3332,7 +3332,7 @@ async function cmSetFrom(ev, o) {
 /** "Home" on the From line. Where the block's own rule already starts at Home this is "Back to Home" (the pick is cleared); where
     it would start at the place before (or nowhere), Home is saved as the pick so the From really reads Home. */
 async function cmFromHome(ev) {
-  const home = cmHome(), auto = CalCommute.fromFor({ ev, events: eventsFor(cmDay(ev), cmDay(ev)), tz: S.tz, targetOf: cmTargetOf, picked: null, home });
+  const home = cmHome(), auto = CalCommute.fromFor({ ev, events: eventsFor(cmDay(ev), cmDay(ev)), tz: S.tz, targetOf: cmTargetOf, picked: null, home, remembered: CM.places || [] });
   cmSugClose();
   if (!home || !auto || auto.name === "Home" || CalCommute.samePlace(auto, home)) {
     if (await cmSaveRoute(ev, "from", null)) { CM.editFrom = false; cmPaint(); cmDirections(ev); } else toast("Not changed: the server could not be reached. Try again.", { bad: true });

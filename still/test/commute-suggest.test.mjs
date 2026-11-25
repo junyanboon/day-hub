@@ -17,7 +17,7 @@ const HOME = { id: "home1", name: "Home", category: "home", address: "100 Queen 
 const forRow = (list, address, x = {}) => ({ id: "r-" + list, category: "commute-for", list, address, name: "x", lat: 43.7, lng: -79.4, ...x });
 const run = (events, o = {}) => K.commuteSuggestions({ day: DAY, events, remembered: [], home: HOME, tz: TZ, now: NOW, ...o });
 /** the suggestion for the event with id dm only (other events in a case carry places of their own and get theirs) */
-const one = (events, o = {}) => run(events, o).filter((s) => s.forId === "dm");
+const one = (events, o = {}) => run(events, o).filter((s) => s.forId === "dm" && s.why !== "Home");   // the "To X" one; the trip home (why "Home", d67) has its own tests below
 // 10:00 to 11:00 in Toronto (15:00Z to 16:00Z)
 const dm = (x = {}) => ev("dm", "DM Advanced Training", "2026-11-26T15:00:00Z", "2026-11-26T16:00:00Z", x);
 
@@ -35,7 +35,8 @@ test("the key is unique per event and the same every time", () => {
   const a = dm({ location: "A St" }), b = ev("zz", "Zouk", "2026-11-26T18:00:00Z", "2026-11-26T19:00:00Z", { location: "B St" });
   const c = ev("zz", "Zouk", "2026-11-26T18:00:00Z", "2026-11-26T19:00:00Z", { location: "B St", calId: "junyan" });
   const keys = run([a, b, c]).map((s) => s.key);
-  assert.equal(new Set(keys).size, 3, "even the same id on another calendar");
+  assert.equal(new Set(keys).size, keys.length, "even the same id on another calendar, trip homes included");
+  assert.equal(run([a, b, c]).filter((s) => s.why !== "Home").length, 3);
   assert.deepEqual(run([a, b, c]).map((s) => s.key), keys);
 });
 
@@ -130,15 +131,15 @@ test("when the block before ends inside the 30 minutes the suggestion starts whe
   assert.equal(d.e - d.s, 30 * MIN, "ended well before: the full 30");
 });
 
-test("today and later only: nothing for an event that has started or ended", () => {
+test("d68: on today's date the suggestion stays after its event has started or ended; a day before today has none", () => {
   const e = dm({ location: "388 Carlaw Ave" });
-  assert.equal(one([e], { now: at("2026-11-26T15:00:00Z") }).length, 0, "starts right now: it has started");
-  assert.equal(one([e], { now: at("2026-11-26T15:30:00Z") }).length, 0);
+  for (const now of ["2026-11-26T15:00:00Z", "2026-11-26T15:30:00Z", "2026-11-26T22:45:00Z", "2026-11-27T04:59:00Z"]) {
+    assert.equal(one([e], { now: at(now) }).length, 1, "still shown at " + now + " (until the day ends in Toronto)");
+  }
   assert.equal(one([e], { now: at("2026-11-26T14:59:00Z") }).length, 1, "one minute before it starts");
-  const soon = one([e], { now: at("2026-11-26T14:45:00Z") })[0];
-  assert.equal(soon.e > at("2026-11-26T14:45:00Z"), true, "not over yet");
+  assert.equal(one([e], { now: at("2026-11-27T05:00:00Z") }).length, 0, "the day is over (midnight in Toronto): a past day shows none");
   assert.equal(one([e], { day: "2026-11-27" }).length, 0, "another day has no such event");
-  assert.equal(run([ev("t", "Later", "2026-11-27T15:00:00Z", "2026-11-27T16:00:00Z", { location: "5 Far Ave" })], { day: "2026-11-27" }).length, 1);
+  assert.equal(run([ev("t", "Later", "2026-11-27T15:00:00Z", "2026-11-27T16:00:00Z", { location: "5 Far Ave" })], { day: "2026-11-27" }).filter((s) => s.why !== "Home").length, 1, "a future day is unchanged");
 });
 
 test("only his own timed events: not all-day, not a suggestion, not itself a Commute block", () => {
@@ -151,7 +152,7 @@ test("only his own timed events: not all-day, not a suggestion, not itself a Com
 test("a Commute suggestion is listed for each event of the day and never for one it already covers", () => {
   const a = dm({ location: "388 Carlaw Ave" });
   const b = ev("b", "Zouk Training", "2026-11-26T20:00:00Z", "2026-11-26T21:30:00Z", { location: "527 Bloor St W" });
-  const out = run([a, b]);
+  const out = run([a, b]).filter((s) => s.why !== "Home");
   assert.deepEqual(out.map((s) => s.why), ["To DM Advanced Training", "To Zouk Training"]);
   assert.equal(out[1].s, at("2026-11-26T19:30:00Z"));
 });
@@ -177,11 +178,11 @@ test("gym: the suggestion rule and the block's To use the same lookup", () => {
   const shared = [forRow("for:gym", "800 Dunfield Ave, Toronto")];
   const jack = ev("j", "Gym · Jack Woods", "2026-11-26T22:00:00Z", "2026-11-26T23:00:00Z");
   assert.equal(run([jack]).length, 0, "nothing taught yet");
-  const out = run([jack], { remembered: shared });
+  const out = run([jack], { remembered: shared }).filter((s) => s.why !== "Home");
   assert.equal(out.length, 1);
   assert.equal(out[0].why, "To Gym · Jack Woods");
   const matt = ev("m", "Gym · Matthew I. Smith", "2026-11-26T22:00:00Z", "2026-11-26T23:00:00Z");
-  assert.equal(run([matt], { remembered: shared }).length, 1, "a new gym name matches too");
+  assert.equal(run([matt], { remembered: shared }).filter((s) => s.why !== "Home").length, 1, "a new gym name matches too");
   const block = ev("cm", "Commute", "2026-11-26T21:30:00Z", "2026-11-26T22:00:00Z");
   const t = K.target({ ev: block, events: [block, matt], tz: TZ, remembered: shared });
   assert.deepEqual([t.source, t.address], ["remembered", "800 Dunfield Ave, Toronto"]);
@@ -234,9 +235,9 @@ test("the To line shows the place's name over its address when one was picked, f
 
 test("page: the second switch, the load of places, the suggestion draw, the gym wording and the stamps", () => {
   const html = fs.readFileSync(fileURLToPath(new URL("../calendar.html", import.meta.url)), "utf8");
-  assert.match(html, /const BUILD = "2026-11-25l commute trip bar";/);
-  assert.match(html, /calendar-commute\.js\?v=11/);
-  assert.match(html, /calendar-core\.js\?v=34"/, "the core is unchanged");
+  assert.match(html, /const BUILD = "2026-11-25m trip home";/);
+  assert.match(html, /calendar-commute\.js\?v=12/);
+  assert.match(html, /calendar-core\.js\?v=35"/, "the core moved on (d70 Domestic)");
   assert.match(html, /id="cmSuggSw"/);
   assert.match(html, /Suggest a Commute block before plans away from home/);
   assert.match(html, /store\.get\("cal-commute-suggest"\) !== "0"/, "on by default, its own store key");
@@ -264,4 +265,143 @@ test("no suggestion when an earlier plan still runs at the start (overlap), and 
   const html = fs.readFileSync(fileURLToPath(new URL("../calendar.html", import.meta.url)), "utf8");
   assert.match(html, /const cm0 = CM\.places !== null \|\| CM\.placesTried;/);
   assert.match(html, /cmCal = S\.cmSuggest && cm0 && homeCal\(\)/);
+});
+
+/* ---- d67 (Junyan, 2026-11-25: "67 yes"): the trip home ---- */
+// His Wed Nov 25 (EST, Z minus 5): 12 pm Drive (a Commute block), 12:30 to 2 pm Samba at 509 Bloor St W, 2 to 2:30 pm Pickup Xmas Decor,
+// free 2:30 to 3 pm, 3 pm Nutty pudding (at home, no place).
+const D25 = "2026-11-25";
+const Z = (hm) => "2026-11-25T" + hm + ":00Z";
+const day25 = (pickup = {}) => [
+  ev("drive", "Drive", Z("17:00"), Z("17:30"), { kind: "commute" }),
+  ev("samba", "Samba Rehearsal w/ Maja", Z("17:30"), Z("19:00"), { location: "509 Bloor St W, Toronto" }),
+  ev("pick", "Pickup Xmas Decor from Studio 693", Z("19:00"), Z("19:30"), pickup),
+  ev("nutty", "Nutty pudding", Z("20:00"), Z("21:00")),
+];
+const runDay = (events, o = {}) => run(events, { day: D25, now: at(Z("22:45")), ...o });
+const home = (list) => list.filter((s) => s.why === "Home");
+
+test("d67: his screenshot day gives a trip home at 2:30 to 3:00 pm, whatever place Pickup has or lacks", () => {
+  for (const [name, pickup] of [["no place", {}], ["the same place as Samba", { location: "509 Bloor St W, Toronto" }], ["a different away place", { location: "693 Queen St W, Toronto" }]]) {
+    const h = home(runDay(day25(pickup)));
+    assert.equal(h.length, 1, "Pickup with " + name + ": exactly one trip home");
+    assert.deepEqual([h[0].title, h[0].kind, h[0].s, h[0].e], ["Commute", "commute", at(Z("19:30")), at(Z("20:00"))], name);
+    assert.match(h[0].key, /^\w+$/);
+  }
+});
+
+test("d67: the key is its own, never the 'To X' key of the same plan", () => {
+  const out = runDay(day25({ location: "693 Queen St W, Toronto" }));
+  const keys = out.map((s) => s.key);
+  assert.equal(new Set(keys).size, keys.length);
+  const h = home(out)[0], to = out.find((s) => s.forId === "pick");
+  assert.ok(to, "Pickup at a different away place also has its To suggestion");
+  assert.notEqual(h.key, to.key);
+  assert.match(h.key, /^cm_h/, "'cm' plus a base 36 hash can never contain the underscore");
+  assert.match(`auto:${h.key}:${D25}`, /^auto:(\w+):(.+)$/);
+});
+
+test("d67: nothing planned later: the trip home starts when the away plan ends and runs 30 minutes", () => {
+  const h = home(run([dm({ location: "388 Carlaw Ave" })]));
+  assert.deepEqual([h.length, h[0].s, h[0].e, h[0].why, h[0].forId], [1, at("2026-11-26T16:00:00Z"), at("2026-11-26T16:30:00Z"), "Home", "dm"]);
+});
+
+test("d67: it shrinks to end when the next plan starts, and is not suggested under 15 minutes", () => {
+  const a = dm({ location: "388 Carlaw Ave" });
+  const next = (z) => ev("n", "Tea", z, "2026-11-26T18:00:00Z");
+  const t20 = home(run([a, next("2026-11-26T16:20:00Z")]));
+  assert.deepEqual([t20[0].s, t20[0].e], [at("2026-11-26T16:00:00Z"), at("2026-11-26T16:20:00Z")], "20 minutes fit: 20 minutes");
+  const t15 = home(run([a, next("2026-11-26T16:15:00Z")]));
+  assert.equal(t15[0].e - t15[0].s, 15 * MIN, "15 minutes fit: the floor");
+  assert.equal(home(run([a, next("2026-11-26T16:14:00Z")])).length, 0, "14 minutes: none");
+  assert.equal(home(run([a, next("2026-11-26T16:30:00Z")]))[0].e - at("2026-11-26T16:00:00Z"), 30 * MIN, "30 or more: 30");
+});
+
+test("d67: a plan with no place counts as home; so does one whose Location says Home or is Home's address", () => {
+  const a = dm({ location: "388 Carlaw Ave" });
+  const later = (x) => ev("n", "Tea", "2026-11-26T17:00:00Z", "2026-11-26T18:00:00Z", x);
+  const afterDm = (list) => home(list).filter((s) => s.forId === "dm");
+  for (const x of [{}, { location: "Home" }, { location: "100 Queen St W, Toronto" }]) assert.equal(afterDm(run([a, later(x)])).length, 1, JSON.stringify(x));
+  assert.equal(afterDm(run([a, later({ location: "5 Far Ave" })])).length, 0, "another away place: the 'To X' suggestion covers it");
+  assert.equal(afterDm(run([a, later({ location: "388 Carlaw Ave" })])).length, 0, "the same away place: no trip at all");
+});
+
+test("d67: none when a Commute block already sits between the away plan and the next home plan", () => {
+  const a = dm({ location: "388 Carlaw Ave" });
+  const later = ev("n", "Tea", "2026-11-26T18:00:00Z", "2026-11-26T19:00:00Z");
+  const c = ev("c", "Commute", "2026-11-26T16:30:00Z", "2026-11-26T17:00:00Z", { kind: "commute" });
+  assert.equal(home(run([a, later, c])).length, 0);
+  assert.equal(home(run([a, c])).length, 0, "with nothing planned after, too");
+  const before = ev("b", "Commute", "2026-11-26T14:30:00Z", "2026-11-26T15:00:00Z", { kind: "commute" });
+  assert.equal(home(run([a, later, before])).length, 1, "the Commute that got him there does not count");
+});
+
+test("d67: it skips over what sits right after the away plan, never sits on a plan, and leaves a plan with a place of its own to its own trip", () => {
+  const a = dm({ location: "388 Carlaw Ave" });
+  const chain = [a, ev("x", "Call", "2026-11-26T16:00:00Z", "2026-11-26T16:20:00Z"), ev("y", "Email", "2026-11-26T16:20:00Z", "2026-11-26T16:40:00Z"), ev("n", "Tea", "2026-11-26T18:00:00Z", "2026-11-26T19:00:00Z")];
+  const h = home(run(chain));
+  assert.deepEqual([h[0].s, h[0].e], [at("2026-11-26T16:40:00Z"), at("2026-11-26T17:10:00Z")]);
+  const overlap = [a, ev("x", "Long call", "2026-11-26T15:30:00Z", "2026-11-26T16:50:00Z")];
+  assert.equal(home(run(overlap))[0].s, at("2026-11-26T16:50:00Z"), "a plan still running when it ends");
+  const homePlan = [a, ev("x", "Lunch", "2026-11-26T16:00:00Z", "2026-11-26T16:30:00Z", { location: "Home" }), ev("n", "Tea", "2026-11-26T18:00:00Z", "2026-11-26T19:00:00Z")];
+  assert.equal(home(run(homePlan)).length, 0, "back to back with a plan at Home: he is home already");
+  const away = [a, ev("x", "Call", "2026-11-26T16:00:00Z", "2026-11-26T16:30:00Z"), ev("z", "Dinner", "2026-11-26T16:30:00Z", "2026-11-26T17:30:00Z", { location: "9 Other Ave" })];
+  assert.equal(home(run(away)).map((s) => s.forId).join(), "z", "the trip home belongs to the plan the day ends on, once");
+});
+
+test("d67: a trip home never overlaps a 'To X' suggestion; it stops at the day's end; none for all-day, ghost or Home plans", () => {
+  const a = dm({ location: "388 Carlaw Ave" });
+  const tea = ev("t", "Tea", "2026-11-26T16:00:00Z", "2026-11-26T16:30:00Z");
+  const dinner = ev("d", "Dinner", "2026-11-26T16:45:00Z", "2026-11-26T17:45:00Z", { location: "9 Other Ave" });
+  const out = run([a, tea, dinner]);
+  assert.equal(home(out).filter((s) => s.forId === "dm").length, 0, "16:30 to 16:45 would be a trip home, but Dinner's own To suggestion sits on it");
+  assert.equal(out.filter((s) => s.forId === "d" && s.why !== "Home").length, 1);
+  for (const x of out) for (const y of out) if (x !== y) assert.ok(x.e <= y.s || y.e <= x.s, "no two suggestions overlap");
+  const late = ev("l", "Late show", "2026-11-27T04:20:00Z", "2026-11-27T04:40:00Z", { location: "388 Carlaw Ave" });
+  assert.equal(home(run([late]))[0].e, at("2026-11-27T05:00:00Z"), "ends at midnight Toronto at the latest");
+  assert.equal(home(run([dm({ location: "388 Carlaw Ave", allDay: true })])).length, 0);
+  assert.equal(home(run([dm({ location: "388 Carlaw Ave", ghost: true })])).length, 0);
+  assert.equal(home(run([dm({ location: "100 Queen St W, Toronto" })])).length, 0, "a plan at Home needs no trip home");
+  assert.equal(home(run([dm({})])).length, 0, "a plan with no place needs none");
+});
+
+test("d67: the page draws it from the same switch, Skip and calendar as the To suggestions, and Domestic stays after it has passed", () => {
+  const html = fs.readFileSync(fileURLToPath(new URL("../calendar.html", import.meta.url)), "utf8");
+  const draw = html.slice(html.indexOf("function autoGhosts"), html.indexOf("/** Studio shifts"));
+  assert.match(draw, /CalCommute\.commuteSuggestions\(/, "one call draws both kinds, behind S.cmSuggest, skip[id] and homeCal()");
+  assert.match(draw, /skip\[id\] \|\| \(b\.e <= now && b\.key !== "domestic"\)/, "an ended Domestic stays; the night blocks still go");
+  const commuteLoop = draw.slice(draw.indexOf("commuteSuggestions"));
+  assert.doesNotMatch(commuteLoop.split("}")[0], /b\.e <= now/, "an earlier Commute suggestion is not hidden by the clock");
+  assert.match(commuteLoop, /if \(skip\[id\]\) continue;/);
+  assert.match(draw, /C\.routineBlocks\(d, mine\.filter\(\(e\) => e\.e > a && e\.s < z\), S\.tz\)/, "the routine search no longer takes the clock");
+});
+
+test("d67: an accepted trip home block opens with From the place he is leaving and To Home", () => {
+  const trip = ev("trip", "Commute", Z("19:30"), Z("20:00"), { kind: "commute" });
+  const targetOf = (x) => K.target({ ev: x, events: all, tz: TZ, remembered: [], home: HOME });
+  const view = (pickup, remembered = []) => {
+    all = [...day25(pickup), trip];
+    const to = K.target({ ev: trip, events: all, tz: TZ, remembered, home: HOME, from: K.fromFor({ ev: trip, events: all, tz: TZ, targetOf, remembered, home: HOME }) });
+    const from = K.fromFor({ ev: trip, events: all, tz: TZ, targetOf, remembered, home: HOME });
+    return { to, from };
+  };
+  let all = [];
+  let v = view({});
+  assert.deepEqual([v.to.source, v.to.name, v.to.address], ["home", "Home", HOME.address], "Nutty pudding has no place: Home");
+  assert.equal(v.from.address, "509 Bloor St W, Toronto", "Pickup has no place: he leaves Samba's");
+  v = view({ location: "693 Queen St W, Toronto" });
+  assert.equal(v.from.address, "693 Queen St W, Toronto", "Pickup is the plan he is leaving");
+  v = view({}, [forRow("for:pickup xmas decor from studio", "693 Queen St W, Toronto")]);
+  assert.equal(v.from.address, "693 Queen St W, Toronto", "a place remembered for Pickup's name counts, as it does for the suggestion");
+  // nothing planned after: still Home
+  all = [day25()[1], trip];
+  assert.deepEqual([K.target({ ev: trip, events: all, tz: TZ, home: HOME }).source, K.fromFor({ ev: trip, events: all, tz: TZ, targetOf, home: HOME }).address], ["home", "509 Bloor St W, Toronto"]);
+  // the next plan's Location says Home (or is Home's address): that is Home too, not a street named "Home"
+  for (const loc of ["Home", "100 Queen St W, Toronto"]) {
+    all = [day25()[1], trip, ev("n", "Nutty pudding", Z("20:00"), Z("21:00"), { location: loc })];
+    const t = K.target({ ev: trip, events: all, tz: TZ, home: HOME });
+    assert.deepEqual([t.source, t.name, t.address], ["home", "Home", HOME.address], loc);
+  }
+  all = [day25()[1], trip, ev("n", "Tea", Z("20:00"), Z("21:00"), { location: "5 Far Ave" })];
+  assert.equal(K.target({ ev: trip, events: all, tz: TZ, home: HOME }).source, "next", "an away next plan is still its own place");
 });
