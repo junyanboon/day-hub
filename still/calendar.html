@@ -2862,7 +2862,7 @@ function cmEndedInput(ev) {
   const arrive = CalCommute.arriveTarget(ev, eventsFor(cmDay(ev), cmDay(ev)), S.tz);
   return { t, from, arrive, sig: cmSig(from, t, arrive) };
 }
-/** A check that failed with nothing good held for this trip: hold the answer this browser kept for it (same sig), so the panel draws it and says why under it. No request. */
+/** A check that failed with nothing good held for this trip: hold the answer this browser kept for it (same sig), so the panel draws it (got = now keeps the 60 second guard: a repaint does not ask again) and says why under it. No request. */
 function cmRestored(d, stored, inp) {
   const k = CalCommute.restoredAfterFail({ held: d.res, heldSig: d.sig, stored, sig: inp.sig });
   if (!k) return null;
@@ -2885,8 +2885,7 @@ async function cmDirections(ev, { fresh = false, auto = false } = {}) {
     const res = await send("/quest/commute/directions", "POST", { from: cmEnd(inp.from), to: cmEnd(inp.t), arriveBy: new Date(inp.arrive.at).toISOString(), fresh });
     if (d.seq !== seq) return;   // a newer request replaced this one
     const restored = res && res.state !== "ok" ? cmRestored(d, stored, inp) : null;
-    if (restored) { d.note = CalCommute.notOkText(res); d.checked = wasChecked; }   // a failed first check after a reload shows the answer this browser kept for this trip
-    else if (!CalCommute.replacesHeld({ held: d.res, heldSig: d.sig, sig: inp.sig, res })) { d.note = CalCommute.notOkText(res); d.checked = wasChecked; }   // d45: a not-ok re-check never throws away the good directions he has
+    if (restored || !CalCommute.replacesHeld({ held: d.res, heldSig: d.sig, sig: inp.sig, res })) { d.note = CalCommute.notOkText(res); d.checked = wasChecked; }   // d45: a not-ok re-check never throws away the good directions he has
     else {
       d.prev = res.state === "ok" && before && before.state === "ok" ? before : null;
       d.res = res; d.got = Date.now(); d.sig = inp.sig;
