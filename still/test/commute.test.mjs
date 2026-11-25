@@ -428,23 +428,92 @@ test("d24: the open box has the label, the typing box with enterkeyhint go, the 
   const fn = html.slice(html.indexOf("function cmEditBox("), html.indexOf("function cmKeepTyped("));
   assert.match(fn, /enterkeyhint="go"/);
   let last = -1;
-  for (const w of ['<label class="lbl"', '<input id=', 'id="cmSug"', 'Saved places', 'Remember for every', '>Cancel<']) { const i = fn.indexOf(w); assert.ok(i > last, w + " out of order"); last = i; }
-  assert.match(fn, /\.\.\.\(home \? \[\{ id: home\.id, name: "Home" \}\] : \[\]\), \.\.\.saved/, "Home first when a home is saved");
+  for (const w of ['<label class="lbl"', '<input id=', 'id="cmSug"', 'id="cmKeep"', '>Saved places</p>', 'Remember for every', '>Cancel<']) { const i = fn.indexOf(w); assert.ok(i > last, w + " out of order"); last = i; }
+  assert.match(fn, /CalCommute\.savedChips\(CM\.places, home\)/, "Home first when a home is saved (the rule is tested above)");
 });
 test("d25: the page asks places after 300 ms and 3 characters, shows no error for 404, and says one soft line for stopped", async () => {
   const { readFileSync } = await import("node:fs");
   const html = readFileSync(new URL("../calendar.html", import.meta.url), "utf8");
   const src = html.slice(html.indexOf("/* commute:start */"), html.indexOf("/* commute:end */"));
-  assert.match(src, /setTimeout\(\(\) => cmAskPlaces\(side, q\), 300\)/);
+  assert.match(src, /setTimeout\(\(\) => L\.ask\(side, q\), 300\)/);
   assert.match(src, /\/quest\/commute\/places/); assert.match(src, /\/quest\/commute\/place"/);
   assert.match(src, /Place suggestions are off for the rest of the month\. Type the full address\./);
-  const ask = src.slice(src.indexOf("async function cmAskPlaces("), src.indexOf("/** A pin already known"));
+  const ask = src.slice(src.indexOf("L.ask = async ("), src.indexOf("return L;"));
   assert.match(ask, /catch \(e\) \{[^}]*\}/, "a failed request is swallowed");
   assert.doesNotMatch(ask, /toast\(/, "and never shown");
-  assert.match(ask, /CMS\.q !== q/, "a slow answer for changed text is dropped");
+  assert.match(ask, /L\.q !== q/, "a slow answer for changed text is dropped");
+});
+test("d28: one shared list piece serves the Commute box and the Location row, each with its own element, state and session", async () => {
+  const { readFileSync } = await import("node:fs");
+  const html = readFileSync(new URL("../calendar.html", import.meta.url), "utf8");
+  assert.equal((html.match(/function makePlaceList\(/g) || []).length, 1, "one list piece");
+  assert.match(html, /const CMS = makePlaceList\(\{ id: "cmSug"/); assert.match(html, /const LOC = makePlaceList\(\{ id: "locSug"/);
+  assert.equal((html.match(/\/quest\/commute\/places"/g) || []).length, 1, "the ask is written once");
+  assert.match(html, /<div class="cmsug locsug" id="locSug" aria-live="polite"><\/div>/, "announced like the Commute list");
+  assert.match(html, /data-f="location"[^>]*aria-controls="locSug"/);
+  assert.match(html, /\.cmsug button\{[^}]*min-height:44px/, "rows are 44px or taller");
+  const loc = html.slice(html.indexOf("const LOC = makePlaceList("), html.indexOf("const CM = {"));
+  assert.doesNotMatch(loc, /geocode\(|cmPin\(|cmFound\(/, "never geocode just for the bias");
+  const pick = html.slice(html.indexOf("async function locPick("), html.indexOf("async function cmAct("));
+  assert.match(pick, /CalCommute\.locationText\(o \|\| \{ name: x\.name, address: x\.sub \}\)/, "a failed lookup falls back to name and sub");
+  assert.match(pick, /sheetInput\(i\)/, "saved the way a typed Location is: through the sheet form and the Save button");
+  assert.doesNotMatch(pick, /patchEvent\(|createEvent\(/, "no new save path");
+});
+test("d29: the switch sits under the places list and above Saved places; a pick or Go with it on saves the place once", async () => {
+  const { readFileSync } = await import("node:fs");
+  const html = readFileSync(new URL("../calendar.html", import.meta.url), "utf8");
+  const fn = html.slice(html.indexOf("function cmEditBox("), html.indexOf("function cmKeepTyped("));
+  assert.ok(fn.indexOf('id="cmSug"') < fn.indexOf('id="cmKeep"') && fn.indexOf('id="cmKeep"') < fn.indexOf("Saved places"));
+  assert.match(fn, /role="switch" id="cmKeep"[^>]*> <span>Keep in Saved places<\/span>/);
+  assert.doesNotMatch(fn, /id="cmKeep"[^>]*checked/, "off every time a box opens");
+  const keep = html.slice(html.indexOf("async function cmKeepPlace("), html.indexOf("/** A row of the places list was tapped"));
+  assert.match(keep, /CalCommute\.keepPlace\(o\)/); assert.match(keep, /CalCommute\.alreadyKept\(CM\.places, place\)/);
+  assert.match(keep, /\/quest\/places", "POST", \{ op: "put", place \}/); assert.match(keep, /Saved to your places/);
 });
 test("d26: the page links Open in Organic Maps next to Open in Google Maps from the pure function", async () => {
   const { readFileSync } = await import("node:fs");
   const html = readFileSync(new URL("../calendar.html", import.meta.url), "utf8");
   assert.match(html, /Open in Organic Maps/); assert.match(html, /CalCommute\.organicMapsLink\(/);
+});
+
+/* ---- the Location row's places list and "Keep in Saved places" (Junyan, 2026-11-24, d28 to d30: "yes to all thre") ---- */
+test("d28: a picked place reads 'Name, full address' in Location; just the address when it already starts with the name", () => {
+  assert.equal(K.locationText({ name: "St. Michael's Hospital", address: "30 Bond St, Toronto, ON M5B 1W8" }), "St. Michael's Hospital, 30 Bond St, Toronto, ON M5B 1W8");
+  assert.equal(K.locationText({ name: "30 Bond St", address: "30 Bond St, Toronto, ON" }), "30 Bond St, Toronto, ON");
+  assert.equal(K.locationText({ name: "  30 BOND st ", address: "30 Bond St, Toronto" }), "30 Bond St, Toronto", "case and spaces ignored");
+  assert.equal(K.locationText({ name: "Saigon Lotus", address: "" }), "Saigon Lotus", "no address: the name alone");
+  assert.equal(K.locationText({ name: "Saigon Lotus", address: "Saigon Lotus" }), "Saigon Lotus");
+  // the call failed: the row's own words, name and sub
+  assert.equal(K.locationText({ name: "Saigon Lotus", address: "Queen St W, Toronto" }), "Saigon Lotus, Queen St W, Toronto");
+  assert.equal(K.locationText(null), "");
+});
+test("d29: a place is kept only with coordinates and something to call it, in the shape the server wants", () => {
+  const p = K.keepPlace({ name: "  Saigon Lotus ", address: "1 Queen St W, Toronto", lat: 43.65, lng: -79.38 });
+  assert.deepEqual(p, { name: "Saigon Lotus", address: "1 Queen St W, Toronto", lat: 43.65, lng: -79.38, category: "saved", savedBy: "Calendar", list: "", notes: "Kept from the Commute box" });
+  assert.equal(K.keepPlace({ name: "Nowhere", address: "Nowhere", lat: null, lng: null }), null, "no coordinates: not kept");
+  assert.equal(K.keepPlace({ name: "", address: "", lat: 1, lng: 2 }), null, "nothing to call it: not kept");
+  assert.equal(K.keepPlace(null), null);
+  assert.equal(K.keepPlace({ name: "Typed text", address: "Typed text", lat: 0, lng: 0 }).lat, 0, "0,0 is a spot, not missing");
+});
+test("d29: no second copy of a place already in the chips (same name and address, case and spaces ignored)", () => {
+  const places = [{ id: "a", name: "Saigon Lotus", address: "1 Queen St W, Toronto", lat: 1, lng: 2, category: "saved" }, { id: "b", name: "Cafe", address: "", category: "place" }];
+  assert.equal(K.alreadyKept(places, { name: "saigon  lotus", address: "1 queen st w,Toronto" }), true);
+  assert.equal(K.alreadyKept(places, { name: "Saigon Lotus", address: "2 Queen St W" }), false, "another address is another place");
+  assert.equal(K.alreadyKept(places, { name: "CAFE", address: "" }), true);
+  assert.equal(K.alreadyKept([], { name: "x", address: "y" }), false);
+  assert.equal(K.alreadyKept(null, { name: "x", address: "y" }), false);
+});
+test("d29: the Saved places chips show Home first, then kept places, then the Trips places as before (12 at most)", () => {
+  const home = { id: "h", name: "Home", category: "home", address: "1 Home St" };
+  const trips = Array.from({ length: 14 }, (_, i) => ({ id: "t" + i, name: "Trip " + i, category: "place", address: "x", lat: 1, lng: 1 }));
+  const kept = { id: "k1", name: "Saigon Lotus", category: "saved", address: "1 Queen St W", lat: 1, lng: 2 };
+  const remembered = { id: "r1", name: "DM", category: "commute-for", address: "a" };
+  const noPin = { id: "n1", name: "Nothing", category: "place", address: "", lat: null };
+  const chips = K.savedChips([home, remembered, ...trips, noPin, kept], home);
+  assert.deepEqual(chips.map((p) => p.id), ["h", "k1", "t0", "t1", "t2", "t3", "t4", "t5", "t6", "t7", "t8", "t9", "t10", "t11"], "Home, then the kept one, then the 12 Trips places");
+  assert.equal(chips[0].name, "Home");
+  assert.equal(chips.filter((p) => p.id !== "h").length, 13, "the kept place never pushes a Trips place out of its 12");
+  assert.equal(chips.some((p) => p.id === "r1" || p.id === "n1"), false, "remembered-for and pin-less places stay out");
+  assert.deepEqual(K.savedChips([], null), []); assert.deepEqual(K.savedChips(null, null), []);
+  assert.deepEqual(K.savedChips(trips.slice(0, 2), null).map((p) => p.id), ["t0", "t1"], "no Home saved: no Home chip");
 });
