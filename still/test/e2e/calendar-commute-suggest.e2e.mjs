@@ -16,6 +16,7 @@ import { fileURLToPath } from "node:url";
 const require = createRequire(path.join(process.env.PW_DIR || process.cwd(), "x.js"));
 const { chromium } = require("playwright-core");
 import { launchTestBrowser } from "../helpers/test-browser.mjs";
+import { serverReady } from "../helpers/dev-server.mjs";
 import { stubOpenMeteo } from "../helpers/open-meteo-stub.mjs";
 const here = path.dirname(fileURLToPath(import.meta.url));
 const PORT = +(process.env.PORT || 8861), BASE = `http://localhost:${PORT}`;
@@ -61,7 +62,7 @@ try {
   for (const [label, opts] of sizes) {
     if (process.env.ONLY && process.env.ONLY !== label) continue;
     const server = spawn(process.execPath, [path.join(here, "calendar-dev.mjs"), String(PORT)], { stdio: ["ignore", "pipe", "inherit"], env: { ...process.env, DEV_NOW: NOW, TZ: "America/Toronto" } });
-    await new Promise((ok) => server.stdout.once("data", ok));
+    await serverReady(server);
     try {
       const phone = label === "phone";
       // the dev server's own sample plans are set aside, so only the cases above are on the calendar
@@ -92,7 +93,7 @@ try {
       const homeSugg = (day) => page.evaluate((d) => S.autoG.filter((g) => g.kind === "commute" && g.why === "Home" && g.id.endsWith(":" + d)).map((g) => ({ id: g.id, s: g.s, e: g.e, calId: g.calId, title: g.title })), day);
       const whys = async (day) => (await sugg(day)).map((g) => g.why);
       const toastText = () => page.evaluate(() => document.querySelector("#toast")?.innerText || "");
-      const tap = async (sel) => { const el = page.locator(sel).first(); await el.scrollIntoViewIfNeeded(); await el.click(); };
+      const tap = (sel) => page.locator(sel).first().click();   // click scrolls into view itself and finds the element again if the page repaints under it
       const openGhost = async (day, why) => {
         const g = (await sugg(day)).find((x) => x.why === why); if (!g) return null;
         await closeSheet(); await goDay(day);

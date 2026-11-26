@@ -16,6 +16,7 @@ import { fileURLToPath } from "node:url";
 const require = createRequire(path.join(process.env.PW_DIR || process.cwd(), "x.js"));
 const { chromium } = require("playwright-core");
 import { launchTestBrowser } from "../helpers/test-browser.mjs";
+import { serverReady } from "../helpers/dev-server.mjs";
 import { stubOpenMeteo } from "../helpers/open-meteo-stub.mjs";
 const here = path.dirname(fileURLToPath(import.meta.url));
 const PORT = +(process.env.PORT || 8853), BASE = `http://localhost:${PORT}`;
@@ -62,7 +63,7 @@ try {
   for (const [label, opts] of sizes) {
     if (process.env.ONLY && process.env.ONLY !== label) continue;
     const server = spawn(process.execPath, [path.join(here, "calendar-dev.mjs"), String(PORT)], { stdio: ["ignore", "pipe", "inherit"], env: { ...process.env, DEV_NOW: NOW, TZ: "America/Toronto" } });
-    await new Promise((ok) => server.stdout.once("data", ok));
+    await serverReady(server);
     try {
       // Home is saved first, so every trip has a From and the page really asks for directions
       await fetch(BASE + "/quest/places", { method: "POST", headers: { "X-Quest-Key": "test", "content-type": "application/json" }, body: JSON.stringify({ op: "put", place: { name: "Home", category: "home", address: "100 Queen St W, Toronto", lat: 43.6529, lng: -79.3849 } }) });
@@ -93,12 +94,12 @@ try {
         for (let i = 0; i < 14; i++) {
           const el = page.locator(`.ev:not(.ghost):has-text("${title}")`).first();
           const inView = await el.count() && await el.evaluate((n) => { const r = n.getBoundingClientRect(); return r.width > 0 && r.right > 0 && r.left < innerWidth; });
-          if (inView) { await el.scrollIntoViewIfNeeded(); await el.click(); await sleep(400); await page.waitForFunction(() => !/Looking up/.test(document.querySelector("#cmBox")?.innerText || "x"), null, { timeout: 5000 }).catch(() => {}); await sleep(500); return true; }
+          if (inView) { await el.click(); await sleep(400); await page.waitForFunction(() => !/Looking up/.test(document.querySelector("#cmBox")?.innerText || "x"), null, { timeout: 5000 }).catch(() => {}); await sleep(500); return true; }
           await page.evaluate(() => document.querySelector("#next").click()); await sleep(400);   // the phone hides the arrows; this is the same step
         }
         return false;
       };
-      const tap = async (sel) => { const el = page.locator(sel).first(); await el.scrollIntoViewIfNeeded(); await el.click(); };
+      const tap = (sel) => page.locator(sel).first().click();   // click scrolls into view itself and finds the element again if the page repaints under it
       const toRow = async () => flat(await page.evaluate(() => document.querySelector("#cmVto")?.innerText || ""));
 
       // 1. the first block: no memory yet. To reads the Location text; the To box offers the second switch

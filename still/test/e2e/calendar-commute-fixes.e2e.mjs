@@ -14,6 +14,7 @@ import { fileURLToPath } from "node:url";
 const require = createRequire(path.join(process.env.PW_DIR || process.cwd(), "x.js"));
 const { chromium } = require("playwright-core");
 import { launchTestBrowser } from "../helpers/test-browser.mjs";
+import { serverReady } from "../helpers/dev-server.mjs";
 import { stubOpenMeteo } from "../helpers/open-meteo-stub.mjs";
 const here = path.dirname(fileURLToPath(import.meta.url));
 const PORT = +(process.env.PORT || 8827), BASE = `http://localhost:${PORT}`;
@@ -35,7 +36,7 @@ try {
   ];
   for (const [label, opts] of sizes) {
     const server = spawn(process.execPath, [path.join(here, "calendar-dev.mjs"), String(PORT)], { stdio: ["ignore", "pipe", "inherit"], env: { ...process.env, DEV_NOW: NOW, TZ: "America/Toronto" } });
-    await new Promise((ok) => server.stdout.once("data", ok));
+    await serverReady(server);
     const phone = label === "phone";
     const ctx = await browser.newContext({ ...opts, timezoneId: "America/Toronto" });
     const page = await ctx.newPage();

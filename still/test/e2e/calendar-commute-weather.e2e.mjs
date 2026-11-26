@@ -16,6 +16,7 @@ import { fileURLToPath } from "node:url";
 const require = createRequire(path.join(process.env.PW_DIR || process.cwd(), "x.js"));
 const { chromium } = require("playwright-core");
 import { launchTestBrowser } from "../helpers/test-browser.mjs";
+import { serverReady } from "../helpers/dev-server.mjs";
 import { stubOpenMeteo } from "../helpers/open-meteo-stub.mjs";
 const here = path.dirname(fileURLToPath(import.meta.url));
 const PORT = +(process.env.PORT || 8871), BASE = `http://localhost:${PORT}`;
@@ -34,7 +35,7 @@ try {
     if (process.env.ONLY && process.env.ONLY !== label) continue;
     const port = PORT + (label === "phone" ? 1 : 0), base = `http://localhost:${port}`;
     const server = spawn(process.execPath, [path.join(here, "calendar-dev.mjs"), String(port)], { stdio: ["ignore", "pipe", "inherit"], env: { ...process.env, DEV_NOW: NOW, TZ: "America/Toronto" } });
-    await new Promise((ok) => server.stdout.once("data", ok));
+    await serverReady(server);
     const ctx = await browser.newContext({ ...opts, timezoneId: "America/Toronto" });
     const page = await ctx.newPage(); page.setDefaultTimeout(8000);
     await page.clock.install({ time: new Date(NOW) });
@@ -119,9 +120,9 @@ try {
     await ctx.close(); server.kill();
 
     // From with no pin: its address cannot be found on the map
-    const server2 = spawn(process.execPath, [path.join(here, "calendar-dev.mjs"), String(port + 10)], { stdio: ["ignore", "pipe", "inherit"], env: { ...process.env, DEV_NOW: NOW, TZ: "America/Toronto" } });
-    await new Promise((ok) => server2.stdout.once("data", ok));
-    const b2 = `http://localhost:${port + 10}`;
+    const server2 = spawn(process.execPath, [path.join(here, "calendar-dev.mjs"), String(port + 2)], { stdio: ["ignore", "pipe", "inherit"], env: { ...process.env, DEV_NOW: NOW, TZ: "America/Toronto" } });
+    await serverReady(server2);
+    const b2 = `http://localhost:${port + 2}`;
     const ctx2 = await browser.newContext({ ...opts, timezoneId: "America/Toronto" });
     const p2 = await ctx2.newPage(); p2.setDefaultTimeout(8000); await p2.clock.install({ time: new Date(NOW) });
     const wx2 = stubOpenMeteo(p2);

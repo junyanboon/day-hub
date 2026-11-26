@@ -13,6 +13,7 @@ import { fileURLToPath } from "node:url";
 const require = createRequire(path.join(process.env.PW_DIR || process.cwd(), "x.js"));
 const pw = require(process.env.BROWSER === "webkit" ? "playwright" : "playwright-core");
 import { launchTestBrowser } from "../helpers/test-browser.mjs";
+import { serverReady } from "../helpers/dev-server.mjs";
 import { stubOpenMeteo } from "../helpers/open-meteo-stub.mjs";
 const here = path.dirname(fileURLToPath(import.meta.url));
 const PORT = +(process.env.PORT || 8861), BASE = `http://localhost:${PORT}`;
@@ -37,7 +38,7 @@ const savedOnServer = (page) => page.evaluate(async (b) => (await (await fetch(b
 try {
   /* ============ phone: the Location row ============ */
   const server = spawn(process.execPath, [path.join(here, "calendar-dev.mjs"), String(PORT)], { stdio: ["ignore", "pipe", "inherit"], env: { ...process.env, DEV_NOW: NOW, TZ: "America/Toronto" } });
-  await new Promise((ok) => server.stdout.once("data", ok));
+  await serverReady(server);
   const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true, timezoneId: "America/Toronto" });
   const page = await ctx.newPage(); page.setDefaultTimeout(8000);
   await page.clock.install({ time: new Date(NOW) });
@@ -210,7 +211,7 @@ try {
   /* ============ computer: the switch and the chips work ============ */
   if (process.env.BROWSER !== "webkit") {
     const server2 = spawn(process.execPath, [path.join(here, "calendar-dev.mjs"), String(PORT + 1)], { stdio: ["ignore", "pipe", "inherit"], env: { ...process.env, DEV_NOW: NOW, TZ: "America/Toronto" } });
-    await new Promise((ok) => server2.stdout.once("data", ok));
+    await serverReady(server2);
     const B2 = `http://localhost:${PORT + 1}`;
     const ctx2 = await browser.newContext({ viewport: { width: 1280, height: 860 }, timezoneId: "America/Toronto" });
     const p2 = await ctx2.newPage(); await p2.clock.install({ time: new Date(NOW) });
