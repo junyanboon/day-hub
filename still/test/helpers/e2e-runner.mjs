@@ -74,7 +74,7 @@ export function pickFiles(all, names) {
   return { files, unknown };
 }
 
-/** The names of this run's leftover processes (pid list), found by the tag in their environment. */
+/** The pids of this run's leftover processes, found by the tag in their environment. */
 export function listTagged(tag, { exec = execFileSync, self = process.pid, family = false } = {}) {
   let text = "";
   try { text = exec("ps", ["-axE", "-ww", "-o", "pid=,command="], { encoding: "utf8", maxBuffer: 256 * 1024 * 1024 }); } catch { return []; }
@@ -125,8 +125,8 @@ export function reapOrphans({ exec = execFileSync, self = process.pid } = {}) {
 }
 
 /** Run one file with a time limit. A file that passes the limit is stopped whole (node, servers, browser) and is HUNG.
- *  `tree` is told the child's pid while it runs so an interrupt can stop it. */
-export function runFile({ node = process.execPath, file, args = [], env = {}, cwd, timeoutMs, tag, onStart, keep = 60000 }) {
+ *  `onStart` is handed the child while it runs so an interrupt can stop it. */
+export function runFile({ node = process.execPath, file, args = [], env = {}, cwd, timeoutMs, tag, onStart, keep = 4000000 }) {
   return new Promise((resolve) => {
     const t0 = Date.now();
     const child = spawn(node, [file, ...args], { cwd, detached: true, stdio: ["ignore", "pipe", "pipe"], env: { ...process.env, ...env, [TAG_VAR]: tag } });
@@ -143,8 +143,11 @@ export function runFile({ node = process.execPath, file, args = [], env = {}, cw
     };
     child.on("error", (e) => { out += `\nspawn error: ${e.message}\n`; finish(1); });
     // "exit", not "close": a server the file left running holds the output pipe open, and "close" would wait for it
-    // until the time limit. Output still in flight gets a moment to arrive, then whatever is left running is stopped.
-    child.on("exit", (code) => setTimeout(() => finish(code), 150));
+    // until the time limit. Output still in flight is read until both pipes end (at most 1s), then whatever is left running is stopped.
+    child.on("exit", (code) => {
+      const ended = (st) => new Promise((ok) => (st.readableEnded || st.destroyed ? ok() : (st.once("end", ok), st.once("close", ok))));
+      Promise.race([Promise.all([ended(child.stdout), ended(child.stderr)]), new Promise((ok) => setTimeout(ok, 1000))]).then(() => finish(code));
+    });
     child.on("close", (code) => finish(code));
   });
 }

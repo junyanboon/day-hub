@@ -23,12 +23,12 @@ passed. A skipped file ("test browser missing") is not a pass.
 | More or fewer at once | `--jobs 6` |
 | Longer time limit | `--timeout 300` (seconds, per file) |
 | No rerun of failures | `--no-retry` |
-| Keep each file's full output | `--logs <folder>` |
+| Keep each file's full output (a rerun goes to `<name>.retry.log`) | `--logs <folder>` |
 | List the files | `--list` |
 
 Needs the test browser once: `sh scripts/install-test-browser.sh`. The runner checks first and never downloads.
 
-Ctrl-C, a hang or a crash leaves nothing behind. The runner stops only what it started (each process carries an
+Ctrl-C, a hang or a crash of a test file leaves nothing behind (if the runner itself is killed with `kill -9`, the next run cleans up after it). The runner stops only what it started (each process carries an
 `E2E_RUN_TAG` variable), never by program name, so other sessions' browsers are left alone.
 
 ## Writing a file

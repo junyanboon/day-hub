@@ -23,8 +23,6 @@ const results = [];
 const check = (name, ok, detail = "") => { results.push({ name, ok }); console.log(`${ok ? "PASS" : "FAIL"}  ${name}${detail ? "  (" + detail + ")" : ""}`); };
 const near = (a, b, tol) => Math.abs(a - b) <= tol;
 
-/** What the page shows, read from the layout itself: the hour height (the distance between two hour labels), the
-    top of the hours on screen, the day at the hour gutter, the zoom, whether #strip is the node marked earlier. */
 /** Waits until the layout has stopped moving (the hours' top, the row height and the scroll position the same for 6 frames
     in a row, 4 seconds at most). After a reload the page scrolls itself to the time of day a moment late, and on a busy
     machine that moment is longer than any fixed wait: a reading taken before it is a reading of a layout about to move. */
@@ -35,6 +33,8 @@ const settle = (page) => page.evaluate(() => new Promise((done) => {
   const tick = () => { const now = read(); same = now === last ? same + 1 : 0; last = now; if (same >= 6 || performance.now() > end) done(); else requestAnimationFrame(tick); };
   requestAnimationFrame(tick);
 }));
+/** What the page shows, read from the layout itself: the hour height (the distance between two hour labels), the
+    top of the hours on screen, the day at the hour gutter, the zoom, whether #strip is the node marked earlier. */
 const look = async (page) => { await settle(page); return page.evaluate(() => {
   const v = document.querySelector("#view"), sp = document.querySelectorAll(".gut .hours span:not(.nowlbl)");
   const hours = document.querySelector(".gut .hours").getBoundingClientRect(), gut = document.querySelector(".gut").getBoundingClientRect();

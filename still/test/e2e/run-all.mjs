@@ -89,7 +89,7 @@ const pool = createPortPool();
 const jobs = Math.max(1, Math.min(opts.jobs, files.length));
 const t0 = Date.now();
 let runs = 0;
-const attempt = async (file) => {
+const attempt = async (file, suffix = "") => {
   const port = await pool.claim(), dir = fs.mkdtempSync(path.join(tmp, "t-"));
   try {
     const r = await runFile({
@@ -97,7 +97,7 @@ const attempt = async (file) => {
       env: { ...portEnv(port), TMPDIR: dir, PW_DIR },
       onStart: (c) => live.add(c),
     });
-    if (opts.logs) fs.writeFileSync(path.join(opts.logs, file.replace(/\.mjs$/, "") + ".log"), r.output);
+    if (opts.logs) fs.writeFileSync(path.join(opts.logs, file.replace(/\.mjs$/, "") + suffix + ".log"), r.output);
     return r;
   } finally {
     for (const c of [...live]) if (c.exitCode !== null || c.signalCode) live.delete(c);
@@ -124,7 +124,7 @@ for (const f of [...files].sort()) {
   const r = first.get(f);
   if (r.status === "PASS" || !opts.retry || r.status === "SKIP") continue;
   console.log(`rerunning ${f} alone (it was ${r.status})`);
-  again.set(f, await attempt(f));
+  again.set(f, await attempt(f, ".retry"));
 }
 for (const f of [...files].sort()) {
   const r = first.get(f), r2 = again.get(f);

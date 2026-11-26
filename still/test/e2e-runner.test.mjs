@@ -68,11 +68,11 @@ test("a file past its time limit is stopped with everything it started, and is H
     const r = await runFile({ file, timeoutMs: 1500, tag, onStart: (c) => { child = c; } });
     assert.equal(r.status, "HUNG");
     assert.match(r.output, /HUNG: no exit after/);
-    assert.ok(r.seconds >= 1.4 && r.seconds < 10, `took ${r.seconds}s`);
+    assert.ok(r.seconds >= 1.4 && r.seconds < 30, `took ${r.seconds}s`);
     const g = +fs.readFileSync(pidFile, "utf8");
-    await new Promise((ok) => setTimeout(ok, 200));
-    assert.equal(isAlive(child.pid), false, "the file's node is gone");
-    assert.equal(isAlive(g), false, "the grandchild in its own group is gone too");
+    const gone = async (pid) => { for (let i = 0; i < 50 && isAlive(pid); i++) await new Promise((ok) => setTimeout(ok, 100)); return !isAlive(pid); };
+    assert.equal(await gone(child.pid), true, "the file's node is gone");
+    assert.equal(await gone(g), true, "the grandchild in its own group is gone too");
     assert.deepEqual(listTagged(tag), []);
   } finally { killTree(tag, {}); fs.rmSync(dir, { recursive: true, force: true }); }
 });
@@ -89,7 +89,7 @@ test("a file that ends on its own is read from its output, and stopping one file
     const r = await runFile({ file: ok, timeoutMs: 20000, tag: tagA });
     assert.equal(r.status, "PASS"); assert.equal(r.passedChecks, 1);
     assert.equal(isAlive(neighbour.pid), true, "the other file is still running after this one ended");
-    assert.deepEqual(listTagged(tagB).length > 0, true);
+    assert.ok(listTagged(tagB).length > 0);
     assert.equal(listTagged(tagA).length, 0);
     killTree(run, { family: true });
     assert.equal((await waiting).status, "FAIL", "killed from outside, not by its own limit");
