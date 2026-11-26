@@ -17,6 +17,7 @@ import { fileURLToPath } from "node:url";
 const require = createRequire(path.join(process.env.PW_DIR || process.cwd(), "x.js"));
 const { chromium } = require("playwright-core");
 import { launchTestBrowser } from "../helpers/test-browser.mjs";
+import { serverReady } from "../helpers/dev-server.mjs";
 const here = path.dirname(fileURLToPath(import.meta.url));
 const PORT = +(process.env.PORT || 8818), OLD_PORT = PORT + 1;
 const urlOf = (port) => `http://localhost:${port}/still/calendar.html?api=${encodeURIComponent("http://localhost:" + port)}`;
@@ -32,7 +33,7 @@ const shown = (page, sel) => page.evaluate((s) => { const el = document.querySel
 
 async function serve(port, root) {
   const server = spawn(process.execPath, [path.join(here, "calendar-dev.mjs"), String(port)], { stdio: ["ignore", "pipe", "inherit"], env: { ...process.env, ...(root ? { DEV_ROOT: root } : {}) } });
-  await new Promise((ok) => server.stdout.once("data", ok));
+  await serverReady(server);
   return server;
 }
 async function openTrip(browser, port, opts) {

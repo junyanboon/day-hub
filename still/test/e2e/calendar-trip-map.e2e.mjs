@@ -16,6 +16,7 @@ import { fileURLToPath } from "node:url";
 const require = createRequire(path.join(process.env.PW_DIR || process.cwd(), "x.js"));
 const { chromium } = require("playwright-core");
 import { launchTestBrowser } from "../helpers/test-browser.mjs";
+import { serverReady } from "../helpers/dev-server.mjs";
 const here = path.dirname(fileURLToPath(import.meta.url));
 const PORT = +(process.env.PORT || 8815), BASE = `http://localhost:${PORT}`;
 const URL_ = `${BASE}/still/calendar.html?api=${encodeURIComponent(BASE)}`;
@@ -41,7 +42,7 @@ try {
   for (const [label, opts] of sizes) {
     // a fresh dev server per size, so each starts with no saved places
     const server = spawn(process.execPath, [path.join(here, "calendar-dev.mjs"), String(PORT)], { stdio: ["ignore", "pipe", "inherit"] });
-    await new Promise((ok) => server.stdout.once("data", ok));
+    await serverReady(server);
     const phone = label === "phone";
     const ctx = await browser.newContext({ ...opts, timezoneId: "America/Toronto" });
     const page = await ctx.newPage();

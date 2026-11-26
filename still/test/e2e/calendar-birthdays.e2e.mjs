@@ -18,6 +18,7 @@ import { fileURLToPath } from "node:url";
 const require = createRequire(path.join(process.env.PW_DIR || process.cwd(), "x.js"));
 const { chromium } = require("playwright-core");
 import { launchTestBrowser } from "../helpers/test-browser.mjs";
+import { serverReady } from "../helpers/dev-server.mjs";
 const here = path.dirname(fileURLToPath(import.meta.url));
 const PORT = +(process.env.PORT || 8837), BASE = `http://localhost:${PORT}`;
 const URL_ = `${BASE}/still/calendar.html?api=${encodeURIComponent(BASE)}`;
@@ -29,7 +30,7 @@ const results = [];
 const check = (name, ok, detail = "") => { results.push({ name, ok }); console.log(`${ok ? "PASS" : "FAIL"}  ${name}${detail ? "  (" + detail + ")" : ""}`); };
 
 const server = spawn(process.execPath, [path.join(here, "calendar-dev.mjs"), String(PORT)], { stdio: ["ignore", "pipe", "inherit"], env: { ...process.env, DEV_TODAY: "2026-11-24", TZ: "America/Toronto" } });
-await new Promise((ok) => server.stdout.once("data", ok));
+await serverReady(server);
 const browser = await launchTestBrowser(chromium);
 const desktop = { viewport: { width: 1280, height: 900 }, timezoneId: "America/Toronto" };
 const phone = { viewport: { width: 402, height: 874 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true, timezoneId: "America/Toronto" };
@@ -119,7 +120,7 @@ try {
   /* ---- an old server: no Community Birthdays calendar and no flagged events (the page goes live before the server does) ---- */
   { const PORT2 = PORT + 1, BASE2 = `http://localhost:${PORT2}`;
     const old = spawn(process.execPath, [path.join(here, "calendar-dev.mjs"), String(PORT2)], { stdio: ["ignore", "pipe", "inherit"], env: { ...process.env, DEV_TODAY: "2026-11-24", TZ: "America/Toronto", DEV_NO_BDAY: "1" } });
-    await new Promise((ok) => old.stdout.once("data", ok));
+    await serverReady(old);
     try {
       for (const [label, ctxOpts, n] of [["computer week", desktop, "7"], ["computer month", desktop, "m"], ["phone", phone, "3"]]) {
         const ctx = await browser.newContext(ctxOpts), page = await ctx.newPage(), errors = [];

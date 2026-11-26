@@ -19,6 +19,7 @@ import { fileURLToPath } from "node:url";
 const require = createRequire(path.join(process.env.PW_DIR || process.cwd(), "x.js"));
 const { chromium } = require("playwright-core");
 import { launchTestBrowser } from "../helpers/test-browser.mjs";
+import { serverReady } from "../helpers/dev-server.mjs";
 import { stubOpenMeteo } from "../helpers/open-meteo-stub.mjs";
 const here = path.dirname(fileURLToPath(import.meta.url));
 const PORT = +(process.env.PORT || 8891);
@@ -38,7 +39,7 @@ try {
     if (process.env.ONLY && process.env.ONLY !== label) continue;
     const phone = label === "phone", port = PORT + (phone ? 1 : 0), base = `http://localhost:${port}`;
     const server = spawn(process.execPath, [path.join(here, "calendar-dev.mjs"), String(port)], { stdio: ["ignore", "pipe", "inherit"], env: { ...process.env, DEV_NOW, TZ: "America/Toronto" } });
-    await new Promise((ok) => server.stdout.once("data", ok));
+    await serverReady(server);
     const errors = [];
     const dev = (q) => fetch(`${base}/__dev/directions?${q}`).then((r) => r.json());
     const newPage = async (ctx, time) => {
@@ -58,7 +59,7 @@ try {
     };
     const flat = (s) => String(s || "").replace(/\s+/g, " ").trim();
     const box = (page) => page.evaluate(() => (document.querySelector("#cmBox")?.innerText || "").replace(/\s+/g, " ").trim());
-    const tap = async (page, sel) => { const l = page.locator(sel).first(); await l.scrollIntoViewIfNeeded(); await l.click(); };
+    const tap = (page, sel) => page.locator(sel).first().click();   // click scrolls into view itself and finds the element again if the page repaints under it
     const count = (page, sel) => page.locator(sel).count();
     const chipTexts = (page) => page.evaluate(() => [...document.querySelectorAll('#cmBox [data-cm="mode"]')].map((b) => b.textContent.replace(/\s+/g, " ").trim()));
     const waitDirs = (page) => page.waitForSelector("#cmBox .cmleave .big", { timeout: 8000 });

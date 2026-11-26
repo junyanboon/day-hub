@@ -13,6 +13,7 @@ import { fileURLToPath } from "node:url";
 const require = createRequire(path.join(process.env.PW_DIR || process.cwd(), "x.js"));
 const { chromium } = require("playwright-core");
 import { launchTestBrowser } from "../helpers/test-browser.mjs";
+import { serverReady } from "../helpers/dev-server.mjs";
 const here = path.dirname(fileURLToPath(import.meta.url));
 const PORT = +(process.env.PORT || 8811), BASE = `http://localhost:${PORT}`;
 const URL_ = `${BASE}/still/calendar.html?api=${encodeURIComponent(BASE)}`;
@@ -22,9 +23,19 @@ const results = [];
 const check = (name, ok, detail = "") => { results.push({ name, ok }); console.log(`${ok ? "PASS" : "FAIL"}  ${name}${detail ? "  (" + detail + ")" : ""}`); };
 const near = (a, b, tol) => Math.abs(a - b) <= tol;
 
+/** Waits until the layout has stopped moving (the hours' top, the row height and the scroll position the same for 6 frames
+    in a row, 4 seconds at most). After a reload the page scrolls itself to the time of day a moment late, and on a busy
+    machine that moment is longer than any fixed wait: a reading taken before it is a reading of a layout about to move. */
+const settle = (page) => page.evaluate(() => new Promise((done) => {
+  const read = () => { const sp = document.querySelectorAll(".gut .hours span:not(.nowlbl)");
+    return [document.querySelector(".gut .hours").getBoundingClientRect().top, sp[1].getBoundingClientRect().top - sp[0].getBoundingClientRect().top, document.querySelector("#view").scrollTop].join(); };
+  let last = read(), same = 0; const end = performance.now() + 4000;
+  const tick = () => { const now = read(); same = now === last ? same + 1 : 0; last = now; if (same >= 6 || performance.now() > end) done(); else requestAnimationFrame(tick); };
+  requestAnimationFrame(tick);
+}));
 /** What the page shows, read from the layout itself: the hour height (the distance between two hour labels), the
     top of the hours on screen, the day at the hour gutter, the zoom, whether #strip is the node marked earlier. */
-const look = (page) => page.evaluate(() => {
+const look = async (page) => { await settle(page); return page.evaluate(() => {
   const v = document.querySelector("#view"), sp = document.querySelectorAll(".gut .hours span:not(.nowlbl)");
   const hours = document.querySelector(".gut .hours").getBoundingClientRect(), gut = document.querySelector(".gut").getBoundingClientRect();
   const days = [...document.querySelectorAll(".day")].map((d) => ({ k: d.dataset.day, x: d.getBoundingClientRect().left }));
@@ -33,7 +44,7 @@ const look = (page) => page.evaluate(() => {
     scale: visualViewport.scale, same: document.querySelector("#strip") === window.__strip, scrollTop: v.scrollTop,
     fits: v.scrollHeight <= v.clientHeight + 1, viewTop: v.getBoundingClientRect().top,
     open: document.body.classList.contains("popen"), draft: !!document.querySelector(".ev.draft"), saved: localStorage.getItem("cal-hour") };
-});
+}); };
 /** The minute the now pill shows ("3:27", the half of the day from the clock): the line is drawn at that whole minute
     and moved every 30 seconds, so the clock's seconds are not part of where it should be. */
 const nowMin = (page) => page.evaluate(() => {
@@ -41,13 +52,18 @@ const nowMin = (page) => page.evaluate(() => {
   return (h % 12) * 60 + m + (new Date().getHours() >= 12 ? 720 : 0);
 });
 
-const server = spawn(process.execPath, [path.join(here, "calendar-dev.mjs"), String(PORT)], { stdio: ["ignore", "pipe", "inherit"] });
-await new Promise((ok) => server.stdout.once("data", ok));
+/* The clock is pinned (10 am in Toronto) in the page and in the fake backend. Before, "now" was the real time: the page opens scrolled to it,
+   and after about 7 pm a 3 day squeeze runs out of day to scroll (the hours get shorter, the page cannot scroll far enough to keep the time under the
+   fingers), so the check passed in the afternoon and failed in the evening. */
+const NOW = "2026-11-25T15:00:00Z";
+const server = spawn(process.execPath, [path.join(here, "calendar-dev.mjs"), String(PORT)], { stdio: ["ignore", "pipe", "inherit"], env: { ...process.env, DEV_NOW: NOW, TZ: "America/Toronto" } });
+await serverReady(server);
 const browser = await launchTestBrowser(chromium);
 try {
   const phone = { viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true, timezoneId: "America/Toronto" };
   const ctx = await browser.newContext(phone);
   const page = await ctx.newPage();
+  await page.clock.install({ time: new Date(NOW) });
   const errors = []; page.on("pageerror", (e) => errors.push(e.message));
   await page.addInitScript(() => { localStorage.setItem("quest-key", "test"); if (!localStorage.getItem("cal-n")) localStorage.setItem("cal-n", "1"); });
   const cdp = await ctx.newCDPSession(page);

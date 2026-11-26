@@ -16,6 +16,7 @@ import { fileURLToPath } from "node:url";
 const require = createRequire(path.join(process.env.PW_DIR || process.cwd(), "x.js"));
 const { chromium } = require("playwright-core");
 import { launchTestBrowser } from "../helpers/test-browser.mjs";
+import { serverReady } from "../helpers/dev-server.mjs";
 const here = path.dirname(fileURLToPath(import.meta.url)), repo = path.resolve(here, "../../..");
 const PORT = +(process.env.PORT || 8806), BASE = `http://localhost:${PORT}`, MAIN = `http://localhost:${PORT + 1}`;
 const pageUrl = (b) => `${b}/still/calendar.html?api=${encodeURIComponent(b)}`;
@@ -26,10 +27,11 @@ const torontoHM = (iso) => new Intl.DateTimeFormat("en-CA", { timeZone: "America
 
 /* origin/main's page in a temp tree, served by a copy of the same fake backend, for the desktop comparison */
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "cal-sheet-main-"));
-fs.mkdirSync(path.join(tmp, "still/test/e2e"), { recursive: true });
-for (const f of ["still/calendar.html", "still/calendar-core.js"]) fs.writeFileSync(path.join(tmp, f), execFileSync("git", ["show", "origin/main:" + f], { cwd: repo }));
+/* the whole of origin/main's still/ folder, not a list of files: the page loads calendar-commute.js, cards.js and more, and a missing
+   script is a page that never draws (the file failed on "waiting for .ev" the day calendar-commute.js came in) */
+execFileSync("tar", ["-x", "-C", tmp], { input: execFileSync("git", ["archive", "origin/main", "still"], { cwd: repo, maxBuffer: 256 * 1024 * 1024 }) });
 fs.copyFileSync(path.join(here, "calendar-dev.mjs"), path.join(tmp, "still/test/e2e/calendar-dev.mjs"));
-const start = async (file, port) => { const s = spawn(process.execPath, [file, String(port)], { stdio: ["ignore", "pipe", "inherit"] }); await new Promise((ok) => s.stdout.once("data", ok)); return s; };
+const start = async (file, port) => { const s = spawn(process.execPath, [file, String(port)], { stdio: ["ignore", "pipe", "inherit"] }); await serverReady(s); return s; };
 const server = await start(path.join(here, "calendar-dev.mjs"), PORT);
 const mainServer = await start(path.join(tmp, "still/test/e2e/calendar-dev.mjs"), PORT + 1);
 
