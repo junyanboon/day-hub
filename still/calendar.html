@@ -364,6 +364,7 @@ button.cmr{border:1px solid var(--line);background:var(--raise);border-radius:10
 .cmask{display:flex;flex-direction:column;gap:6px}.cmask input[type=text],.cmask input:not([type]),.cmask textarea,.cmmodal textarea{width:100%;background:var(--raise);border:1px solid var(--line);border-radius:10px;padding:8px 10px}
 .cmrem{display:flex;align-items:center;gap:8px}
 .cmwx{display:flex;align-items:center;gap:10px;padding:6px 10px;border:1px solid var(--line);border-radius:10px;background:var(--raise)}.cmwx .wxi{font-size:22px;line-height:1;flex:none}.cmwx .wxb{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}.cmwx .wxl{display:flex;align-items:baseline;gap:4px 8px;flex-wrap:wrap}.cmwx .big{font-size:16px;font-weight:700;line-height:1.2}.cmwx .meta{font-size:12px}.cmwx .wxtip{font-weight:600}
+.tmrow{flex-direction:row;align-items:center;gap:10px}.tmrow .lbl{width:52px;flex:none}.tmrow input{flex:1;min-width:0;width:auto}
 .locin{width:100%;background:var(--raise);border:1px solid var(--line);border-radius:10px;padding:8px 10px}
 .cmnote{display:flex;align-items:center;gap:8px;flex-wrap:wrap;border-top:1px solid var(--line);padding-top:6px}.cmnote span{flex:1;min-width:0;overflow-wrap:anywhere}
 .cmbox .chip .cmm{opacity:.85;font-variant-numeric:tabular-nums}.cmbest{display:inline-block;margin-left:4px;padding:1px 6px;border-radius:8px;font-size:10px;font-weight:700;background:var(--k-commute);color:var(--bg)}
@@ -1798,8 +1799,13 @@ function pNow() {
     <div><p class="lbl">Rest of today</p>${rest.map((e) => rowHTML(e)).join("") || '<span class="meta">Clear. Nothing left on the calendar today.</span>'}</div>
     ${sug.length ? `<div><p class="lbl">Suggestions (${sug.length})</p>${sug.map((g) => `<div class="sugg"><b>${nameIcon(g)}</b><span class="meta">${esc(whenText(g))} · from ${esc(g.by)}</span>${g.why ? `<span class="meta">${esc(g.why)}</span>` : ""}<div class="r"><button class="btn pri" data-acc="${esc(g.id)}">Accept</button><button class="btn" data-skip="${esc(g.id)}">Skip</button><button class="btn" data-go="${esc(g.id)}">Show</button></div></div>`).join("")}</div>` : ""}`;
 }
-/** "12:45 pm": when a block of dur minutes starting like ev ends, on the calendar's clock. */
-const endsText = (ev, dur) => C.hm(C.wall(ev.s + dur * 60000, S.tz).min);
+/** The computer panel's times changed (Starts, Ends or Length): the form is the phone sheet's, so the same rule runs; repaint the boxes and the length. */
+function timesPaint() {
+  const tf = S.form.tf; S.form.dur = C.sheetLength(tf);
+  for (const [id, v] of [["#pStart", tf.start], ["#pEnd", tf.end]]) { const i = $(id); if (i && i !== document.activeElement && i.value !== v) i.value = v; }
+  $("[data-lenval]").textContent = C.dur(S.form.dur); $("[data-lenends]").textContent = "ends " + C.hm(C.toMin(tf.end));
+  $('[data-lenstep="-1"]').disabled = S.form.dur <= 15;   // a read-only block never gets here: both buttons are disabled
+}
 function pEvent(ev) {
   if (sheetOn()) return pSheet(ev);
   if (S.form && S.form.sheet) S.form = null;
@@ -1807,7 +1813,7 @@ function pEvent(ev) {
   const len = ev.allDay ? 0 : Math.round((ev.e - ev.s) / 60000);
   const guess = C.kindOf({ title: ev.title, calName: cal.name });
   const writable = S.cals.filter((c) => c.writable || c.id === ev.calId), dis = canEdit ? "" : "disabled";
-  if (!S.form) S.form = { dur: len, kind: ev.kind || "" };
+  if (!S.form) { const tf = ev.allDay || ev.ghost ? null : C.sheetForm(ev, S.tz); S.form = { dur: tf ? C.sheetLength(tf) : len, kind: ev.kind || "", tf, tf0: tf }; }   // tf: the phone sheet's time rows (Starts, Ends), one rule for both
   const mins = ev.allDay ? 0 : (ev.s - Date.now()) / 60000;
   /* A Commute block shows no date and time line (Junyan, 2026-11-24): it keeps "starts in", the second zone, Repeats and the place. */
   const whenTxt = ev.k === "commute" ? "" : esc(whenText(ev)), soon = mins > 0 && mins < 1440 ? `${whenTxt ? " · " : ""}starts in ${untilText(mins)}` : "";
@@ -1820,7 +1826,9 @@ function pEvent(ev) {
     ${commuteBox(ev)}
     <div class="field"><label class="lbl" style="margin:0" for="pLoc">Location</label><input class="locin" id="pLoc" type="text" value="${esc(ev.location || "")}" placeholder="Add location" autocomplete="off" aria-controls="locSug" ${ev.ghost || !canEdit ? "disabled" : ""}>
       <div class="cmsug locsug" id="locSug" aria-live="polite"></div></div>
-    ${ev.allDay || ev.ghost ? "" : `<div class="field"><p class="lbl" style="margin:0">Length</p><div class="lenrow"><button class="btn" data-lenstep="-1" aria-label="15 minutes shorter" ${dis || S.form.dur <= 15 ? "disabled" : ""}>&minus;</button><b data-lenval>${C.dur(S.form.dur)}</b><button class="btn" data-lenstep="1" aria-label="15 minutes longer" ${dis}>+</button><span class="meta" data-lenends>ends ${esc(endsText(ev, S.form.dur))}</span></div></div>`}
+    ${ev.allDay || ev.ghost ? "" : `<div class="field tmrow"><label class="lbl" style="margin:0" for="pStart">Starts</label><input class="locin" id="pStart" type="time" value="${esc(S.form.tf.start)}" aria-label="Starts" ${dis}></div>
+    <div class="field tmrow"><label class="lbl" style="margin:0" for="pEnd">Ends</label><input class="locin" id="pEnd" type="time" value="${esc(S.form.tf.end)}" aria-label="Ends" ${dis}></div>
+    <div class="field"><p class="lbl" style="margin:0">Length</p><div class="lenrow"><button class="btn" data-lenstep="-1" aria-label="15 minutes shorter" ${dis || S.form.dur <= 15 ? "disabled" : ""}>&minus;</button><b data-lenval>${C.dur(S.form.dur)}</b><button class="btn" data-lenstep="1" aria-label="15 minutes longer" ${dis}>+</button><span class="meta" data-lenends>ends ${esc(C.hm(C.toMin(S.form.tf.end)))}</span></div></div>`}
     ${ev.ghost ? "" : isNew ? `<div class="field"><p class="lbl" style="margin:0">Block type</p>${typeChips}</div>`
       : `<div class="field" id="typeBox"><div class="typeline" id="typeLine"><span id="typeName">${esc(KNAME[S.form.kind || guess])}</span> · <button class="linkbtn" data-typechange ${dis}>change</button></div>${typeChips}</div>`}
     <div class="field"><label class="lbl" style="margin:0" for="pCal">Calendar</label><select id="pCal" ${dis}>${writable.map((c) => `<option value="${esc(c.id)}" ${c.id === ev.calId ? "selected" : ""}>${esc(c.name)}</option>`).join("")}</select></div>
@@ -1933,14 +1941,16 @@ async function saveEvent() {
     if (!title) { ti.focus(); return; }
     const loc = (($("#pLoc") || {}).value || "").trim();   // read before the panel closes
     panel("now");
-    await createEvent({ calId, title, start: new Date(ev.s).toISOString(), end: new Date(ev.s + dur * 60000).toISOString(), ...(kind ? { kind } : {}), ...(loc ? { location: loc } : {}) });
+    const w = S.form.tf ? C.sheetWhen(S.form.tf, S.tz) : { start: new Date(ev.s).toISOString(), end: new Date(ev.s + dur * 60000).toISOString() };
+    await createEvent({ calId, title, start: w.start, end: w.end, ...(kind ? { kind } : {}), ...(loc ? { location: loc } : {}) });
     return;
   }
   const f = { ...C.locationPatch(ev, ($("#pLoc") || {}).value) };
   if (title && title !== ev.title) f.title = title;
   if (calId !== ev.calId) f.toCalId = calId;
   if ((kind || "") !== (ev.kind || "")) f.kind = kind;
-  if (!ev.allDay && dur !== len) { f.start = new Date(ev.s).toISOString(); f.end = new Date(ev.s + dur * 60000).toISOString(); }
+  const tf = S.form.tf, t0 = S.form.tf0;   // times go only when Starts, Ends or Length changed the form
+  if (!ev.allDay && tf && (tf.start !== t0.start || tf.end !== t0.end || tf.days !== t0.days)) { const w = C.sheetWhen(tf, S.tz); f.start = w.start; f.end = w.end; }
   panel("now");
   if (Object.keys(f).length) await patchEvent(ev, f, "Change");
 }
@@ -3517,7 +3527,7 @@ function setup() {
     }
     else if (d.lenstep) {
       S.form.dur = CalCommute.stepDur(S.form.dur, +d.lenstep);
-      $("[data-lenval]").textContent = C.dur(S.form.dur); $("[data-lenends]").textContent = "ends " + endsText(S.ev, S.form.dur);
+      S.form.tf = C.sheetLen(S.form.tf, S.form.dur); timesPaint();
       $('[data-lenstep="-1"]').disabled = S.form.dur <= 15;   // a read-only block never gets here: both buttons are disabled
     }
     else if ("typechange" in d) { $("#typeLine").hidden = true; $("#typeChips").hidden = false; }
@@ -3573,6 +3583,11 @@ function setup() {
   $("#pClose").onclick = () => { panel("now"); document.body.classList.remove("popen"); if (innerWidth > 1100) { document.body.classList.add("nopanel"); setTimeout(size, 300); } };
   /* the phone sheet: a box being typed in updates its row at once; a time or day box opens its picker on a click with a
      mouse (a phone opens its own wheels); the box in focus stays above the keyboard */
+  $("#pbody").addEventListener("change", (e) => {
+    const t = e.target; if (!S.form || S.form.sheet || !S.form.tf || (t.id !== "pStart" && t.id !== "pEnd")) return;
+    S.form.tf = t.id === "pStart" ? C.sheetStart(S.form.tf, t.value) : C.sheetEnd(S.form.tf, t.value);
+    timesPaint(); const nv = S.form.tf[t.id === "pStart" ? "start" : "end"]; if (t.value !== nv) t.value = nv;
+  });
   $("#pbody").addEventListener("input", (e) => { const t = e.target; if (t.dataset.f && t.closest(".sheet")) { sheetInput(t); if (t.tagName === "TEXTAREA") grow(t); } });
   $("#pbody").addEventListener("click", (e) => { const t = e.target; if (!TOUCH && t.matches("input.ov") && t.showPicker) try { t.showPicker(); } catch {} });
   $("#pbody").addEventListener("focusin", (e) => { if (e.target.closest(".sheet")) setTimeout(sheetFit, 350); });

@@ -547,11 +547,15 @@
     const s = toMin(f.start), e = toMin(f.end);
     return ((f.days || 0) + (e <= s ? 1 : 0)) * 1440 + e - s;
   }
+  /** The form's length set to dur minutes: the start stays, the end (and any extra days) follows. */
+  function sheetLen(f, dur) {
+    const ns = toMin(f.start), tot = ns + Math.max(0, Math.round(dur)), em = tot % 1440;
+    return { ...f, end: toHHMM(em), days: Math.max(0, Math.floor(tot / 1440) - (em <= ns ? 1 : 0)) };
+  }
   /** Starts changed to hhmm: the end moves with it so the length stays. A blank or broken time changes nothing. */
   function sheetStart(f, hhmm) {
     const ns = toMin(hhmm); if (ns == null) return f;
-    const tot = ns + sheetLength(f), em = tot % 1440;
-    return { ...f, start: toHHMM(ns), end: toHHMM(em), days: Math.max(0, Math.floor(tot / 1440) - (em <= ns ? 1 : 0)) };
+    return sheetLen({ ...f, start: toHHMM(ns) }, sheetLength(f));
   }
   const isDay = (day) => /^\d{4}-\d{2}-\d{2}$/.test(day || "");
   /** Ends changed to hhmm, on its own. */
@@ -615,7 +619,7 @@
 
   root.CalCore = { wall, instant, offset, addDays, dowOf, weekStart, isoWeek, addMonths, monthKey, monthsFor,
     KINDS, MODES, modeOf, guessKind, kindOf, layout, pieces, coversDay, routineBlocks, mealBlocks, mealIcon, MEALS, ROUTINE, BEDTIME, bedtimeOf, nightIcon, floats, floatPiece, tailHours, orderBetween, groupOf, dropTask, blockMinutes, hm, dur, SWIPE, swipeLock, swipeCommit, HOUR, pinchHeight, hourMin, pinchMinute, pinchScroll, cardFit, cardTime, startHour, LOOKS, lookId, startLook, LOOK_RESET, placeOf, sunTimes, sunHalf, lookFace, tripCards, tripLinks, homeFit, homeShift,
-    sheetForm, sheetWhen, sheetPatch, locationPatch, sheetLength, sheetStart, sheetEnd, sheetDay, sheetEndDay, sheetAllDay, notesRich, notesText, dayText, clock, toMin };
+    sheetForm, sheetWhen, sheetPatch, locationPatch, sheetLength, sheetLen, sheetStart, sheetEnd, sheetDay, sheetEndDay, sheetAllDay, notesRich, notesText, dayText, clock, toMin };
 })(typeof window !== "undefined" ? window : globalThis);
 
 /* The Packing page's rules (slice 01, Junyan 2026-11-13, d22: "22 yes"), with no page in them: still/test/packing.test.mjs.
