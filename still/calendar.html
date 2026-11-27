@@ -13,7 +13,7 @@
 <meta name="apple-mobile-web-app-title" content="Calendar">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>Calendar</title>
-<script src="calendar-core.js?v=35"></script>
+<script src="calendar-core.js?v=36"></script>
 <script src="calendar-commute.js?v=12"></script>
 <script src="cards-vault.js?v=2"></script><script src="cards.js?v=7"></script>
 <script src="quest-trips.js?v=20261121a" data-helpers></script>
@@ -240,7 +240,7 @@ body.touch .pane{overflow-x:clip}
 .gut>div{flex:1;min-width:0}
 .corner{position:sticky;top:0;height:var(--hh);z-index:2;background:var(--bar);display:flex;align-items:flex-end;justify-content:center;padding:0 2px 7px;font-size:9.5px;font-weight:600;letter-spacing:.02em;color:var(--soft);border-bottom:1px solid var(--line);box-shadow:0 6px 12px -8px var(--drop);overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
 .corner span{overflow:hidden;text-overflow:ellipsis}
-.hours{position:relative;height:calc(24*var(--H))}
+.hours{position:relative;height:calc((24 + var(--tail,0))*var(--H))}
 .hours span{position:absolute;right:7px;font-size:10.5px;color:var(--faint);transform:translateY(-50%);font-variant-numeric:tabular-nums;white-space:nowrap;letter-spacing:.01em}
 .second .hours span{color:var(--k-travel)}
 .hours .nowlbl{background:var(--now);color:var(--on-accent);font-weight:700;border-radius:5px;padding:1px 4px;right:3px;z-index:2;font-size:10px}
@@ -276,8 +276,10 @@ body.touch .pane{overflow-x:clip}
 .shape i{position:absolute;top:0;bottom:0;background:var(--c);border-radius:2px}
 .pill{display:block;width:100%;text-align:left;border:0;font-size:11.5px;font-weight:600;border-radius:6px;padding:3px 7px;box-shadow:inset 3px 0 0 var(--c);background:color-mix(in srgb,var(--c) var(--pill-fill),var(--bar));color:color-mix(in srgb,var(--c) var(--ev-title),var(--ev-ink));white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:none}
 .pill.ghost{box-shadow:none;border:1.5px dashed var(--c);background:transparent}.pill.more{box-shadow:none;background:none;color:var(--faint);font-weight:500}
-.col{position:relative;height:calc(24*var(--H));background-image:linear-gradient(var(--hair) 1px,transparent 1px);background-size:100% var(--H)}
+.col{position:relative;height:calc((24 + var(--tail,0))*var(--H));background-image:linear-gradient(var(--hair) 1px,transparent 1px);background-size:100% var(--H)}
 .day.today .col{background-color:var(--today-col)}
+/* below midnight: where tonight's Wind Down and Sleep run on (the night blocks float); a line at midnight and a quiet tint */
+.strip.tail .col::before{content:"";position:absolute;left:0;right:0;top:calc(24*var(--H));height:calc(var(--tail,0)*var(--H));border-top:1.5px solid var(--line);background:color-mix(in srgb,var(--faint) 7%,transparent);pointer-events:none}
 .day.past .pip{opacity:.5}
 .shade{position:absolute;left:0;right:0;top:0;background:var(--past);pointer-events:none}
 /* an event: a solid tinted card with a strong colour bar, a bright title and a quieter time */
@@ -1032,7 +1034,7 @@ if (TOUCH) for (const g of ["gesturestart", "gesturechange"]) document.addEventL
    which shows this build, the phone's answers and a log of every day change with its cause. Until then CalHook.on is
    null and diag() does nothing. BUILD names this copy of the page, so a screenshot proves which copy ran: change it on
    every change to this page or calendar-readout.js (the date plus a letter). */
-const BUILD = "2026-11-25m trip home";
+const BUILD = "2026-11-27a night float";
 const CalHook = window.CalHook = { BUILD, on: null };
 const diag = (kind, msg) => { if (CalHook.on) CalHook.on(kind, msg); };
 /* The iPhone home screen app's fit (2026-11-12): html.hs in a home screen app on touch, html.hsfill and --hsgap when
@@ -1089,7 +1091,9 @@ const MON = ["January","February","March","April","May","June","July","August","
 const DOW = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"], DOWM = ["Mo","Tu","We","Th","Fr","Sa","Su"];
 const KICON = { deep: "🎯", studio: "🔑", yoga: "🪔", gym: "🏋️", dance: "💃", cook: "🍳", travel: "✈️", commute: "🚶", pack: "🧳", social: "💛", errand: "🧭", wind: "🌙", rest: "🌀", home: "🧺", other: "" };
 /** A Commute block shows its mode: 🚶, 🚇 or 🚗 (calendar-core.js modeOf: the pick in the panel, else the title). */
-const kicon = (e) => (e.k === "commute" ? (C.MODES.find((m) => m[0] === C.modeOf(e)) || C.MODES[0])[1] : KICON[e.k]);
+const kicon = (e) => (e.k === "commute" ? (C.MODES.find((m) => m[0] === C.modeOf(e)) || C.MODES[0])[1] : C.nightIcon(e.title) || KICON[e.k]);
+/** A night block's name with its icon (candle, bed, sun) on the panel's cards and rows (Junyan, 2026-11-27); any other title as it is. */
+const nameIcon = (e) => { const i = C.nightIcon(e.title); return (i ? i + " " : "") + esc(e.title); };
 const KNAME = Object.fromEntries(C.KINDS), TYPES = C.KINDS.map((x) => x[0]).filter((k) => k !== "other" && k !== "pack" && k !== "home" && k !== "commute");   // Domestic has no page of its own (d62); Commute has none either: its panel is in the event
 /* Packing (slice 02, d23) has no tab of its own: the rail's Packing button after Travel is its page (d17). */
 const KFROM = { deep: "your Tasks Inbox and your Claude sessions", studio: "the maintenance tab in FBS", yoga: "the new Yoga tab", gym: "your Gym tab",
@@ -1104,7 +1108,7 @@ const zoneName = (tz) => (ZONES.find((x) => x[0] === tz) || [0, tz])[1];
 const CACHE_KEY = "cal-app-cache-v1";
 const S = { tz: store.get("cal-tz") || DEVICE_TZ, tz2: store.get("cal-tz2") || "", n: store.get("cal-n") || "3",
   cur: null, win0: null, mini: null, miniLock: false, cals: [], hidden: new Set(JSON.parse(store.get("cal-hidden") || "[]")),
-  months: {}, sugg: [], loading: new Set(), tab: "now", ev: null, form: null, page: "cal", rail: store.get("cal-rail") !== "0", routine: store.get("cal-routine") !== "0", cmSuggest: store.get("cal-commute-suggest") !== "0", cmEarly: CalCommute.earlyMin(store.get("cal-commute-early")), autoG: [], top: null,
+  months: {}, sugg: [], loading: new Set(), tab: "now", ev: null, form: null, page: "cal", rail: store.get("cal-rail") !== "0", routine: store.get("cal-routine") !== "0", bedtime: C.bedtimeOf(store.get("cal-bedtime")), cmSuggest: store.get("cal-commute-suggest") !== "0", cmEarly: CalCommute.earlyMin(store.get("cal-commute-early")), autoG: [], top: null,
   look: C.lookId(store.get("cal-look")),
   h: C.startHour({ getItem: store.get }, TOUCH) };   // the hour height in px: 56 on a desktop; a phone's own pinched height (slice 01)
 S.n = S.n === "m" ? "m" : +S.n || 3;
@@ -1212,7 +1216,7 @@ function autoGhosts(days, evs) {
   for (const d of days) {
     if (d < t) continue;
     const a = C.instant(d, 0, S.tz), z = C.instant(C.addDays(d, 2), 0, S.tz);   // that day and the next morning only
-    for (const b of cal ? C.routineBlocks(d, mine.filter((e) => e.e > a && e.s < z), S.tz) : []) {
+    for (const b of cal ? C.routineBlocks(d, mine.filter((e) => e.e > a && e.s < z), S.tz, { bedtime: S.bedtime }) : []) {
       const id = `auto:${b.key}:${d}`;
       if (skip[id] || (b.e <= now && b.key !== "domestic")) continue;   // Domestic stays after its time has passed, so it can be accepted late (d70)
       out.push({ id, auto: true, ghost: true, status: "open", allDay: false, calId: cal.id, title: b.title, kind: b.kind, k: b.kind,
@@ -1394,12 +1398,16 @@ function strip(v) {
   const gh = ghosts();
   const allDay = [...evs.filter((e) => e.allDay), ...gh.filter((g) => g.allDay)];
   const timed = [...evs.filter((e) => !e.allDay), ...gh.filter((g) => !g.allDay)];
-  const hours = (tz) => { let s = ""; for (let h = 1; h < 24; h++) s += `<span style="top:calc(${h} * var(--H))">${C.hm(C.wall(C.instant(S.cur, h * 60, S.tz), tz).min)}</span>`; return s; };
+  /* The night blocks float (Junyan, 2026-11-27): each is drawn once, in the column of the day it starts, and the columns grow below midnight
+     by --tail hours so tonight's Sleep shows at its real times. The next day's column draws nothing for it (C.floatPiece). */
+  const tail = C.tailHours(timed.filter((e) => C.floats(e)).map((e) => C.floatPiece(e, S.tz)));
+  v.style.setProperty("--tail", String(tail));
+  const hours = (tz) => { let s = ""; for (let h = 1; h < 24 + tail; h++) s += `<span style="top:calc(${h} * var(--H))">${C.hm(C.wall(C.instant(S.cur, h * 60, S.tz), tz).min)}</span>`; return s; };
   let h = `<div class="gut"><div><div class="corner" title="Times in ${esc(zoneName(S.tz))}"><span>${esc(zoneName(S.tz))}</span></div><div class="hours">${hours(S.tz)}<span class="nowlbl" id="nowlbl" style="top:${nowY}" ${days.includes(t) ? "" : "hidden"}>${nowText(nowW.min)}</span></div></div>
     ${two() ? `<div class="second"><div class="corner" title="Times in ${esc(zoneName(S.tz2))}"><span>${esc(zoneName(S.tz2))}</span></div><div class="hours">${hours(S.tz2)}</div></div>` : ""}</div>`;
   for (const k of days) {
     const ad = allDay.filter((a) => C.coversDay(a, k)), ps = [], staff = [];
-    for (const e of timed) for (const p of C.pieces({ start: e.s, end: e.e }, [k], S.tz)) (isStaff(e) ? staff : ps).push({ id: keyOf(e), s: p.top, e: Math.max(p.bottom, p.top + 20), top: p.top, bot: p.bottom, ev: e });
+    for (const e of timed) for (const p of C.floats(e) ? [C.floatPiece(e, S.tz)].filter((x) => x.day === k) : C.pieces({ start: e.s, end: e.e }, [k], S.tz)) (isStaff(e) ? staff : ps).push({ id: keyOf(e), s: p.top, e: Math.max(p.bottom, p.top + 20), top: p.top, bot: p.bottom, ev: e });
     const shape = ps.map((p) => { const a = Math.max(0, (p.top - 360) / 960), b = Math.min(1, (p.bot - 360) / 960); return b > a ? `<i class="k-${p.ev.k}" style="left:${a * 100}%;width:${(b - a) * 100}%"></i>` : ""; }).join("");
     const bd = birthdaysOn(k).length;
     const pill = (a) => `<button class="pill k-${a.k} ${a.ghost ? "ghost" : ""}" data-key="${esc(keyOf(a))}">${esc(a.title)}</button>`;
@@ -1421,7 +1429,7 @@ function strip(v) {
   }
   const keepTop = v.querySelector(".strip") ? v.scrollTop : S.top;
   v.classList.add("snap");
-  v.innerHTML = `<div class="pane"><div class="strip" id="strip">${h}</div></div>`;
+  v.innerHTML = `<div class="pane"><div class="strip${tail ? " tail" : ""}" id="strip">${h}</div></div>`;
   size();
   v.scrollTop = keepTop ?? Math.max(0, (days.includes(t) ? nowW.min / 60 : 8) * S.h - 220);
   wireStrip(v);
@@ -1543,6 +1551,7 @@ function wireStrip(v) {
   v.querySelectorAll(".col").forEach((col) => {
     col.onclick = (e) => {
       if (e.target !== col && e.target.id !== "shade") return;
+      if (e.clientY - col.getBoundingClientRect().top >= 24 * S.h) return;   // below midnight is only where tonight's Sleep runs on
       const min = Math.floor(yToMin(col, e.clientY) / 30) * 30, s = C.instant(col.dataset.day, min, S.tz), cal = homeCal();
       if (!cal) { toast("No calendar you can write to", { bad: true }); return; }
       clearDraft(); const wasOpen = document.body.classList.contains("popen");
@@ -1658,7 +1667,7 @@ function wirePinch(v) {
     pinchFrame = 0; const p = pinch; if (!p) return;
     const h = C.pinchHeight(p.h0, p.d0, p.d, p.lo, C.HOUR.max);
     if (h !== S.h) setHour(h, p.cards);
-    v.scrollTop = C.pinchScroll(p.minute, p.y, p.head, h, p.sh0 + 24 * (h - p.h0) - p.ch);
+    v.scrollTop = C.pinchScroll(p.minute, p.y, p.head, h, p.sh0 + (24 + (+$("#view").style.getPropertyValue("--tail") || 0)) * (h - p.h0) - p.ch);
   }
   v.addEventListener("touchstart", function pinchStart(e) {
     if (pinch || e.touches.length !== 2 || S.page !== "cal" || S.n === "m" || !$("#strip")) return;
@@ -1762,7 +1771,7 @@ function paintPanel(anim) {
   if (S.tab === "event" && S.ev && b.querySelector("#cmBox")) cmAfter(S.ev);
 }
 const untilText = (min) => min < 60 ? `${Math.max(1, Math.round(min))} min` : min < 1440 ? C.dur(Math.round(min)) : `${Math.round(min / 1440)} days`;
-const rowHTML = (e, withDay) => `<button class="row k-${e.k}" data-key="${esc(keyOf(e))}" ${withDay ? 'style="grid-template-columns:104px 8px minmax(0,1fr)"' : ""}><small>${e.allDay ? "All day" : (withDay ? DOW[C.wall(e.s, S.tz).dow] + " " : "") + C.hm(C.wall(e.s, S.tz).min)}</small><i></i><span>${e.ghost ? "Suggested: " : ""}${esc(e.title)}</span></button>`;
+const rowHTML = (e, withDay) => `<button class="row k-${e.k}" data-key="${esc(keyOf(e))}" ${withDay ? 'style="grid-template-columns:104px 8px minmax(0,1fr)"' : ""}><small>${e.allDay ? "All day" : (withDay ? DOW[C.wall(e.s, S.tz).dow] + " " : "") + C.hm(C.wall(e.s, S.tz).min)}</small><i></i><span>${e.ghost ? "Suggested: " : ""}${nameIcon(e)}</span></button>`;
 /** A display-only row (a birthday): plain text, no button, no key, so a tap opens nothing and it can never be edited. */
 const plainRow = (e) => `<div class="row plain"><small>${e.allDay ? "All day" : C.hm(C.wall(e.s, S.tz).min)}</small><i></i><span>${esc(e.title)}</span></div>`;
 function pNow() {
@@ -1778,7 +1787,7 @@ function pNow() {
       <div style="min-width:0"><p class="lbl" style="margin:0 0 4px">${lbl}</p><div class="big">${esc(big)}</div><div style="font-size:13px;color:var(--soft);overflow-wrap:anywhere">${esc(sub)}</div></div></div>
     ${cur && next ? `<div><p class="lbl">Then</p>${rowHTML(next, C.wall(next.s, S.tz).day !== t)}</div>` : ""}
     <div><p class="lbl">Rest of today</p>${rest.map((e) => rowHTML(e)).join("") || '<span class="meta">Clear. Nothing left on the calendar today.</span>'}</div>
-    ${sug.length ? `<div><p class="lbl">Suggestions (${sug.length})</p>${sug.map((g) => `<div class="sugg"><b>${esc(g.title)}</b><span class="meta">${esc(whenText(g))} · from ${esc(g.by)}</span>${g.why ? `<span class="meta">${esc(g.why)}</span>` : ""}<div class="r"><button class="btn pri" data-acc="${esc(g.id)}">Accept</button><button class="btn" data-skip="${esc(g.id)}">Skip</button><button class="btn" data-go="${esc(g.id)}">Show</button></div></div>`).join("")}</div>` : ""}`;
+    ${sug.length ? `<div><p class="lbl">Suggestions (${sug.length})</p>${sug.map((g) => `<div class="sugg"><b>${nameIcon(g)}</b><span class="meta">${esc(whenText(g))} · from ${esc(g.by)}</span>${g.why ? `<span class="meta">${esc(g.why)}</span>` : ""}<div class="r"><button class="btn pri" data-acc="${esc(g.id)}">Accept</button><button class="btn" data-skip="${esc(g.id)}">Skip</button><button class="btn" data-go="${esc(g.id)}">Show</button></div></div>`).join("")}</div>` : ""}`;
 }
 /** "12:45 pm": when a block of dur minutes starting like ev ends, on the calendar's clock. */
 const endsText = (ev, dur) => C.hm(C.wall(ev.s + dur * 60000, S.tz).min);
@@ -1937,7 +1946,7 @@ function pSet() {
   const swatch = (l) => { const a = l.day || l, b = l.night || l;
     return `--lk-bg:${a.bg};--lk-bar:${a.theme};--lk-bg2:${b.bg};--lk-bar2:${b.theme};--lk-acc:${a.accent};--lk-1:${a.gels[0]};--lk-2:${a.gels[1]};--lk-3:${a.gels[2]}`; };
   return `<div class="field"><p class="lbl" style="margin:0">Look</p><div class="looks" role="group" aria-label="Look">${C.LOOKS.map((l) => `<button class="look" data-look="${l.id}" aria-pressed="${l.id === S.look}" style="${swatch(l)}"><span class="lk-chip ${l.day ? "split" : ""}" aria-hidden="true"><i></i><i></i><i></i></span><span class="lk-nm">${esc(l.name)}</span></button>`).join("")}</div><div class="meta">Tap one to try it on the whole calendar. This device remembers it. Studio is light by day and dark after sunset.</div></div>
-    <div class="field"><p class="lbl" style="margin:0">Daily blocks</p><label class="sw" for="routineSw">Suggest Domestic, Wind Down, Sleep and Morning Routine<input type="checkbox" id="routineSw" ${S.routine ? "checked" : ""}></label><label class="sw" for="cmSuggSw">Suggest a Commute block before plans away from home<input type="checkbox" id="cmSuggSw" ${S.cmSuggest ? "checked" : ""}></label></div>
+    <div class="field"><p class="lbl" style="margin:0">Daily blocks</p><label class="sw" for="routineSw">Suggest Domestic, Wind Down, Sleep and Morning Routine<input type="checkbox" id="routineSw" ${S.routine ? "checked" : ""}></label><label class="sw" for="bedSel">Bedtime<select id="bedSel">${C.BEDTIME.choices.map((m) => `<option value="${m % 1440}" ${m % 1440 === S.bedtime ? "selected" : ""}>${C.hm(m % 1440)}</option>`).join("")}</select></label><label class="sw" for="cmSuggSw">Suggest a Commute block before plans away from home<input type="checkbox" id="cmSuggSw" ${S.cmSuggest ? "checked" : ""}></label></div>
     <div class="field"><p class="lbl" style="margin:0">Studio shifts</p><label class="sw" for="railSw">Show in a slim rail, not as full blocks<input type="checkbox" id="railSw" ${S.rail ? "checked" : ""}></label></div>
     <div class="field"><p class="lbl" style="margin:0">Time zones</p><label class="sw" for="tz1">Main<select id="tz1">${opts(S.tz)}</select></label><label class="sw" for="tz2">Second<select id="tz2">${opts(S.tz2, true)}</select></label></div>
     <div class="field"><p class="lbl" style="margin:0">Block types</p>${C.KINDS.map(([k, n]) => `<div class="r k-${k}" style="color:var(--soft)"><i style="width:12px;height:12px;border-radius:4px;background:var(--c)"></i>${KICON[k] ? KICON[k] + " " : ""}${n}</div>`).join("")}<div class="meta">Guessed from the title. Change one on its event and it sticks.</div></div>
@@ -3527,6 +3536,7 @@ function setup() {
     const t = e.target;
     if (t.id === "railSw") { S.rail = t.checked; store.set("cal-rail", S.rail ? "1" : "0"); render(); }
     else if (t.id === "routineSw") { S.routine = t.checked; store.set("cal-routine", S.routine ? "1" : "0"); render(); }
+    else if (t.id === "bedSel") { S.bedtime = C.bedtimeOf(t.value); store.set("cal-bedtime", String(S.bedtime)); render(); }
     else if (t.id === "cmSuggSw") { S.cmSuggest = t.checked; store.set("cal-commute-suggest", S.cmSuggest ? "1" : "0"); render(); }
     else if (t.id === "tz1") { S.tz = t.value; store.set("cal-tz", S.tz); S.months = {}; showLook(); render(); refresh(true); }
     else if (t.id === "tz2") { S.tz2 = t.value; store.set("cal-tz2", S.tz2); render(); }

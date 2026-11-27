@@ -171,30 +171,39 @@
   /** Suggested blocks for one day. events: his own timed events {title, s, e} in ms (no all-day, no studio shifts, no
       suggestions), covering the day and the next morning. Domestic is searched over the whole day from 9 am, today included,
       so it stays where it was and can be accepted late (Junyan, 2026-11-25, d70). Returns [{key, kind, title, s, e, why}]; a block he already has (by title) is left out, the rest keep their times. */
-  function routineBlocks(day, events, tz) {
+  /* Bedtime (Junyan, 2026-11-27, d3: "3 11pm is bed time"): the night starts at bedtime, not 8 hours before the morning. Minutes after
+     midnight; a pick before noon (12:30 am) is after midnight, on the next calendar day. */
+  const BEDTIME = { default: 23 * 60, choices: [21 * 60, 21 * 60 + 30, 22 * 60, 22 * 60 + 30, 23 * 60, 23 * 60 + 30, 24 * 60, 24 * 60 + 30, 25 * 60] };
+  function bedtimeOf(raw) { const n = Math.round(Number(raw)); return raw != null && raw !== "" && Number.isFinite(n) && n >= 0 && n < 1440 ? n : BEDTIME.default; }
+  function routineBlocks(day, events, tz, opts = {}) {
     const R = ROUTINE, M = 60000, next = addDays(day, 1), [d0, d1] = dayBounds(day, tz), [, n1] = dayBounds(next, tz);
+    const bed = bedtimeOf(opts.bedtime), bedAt = instant(day, bed < 12 * 60 ? bed + 1440 : bed, tz);
     const own = (e) => RX_WIND.test(e.title) || RX_SLEEP.test(e.title) || RX_MORNING.test(e.title) || RX_DOMESTIC.test(e.title);
     const busy = events.filter((e) => e.e > e.s && !own(e)).sort((a, b) => a.s - b.s);
-    // the morning: an hour, ending at the next day's first plan (after 4 am), else 9 am, and never after 10 am
+    // the latest he can wake: an hour for the morning routine before the next day's first plan (after 4 am), else 9 am, and never after 10 am
     const first = busy.find((e) => e.s >= instant(next, 4 * 60, tz) && e.s < n1);
     const mEnd = first ? Math.min(first.s, instant(next, R.morningLatest, tz)) : instant(next, R.morningBy, tz);
-    const mStart = mEnd - R.morning * M, sleepEnd = mStart;
-    // the night: 8 hours of sleep and an hour to wind down before it, moved later (and shorter) when the evening runs late
-    let windStart = sleepEnd - (R.sleep + R.wind) * M, sleepStart = sleepEnd - R.sleep * M;
-    const late = busy.filter((e) => e.s < sleepEnd && e.e > windStart && e.s >= instant(day, 12 * 60, tz)).reduce((m, e) => Math.max(m, e.e), 0);
+    const latestWake = mEnd - R.morning * M;
+    // the night: bed at bedtime, or earlier when an early plan needs 8 hours before it (a late plan never pushes bed past bedtime);
+    // an hour to wind down before; moved later (and shorter) when the evening runs late
+    const sleepStart0 = Math.min(bedAt, latestWake - R.sleep * M), windStart0 = sleepStart0 - R.wind * M;
+    let windStart = windStart0, sleepStart = sleepStart0;
+    const late = busy.filter((e) => e.s < sleepStart0 + R.sleep * M && e.e > windStart0 && e.s >= instant(day, 12 * 60, tz)).reduce((m, e) => Math.max(m, e.e), 0);
     if (late > windStart) { windStart = late; sleepStart = Math.max(sleepStart, windStart + R.windMin * M); }
     // his own wind down that night: sleep starts when it ends
-    const myWind = events.filter((e) => RX_WIND.test(e.title) && e.s >= instant(day, 12 * 60, tz) && e.s < sleepEnd).sort((a, b) => b.e - a.e)[0];
-    if (myWind && myWind.e > sleepStart) sleepStart = Math.min(myWind.e, sleepEnd);
+    const myWind = events.filter((e) => RX_WIND.test(e.title) && e.s >= instant(day, 12 * 60, tz) && e.s < latestWake).sort((a, b) => b.e - a.e)[0];
+    if (myWind && myWind.e > sleepStart) sleepStart = Math.min(myWind.e, latestWake);
+    // 8 hours of sleep, cut short only by the latest wake time; the morning routine follows the wake up
+    const sleepEnd = Math.min(latestWake, sleepStart + R.sleep * M), mStart = sleepEnd, mEnd2 = mStart + R.morning * M;
     const h = (ms) => dur(Math.round(ms / M));
     const out = [], night = sleepStart < sleepEnd;   // a plan that runs into the morning leaves no night to suggest
     const has = (rx, a, b) => events.some((e) => rx.test(e.title) && e.s < b && e.e > a);
     if (night && !has(RX_WIND, d0 + 12 * 60 * M, d1 + 6 * 60 * M)) out.push({ key: "wind", kind: "wind", title: "Wind Down", s: windStart, e: sleepStart,
-      why: late > sleepEnd - (R.sleep + R.wind) * M ? "Starts when your evening ends" : "An hour before sleep" });
+      why: late > windStart0 ? "Starts when your evening ends" : "An hour before sleep" });
     if (night && !has(RX_SLEEP, sleepStart, sleepEnd)) out.push({ key: "sleep", kind: "wind", title: "Sleep", s: sleepStart, e: sleepEnd,
-      why: sleepEnd - sleepStart < R.sleep * M ? `${h(sleepEnd - sleepStart)}, the evening runs late` : "8 hours" });
-    if (!has(RX_MORNING, d1, n1)) out.push({ key: "morning", kind: "yoga", title: "Morning Routine", s: mStart, e: mEnd,
-      why: first ? `Before ${first.title}` : "Before your day starts" });
+      why: sleepEnd - sleepStart < R.sleep * M ? `${h(sleepEnd - sleepStart)}, ${sleepEnd === latestWake ? "the evening runs late" : "your own wind down runs late"}` : "8 hours" });
+    if (!has(RX_MORNING, d1, n1)) out.push({ key: "morning", kind: "yoga", title: "Morning Routine", s: mStart, e: mEnd2,
+      why: sleepEnd === latestWake ? (first ? `Before ${first.title}` : "Before your day starts") : "Right after you wake" });
     // Domestic (d70): the EARLIEST free window of 30 min or more between 9 am and wind down, an hour long when the hour fits there,
     // else the window's length rounded down to 15 minutes. Today is searched from 9 am too, so the block does not move as the day goes.
     if (!has(RX_DOMESTIC, d0, d1)) {
@@ -211,6 +220,20 @@
     }
     return out;
   }
+
+  /* ---- the night blocks float (Junyan, 2026-11-27: "I want it to float directly in the calendar"): Wind Down, Sleep and Morning
+     Routine, suggested or accepted, are drawn ONCE, in the column of the day they start, running on past midnight into a
+     taller column, like Commute floats before its plan. The next day's column draws nothing for them (no duplicate). ---- */
+  const NIGHT_ICON = [[/^wind.?down$/i, "\u{1F56F}\uFE0F"], [/^sleep$/i, "\u{1F6CF}\uFE0F"], [/^morning routine$/i, "\u2600\uFE0F"]];
+  const nightIcon = (title) => { const t = String(title || "").trim(), hit = NIGHT_ICON.find(([rx]) => rx.test(t)); return hit ? hit[1] : ""; };
+  const floats = (ev) => !!nightIcon(ev && ev.title);
+  /** The one piece a floated block draws: the column of the day it starts, top and bottom in minutes from that midnight (bottom may pass 1440). */
+  function floatPiece(ev, tz) {
+    const w = wall(ev.s, tz);
+    return { day: w.day, top: w.min, bottom: w.min + Math.round((ev.e - ev.s) / 60000) };
+  }
+  /** How many hours the columns grow below midnight so every floated piece fits (0 when none passes midnight). */
+  const tailHours = (pcs) => Math.max(0, Math.ceil(pcs.reduce((m, p) => Math.max(m, p.bottom), 1440) / 60) - 24);
 
   /* ---- tasks ---- */
   function orderBetween(prev, next) {
@@ -539,7 +562,7 @@
   const clock = (min) => { const h = Math.floor(min / 60) % 24; return `${h % 12 || 12}:${String(min % 60).padStart(2, "0")} ${h < 12 ? "AM" : "PM"}`; };
 
   root.CalCore = { wall, instant, offset, addDays, dowOf, weekStart, isoWeek, addMonths, monthKey, monthsFor,
-    KINDS, MODES, modeOf, guessKind, kindOf, layout, pieces, coversDay, routineBlocks, ROUTINE, orderBetween, groupOf, dropTask, blockMinutes, hm, dur, SWIPE, swipeLock, swipeCommit, HOUR, pinchHeight, hourMin, pinchMinute, pinchScroll, cardFit, cardTime, startHour, LOOKS, lookId, startLook, LOOK_RESET, placeOf, sunTimes, sunHalf, lookFace, tripCards, tripLinks, homeFit, homeShift,
+    KINDS, MODES, modeOf, guessKind, kindOf, layout, pieces, coversDay, routineBlocks, ROUTINE, BEDTIME, bedtimeOf, nightIcon, floats, floatPiece, tailHours, orderBetween, groupOf, dropTask, blockMinutes, hm, dur, SWIPE, swipeLock, swipeCommit, HOUR, pinchHeight, hourMin, pinchMinute, pinchScroll, cardFit, cardTime, startHour, LOOKS, lookId, startLook, LOOK_RESET, placeOf, sunTimes, sunHalf, lookFace, tripCards, tripLinks, homeFit, homeShift,
     sheetForm, sheetWhen, sheetPatch, locationPatch, sheetLength, sheetStart, sheetEnd, sheetDay, sheetEndDay, sheetAllDay, notesRich, notesText, dayText, clock, toMin };
 })(typeof window !== "undefined" ? window : globalThis);
 

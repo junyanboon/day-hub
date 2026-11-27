@@ -12,23 +12,23 @@ const by = (list) => Object.fromEntries(list.map((b) => [b.key, b]));
 
 test("a clear evening: wind down, 8 hours of sleep and the morning routine sit back to back", () => {
   const b = by(C.routineBlocks(DAY, [ev("Shambhavi", NEXT, 9, 30, 10, 30)], TO));
-  assert.equal(hm(b.morning.e), "22 9:30 am", "the morning ends at the next day's first plan");
-  assert.equal(hm(b.morning.s), "22 8:30 am");
+  assert.equal(hm(b.morning.s), "22 7:00 am", "the morning follows the wake up (bedtime 11 pm, 8 hours), well before the 9:30 plan");
+  assert.equal(hm(b.morning.e), "22 8:00 am");
   assert.equal(b.sleep.e, b.morning.s); assert.equal(b.wind.e, b.sleep.s);
-  assert.equal(hm(b.sleep.s), "22 12:30 am"); assert.equal(hm(b.wind.s), "21 11:30 pm");
+  assert.equal(hm(b.sleep.s), "21 11:00 pm"); assert.equal(hm(b.wind.s), "21 10:00 pm");
   assert.equal(b.sleep.e - b.sleep.s, 8 * 3600000);
 });
 
-test("no plan the next morning: the routine ends at 9 am; an early class moves it earlier, a late one stops at 10 am", () => {
-  assert.equal(hm(by(C.routineBlocks(DAY, [], TO)).morning.e), "22 9:00 am");
+test("no plan the next morning: bed at 11 pm, up at 7, routine 7 to 8; an early class moves it earlier, a late one never pushes bed past bedtime", () => {
+  assert.equal(hm(by(C.routineBlocks(DAY, [], TO)).morning.e), "22 8:00 am");
   assert.equal(hm(by(C.routineBlocks(DAY, [ev("Gym", NEXT, 7, 0, 8, 0)], TO)).morning.e), "22 7:00 am");
-  assert.equal(hm(by(C.routineBlocks(DAY, [ev("Brunch", NEXT, 12, 0, 13, 0)], TO)).morning.e), "22 10:00 am");
+  assert.equal(hm(by(C.routineBlocks(DAY, [ev("Brunch", NEXT, 12, 0, 13, 0)], TO)).morning.e), "22 8:00 am");
 });
 
 test("a late night: wind down starts when the evening ends, and sleep gets shorter, not the morning", () => {
   const b = by(C.routineBlocks(DAY, [ev("DLX - Bday Dance!", DAY, 22, 30, 23, 45), ev("Shambhavi", NEXT, 9, 30, 10, 30)], TO));
   assert.equal(hm(b.wind.s), "21 11:45 pm");
-  assert.equal(hm(b.sleep.s), "22 12:30 am", "45 min of wind down still fits before 12:30, so sleep keeps its 8 hours");
+  assert.equal(hm(b.sleep.s), "22 12:15 am", "wind down shrinks to its 30 min minimum, bed moves from 11 pm to 12:15 am");
   const c = by(C.routineBlocks(DAY, [{ title: "Party", s: at(DAY, 23, 0), e: at(NEXT, 1, 30) }, ev("Shambhavi", NEXT, 9, 30, 10, 30)], TO));
   assert.equal(hm(c.wind.s), "22 1:30 am"); assert.equal(hm(c.sleep.s), "22 2:00 am", "wind down shrinks to 30 min");
   assert.equal(hm(c.sleep.e), "22 8:30 am"); assert.match(c.sleep.why, /6 h 30|6h 30|6:30/);
@@ -66,11 +66,11 @@ test("d70: today is searched from 9 am too, so the suggestion stays where it was
 });
 
 test("a block he already has is not suggested again, and the others keep their times", () => {
-  const mine = [ev("Wind down", DAY, 23, 30, 23, 59), ev("Shambhavi", NEXT, 9, 30, 10, 30), ev("Laundry", DAY, 14, 0, 15, 0)];
+  const mine = [ev("Wind down", DAY, 22, 0, 22, 45), ev("Shambhavi", NEXT, 9, 30, 10, 30), ev("Laundry", DAY, 14, 0, 15, 0)];
   const b = by(C.routineBlocks(DAY, mine, TO));
   assert.equal(b.wind, undefined); assert.equal(b.domestic, undefined);
-  assert.equal(hm(b.sleep.s), "22 12:30 am", "his own wind down does not push sleep later");
-  assert.equal(hm(b.morning.e), "22 9:30 am");
+  assert.equal(hm(b.sleep.s), "21 11:00 pm", "his own wind down, over before bedtime, does not push sleep later");
+  assert.equal(hm(b.morning.e), "22 8:00 am");
 });
 
 test("his own wind down that runs late: the suggested sleep starts when it ends", () => {

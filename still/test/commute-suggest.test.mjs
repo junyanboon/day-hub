@@ -235,9 +235,9 @@ test("the To line shows the place's name over its address when one was picked, f
 
 test("page: the second switch, the load of places, the suggestion draw, the gym wording and the stamps", () => {
   const html = fs.readFileSync(fileURLToPath(new URL("../calendar.html", import.meta.url)), "utf8");
-  assert.match(html, /const BUILD = "2026-11-25m trip home";/);
+  assert.match(html, /const BUILD = "2026-11-27a night float";/);
   assert.match(html, /calendar-commute\.js\?v=12/);
-  assert.match(html, /calendar-core\.js\?v=35"/, "the core moved on (d70 Domestic)");
+  assert.match(html, /calendar-core\.js\?v=36"/, "the core moved on (d70 Domestic)");
   assert.match(html, /id="cmSuggSw"/);
   assert.match(html, /Suggest a Commute block before plans away from home/);
   assert.match(html, /store\.get\("cal-commute-suggest"\) !== "0"/, "on by default, its own store key");
@@ -373,7 +373,7 @@ test("d67: the page draws it from the same switch, Skip and calendar as the To s
   const commuteLoop = draw.slice(draw.indexOf("commuteSuggestions"));
   assert.doesNotMatch(commuteLoop.split("}")[0], /b\.e <= now/, "an earlier Commute suggestion is not hidden by the clock");
   assert.match(commuteLoop, /if \(skip\[id\]\) continue;/);
-  assert.match(draw, /C\.routineBlocks\(d, mine\.filter\(\(e\) => e\.e > a && e\.s < z\), S\.tz\)/, "the routine search no longer takes the clock");
+  assert.match(draw, /C\.routineBlocks\(d, mine\.filter\(\(e\) => e\.e > a && e\.s < z\), S\.tz, \{ bedtime: S\.bedtime \}\)/, "the routine search no longer takes the clock");
 });
 
 test("d67: an accepted trip home block opens with From the place he is leaving and To Home", () => {
