@@ -145,3 +145,10 @@ test("a real Super Veggie keeps the Morning Routine anchored before it", () => {
   assert.equal(m.why, "Before Super Veggie"); assert.equal(m.e, at(FRI, 8, 30));
   assert.equal(meals(sv).veggie, undefined);
 });
+
+test("ghost blocks carry no visible 'Suggested:' prefix (the dashed border says it)", async () => {
+  const { readFileSync } = await import("node:fs");
+  const html = readFileSync(new URL("../calendar.html", import.meta.url), "utf8");
+  assert.doesNotMatch(html, /content:\s*"Suggested: "/);
+  assert.match(html, /\.ev\.ghost\{[^}]*dashed/);
+});

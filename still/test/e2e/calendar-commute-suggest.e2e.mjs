@@ -120,7 +120,7 @@ try {
       check(`${label}: none before the plan at the same place, after a Commute block, at Home, on a staff calendar or a read-only one`, !day.some((g) => /Studio hour 2|Tutoring|Dinner at home|Staff meeting|Caney lunch/.test(g.why)));
       await goDay("2026-11-26");
       const look = await page.evaluate((id) => { const el = document.querySelector(`.ev.ghost[data-key="g|joint|${id}"]`); if (!el) return null; const cs = getComputedStyle(el); return { dashed: cs.borderTopStyle, text: el.innerText.replace(/\s+/g, " ").trim(), icon: !!el.querySelector(".ei") && el.querySelector(".ei").innerText }; }, den.id);
-      check(`${label}: it is drawn like the other suggestions: dashed, "Suggested: Commute", with the Walk icon`, !!look && look.dashed === "dashed" && /Commute/.test(look.text) && look.icon === "\u{1F6B6}", JSON.stringify(look));
+      check(`${label}: it is drawn like the other suggestions: dashed, plain "Commute" (no "Suggested:"), with the Walk icon`, !!look && look.dashed === "dashed" && /Commute/.test(look.text) && !/Suggested/.test(look.text) && look.icon === "\u{1F6B6}", JSON.stringify(look));
       check(`${label}: the four routine suggestions still draw on a free day`, await page.evaluate(() => ["wind", "sleep", "morning", "domestic"].every((k) => S.autoG.some((g) => g.id === `auto:${k}:2026-11-27`))));
       await sleep(1500);
       const calls = reqs.filter((u) => CALL.test(u));
