@@ -14,6 +14,8 @@ const PORT = +(process.argv[2] || process.env.PORT || 8791);
 const TYPES = { ".html": "text/html", ".js": "text/javascript", ".mjs": "text/javascript", ".css": "text/css", ".svg": "image/svg+xml", ".png": "image/png", ".json": "application/json", ".webmanifest": "application/manifest+json" };
 /* DEV_NO_BDAY=1 plays the old server: no Community Birthdays calendar in the list and none of its events (the page goes live before the server part does) */
 const NO_BDAY = !!process.env.DEV_NO_BDAY;
+/* DEV_NO_WIND=1 leaves out the sample nightly "Wind down" and daily "Morning Yoga" plans, so the calendar's own suggested night blocks show (the night blocks check) */
+const NO_WIND = !!process.env.DEV_NO_WIND;
 const CALS = [
   { id: "joint", name: "Joint Plans", color: "#33c481", writable: true, ok: true },
   { id: "junyan", name: "Junyan", color: "#f6bf26", writable: true, ok: true },
@@ -44,6 +46,7 @@ let events = [
   E(-2, 12, 0, 13, 0, "Gym · Jack Woods"), E(20, 13, 15, 14, 45, "Zouk Training"), E(-20, 13, 15, 14, 45, "Zouk Training"),
 ];
 for (let d = -30; d <= 45; d++) events.push(E(d, 18, 0, 19, 0, "Dinner", "joint", { recurringEventId: "dinner" }), E(d, 6, 45, 8, 0, "Morning Yoga"), E(d, 21, 45, 22, 30, "Wind down"));
+if (NO_WIND) events = events.filter((x) => x.title !== "Wind down" && x.title !== "Morning Yoga");
 let sugg = [{ id: "sg_1", status: "open", title: "Pack for FICTION stay", start: at(2, 19), end: at(2, 20), calId: "joint", by: "Desk Hand session", why: "You drive out at 10:30 Friday" }];
 const tasks = [];
 let places = [];

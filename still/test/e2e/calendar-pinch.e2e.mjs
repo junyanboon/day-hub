@@ -42,7 +42,8 @@ const look = async (page) => { await settle(page); return page.evaluate(() => {
   const shown = days.reduce((a, b) => (Math.abs(b.x - gut.right) < Math.abs(a.x - gut.right) ? b : a)).k;
   return { h: sp[1].getBoundingClientRect().top - sp[0].getBoundingClientRect().top, hoursTop: hours.top, shown,
     scale: visualViewport.scale, same: document.querySelector("#strip") === window.__strip, scrollTop: v.scrollTop,
-    fits: v.scrollHeight <= v.clientHeight + 1, viewTop: v.getBoundingClientRect().top,
+    fits: v.scrollHeight - (+v.style.getPropertyValue("--tail") || 0) * S.h <= v.clientHeight + 3,   /* (whole pixels) the 24 hours fit; the hours below midnight (tonight's Sleep floats there, 2026-11-27) scroll */
+    viewTop: v.getBoundingClientRect().top,
     open: document.body.classList.contains("popen"), draft: !!document.querySelector(".ev.draft"), saved: localStorage.getItem("cal-hour") };
 }); };
 /** The minute the now pill shows ("3:27", the half of the day from the clock): the line is drawn at that whole minute
@@ -118,7 +119,7 @@ try {
   await pinch(X, Y, 420, 40, 18);
   L = await look(page);
   check("squeeze far: the rows get shorter than 56", L.h < 56, L.h.toFixed(2));
-  check("squeeze far: stops where the whole day fits the screen (no up/down scroll left)", L.fits, `h ${L.h.toFixed(2)}`);
+  check("squeeze far: stops where the whole day fits the screen (no up/down scroll left, bar the hours below midnight)", L.fits, `h ${L.h.toFixed(2)}`);
   const lo = L.h;
   await pinch(X, Y, 300, 60);
   L = await look(page);
