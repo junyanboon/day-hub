@@ -129,3 +129,19 @@ test("meal icons: broccoli, peanuts, pot; apart from the night icons, so a meal 
   assert.equal(C.mealIcon("Bday Dinner"), ""); assert.equal(C.mealIcon("Sleep"), "");
   for (const t of ["Super Veggie", "Nutty Pudding", "Dinner"]) { assert.equal(C.nightIcon(t), ""); assert.equal(C.floats({ title: t }), false); }
 });
+
+test("review fixes: Super Veggie stays right after the routine even with Domestic suggested; a routine across midnight is the anchor; a late dinner last night is not today's", () => {
+  const b = by(C.mealBlocks(FRI, [], TO, { bedtime: 30 }));
+  assert.deepEqual(span(by(C.routineBlocks(THU, [], TO, { bedtime: 30 })).morning), ["27 8:00 am", "27 9:00 am"]);
+  assert.deepEqual(span(b.veggie), ["27 9:00 am", "27 10:00 am"], "right after the 8 to 9 routine, beside Domestic");
+  const across = [{ title: "Morning Routine", s: at(THU, 23, 30), e: at(FRI, 0, 30) }];
+  assert.deepEqual(span(meals(across).veggie), ["27 12:30 am", "27 1:30 am"]);
+  assert.ok(meals([ev("Bday Dinner", THU, 21, 0, 23, 59), { title: "Late Dinner", s: at(THU, 22, 0), e: at(FRI, 1, 0) }]).dinner, "dinners that start the day before do not count");
+});
+
+test("a real Super Veggie keeps the Morning Routine anchored before it", () => {
+  const sv = [ev("Super Veggie", FRI, 8, 30, 9, 30)];
+  const m = by(C.routineBlocks(THU, sv, TO, { bedtime: 23 * 60 + 30 })).morning;
+  assert.equal(m.why, "Before Super Veggie"); assert.equal(m.e, at(FRI, 8, 30));
+  assert.equal(meals(sv).veggie, undefined);
+});

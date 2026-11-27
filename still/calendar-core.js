@@ -241,10 +241,10 @@
     const free = (s, e, held) => !real.some((x) => x.s < e && x.e > s) && !held.some((x) => x.s < e && x.e > s);
     // meals keep out of Domestic's way; when that leaves no room, the meal still goes in (eating comes first) and only avoids real events and other meals
     const fit = (list, held) => list.find((c) => free(c.s, c.e, held)) || list.find((c) => free(c.s, c.e, held.filter((x) => x.key !== "domestic")));
-    const today = (rx) => real.some((e) => rx.test(e.title) && e.s < d1 && e.e > d0);
+    const today = (rx) => real.some((e) => rx.test(e.title) && e.s >= d0 && e.s < d1);   // a plan that starts that day: a late dinner last night is last night's
     const held = [], out = [], pick = (list, k) => list.find((b) => b.key === k);
     // the morning: his own Morning Routine that day, else the one suggested the evening before
-    const mine = real.filter((e) => RX_MORNING.test(e.title) && e.s >= d0 && e.s < d1).sort((a, b) => b.e - a.e)[0];
+    const mine = real.filter((e) => RX_MORNING.test(e.title) && e.e > d0 && e.s < d1).sort((a, b) => b.e - a.e)[0];
     const sugg = mine || pick(routineBlocks(prev, real.filter((e) => e.e > instant(prev, 0, tz)), tz, opts), "morning");
     // the night: his own Wind Down that evening, else the one suggested, else bedtime less an hour
     const winds = real.filter((e) => RX_WIND.test(e.title) && e.s >= d0 + 12 * 60 * M && e.s < d1 + 6 * 60 * M).sort((a, b) => a.s - b.s);
@@ -255,7 +255,7 @@
     const dom = pick(routineBlocks(day, real.filter((e) => e.e > d0), tz, opts), "domestic"); if (dom) held.push(dom);
     if (!today(RX_MEAL.veggie) && sugg) {
       const list = []; for (let s = sugg.e; s <= sugg.e + X.veggieSlide * M; s += q) list.push({ s, e: s + X.veggie * M });
-      const c = fit(list, held);
+      const c = list.find((x) => free(x.s, x.e, [])) === list[0] ? list[0] : fit(list, held);   // right after the routine wins over Domestic's suggested hour; sliding is only for a real plan in the way
       if (c) { out.push({ key: "veggie", kind: "cook", title: "Super Veggie", s: c.s, e: c.e, why: c.s === sugg.e ? "Right after Morning Routine" : "After Morning Routine, once you are free" }); held.push(out[out.length - 1]); }
     }
     if (!today(RX_MEAL.pudding)) {
