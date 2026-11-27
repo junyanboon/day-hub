@@ -221,6 +221,58 @@
     return out;
   }
 
+  /* ---- meals (Junyan, 2026-11-27: "if meals are missing can we have it suggested as well? (We need to eat)"; "4 yes but we want specifically
+     Super Veggie, Nutty Pudding & Dinner"; "Nutty Pudding is 30 minutes, Super veggie is 1 hr (I need to cook) Dinner is also 1 hr (generally around
+     6pm.. we prefer to have a bit of distance from when we wind down)") ----
+     Keyed by the day he eats them. Super Veggie is right after that morning's Morning Routine (the one routineBlocks(day - 1) suggests, or his own);
+     Nutty Pudding is the free half hour nearest 12:30; Dinner is the free hour nearest 6 pm, earlier and never later, ending at least 3 hours before
+     that night's Wind Down. A meal never overlaps a real event, Domestic or another meal: with no room it is left out that day. */
+  const MEALS = { veggie: 60, pudding: 30, dinner: 60, step: 15, veggieSlide: 90, puddingAt: 12 * 60 + 30, puddingFrom: 10 * 60, puddingTo: 16 * 60,
+    dinnerAt: 18 * 60, dinnerFrom: 15 * 60, dinnerGap: 3 * 60 };
+  const RX_MEAL = { veggie: /super veggie/i, pudding: /nutty pudding/i, dinner: /dinner/i };
+  const MEAL_ICON = [[/^super veggie$/i, "\u{1F966}"], [/^nutty pudding$/i, "\u{1F95C}"], [/^dinner$/i, "\u{1F372}"]];
+  /** A meal suggestion's icon by its exact title (broccoli, peanuts, pot); "" for any other title. Apart from nightIcon, so a meal never floats. */
+  const mealIcon = (title) => { const t = String(title || "").trim(), hit = MEAL_ICON.find(([rx]) => rx.test(t)); return hit ? hit[1] : ""; };
+  /** Suggested meals for one day. events: his own timed events {title, s, e} in ms (as routineBlocks), covering the day before through the next morning.
+      Returns [{key, kind, title, s, e, why}] with keys veggie, pudding, dinner; a meal he already has that day (by title) is left out. */
+  function mealBlocks(day, events, tz, opts = {}) {
+    const R = ROUTINE, X = MEALS, M = 60000, prev = addDays(day, -1), [d0, d1] = dayBounds(day, tz);
+    const real = events.filter((e) => e.e > e.s), q = X.step * M, at = (min) => instant(day, min, tz);
+    const free = (s, e, held) => !real.some((x) => x.s < e && x.e > s) && !held.some((x) => x.s < e && x.e > s);
+    // meals keep out of Domestic's way; when that leaves no room, the meal still goes in (eating comes first) and only avoids real events and other meals
+    const fit = (list, held) => list.find((c) => free(c.s, c.e, held)) || list.find((c) => free(c.s, c.e, held.filter((x) => x.key !== "domestic")));
+    const today = (rx) => real.some((e) => rx.test(e.title) && e.s >= d0 && e.s < d1);   // a plan that starts that day: a late dinner last night is last night's
+    const held = [], out = [], pick = (list, k) => list.find((b) => b.key === k);
+    // the morning: his own Morning Routine that day, else the one suggested the evening before
+    const mine = real.filter((e) => RX_MORNING.test(e.title) && e.e > d0 && e.s < d1).sort((a, b) => b.e - a.e)[0];
+    const sugg = mine || pick(routineBlocks(prev, real.filter((e) => e.e > instant(prev, 0, tz)), tz, opts), "morning");
+    // the night: his own Wind Down that evening, else the one suggested, else bedtime less an hour
+    const winds = real.filter((e) => RX_WIND.test(e.title) && e.s >= d0 + 12 * 60 * M && e.s < d1 + 6 * 60 * M).sort((a, b) => a.s - b.s);
+    const night = pick(routineBlocks(day, real.filter((e) => e.e > d0), tz, opts), "wind");
+    const bed = bedtimeOf(opts.bedtime), bedAt = instant(day, bed < 12 * 60 ? bed + 1440 : bed, tz);
+    const windAt = winds.length ? winds[0].s : night ? night.s : bedAt - R.wind * M;
+    // Domestic is placed first (its own rule, d70); meals keep out of its way
+    const dom = pick(routineBlocks(day, real.filter((e) => e.e > d0), tz, opts), "domestic"); if (dom) held.push(dom);
+    if (!today(RX_MEAL.veggie) && sugg) {
+      const list = []; for (let s = sugg.e; s <= sugg.e + X.veggieSlide * M; s += q) list.push({ s, e: s + X.veggie * M });
+      const c = list.find((x) => free(x.s, x.e, [])) === list[0] ? list[0] : fit(list, held);   // right after the routine wins over Domestic's suggested hour; sliding is only for a real plan in the way
+      if (c) { out.push({ key: "veggie", kind: "cook", title: "Super Veggie", s: c.s, e: c.e, why: c.s === sugg.e ? "Right after Morning Routine" : "After Morning Routine, once you are free" }); held.push(out[out.length - 1]); }
+    }
+    if (!today(RX_MEAL.pudding)) {
+      const cands = []; for (let m = X.puddingFrom; m + X.pudding <= X.puddingTo; m += X.step) cands.push(m);
+      cands.sort((a, b) => Math.abs(a - X.puddingAt) - Math.abs(b - X.puddingAt) || a - b);
+      const c = fit(cands.map((m) => ({ m, s: at(m), e: at(m) + X.pudding * M })), held);
+      if (c) { out.push({ key: "pudding", kind: "cook", title: "Nutty Pudding", s: c.s, e: c.e, why: c.m === X.puddingAt ? "Around 12:30" : "Nearest free time to 12:30" }); held.push(out[out.length - 1]); }
+    }
+    if (!today(RX_MEAL.dinner)) {
+      const latest = Math.floor((windAt - X.dinnerGap * M - X.dinner * M) / q) * q, top = Math.min(at(X.dinnerAt), latest);
+      const list = []; for (let s = top; s >= at(X.dinnerFrom); s -= q) list.push({ s, e: s + X.dinner * M });
+      const c = fit(list, held);
+      if (c) out.push({ key: "dinner", kind: "cook", title: "Dinner", s: c.s, e: c.e, why: c.s === at(X.dinnerAt) ? "Around 6 pm" : "Earlier than 6 pm, to keep 3 hours before Wind Down" });
+    }
+    return out.sort((a, b) => a.s - b.s);
+  }
+
   /* ---- the night blocks float (Junyan, 2026-11-27: "I want it to float directly in the calendar"): Wind Down, Sleep and Morning
      Routine, suggested or accepted, are drawn ONCE, in the column of the day they start, running on past midnight into a
      taller column, like Commute floats before its plan. The next day's column draws nothing for them (no duplicate). ---- */
@@ -495,11 +547,15 @@
     const s = toMin(f.start), e = toMin(f.end);
     return ((f.days || 0) + (e <= s ? 1 : 0)) * 1440 + e - s;
   }
+  /** The form's length set to dur minutes: the start stays, the end (and any extra days) follows. */
+  function sheetLen(f, dur) {
+    const ns = toMin(f.start), tot = ns + Math.max(0, Math.round(dur)), em = tot % 1440;
+    return { ...f, end: toHHMM(em), days: Math.max(0, Math.floor(tot / 1440) - (em <= ns ? 1 : 0)) };
+  }
   /** Starts changed to hhmm: the end moves with it so the length stays. A blank or broken time changes nothing. */
   function sheetStart(f, hhmm) {
     const ns = toMin(hhmm); if (ns == null) return f;
-    const tot = ns + sheetLength(f), em = tot % 1440;
-    return { ...f, start: toHHMM(ns), end: toHHMM(em), days: Math.max(0, Math.floor(tot / 1440) - (em <= ns ? 1 : 0)) };
+    return sheetLen({ ...f, start: toHHMM(ns) }, sheetLength(f));
   }
   const isDay = (day) => /^\d{4}-\d{2}-\d{2}$/.test(day || "");
   /** Ends changed to hhmm, on its own. */
@@ -562,8 +618,8 @@
   const clock = (min) => { const h = Math.floor(min / 60) % 24; return `${h % 12 || 12}:${String(min % 60).padStart(2, "0")} ${h < 12 ? "AM" : "PM"}`; };
 
   root.CalCore = { wall, instant, offset, addDays, dowOf, weekStart, isoWeek, addMonths, monthKey, monthsFor,
-    KINDS, MODES, modeOf, guessKind, kindOf, layout, pieces, coversDay, routineBlocks, ROUTINE, BEDTIME, bedtimeOf, nightIcon, floats, floatPiece, tailHours, orderBetween, groupOf, dropTask, blockMinutes, hm, dur, SWIPE, swipeLock, swipeCommit, HOUR, pinchHeight, hourMin, pinchMinute, pinchScroll, cardFit, cardTime, startHour, LOOKS, lookId, startLook, LOOK_RESET, placeOf, sunTimes, sunHalf, lookFace, tripCards, tripLinks, homeFit, homeShift,
-    sheetForm, sheetWhen, sheetPatch, locationPatch, sheetLength, sheetStart, sheetEnd, sheetDay, sheetEndDay, sheetAllDay, notesRich, notesText, dayText, clock, toMin };
+    KINDS, MODES, modeOf, guessKind, kindOf, layout, pieces, coversDay, routineBlocks, mealBlocks, mealIcon, MEALS, ROUTINE, BEDTIME, bedtimeOf, nightIcon, floats, floatPiece, tailHours, orderBetween, groupOf, dropTask, blockMinutes, hm, dur, SWIPE, swipeLock, swipeCommit, HOUR, pinchHeight, hourMin, pinchMinute, pinchScroll, cardFit, cardTime, startHour, LOOKS, lookId, startLook, LOOK_RESET, placeOf, sunTimes, sunHalf, lookFace, tripCards, tripLinks, homeFit, homeShift,
+    sheetForm, sheetWhen, sheetPatch, locationPatch, sheetLength, sheetLen, sheetStart, sheetEnd, sheetDay, sheetEndDay, sheetAllDay, notesRich, notesText, dayText, clock, toMin };
 })(typeof window !== "undefined" ? window : globalThis);
 
 /* The Packing page's rules (slice 01, Junyan 2026-11-13, d22: "22 yes"), with no page in them: still/test/packing.test.mjs.

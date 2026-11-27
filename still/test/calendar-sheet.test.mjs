@@ -118,3 +118,33 @@ test("the rows' words: Fri, Nov 13 and 1:45 PM", () => {
   assert.equal(C.clock(9 * 60), "9:00 AM");
   assert.equal(C.clock(0), "12:00 AM");
 });
+
+/* ---- the computer panel's Starts, Ends and Length (Junyan, 2026-11-27, d6: "6 yes"): same rule as the phone sheet ---- */
+const sleep = { ...fbs, title: "Sleep", start: "2026-11-13T23:00:00-05:00", end: "2026-11-14T07:00:00-05:00" };
+
+test("sheetLen: a new length moves the end and keeps the start, across midnight too", () => {
+  const f = C.sheetLen(C.sheetForm(fbs, TO), 75);
+  assert.deepEqual([f.start, f.end, f.days], ["13:45", "15:00", 0]);
+  assert.equal(C.sheetLength(f), 75);
+  const s = C.sheetLen(C.sheetForm(sleep, TO), 540);   // 11 pm + 9 h = 8 am next day
+  assert.deepEqual([s.start, s.end], ["23:00", "08:00"]);
+  assert.equal(C.sheetLength(s), 540);
+  assert.equal(C.sheetLength(C.sheetLen(C.sheetForm(sleep, TO), 1440)), 1440, "a full day");
+});
+
+test("a Sleep block 11 pm to 7 am reads as 8 hours, and Ends 6 am makes it 7", () => {
+  const f = C.sheetForm(sleep, TO);
+  assert.equal(C.sheetLength(f), 480);
+  const g = C.sheetEnd(f, "06:00");
+  assert.equal(C.sheetLength(g), 420);
+  assert.deepEqual(C.sheetPatch(sleep, g, TO), { end: "2026-11-14T11:00:00.000Z", start: "2026-11-14T04:00:00.000Z" });
+});
+
+test("Starts 10 pm on Sleep moves the end to 6 am, same 8 hours; Ends before Starts is the next day", () => {
+  const f = C.sheetStart(C.sheetForm(sleep, TO), "22:00");
+  assert.deepEqual([f.start, f.end, C.sheetLength(f)], ["22:00", "06:00", 480]);
+  const o = C.sheetEnd(C.sheetStart(C.sheetForm(fbs, TO), "23:00"), "07:00");   // an ordinary 1:45 pm block set to 11 pm to 7 am
+  assert.equal(C.sheetLength(o), 480);
+  const w = C.sheetWhen(o, TO);
+  assert.deepEqual([w.start, w.end], ["2026-11-14T04:00:00.000Z", "2026-11-14T12:00:00.000Z"]);
+});

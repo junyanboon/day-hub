@@ -343,7 +343,7 @@ test("the page: Length is one minus / plus line with the end time, disabled wher
   assert.doesNotMatch(fn, /durs\.map/, "no row of length chips");
   assert.match(fn, /aria-label="15 minutes shorter"/); assert.match(fn, /aria-label="15 minutes longer"/);
   assert.match(fn, /data-lenstep="-1"/); assert.match(fn, /data-lenstep="1"/);
-  assert.match(fn, /ends \$\{esc\(endsText\(/, "beside the length: ends 12:45 pm");
+  assert.match(fn, /ends \$\{esc\(C\.hm\(C\.toMin\(S\.form\.tf\.end\)\)\)\}/, "beside the length: ends 12:45 pm");
   assert.match(h, /\.lenrow button\{[^}]*min-height:44px/, "44px tall for touch");
   assert.match(h, /d\.lenstep/, "the buttons are wired");
   assert.match(h, /S\.form\.dur = CalCommute\.stepDur\(S\.form\.dur, \+d\.lenstep\)/, "it saves the way the chips did: S.form.dur");
@@ -534,4 +534,13 @@ test("d29: the Saved places chips show Home first, then kept places, then the Tr
   assert.equal(chips.some((p) => p.id === "r1" || p.id === "n1"), false, "remembered-for and pin-less places stay out");
   assert.deepEqual(K.savedChips([], null), []); assert.deepEqual(K.savedChips(null, null), []);
   assert.deepEqual(K.savedChips(trips.slice(0, 2), null).map((p) => p.id), ["t0", "t1"], "no Home saved: no Home chip");
+});
+test("the page: the computer panel has Starts and Ends time boxes above Length, saved through the sheet's rule", () => {
+  const h = html2(), fn = h.slice(h.indexOf("function pEvent(ev)"), h.indexOf("function pSheet(ev)"));
+  assert.match(fn, /for="pStart"[^>]*>Starts</); assert.match(fn, /for="pEnd"[^>]*>Ends</);
+  assert.match(fn, /id="pStart" type="time"/); assert.match(fn, /id="pEnd" type="time"/);
+  assert.ok(fn.indexOf('id="pStart"') < fn.indexOf("lenrow") && fn.indexOf('id="pEnd"') < fn.indexOf("lenrow"), "above the Length row");
+  assert.match(h, /C\.sheetStart\(S\.form\.tf/); assert.match(h, /C\.sheetEnd\(S\.form\.tf/); assert.match(h, /C\.sheetLen\(S\.form\.tf/);
+  const save = h.slice(h.indexOf("async function saveEvent()"), h.indexOf("/** A plain list in the panel"));
+  assert.match(save, /C\.sheetWhen\(S\.form\.tf/, "Save writes the times from the same form");
 });
