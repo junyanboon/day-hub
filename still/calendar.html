@@ -1091,9 +1091,9 @@ const MON = ["January","February","March","April","May","June","July","August","
 const DOW = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"], DOWM = ["Mo","Tu","We","Th","Fr","Sa","Su"];
 const KICON = { deep: "🎯", studio: "🔑", yoga: "🪔", gym: "🏋️", dance: "💃", cook: "🍳", travel: "✈️", commute: "🚶", pack: "🧳", social: "💛", errand: "🧭", wind: "🌙", rest: "🌀", home: "🧺", other: "" };
 /** A Commute block shows its mode: 🚶, 🚇 or 🚗 (calendar-core.js modeOf: the pick in the panel, else the title). */
-const kicon = (e) => (e.k === "commute" ? (C.MODES.find((m) => m[0] === C.modeOf(e)) || C.MODES[0])[1] : C.nightIcon(e.title) || KICON[e.k]);
+const kicon = (e) => (e.k === "commute" ? (C.MODES.find((m) => m[0] === C.modeOf(e)) || C.MODES[0])[1] : C.nightIcon(e.title) || (e.ghost && C.mealIcon(e.title)) || KICON[e.k]);
 /** A night block's name with its icon (candle, bed, sun) on the panel's cards and rows (Junyan, 2026-11-27); any other title as it is. */
-const nameIcon = (e) => { const i = C.nightIcon(e.title); return (i ? i + " " : "") + esc(e.title); };
+const nameIcon = (e) => { const i = C.nightIcon(e.title) || (e.ghost && C.mealIcon(e.title)); return (i ? i + " " : "") + esc(e.title); };
 const KNAME = Object.fromEntries(C.KINDS), TYPES = C.KINDS.map((x) => x[0]).filter((k) => k !== "other" && k !== "pack" && k !== "home" && k !== "commute");   // Domestic has no page of its own (d62); Commute has none either: its panel is in the event
 /* Packing (slice 02, d23) has no tab of its own: the rail's Packing button after Travel is its page (d17). */
 const KFROM = { deep: "your Tasks Inbox and your Claude sessions", studio: "the maintenance tab in FBS", yoga: "the new Yoga tab", gym: "your Gym tab",
@@ -1219,6 +1219,15 @@ function autoGhosts(days, evs) {
     for (const b of cal ? C.routineBlocks(d, mine.filter((e) => e.e > a && e.s < z), S.tz, { bedtime: S.bedtime }) : []) {
       const id = `auto:${b.key}:${d}`;
       if (skip[id] || (b.e <= now && b.key !== "domestic")) continue;   // Domestic stays after its time has passed, so it can be accepted late (d70)
+      out.push({ id, auto: true, ghost: true, status: "open", allDay: false, calId: cal.id, title: b.title, kind: b.kind, k: b.kind,
+        s: b.s, e: b.e, start: new Date(b.s).toISOString(), end: new Date(b.e).toISOString(), by: "the calendar", why: b.why });
+    }
+    /* Meals he has not put in the day (Junyan, 2026-11-27): Super Veggie right after Morning Routine, Nutty Pudding near 12:30, Dinner near 6 pm, each left out
+       when the day already has one by that name or no free time fits. Same Daily blocks switch; a past meal is dropped, like Wind Down. */
+    const ma = C.instant(C.addDays(d, -1), 0, S.tz);
+    for (const b of cal ? C.mealBlocks(d, mine.filter((e) => e.e > ma && e.s < z), S.tz, { bedtime: S.bedtime }) : []) {
+      const id = `auto:${b.key}:${d}`;
+      if (skip[id] || b.e <= now) continue;
       out.push({ id, auto: true, ghost: true, status: "open", allDay: false, calId: cal.id, title: b.title, kind: b.kind, k: b.kind,
         s: b.s, e: b.e, start: new Date(b.s).toISOString(), end: new Date(b.e).toISOString(), by: "the calendar", why: b.why });
     }
@@ -1946,7 +1955,7 @@ function pSet() {
   const swatch = (l) => { const a = l.day || l, b = l.night || l;
     return `--lk-bg:${a.bg};--lk-bar:${a.theme};--lk-bg2:${b.bg};--lk-bar2:${b.theme};--lk-acc:${a.accent};--lk-1:${a.gels[0]};--lk-2:${a.gels[1]};--lk-3:${a.gels[2]}`; };
   return `<div class="field"><p class="lbl" style="margin:0">Look</p><div class="looks" role="group" aria-label="Look">${C.LOOKS.map((l) => `<button class="look" data-look="${l.id}" aria-pressed="${l.id === S.look}" style="${swatch(l)}"><span class="lk-chip ${l.day ? "split" : ""}" aria-hidden="true"><i></i><i></i><i></i></span><span class="lk-nm">${esc(l.name)}</span></button>`).join("")}</div><div class="meta">Tap one to try it on the whole calendar. This device remembers it. Studio is light by day and dark after sunset.</div></div>
-    <div class="field"><p class="lbl" style="margin:0">Daily blocks</p><label class="sw" for="routineSw">Suggest Domestic, Wind Down, Sleep and Morning Routine<input type="checkbox" id="routineSw" ${S.routine ? "checked" : ""}></label><label class="sw" for="bedSel">Bedtime<select id="bedSel">${C.BEDTIME.choices.map((m) => `<option value="${m % 1440}" ${m % 1440 === S.bedtime ? "selected" : ""}>${C.hm(m % 1440)}</option>`).join("")}</select></label><label class="sw" for="cmSuggSw">Suggest a Commute block before plans away from home<input type="checkbox" id="cmSuggSw" ${S.cmSuggest ? "checked" : ""}></label></div>
+    <div class="field"><p class="lbl" style="margin:0">Daily blocks</p><label class="sw" for="routineSw">Suggest Domestic, meals (Super Veggie, Nutty Pudding, Dinner), Wind Down, Sleep and Morning Routine<input type="checkbox" id="routineSw" ${S.routine ? "checked" : ""}></label><label class="sw" for="bedSel">Bedtime<select id="bedSel">${C.BEDTIME.choices.map((m) => `<option value="${m % 1440}" ${m % 1440 === S.bedtime ? "selected" : ""}>${C.hm(m % 1440)}</option>`).join("")}</select></label><label class="sw" for="cmSuggSw">Suggest a Commute block before plans away from home<input type="checkbox" id="cmSuggSw" ${S.cmSuggest ? "checked" : ""}></label></div>
     <div class="field"><p class="lbl" style="margin:0">Studio shifts</p><label class="sw" for="railSw">Show in a slim rail, not as full blocks<input type="checkbox" id="railSw" ${S.rail ? "checked" : ""}></label></div>
     <div class="field"><p class="lbl" style="margin:0">Time zones</p><label class="sw" for="tz1">Main<select id="tz1">${opts(S.tz)}</select></label><label class="sw" for="tz2">Second<select id="tz2">${opts(S.tz2, true)}</select></label></div>
     <div class="field"><p class="lbl" style="margin:0">Block types</p>${C.KINDS.map(([k, n]) => `<div class="r k-${k}" style="color:var(--soft)"><i style="width:12px;height:12px;border-radius:4px;background:var(--c)"></i>${KICON[k] ? KICON[k] + " " : ""}${n}</div>`).join("")}<div class="meta">Guessed from the title. Change one on its event and it sticks.</div></div>
