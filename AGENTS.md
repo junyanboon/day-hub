@@ -9,6 +9,11 @@ is in git (github.com/junyanboon/still-api): change it on a branch in a worktree
 The `day-hub/still-api` copy is stale (last touched 2026-08-08). Since 2026-11-21 the backend
 also serves the calendar page itself at junyan.danceannex.ca, with password and Face ID sign-in.
 
+How the calendar goes live: merging to day-hub `main` is the deploy. still-api (`src/site.mjs`) fetches
+`still/` from GitHub at main's newest commit, checking at most every 2 minutes, so no server step is needed.
+Check it: `curl -sI https://junyan.danceannex.ca/ | grep -i x-site-commit` shows the live short sha, and the page
+is at `/calendar.html` (not `/still/calendar.html`, which is 404). Only a still-api code change needs `deploy.sh`.
+
 1. After a change is merged or verified live, remove every working copy or worktree you made
    (`git worktree remove <path>`, and any extra folder or deploy copy).
 2. Do not make a full backup folder before every change when git history already covers it.
