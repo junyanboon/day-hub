@@ -78,7 +78,7 @@ test("page: the To box has a second switch, read wherever the other switches are
   assert.match(html, /Remember "\$\{esc\(t\.locText\)\}" as this place/);
   assert.match(html, /CalCommute\.rememberLocation\(/);
   assert.match(html, /#cmRemLoc/);
-  assert.match(html, /const BUILD = "2026-11-25m trip home";/);
+  assert.match(html, /const BUILD = "2026-11-27a night float";/);
   assert.match(html, /calendar-commute\.js\?v=12/);
   assert.match(html, /CalCommute\.rememberToast\(/);
 });

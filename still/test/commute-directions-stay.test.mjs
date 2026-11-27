@@ -94,6 +94,6 @@ test("the page: a failed first check (not ok or no answer) restores from this br
   assert.doesNotMatch(fn, /send\(|cmDirections\(/);
 });
 test("the build stamp and the script number name this copy", () => {
-  assert.match(html, /const BUILD = "2026-11-25m trip home";/);
+  assert.match(html, /const BUILD = "2026-11-27a night float";/);
   assert.match(html, /calendar-commute\.js\?v=12/);
 });
